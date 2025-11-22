@@ -35,6 +35,8 @@ public class TheVirusBlock implements ModInitializer {
 			GameRuleRegistry.register("virusSpreadSourceRadius", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(64, 8, 256));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_SPREAD_SOURCE_ATTEMPTS =
 			GameRuleRegistry.register("virusSpreadSourceAttempts", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(48, 1, 1024));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_SPREAD_VERTICAL_RADIUS =
+			GameRuleRegistry.register("virusSpreadVerticalRadius", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(16, 4, 80));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_SPREAD_INITIAL_RADIUS =
 			GameRuleRegistry.register("virusSpreadInitialRadius", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(96, 8, 512));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_SPREAD_INITIAL_ATTEMPTS =
@@ -48,7 +50,7 @@ public class TheVirusBlock implements ModInitializer {
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_MUTATION_RADIUS =
 			GameRuleRegistry.register("virusMutationRadius", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(16, 4, 64));
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_CHUNK_REWRITE_ON_LOAD =
-			GameRuleRegistry.register("virusCorruptChunksOnLoad", GameRules.Category.UPDATES, GameRuleFactory.createBooleanRule(false));
+			GameRuleRegistry.register("virusCorruptChunksOnLoad", GameRules.Category.UPDATES, GameRuleFactory.createBooleanRule(true));
 
 	@Override
 	public void onInitialize() {
