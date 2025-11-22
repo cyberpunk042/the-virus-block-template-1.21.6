@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "CGC",
+    "GTG",
+    "CGC"
+  ],
+  "key": {
+    "C": {
+      "item": "the-virus-block:corrupted_crying_obsidian"
+    },
+    "G": {
+      "item": "the-virus-block:corrupted_gold"
+    },
+    "T": {
+      "item": "minecraft:totem_of_undying"
+    }
+  },
+  "result": {
+    "item": "the-virus-block:purification_totem"
+  }
+}
+

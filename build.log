@@ -1,0 +1,29 @@
+
+> Configure project :
+Fabric Loom: 1.13.4
+
+> Task :compileJava
+
+> Task :processResources
+> Task :classes
+> Task :compileClientJava
+> Task :processClientResources UP-TO-DATE
+> Task :jar
+> Task :processIncludeJars UP-TO-DATE
+> Task :sourcesJar
+> Task :clientClasses
+> Task :compileTestJava NO-SOURCE
+> Task :processTestResources NO-SOURCE
+> Task :testClasses UP-TO-DATE
+> Task :test NO-SOURCE
+> Task :validateAccessWidener NO-SOURCE
+> Task :check UP-TO-DATE
+> Task :remapSourcesJar
+> Task :remapJar
+> Task :assemble
+> Task :build
+
+[Incubating] Problems report is available at: file:///mnt/c/Users/Jean/the-virus-block-template-1.21.6/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 1m 12s
+9 actionable tasks: 7 executed, 2 up-to-date

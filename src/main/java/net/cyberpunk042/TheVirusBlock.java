@@ -1,0 +1,64 @@
+package net.cyberpunk042;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import net.cyberpunk042.infection.VirusInfectionSystem;
+import net.cyberpunk042.registry.ModBlockEntities;
+import net.cyberpunk042.registry.ModBlocks;
+import net.cyberpunk042.registry.ModItemGroups;
+import net.cyberpunk042.registry.ModItems;
+import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.gamerule.v1.GameRuleFactory;
+import net.fabricmc.fabric.api.gamerule.v1.GameRuleRegistry;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.cyberpunk042.network.SkyTintPayload;
+import net.minecraft.util.Identifier;
+import net.minecraft.world.GameRules;
+
+public class TheVirusBlock implements ModInitializer {
+	public static final String MOD_ID = "the-virus-block";
+	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+	public static final Identifier SKY_TINT_PACKET = Identifier.of(MOD_ID, "sky_tint");
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_WAVE_FRIENDLY_FIRE =
+			GameRuleRegistry.register("virusWaveFriendlyFire", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(false));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_BLOCK_TELEPORT_ENABLED =
+			GameRuleRegistry.register("virusBlockTeleportEnabled", GameRules.Category.MISC, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_BLOCK_TELEPORT_RADIUS =
+			GameRuleRegistry.register("virusBlockTeleportRadius", GameRules.Category.MISC, GameRuleFactory.createIntRule(16, 0, 64));
+	public static final String CORRUPTED_WORM_TAG = MOD_ID + ":corrupted_worm";
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_SPREAD_PLAYER_RADIUS =
+			GameRuleRegistry.register("virusSpreadPlayerRadius", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(48, 8, 256));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_SPREAD_PLAYER_ATTEMPTS =
+			GameRuleRegistry.register("virusSpreadPlayerAttempts", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(96, 1, 1024));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_SPREAD_SOURCE_RADIUS =
+			GameRuleRegistry.register("virusSpreadSourceRadius", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(64, 8, 256));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_SPREAD_SOURCE_ATTEMPTS =
+			GameRuleRegistry.register("virusSpreadSourceAttempts", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(48, 1, 1024));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_SPREAD_INITIAL_RADIUS =
+			GameRuleRegistry.register("virusSpreadInitialRadius", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(96, 8, 512));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_SPREAD_INITIAL_ATTEMPTS =
+			GameRuleRegistry.register("virusSpreadInitialAttempts", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(600, 1, 8192));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_SPREAD_CLEANSE_ATTEMPTS =
+			GameRuleRegistry.register("virusSpreadCleanseAttempts", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(1500, 1, 16384));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_CORRUPTION_PROFILER =
+			GameRuleRegistry.register("virusCorruptionProfiler", GameRules.Category.MISC, GameRuleFactory.createBooleanRule(false));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_MUTATION_ATTEMPTS =
+			GameRuleRegistry.register("virusMutationAttemptsPerTick", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(64, 0, 256));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_MUTATION_RADIUS =
+			GameRuleRegistry.register("virusMutationRadius", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(16, 4, 64));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_CHUNK_REWRITE_ON_LOAD =
+			GameRuleRegistry.register("virusCorruptChunksOnLoad", GameRules.Category.UPDATES, GameRuleFactory.createBooleanRule(false));
+
+	@Override
+	public void onInitialize() {
+		PayloadTypeRegistry.playS2C().register(SkyTintPayload.ID, SkyTintPayload.CODEC);
+		ModBlocks.bootstrap();
+		ModItems.bootstrap();
+		ModBlockEntities.bootstrap();
+		ModItemGroups.bootstrap();
+		VirusInfectionSystem.init();
+
+		LOGGER.info("The Virus Block is primed. Containment is impossible.");
+	}
+}

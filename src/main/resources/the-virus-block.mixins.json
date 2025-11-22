@@ -1,0 +1,17 @@
+{
+	"required": true,
+	"package": "net.cyberpunk042.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"mixins": [
+		"WitherEntityMixin",
+		"LivingEntityMixin",
+		"ZombieEntityMixin",
+		"AbstractSkeletonEntityMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}
