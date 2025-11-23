@@ -188,6 +188,11 @@ public final class BoobytrapHelper {
 		return target;
 	}
 
+	public static void applyTrap(ServerWorld world, BlockPos pos, TrapSelection trap) {
+		world.setBlockState(pos, trap.state(), Block.NOTIFY_LISTENERS);
+		CorruptionProfiler.logBoobytrapPlacement(world, pos, trap.type().name());
+	}
+
 	private static BlockPos snapToSurface(ServerWorld world, BlockPos.Mutable original, BlockState originalState) {
 		int x = original.getX();
 		int z = original.getZ();

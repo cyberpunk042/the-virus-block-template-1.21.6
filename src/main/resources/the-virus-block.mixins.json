@@ -6,7 +6,8 @@
 		"WitherEntityMixin",
 		"LivingEntityMixin",
 		"ZombieEntityMixin",
-		"AbstractSkeletonEntityMixin"
+		"AbstractSkeletonEntityMixin",
+		"FallingBlockEntityAccessor"
 	],
 	"injectors": {
 		"defaultRequire": 1

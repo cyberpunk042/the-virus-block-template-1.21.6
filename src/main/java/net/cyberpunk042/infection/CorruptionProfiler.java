@@ -1,16 +1,22 @@
 package net.cyberpunk042.infection;
 
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.jetbrains.annotations.Nullable;
+
 import net.cyberpunk042.TheVirusBlock;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 
-final class CorruptionProfiler {
+public final class CorruptionProfiler {
 	private CorruptionProfiler() {
 	}
 
-	static void logChunkRewrite(ServerWorld world, ChunkPos pos, int conversions, boolean cleanse) {
+	public static void logChunkRewrite(ServerWorld world, ChunkPos pos, int conversions, boolean cleanse) {
 		if (conversions <= 0 || !isEnabled(world)) {
 			return;
 		}
@@ -19,28 +25,83 @@ final class CorruptionProfiler {
 				worldId(world), pos, action, conversions);
 	}
 
-	static void logBoobytrapPlacement(ServerWorld world, BlockPos pos, String type) {
-		if (!isEnabled(world)) {
+	public static void logBoobytrapPlacement(ServerWorld world, BlockPos pos, String type) {
+		if (!shouldLogBoobytrap(world)) {
 			return;
 		}
 		TheVirusBlock.LOGGER.info("[CorruptionProfiler:{}] boobytrap {} armed at {}",
 				worldId(world), type, pos);
 	}
 
-	static void logBoobytrapSpread(ServerWorld world, BlockPos pos, String type, int conversions) {
-		if (conversions <= 0 || !isEnabled(world)) {
+	public static void logBoobytrapSpread(ServerWorld world, BlockPos pos, String type, int conversions) {
+		if (conversions <= 0 || !shouldLogBoobytrap(world)) {
 			return;
 		}
 		TheVirusBlock.LOGGER.info("[CorruptionProfiler:{}] boobytrap {} spread {} blocks around {}",
 				worldId(world), type, conversions, pos);
 	}
 
-	static void logBoobytrapTrigger(ServerWorld world, BlockPos pos, String type, String reason, int affectedPlayers) {
-		if (!isEnabled(world)) {
+	public static void logBoobytrapTrigger(ServerWorld world, BlockPos pos, String type, String reason, int affectedPlayers) {
+		if (!shouldLogBoobytrap(world)) {
 			return;
 		}
 		TheVirusBlock.LOGGER.info("[CorruptionProfiler:{}] boobytrap {} triggered ({}) at {} hitting {} players",
 				worldId(world), type, reason, pos, affectedPlayers);
+	}
+
+	public static void logMatrixCubeSkip(ServerWorld world, String reason, @Nullable String detail, int active, int maxActive) {
+		if (!isEnabled(world)) {
+			return;
+		}
+		TheVirusBlock.LOGGER.info("[CorruptionProfiler:{}] matrix cube skipped: {}{} (active {}/{})",
+				worldId(world),
+				reason,
+				detail == null || detail.isEmpty() ? "" : " [" + detail + "]",
+				active,
+				maxActive);
+	}
+
+	public static void logMatrixCubeSpawn(ServerWorld world, BlockPos pos, int active, int maxActive) {
+		if (!isEnabled(world)) {
+			return;
+		}
+		TheVirusBlock.LOGGER.info("[CorruptionProfiler:{}] matrix cube armed at {} (active {}/{})",
+				worldId(world), pos, active + 1, maxActive);
+	}
+
+	public static void logMatrixCubeEntity(ServerWorld world, BlockPos pos) {
+		if (!isEnabled(world)) {
+			return;
+		}
+		TheVirusBlock.LOGGER.info("[CorruptionProfiler:{}] matrix cube entity spawned at {}",
+				worldId(world), pos);
+	}
+
+	public static void logMatrixCubeAttempt(ServerWorld world, BlockPos anchor, BlockPos target, int seaLevel, int anchorY, int base, int maxY) {
+		if (!isEnabled(world)) {
+			return;
+		}
+		TheVirusBlock.LOGGER.info("[CorruptionProfiler:{}] matrix cube attempt anchor={} target={} sea={} anchorY={} base={} maxY={}",
+				worldId(world), anchor, target, seaLevel, anchorY, base, maxY);
+	}
+
+	public static void logMatrixCubeCleanup(ServerWorld world, @Nullable BlockPos pos, UUID id) {
+		if (!isEnabled(world)) {
+			return;
+		}
+		TheVirusBlock.LOGGER.info("[CorruptionProfiler:{}] matrix cube tracker pruned {} at {}",
+				worldId(world), id, pos == null ? "unknown" : pos);
+	}
+
+	public static void logTierEvent(ServerWorld world, VirusEventType type, @Nullable BlockPos origin, @Nullable String detail) {
+		if (!isEnabled(world)) {
+			return;
+		}
+		TheVirusBlock.LOGGER.info("[CorruptionProfiler:{}] event {} at {}{}",
+				worldId(world),
+				type.name(),
+				origin == null ? "unknown" : origin,
+				detail == null || detail.isEmpty() ? "" : " [" + detail + "]");
 	}
 
 	private static boolean isEnabled(ServerWorld world) {
@@ -49,6 +110,23 @@ final class CorruptionProfiler {
 
 	private static Identifier worldId(ServerWorld world) {
 		return world.getRegistryKey().getValue();
+	}
+
+	private static final Map<Identifier, Long> LAST_BOOBYTRAP_LOG = new ConcurrentHashMap<>();
+	private static final long BOOBYTRAP_LOG_INTERVAL_TICKS = 40;
+
+	private static boolean shouldLogBoobytrap(ServerWorld world) {
+		if (!isEnabled(world)) {
+			return false;
+		}
+		long now = world.getTime();
+		Identifier id = worldId(world);
+		Long last = LAST_BOOBYTRAP_LOG.get(id);
+		if (last == null || now - last >= BOOBYTRAP_LOG_INTERVAL_TICKS) {
+			LAST_BOOBYTRAP_LOG.put(id, now);
+			return true;
+		}
+		return false;
 	}
 }
 

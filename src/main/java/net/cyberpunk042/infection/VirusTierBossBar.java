@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import it.unimi.dsi.fastutil.objects.Object2ByteMap;
 import it.unimi.dsi.fastutil.objects.Object2ByteOpenHashMap;
+import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.network.SkyTintPayload;
 import net.minecraft.entity.boss.BossBar;
 import net.minecraft.entity.boss.ServerBossBar;
@@ -96,7 +97,9 @@ public final class VirusTierBossBar {
 
 	private static void syncSkyTint(ServerWorld world, VirusWorldState state) {
 		boolean skyCorrupted = state.isInfected() && (state.getCurrentTier().getIndex() >= 0 || state.isApocalypseMode());
-		boolean fluidsCorrupted = false; // temporarily disable fluid tint while investigating lag complaints
+		boolean fluidsCorrupted = state.isInfected()
+				&& world.getGameRules().getBoolean(TheVirusBlock.VIRUS_LIQUID_MUTATION_ENABLED)
+				&& (state.getCurrentTier().getIndex() >= 2 || state.isApocalypseMode());
 		byte encoded = encodeSkyState(skyCorrupted, fluidsCorrupted);
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			byte cached = SKY_TINT.getOrDefault(player.getUuid(), (byte) 0);

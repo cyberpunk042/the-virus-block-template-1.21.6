@@ -1,7 +1,9 @@
 package net.cyberpunk042.mixin;
 
+import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.infection.singularity.SingularityManager;
+import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
@@ -9,8 +11,10 @@ import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemStack;
 import net.minecraft.registry.tag.DamageTypeTags;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -29,7 +33,8 @@ public abstract class LivingEntityMixin extends Entity {
 		LivingEntity self = (LivingEntity) (Object) this;
 
 		if (source.isIn(DamageTypeTags.IS_FIRE) && self instanceof PlayerEntity player && player.isInLava()) {
-			if (VirusWorldState.get(world).getCurrentTier().getIndex() >= 2) {
+			if (world.getGameRules().getBoolean(TheVirusBlock.VIRUS_LIQUID_MUTATION_ENABLED)
+					&& VirusWorldState.get(world).getCurrentTier().getIndex() >= 2) {
 				player.extinguish();
 				player.addStatusEffect(new StatusEffectInstance(StatusEffects.REGENERATION, 60, 0, false, true));
 				cir.setReturnValue(false);
@@ -59,13 +64,34 @@ public abstract class LivingEntityMixin extends Entity {
 		}
 
 		int tier = VirusWorldState.get(serverWorld).getCurrentTier().getIndex();
-		if (tier >= 2 && player.isInLava()) {
+		boolean liquidsEnabled = serverWorld.getGameRules().getBoolean(TheVirusBlock.VIRUS_LIQUID_MUTATION_ENABLED);
+		if (liquidsEnabled && tier >= 2 && player.isInLava()) {
 			player.extinguish();
 			player.addStatusEffect(new StatusEffectInstance(StatusEffects.REGENERATION, 80, 0, false, true));
 		}
 
-		if (tier >= 1 && (player.isTouchingWater() || player.isSubmergedInWater())) {
-			// Water no longer degrades armor; feature temporarily disabled while investigating lag.
+		if (liquidsEnabled && tier >= 1 && (player.isTouchingWater() || player.isSubmergedInWater()) && player instanceof ServerPlayerEntity serverPlayer) {
+			theVirusBlock$degradeArmorInWater(serverPlayer, tier, serverWorld);
+		}
+	}
+
+	private void theVirusBlock$degradeArmorInWater(ServerPlayerEntity player, int tier, ServerWorld world) {
+		if (player.age % 20 != 0) {
+			return;
+		}
+		float chance = Math.min(0.95F, 0.2F + tier * 0.05F);
+		if (player.getRandom().nextFloat() > chance) {
+			return;
+		}
+		for (EquipmentSlot slot : EquipmentSlot.values()) {
+			if (!slot.isArmorSlot()) {
+				continue;
+			}
+			ItemStack stack = player.getEquippedStack(slot);
+			if (stack.isEmpty()) {
+				continue;
+			}
+			stack.damage(1 + tier, world, player, item -> player.sendEquipmentBreakStatus(item, slot));
 		}
 	}
 }

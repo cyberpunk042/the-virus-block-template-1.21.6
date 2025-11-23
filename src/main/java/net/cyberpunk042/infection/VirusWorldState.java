@@ -17,6 +17,7 @@ import net.cyberpunk042.block.corrupted.CorruptedGlassBlock;
 import net.cyberpunk042.block.corrupted.CorruptedStoneBlock;
 import net.cyberpunk042.block.corrupted.CorruptionStage;
 import net.cyberpunk042.block.entity.MatrixCubeBlockEntity;
+import net.cyberpunk042.entity.FallingMatrixCubeEntity;
 import net.cyberpunk042.infection.mutation.BlockMutationHelper;
 import net.cyberpunk042.infection.singularity.SingularityManager;
 import net.cyberpunk042.registry.ModBlocks;
@@ -53,6 +54,7 @@ import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.random.Random;
+import net.minecraft.world.GameRules;
 import net.minecraft.world.Heightmap;
 import net.minecraft.world.PersistentState;
 import net.minecraft.world.PersistentStateType;
@@ -110,6 +112,7 @@ public class VirusWorldState extends PersistentState {
 	private boolean terrainCorrupted;
 	private boolean shellsCollapsed;
 	private boolean cleansingActive;
+	@SuppressWarnings("unused")
 	private long lastMatrixCubeTick;
 
 	public static VirusWorldState get(ServerWorld world) {
@@ -149,7 +152,11 @@ public class VirusWorldState extends PersistentState {
 	}
 
 	private void runEvents(ServerWorld world, InfectionTier tier) {
-		if (tier.getIndex() < 2 || !world.getGameRules().getBoolean(TheVirusBlock.VIRUS_TIER2_EVENTS_ENABLED)) {
+		if (tier.getIndex() < 2) {
+			return;
+		}
+		boolean tier2Enabled = world.getGameRules().getBoolean(TheVirusBlock.VIRUS_TIER2_EVENTS_ENABLED);
+		if (!tier2Enabled) {
 			return;
 		}
 		Random random = world.getRandom();
@@ -158,27 +165,30 @@ public class VirusWorldState extends PersistentState {
 			return;
 		}
 
-		if (world.getGameRules().getBoolean(TheVirusBlock.VIRUS_TIER2_EVENTS_ENABLED)) {
-			maybeMutationPulse(world, tier, random);
-			maybeSkyfall(world, origin, tier, random);
-			maybeCollapseSurge(world, origin, tier, random);
-			maybePassiveRevolt(world, origin, tier, random);
-			maybeMobBuffStorm(world, origin, tier, random);
-			maybeVirusBloom(world, origin, tier, random);
-		}
+		maybeMutationPulse(world, tier, random);
+		maybeSkyfall(world, origin, tier, random);
+		maybeCollapseSurge(world, origin, tier, random);
+		maybePassiveRevolt(world, origin, tier, random);
+		maybeMobBuffStorm(world, origin, tier, random);
+		maybeVirusBloom(world, origin, tier, random);
 
-		if (tier.getIndex() >= 3 && world.getGameRules().getBoolean(TheVirusBlock.VIRUS_TIER2_EVENTS_ENABLED)) {
+		boolean tier3ExtrasEnabled = tier.getIndex() >= 3
+				&& world.getGameRules().getBoolean(TheVirusBlock.VIRUS_TIER3_EXTRAS_ENABLED);
+		if (tier3ExtrasEnabled) {
 			maybeVoidTear(world, origin, tier, random);
 			maybeInversion(world, origin, tier, random);
 		}
 
-		if (tier.getIndex() >= 4 && world.getGameRules().getBoolean(TheVirusBlock.VIRUS_TIER2_EVENTS_ENABLED)) {
+		if (tier.getIndex() >= 4 && tier3ExtrasEnabled) {
 			maybeEntityDuplication(world, origin, tier, random);
 			maybeSpawnSingularity(world, origin);
 		}
 	}
 
 	private void maybeMutationPulse(ServerWorld world, InfectionTier tier, Random random) {
+		if (!isEventEnabled(world, TheVirusBlock.VIRUS_EVENT_MUTATION_PULSE_ENABLED)) {
+			return;
+		}
 		if (!canTrigger(VirusEventType.MUTATION_PULSE, 400)) {
 			return;
 		}
@@ -198,9 +208,13 @@ public class VirusWorldState extends PersistentState {
 		if (pulseOrigin != null) {
 			world.playSound(null, pulseOrigin, SoundEvents.BLOCK_SCULK_SPREAD, SoundCategory.AMBIENT, 1.2F, 0.6F + tier.getIndex() * 0.1F);
 		}
+		CorruptionProfiler.logTierEvent(world, VirusEventType.MUTATION_PULSE, pulseOrigin, "pulses=" + pulses);
 	}
 
 	private void maybeSkyfall(ServerWorld world, BlockPos origin, InfectionTier tier, Random random) {
+		if (!isEventEnabled(world, TheVirusBlock.VIRUS_EVENT_SKYFALL_ENABLED)) {
+			return;
+		}
 		if (!canTrigger(VirusEventType.SKYFALL, 360)) {
 			return;
 		}
@@ -215,8 +229,11 @@ public class VirusWorldState extends PersistentState {
 		}
 
 		markEvent(VirusEventType.SKYFALL);
+		int volleys = 8 + tier.getIndex() * 4;
+		int tntSpawned = 0;
+		int arrowBarrageCount = 0;
+		int totalArrows = 0;
 		for (ServerPlayerEntity player : players) {
-			int volleys = 8 + tier.getIndex() * 4;
 			for (int i = 0; i < volleys; i++) {
 				double x = player.getX() + random.nextBetween(-6, 6);
 				double z = player.getZ() + random.nextBetween(-6, 6);
@@ -231,15 +248,20 @@ public class VirusWorldState extends PersistentState {
 					TntEntity tnt = new TntEntity(world, x, y, z, null);
 					tnt.setFuse(Math.max(15, 50 - tier.getIndex() * 8));
 					world.spawnEntity(tnt);
+					tntSpawned++;
 				}
 			}
+			totalArrows += volleys;
 
 			if (random.nextFloat() < 0.4F + tier.getIndex() * 0.1F) {
 				spawnArrowBarrage(world, player, tier, random);
+				arrowBarrageCount++;
 			}
 		}
 
 		world.syncWorldEvent(WorldEvents.FIRE_EXTINGUISHED, origin, 0);
+		CorruptionProfiler.logTierEvent(world, VirusEventType.SKYFALL, origin,
+				"players=" + players.size() + " arrows=" + totalArrows + " tnt=" + tntSpawned + " barrages=" + arrowBarrageCount);
 	}
 
 	private void spawnArrowBarrage(ServerWorld world, ServerPlayerEntity player, InfectionTier tier, Random random) {
@@ -261,6 +283,9 @@ public class VirusWorldState extends PersistentState {
 	}
 
 	private void maybePassiveRevolt(ServerWorld world, BlockPos origin, InfectionTier tier, Random random) {
+		if (!isEventEnabled(world, TheVirusBlock.VIRUS_EVENT_PASSIVE_REVOLT_ENABLED)) {
+			return;
+		}
 		if (!canTrigger(VirusEventType.PASSIVE_REVOLT, 800)) {
 			return;
 		}
@@ -273,6 +298,7 @@ public class VirusWorldState extends PersistentState {
 		markEvent(VirusEventType.PASSIVE_REVOLT);
 
 		int revolts = Math.min(animals.size(), 2 + tier.getIndex());
+		int converted = 0;
 		for (int i = 0; i < revolts; i++) {
 			AnimalEntity animal = animals.get(random.nextInt(animals.size()));
 			BlockPos pos = animal.getBlockPos();
@@ -282,10 +308,15 @@ public class VirusWorldState extends PersistentState {
 				entity.refreshPositionAndAngles(pos, random.nextFloat() * 360.0F, 0.0F);
 				entity.setCustomName(Text.translatable("entity.the-virus-block.corrupted_passive").formatted(Formatting.DARK_RED));
 			}, pos, SpawnReason.EVENT, true, false);
+			converted++;
 		}
+		CorruptionProfiler.logTierEvent(world, VirusEventType.PASSIVE_REVOLT, origin, "converted=" + converted);
 	}
 
 	private void maybeMobBuffStorm(ServerWorld world, BlockPos origin, InfectionTier tier, Random random) {
+		if (!isEventEnabled(world, TheVirusBlock.VIRUS_EVENT_MOB_BUFF_STORM_ENABLED)) {
+			return;
+		}
 		if (!canTrigger(VirusEventType.MOB_BUFF_STORM, 700)) {
 			return;
 		}
@@ -297,10 +328,13 @@ public class VirusWorldState extends PersistentState {
 
 		markEvent(VirusEventType.MOB_BUFF_STORM);
 
+		int buffed = 0;
 		for (HostileEntity mob : hostiles) {
 			StatusEffectInstance effect = randomMobEffect(random, tier);
 			mob.addStatusEffect(effect);
+			buffed++;
 		}
+		CorruptionProfiler.logTierEvent(world, VirusEventType.MOB_BUFF_STORM, origin, "buffed=" + buffed);
 	}
 
 	private StatusEffectInstance randomMobEffect(Random random, InfectionTier tier) {
@@ -316,6 +350,9 @@ public class VirusWorldState extends PersistentState {
 	}
 
 	private void maybeCollapseSurge(ServerWorld world, BlockPos origin, InfectionTier tier, Random random) {
+		if (!isEventEnabled(world, TheVirusBlock.VIRUS_EVENT_COLLAPSE_SURGE_ENABLED)) {
+			return;
+		}
 		if (!canTrigger(VirusEventType.COLLAPSE_SURGE, 900)) {
 			return;
 		}
@@ -325,6 +362,7 @@ public class VirusWorldState extends PersistentState {
 		}
 
 		markEvent(VirusEventType.COLLAPSE_SURGE);
+		int columns = 0;
 		for (int i = 0; i < 6 + tier.getIndex() * 2; i++) {
 			BlockPos target = origin.add(random.nextBetween(-8, 8), random.nextBetween(-4, 4), random.nextBetween(-8, 8));
 			if (!world.isChunkLoaded(ChunkPos.toLong(target))) {
@@ -337,10 +375,15 @@ public class VirusWorldState extends PersistentState {
 			}
 
 			FallingBlockEntity.spawnFromBlock(world, target, state);
+			columns++;
 		}
+		CorruptionProfiler.logTierEvent(world, VirusEventType.COLLAPSE_SURGE, origin, "columns=" + columns);
 	}
 
 	private void maybeVirusBloom(ServerWorld world, BlockPos origin, InfectionTier tier, Random random) {
+		if (!isEventEnabled(world, TheVirusBlock.VIRUS_EVENT_VIRUS_BLOOM_ENABLED)) {
+			return;
+		}
 		if (!canTrigger(VirusEventType.VIRUS_BLOOM, 900)) {
 			return;
 		}
@@ -350,10 +393,15 @@ public class VirusWorldState extends PersistentState {
 		}
 
 		markEvent(VirusEventType.VIRUS_BLOOM);
-		BlockMutationHelper.corruptFlora(world, origin, 26 + tier.getIndex() * 6);
+		int radius = 26 + tier.getIndex() * 6;
+		BlockMutationHelper.corruptFlora(world, origin, radius);
+		CorruptionProfiler.logTierEvent(world, VirusEventType.VIRUS_BLOOM, origin, "radius=" + radius);
 	}
 
 	private void maybeVoidTear(ServerWorld world, BlockPos origin, InfectionTier tier, Random random) {
+		if (!isEventEnabled(world, TheVirusBlock.VIRUS_EVENT_VOID_TEAR_ENABLED)) {
+			return;
+		}
 		if (!canTrigger(VirusEventType.VOID_TEAR, 1000)) {
 			return;
 		}
@@ -365,19 +413,26 @@ public class VirusWorldState extends PersistentState {
 		markEvent(VirusEventType.VOID_TEAR);
 
 		BlockPos tearPos = origin.up(random.nextBetween(3, 12));
-		Box box = new Box(tearPos).expand(8.0D + tier.getIndex() * 2.0D);
+		double radius = 8.0D + tier.getIndex() * 2.0D;
+		Box box = new Box(tearPos).expand(radius);
 		Vec3d center = Vec3d.ofCenter(tearPos);
 
+		int affected = 0;
 		for (LivingEntity living : world.getEntitiesByClass(LivingEntity.class, box, Entity::isAlive)) {
 			Vec3d offset = center.subtract(living.getPos());
 			Vec3d pull = offset.normalize().multiply(0.25D + tier.getIndex() * 0.05D);
 			living.addVelocity(pull.x, pull.y, pull.z);
+			affected++;
 		}
 
 		world.syncWorldEvent(WorldEvents.COMPOSTER_USED, tearPos, 0);
+		CorruptionProfiler.logTierEvent(world, VirusEventType.VOID_TEAR, tearPos, "affected=" + affected + " radius=" + radius);
 	}
 
 	private void maybeInversion(ServerWorld world, BlockPos origin, InfectionTier tier, Random random) {
+		if (!isEventEnabled(world, TheVirusBlock.VIRUS_EVENT_INVERSION_ENABLED)) {
+			return;
+		}
 		if (!canTrigger(VirusEventType.INVERSION, 1100)) {
 			return;
 		}
@@ -389,12 +444,18 @@ public class VirusWorldState extends PersistentState {
 		markEvent(VirusEventType.INVERSION);
 
 		Box box = new Box(origin).expand(32.0D);
+		int affected = 0;
 		for (LivingEntity entity : world.getEntitiesByClass(LivingEntity.class, box, Entity::isAlive)) {
 			entity.addStatusEffect(new StatusEffectInstance(StatusEffects.LEVITATION, 80 + tier.getIndex() * 20, 0));
+			affected++;
 		}
+		CorruptionProfiler.logTierEvent(world, VirusEventType.INVERSION, origin, "affected=" + affected);
 	}
 
 	private void maybeEntityDuplication(ServerWorld world, BlockPos origin, InfectionTier tier, Random random) {
+		if (!isEventEnabled(world, TheVirusBlock.VIRUS_EVENT_ENTITY_DUPLICATION_ENABLED)) {
+			return;
+		}
 		if (!canTrigger(VirusEventType.ENTITY_DUPLICATION, 1200)) {
 			return;
 		}
@@ -412,15 +473,22 @@ public class VirusWorldState extends PersistentState {
 
 		MobEntity target = mobs.get(random.nextInt(mobs.size()));
 		BlockPos spawnPos = target.getBlockPos().add(random.nextBetween(-2, 2), 0, random.nextBetween(-2, 2));
-		target.getType().spawn(world, entity -> {
+		Entity spawned = target.getType().spawn(world, entity -> {
 			if (entity instanceof MobEntity mob) {
 				mob.refreshPositionAndAngles(spawnPos, target.getYaw(), target.getPitch());
 				mob.setHealth(Math.max(2.0F, target.getHealth() * 0.5F));
 			}
 		}, spawnPos, SpawnReason.EVENT, false, false);
+		if (spawned != null) {
+			CorruptionProfiler.logTierEvent(world, VirusEventType.ENTITY_DUPLICATION, spawnPos,
+					"type=" + spawned.getType().toString());
+		}
 	}
 
 	private void maybeSpawnSingularity(ServerWorld world, BlockPos origin) {
+		if (!isEventEnabled(world, TheVirusBlock.VIRUS_EVENT_SINGULARITY_ENABLED)) {
+			return;
+		}
 		if (singularitySummoned || !canTrigger(VirusEventType.SINGULARITY, 0)) {
 			return;
 		}
@@ -432,6 +500,7 @@ public class VirusWorldState extends PersistentState {
 		singularitySummoned = true;
 		apocalypseMode = true;
 		markEvent(VirusEventType.SINGULARITY);
+		CorruptionProfiler.logTierEvent(world, VirusEventType.SINGULARITY, beaconPos, null);
 		markDirty();
 	}
 
@@ -480,6 +549,10 @@ public class VirusWorldState extends PersistentState {
 
 	private Map<VirusEventType, Long> getEventHistorySnapshot() {
 		return Map.copyOf(eventHistory);
+	}
+
+	private boolean isEventEnabled(ServerWorld world, GameRules.Key<GameRules.BooleanRule> rule) {
+		return world.getGameRules().getBoolean(rule);
 	}
 
 	private boolean canTrigger(VirusEventType type, long cooldown) {
@@ -785,38 +858,62 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		int maxActive = Math.max(1, world.getGameRules().getInt(TheVirusBlock.VIRUS_MATRIX_CUBE_MAX_ACTIVE));
 		int active = MatrixCubeBlockEntity.getActiveCount(world);
 		if (active >= maxActive) {
-			return;
-		}
-
-		Random random = world.getRandom();
-		int interval = Math.max(100, world.getGameRules().getInt(TheVirusBlock.VIRUS_MATRIX_CUBE_SPAWN_INTERVAL));
-		if (totalTicks - lastMatrixCubeTick < interval) {
+			CorruptionProfiler.logMatrixCubeSkip(world, "active_limit", null, active, maxActive);
 			return;
 		}
 
 		List<ServerPlayerEntity> players = world.getPlayers(PlayerEntity::isAlive);
 		if (players.isEmpty()) {
+			CorruptionProfiler.logMatrixCubeSkip(world, "no_players", null, active, maxActive);
 			return;
 		}
 
-		ServerPlayerEntity anchor = players.get(random.nextInt(players.size()));
-		int x = MathHelper.floor(anchor.getX()) + random.nextBetween(-48, 48);
-		int z = MathHelper.floor(anchor.getZ()) + random.nextBetween(-48, 48);
-		int ground = world.getTopY(Heightmap.Type.MOTION_BLOCKING, x, z);
-		int maxY = world.getBottomY() + world.getDimension().height() - 1;
-		int y = Math.min(maxY, ground + 20 + random.nextBetween(0, 20));
-		BlockPos pos = new BlockPos(x, y, z);
-		if (!world.isChunkLoaded(ChunkPos.toLong(pos))) {
-			return;
-		}
-		if (!world.getBlockState(pos).isAir()) {
-			return;
+		Random random = world.getRandom();
+		int attempts = Math.max(1, world.getGameRules().getInt(TheVirusBlock.VIRUS_MATRIX_CUBE_SPAWN_ATTEMPTS));
+		int placements = 0;
+		for (int attempt = 0; attempt < attempts && active < maxActive; attempt++) {
+			ServerPlayerEntity anchor = players.get(random.nextInt(players.size()));
+			int x = MathHelper.floor(anchor.getX()) + random.nextBetween(-48, 48);
+			int z = MathHelper.floor(anchor.getZ()) + random.nextBetween(-48, 48);
+			BlockPos columnPos = new BlockPos(x, world.getBottomY(), z);
+			if (!world.isChunkLoaded(ChunkPos.toLong(columnPos))) {
+				continue;
+			}
+
+			int maxY = world.getBottomY() + world.getDimension().height() - 1;
+			int anchorY = MathHelper.floor(anchor.getY());
+			int minSeaLevel = world.getSeaLevel() + 64;
+			int minAnchor = anchorY + 96;
+			int base = Math.max(minSeaLevel, minAnchor);
+			int y = Math.min(maxY - 4, base + random.nextBetween(0, 24));
+			BlockPos pos = new BlockPos(x, y, z);
+			CorruptionProfiler.logMatrixCubeAttempt(world, anchor.getBlockPos(), pos, world.getSeaLevel(), anchorY, base, maxY);
+			if (!world.isChunkLoaded(ChunkPos.toLong(pos))) {
+				continue;
+			}
+			if (!world.getBlockState(pos).isAir()) {
+				continue;
+			}
+
+			FallingMatrixCubeEntity entity = new FallingMatrixCubeEntity(world, pos, ModBlocks.MATRIX_CUBE.getDefaultState());
+			MatrixCubeBlockEntity.register(world, entity.getUuid(), pos);
+			entity.markRegistered();
+			if (world.spawnEntity(entity)) {
+				world.playSound(null, pos, SoundEvents.BLOCK_BEACON_ACTIVATE, SoundCategory.HOSTILE, 1.0F, 0.6F);
+				CorruptionProfiler.logMatrixCubeSpawn(world, pos, active, maxActive);
+				CorruptionProfiler.logMatrixCubeEntity(world, pos);
+				active++;
+				placements++;
+			} else {
+				MatrixCubeBlockEntity.unregister(world, entity.getUuid());
+			}
 		}
 
-		world.setBlockState(pos, ModBlocks.MATRIX_CUBE.getDefaultState(), Block.NOTIFY_LISTENERS);
-		world.playSound(null, pos, SoundEvents.BLOCK_BEACON_ACTIVATE, SoundCategory.HOSTILE, 1.0F, 0.6F);
-		lastMatrixCubeTick = totalTicks;
-		markDirty();
+		if (placements == 0) {
+			CorruptionProfiler.logMatrixCubeSkip(world, "attempts_exhausted", "attempts=" + attempts, active, maxActive);
+		} else {
+			markDirty();
+		}
 	}
 
 	private void advanceTier(ServerWorld world) {

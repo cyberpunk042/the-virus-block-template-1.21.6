@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import net.cyberpunk042.infection.VirusInfectionSystem;
 import net.cyberpunk042.registry.ModBlockEntities;
 import net.cyberpunk042.registry.ModBlocks;
+import net.cyberpunk042.registry.ModEntities;
 import net.cyberpunk042.registry.ModItemGroups;
 import net.cyberpunk042.registry.ModItems;
 import net.cyberpunk042.command.VirusDebugCommands;
@@ -87,11 +88,35 @@ public class TheVirusBlock implements ModInitializer {
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_MATRIX_CUBE_DAMAGE =
 			GameRuleRegistry.register("virusMatrixCubeDamage", GameRules.Category.PLAYER, GameRuleFactory.createIntRule(8, 0, 40));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_MATRIX_CUBE_MAX_ACTIVE =
-			GameRuleRegistry.register("virusMatrixCubeMaxActive", GameRules.Category.MOBS, GameRuleFactory.createIntRule(100, 1, 500));
+			GameRuleRegistry.register("virusMatrixCubeMaxActive", GameRules.Category.MOBS, GameRuleFactory.createIntRule(200, 1, 500));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_MATRIX_CUBE_SPAWN_INTERVAL =
-			GameRuleRegistry.register("virusMatrixCubeSpawnInterval", GameRules.Category.MOBS, GameRuleFactory.createIntRule(600, 100, 6000));
+			GameRuleRegistry.register("virusMatrixCubeSpawnInterval", GameRules.Category.MOBS, GameRuleFactory.createIntRule(40, 20, 6000));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_MATRIX_CUBE_SPAWN_ATTEMPTS =
+			GameRuleRegistry.register("virusMatrixCubeSpawnAttempts", GameRules.Category.MOBS, GameRuleFactory.createIntRule(20, 1, 200));
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_TIER2_EVENTS_ENABLED =
 			GameRuleRegistry.register("virusTier2EventsEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_TIER3_EXTRAS_ENABLED =
+			GameRuleRegistry.register("virusTier3ExtrasEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(false));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_EVENT_MUTATION_PULSE_ENABLED =
+			GameRuleRegistry.register("virusEventMutationPulseEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_EVENT_SKYFALL_ENABLED =
+			GameRuleRegistry.register("virusEventSkyfallEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_EVENT_COLLAPSE_SURGE_ENABLED =
+			GameRuleRegistry.register("virusEventCollapseSurgeEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_EVENT_PASSIVE_REVOLT_ENABLED =
+			GameRuleRegistry.register("virusEventPassiveRevoltEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_EVENT_MOB_BUFF_STORM_ENABLED =
+			GameRuleRegistry.register("virusEventMobBuffStormEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_EVENT_VIRUS_BLOOM_ENABLED =
+			GameRuleRegistry.register("virusEventVirusBloomEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_EVENT_VOID_TEAR_ENABLED =
+			GameRuleRegistry.register("virusEventVoidTearEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_EVENT_INVERSION_ENABLED =
+			GameRuleRegistry.register("virusEventInversionEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_EVENT_ENTITY_DUPLICATION_ENABLED =
+			GameRuleRegistry.register("virusEventEntityDuplicationEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_EVENT_SINGULARITY_ENABLED =
+			GameRuleRegistry.register("virusEventSingularityEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_LIQUID_MUTATION_ENABLED =
 			GameRuleRegistry.register("virusLiquidMutationEnabled", GameRules.Category.MISC, GameRuleFactory.createBooleanRule(true));
 
@@ -101,6 +126,7 @@ public class TheVirusBlock implements ModInitializer {
 		ModBlocks.bootstrap();
 		ModItems.bootstrap();
 		ModBlockEntities.bootstrap();
+		ModEntities.bootstrap();
 		ModItemGroups.bootstrap();
 		VirusDebugCommands.register();
 		VirusInfectionSystem.init();

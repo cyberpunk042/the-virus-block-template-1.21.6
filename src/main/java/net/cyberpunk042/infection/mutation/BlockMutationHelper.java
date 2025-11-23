@@ -10,6 +10,8 @@ import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.block.corrupted.CorruptedGlassBlock;
 import net.cyberpunk042.block.corrupted.CorruptedStoneBlock;
 import net.cyberpunk042.block.corrupted.CorruptionStage;
+import net.cyberpunk042.infection.BoobytrapHelper;
+import net.cyberpunk042.infection.BoobytrapHelper.TrapSelection;
 import net.cyberpunk042.infection.InfectionTier;
 import net.cyberpunk042.registry.ModBlocks;
 import net.minecraft.block.Block;
@@ -138,6 +140,11 @@ public final class BlockMutationHelper {
 			return;
 		}
 
+		TrapSelection trap = BoobytrapHelper.selectTrap(world);
+		if (trap != null) {
+			BoobytrapHelper.applyTrap(world, pos, trap);
+			return;
+		}
 		world.setBlockState(pos, replacement, Block.NOTIFY_ALL);
 	}
 
