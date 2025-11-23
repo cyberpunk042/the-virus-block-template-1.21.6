@@ -104,6 +104,14 @@ public final class CorruptionProfiler {
 				detail == null || detail.isEmpty() ? "" : " [" + detail + "]");
 	}
 
+	public static void logWormSpawn(ServerWorld world, BlockPos pos) {
+		if (!isEnabled(world)) {
+			return;
+		}
+		TheVirusBlock.LOGGER.info("[CorruptionProfiler:{}] worm spawned at {}",
+				worldId(world), pos);
+	}
+
 	private static boolean isEnabled(ServerWorld world) {
 		return world.getGameRules().getBoolean(TheVirusBlock.VIRUS_CORRUPTION_PROFILER);
 	}

@@ -13,6 +13,8 @@ import net.cyberpunk042.block.corrupted.CorruptionStage;
 import net.cyberpunk042.infection.BoobytrapHelper;
 import net.cyberpunk042.infection.BoobytrapHelper.TrapSelection;
 import net.cyberpunk042.infection.InfectionTier;
+import net.cyberpunk042.infection.TierCookbook;
+import net.cyberpunk042.infection.TierFeature;
 import net.cyberpunk042.registry.ModBlocks;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
@@ -37,11 +39,13 @@ public final class BlockMutationHelper {
 		boolean mutated = false;
 
 		List<ServerPlayerEntity> players = world.getPlayers(ServerPlayerEntity::isAlive);
+		int surfaceAttemptsRule = MathHelper.clamp(world.getGameRules().getInt(TheVirusBlock.VIRUS_SURFACE_CORRUPT_ATTEMPTS), 0, 4096);
 		if (!players.isEmpty()) {
 			List<BlockPos> playerAnchors = players.stream().map(ServerPlayerEntity::getBlockPos).toList();
 			int attemptsRule = MathHelper.clamp(world.getGameRules().getInt(TheVirusBlock.VIRUS_SPREAD_PLAYER_ATTEMPTS), 0, 4096);
 			int radiusRule = MathHelper.clamp(world.getGameRules().getInt(TheVirusBlock.VIRUS_SPREAD_PLAYER_RADIUS), 4, 256);
 			mutated |= mutateFromAnchors(world, playerAnchors, attemptsRule, radiusRule, tier, apocalypseMode, random);
+			mutated |= mutateSurfaceLayers(world, playerAnchors, radiusRule, surfaceAttemptsRule, tier, apocalypseMode, random);
 		}
 
 		if (!sources.isEmpty()) {
@@ -49,6 +53,7 @@ public final class BlockMutationHelper {
 			int attemptsRule = MathHelper.clamp(world.getGameRules().getInt(TheVirusBlock.VIRUS_SPREAD_SOURCE_ATTEMPTS), 0, 4096);
 			int radiusRule = MathHelper.clamp(world.getGameRules().getInt(TheVirusBlock.VIRUS_SPREAD_SOURCE_RADIUS), 4, 256);
 			mutated |= mutateFromAnchors(world, sourceAnchors, attemptsRule, radiusRule, tier, apocalypseMode, random);
+			mutated |= mutateSurfaceLayers(world, sourceAnchors, radiusRule, surfaceAttemptsRule, tier, apocalypseMode, random);
 		}
 
 		if (!mutated && !sources.isEmpty()) {
@@ -121,15 +126,19 @@ public final class BlockMutationHelper {
 		if (original.isAir()) {
 			return;
 		}
+		if (!original.getFluidState().isEmpty()) {
+			return;
+		}
 
 		if (original.isOf(ModBlocks.VIRUS_BLOCK)
 				|| original.isOf(ModBlocks.INFECTED_BLOCK)
 				|| original.isOf(ModBlocks.INFECTIOUS_CUBE)
+				|| original.isOf(ModBlocks.CURED_INFECTIOUS_CUBE)
 				|| original.isOf(ModBlocks.BACTERIA)) {
 			return;
 		}
 
-		BlockState replacement = pickReplacement(original, random);
+		BlockState replacement = pickReplacement(world, original, random, tier, apocalypseMode);
 		if (replacement == null) {
 			return;
 		}
@@ -148,7 +157,11 @@ public final class BlockMutationHelper {
 		world.setBlockState(pos, replacement, Block.NOTIFY_ALL);
 	}
 
-	private static BlockState pickReplacement(BlockState original, Random random) {
+	private static BlockState pickReplacement(ServerWorld world, BlockState original, Random random, InfectionTier tier, boolean apocalypseMode) {
+		boolean corruptSand = TierCookbook.isEnabled(world, tier, apocalypseMode, TierFeature.CORRUPT_SAND);
+		boolean corruptIce = TierCookbook.isEnabled(world, tier, apocalypseMode, TierFeature.CORRUPT_ICE);
+		boolean corruptSnow = TierCookbook.isEnabled(world, tier, apocalypseMode, TierFeature.CORRUPT_SNOW);
+
 		if (original.isIn(BlockTags.LOGS) || original.isIn(BlockTags.PLANKS)) {
 			return ModBlocks.CORRUPTED_WOOD.getDefaultState();
 		}
@@ -165,8 +178,20 @@ public final class BlockMutationHelper {
 			return ModBlocks.CORRUPTED_GLASS.getDefaultState();
 		}
 
-		if (original.isIn(BlockTags.ICE)) {
+		if (corruptIce && original.isOf(Blocks.ICE)) {
 			return ModBlocks.CORRUPTED_ICE.getDefaultState();
+		}
+		if (corruptIce && (original.isOf(Blocks.PACKED_ICE) || original.isOf(Blocks.BLUE_ICE))) {
+			return ModBlocks.CORRUPTED_PACKED_ICE.getDefaultState();
+		}
+		if (corruptSand && (original.isOf(Blocks.SAND) || original.isOf(Blocks.RED_SAND))) {
+			return ModBlocks.CORRUPTED_SAND.getDefaultState();
+		}
+		if (corruptSnow && (original.isOf(Blocks.SNOW_BLOCK) || original.isOf(Blocks.POWDER_SNOW))) {
+			return ModBlocks.CORRUPTED_SNOW_BLOCK.getDefaultState();
+		}
+		if (corruptSnow && original.isOf(Blocks.SNOW)) {
+			return ModBlocks.CORRUPTED_SNOW.getDefaultState();
 		}
 
 		if (original.isIn(BlockTags.BASE_STONE_OVERWORLD) || original.isIn(BlockTags.DEEPSLATE_ORE_REPLACEABLES)) {
@@ -203,6 +228,89 @@ public final class BlockMutationHelper {
 			case 6 -> ModBlocks.CORRUPTED_DIAMOND.getDefaultState();
 			default -> ModBlocks.CORRUPTED_GOLD.getDefaultState();
 		};
+	}
+
+	private static boolean mutateSurfaceLayers(ServerWorld world, List<BlockPos> anchors, int radiusRule, int attemptsRule, InfectionTier tier, boolean apocalypseMode, Random random) {
+		if (anchors.isEmpty() || attemptsRule <= 0) {
+			return false;
+		}
+
+		boolean sandEnabled = TierCookbook.isEnabled(world, tier, apocalypseMode, TierFeature.CORRUPT_SAND);
+		boolean iceEnabled = TierCookbook.isEnabled(world, tier, apocalypseMode, TierFeature.CORRUPT_ICE);
+		boolean snowEnabled = TierCookbook.isEnabled(world, tier, apocalypseMode, TierFeature.CORRUPT_SNOW);
+		if (!sandEnabled && !iceEnabled && !snowEnabled) {
+			return false;
+		}
+
+		int radius = MathHelper.clamp(radiusRule * 2, 8, 192);
+		int tierScale = Math.max(1, tier.getLevel());
+		int attempts = MathHelper.clamp(attemptsRule * tierScale, 0, 4096);
+		attempts = Math.max(attempts, anchors.size() * 40);
+		attempts = Math.min(attempts, 4096);
+		boolean mutated = false;
+		for (int i = 0; i < attempts; i++) {
+			BlockPos anchor = anchors.get(random.nextInt(anchors.size()));
+			BlockPos surface = findSurface(world, anchor, radius, random);
+			if (surface == null) {
+				continue;
+			}
+			if (convertSurfaceBlock(world, surface, sandEnabled, iceEnabled, snowEnabled)) {
+				mutated = true;
+			}
+		}
+		return mutated;
+	}
+
+	private static BlockPos findSurface(ServerWorld world, BlockPos anchor, int radius, Random random) {
+		for (int attempt = 0; attempt < 6; attempt++) {
+			int x = anchor.getX() + random.nextBetween(-radius, radius);
+			int z = anchor.getZ() + random.nextBetween(-radius, radius);
+			BlockPos horizontal = new BlockPos(x, world.getBottomY(), z);
+			if (!isChunkLoaded(world, horizontal)) {
+				continue;
+			}
+			int topY = world.getTopY(Heightmap.Type.MOTION_BLOCKING, x, z) - 1;
+			if (topY < world.getBottomY()) {
+				continue;
+			}
+			return new BlockPos(x, topY, z);
+		}
+		return null;
+	}
+
+	private static boolean convertSurfaceBlock(ServerWorld world, BlockPos pos, boolean sandEnabled, boolean iceEnabled, boolean snowEnabled) {
+		BlockState state = world.getBlockState(pos);
+		boolean mutated = false;
+
+		if (!state.isAir()) {
+			if (sandEnabled && (state.isOf(Blocks.SAND) || state.isOf(Blocks.RED_SAND))) {
+				world.setBlockState(pos, ModBlocks.CORRUPTED_SAND.getDefaultState(), Block.NOTIFY_LISTENERS);
+				mutated = true;
+			} else if (iceEnabled && state.isOf(Blocks.ICE)) {
+				world.setBlockState(pos, ModBlocks.CORRUPTED_ICE.getDefaultState(), Block.NOTIFY_LISTENERS);
+				mutated = true;
+			} else if (iceEnabled && (state.isOf(Blocks.PACKED_ICE) || state.isOf(Blocks.BLUE_ICE))) {
+				world.setBlockState(pos, ModBlocks.CORRUPTED_PACKED_ICE.getDefaultState(), Block.NOTIFY_LISTENERS);
+				mutated = true;
+			} else if (snowEnabled && (state.isOf(Blocks.SNOW_BLOCK) || state.isOf(Blocks.POWDER_SNOW))) {
+				world.setBlockState(pos, ModBlocks.CORRUPTED_SNOW_BLOCK.getDefaultState(), Block.NOTIFY_LISTENERS);
+				mutated = true;
+			} else if (snowEnabled && state.isOf(Blocks.SNOW)) {
+				world.setBlockState(pos, ModBlocks.CORRUPTED_SNOW.getDefaultState(), Block.NOTIFY_LISTENERS);
+				mutated = true;
+			}
+		}
+
+		if (snowEnabled) {
+			BlockPos above = pos.up();
+			BlockState aboveState = world.getBlockState(above);
+			if (aboveState.isOf(Blocks.SNOW)) {
+				world.setBlockState(above, ModBlocks.CORRUPTED_SNOW.getDefaultState(), Block.NOTIFY_LISTENERS);
+				mutated = true;
+			}
+		}
+
+		return mutated;
 	}
 
 	public static void corruptFlora(ServerWorld world, BlockPos origin, int radius) {

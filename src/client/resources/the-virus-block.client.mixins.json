@@ -3,7 +3,10 @@
 	"package": "net.cyberpunk042.mixin.client",
 	"compatibilityLevel": "JAVA_21",
   "client": [
-    "ClientWorldMixin"
+    "ClientWorldMixin",
+    "RainSplashParticleFactoryMixin",
+    "SnowflakeParticleFactoryMixin",
+    "WeatherRenderingMixin"
   ],
 	"injectors": {
 		"defaultRequire": 1

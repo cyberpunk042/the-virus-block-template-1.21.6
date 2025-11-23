@@ -206,11 +206,37 @@ This is a “progressive chaos” mod designed for content creation and challeng
 
 ---
 
+## 🧪 Debug Commands
+
+- `/virustiers` – Shows the current infection tier, whether apocalypse mode is active, and every feature that is currently unlocked by the Tier Cookbook. Use this when tuning gamerules or designing new difficulty presets.
+- `/virusboobytraps [radiusChunks]` – Lists every active boobytrap block around you (defaults to 8 chunks) so you can verify trap density or clean up a play area.
+
+### Tier Feature Defaults
+
+- **Tier 2:** liquid corruption, corrupted sand/ice/snow surfaces, Mutation Pulse, Skyfall, Collapse Surge, Passive Revolt, Mob Buff Storm, Virus Bloom.
+- **Tier 3:** Void Tear, Inversion.
+- **Tier 4:** Entity Duplication, Singularity.
+- **Tier 5:** (Reserved – apocalypse add-ons only.)
+
+## 🛡️ Admin Commands
+
+- `/virusblock waves friendlyfire <enable|disable|status>` – Toggles whether virus-spawned waves can hurt each other (requires permission level 2).
+- `/virusblock teleport <enable|disable|radius <0-64>|status>` – Controls the automatic teleport ability of the Virus Block, including maximum radius in chunks.
+
+## 🍳 Crafting Recipes
+
+| Recipe | Inputs | Notes |
+| --- | --- | --- |
+| **Cured Infectious Cube** | Shapeless: 1× Infectious Cube + 1× Milk Bucket | Produces 1× Cured Infectious Cube. Combine anywhere in the crafting grid. |
+| **Purification Totem** | Shaped “cross” pattern: Top = Cured Infectious Cube, Left = Corrupted Gold, Center = Totem of Undying, Right = Corrupted Iron, Bottom = Corrupted Diamond | There are four JSON variants covering every rotation; the center slot must always be a Totem of Undying. Consumed on use. |
+
+*(Drop your PNGs—`cured_infectious_cube.png`, `purification_totem.png`, etc.—into the repo’s `docs/` folder if you want the README to display the crafting layouts directly.)*
+
 ## 🛠️ Installation
 
 > Placeholder instructions — adjust versions when implementing.
 
-1. Install **Fabric Loader** (0.16.x or later)  
+1. Install **Fabric Loader** (0.18.x or later)  
 2. Install **Fabric API**  
 3. Drop `virusblock-x.x.x.jar` into your `mods` folder  
 4. Launch the game
@@ -219,3 +245,36 @@ Optional but recommended:
 
 - Use shaders for maximum visual freakiness  
 - Recommended performance mods: Sodium, Indium, Iris
+
+---
+
+## ⚙️ Configuration Reference
+
+Most tuning happens through gamerules. Here are the high-impact ones (defaults in parentheses):
+
+| Gamerule | Default | Effect |
+| --- | --- | --- |
+| `virusSurfaceCorruptAttempts` | `640` | Attempts per tick for Tier‑2 surface mutation (sand/ice/snow carpets). Raise for faster biome takeovers. |
+| `virusLiquidMutationEnabled` | `true` | Enables corrupted water/lava once Tier 2 is reached. |
+| `virusCorruptSandEnabled` / `virusCorruptIceEnabled` / `virusCorruptSnowEnabled` | `true` | Opt individual surface conversions in/out. |
+| `virusTier2EventsEnabled` | `true` | Master toggle for Tier‑2 global events (Mutation Pulse, Skyfall, etc.). |
+| `virusTier3ExtrasEnabled` | `false` | Unlocks Tier‑3+ extras (Void Tear, Inversion, Entity Duplication, Singularity). |
+| `virusEventMutationPulseEnabled` … `virusEventSingularityEnabled` | `true` | Fine-grained switches for each event (Mutation Pulse, Skyfall, Collapse Surge, Passive Revolt, Mob Buff Storm, Virus Bloom, Void Tear, Inversion, Entity Duplication, Singularity). Use these if you want to cherry-pick specific events without disabling the whole tier. |
+| `virusMatrixCubeMaxActive` | `200` | Cap on simultaneous Matrix Cubes raining from the sky. |
+| `virusBoobytrapsEnabled` | `true` | Controls spontaneous boobytrap placement/explosions. |
+| `virusWormsEnabled` | `true` | Allows corrupted dirt/boobytraps to spawn corrupted worms. |
+
+### Example Preset (`configs/virus_contained.mcfunction`)
+
+```mcfunction
+# Tier-2 visuals only, low chaos
+/gamerule virusTier3ExtrasEnabled false
+/gamerule virusTier2EventsEnabled true
+/gamerule virusSurfaceCorruptAttempts 320
+/gamerule virusLiquidMutationEnabled true
+/gamerule virusBoobytrapsEnabled false
+/gamerule virusMatrixCubeMaxActive 80
+/gamerule virusWormsEnabled false
+```
+
+Drop this `.mcfunction` into a datapack and run `/function configs:virus_contained` to apply it instantly on a server.

@@ -1,6 +1,5 @@
 package net.cyberpunk042.mixin;
 
-import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.infection.singularity.SingularityManager;
 import net.minecraft.entity.EquipmentSlot;
@@ -12,6 +11,7 @@ import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 import net.minecraft.registry.tag.DamageTypeTags;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -33,8 +33,8 @@ public abstract class LivingEntityMixin extends Entity {
 		LivingEntity self = (LivingEntity) (Object) this;
 
 		if (source.isIn(DamageTypeTags.IS_FIRE) && self instanceof PlayerEntity player && player.isInLava()) {
-			if (world.getGameRules().getBoolean(TheVirusBlock.VIRUS_LIQUID_MUTATION_ENABLED)
-					&& VirusWorldState.get(world).getCurrentTier().getIndex() >= 2) {
+			VirusWorldState state = VirusWorldState.get(world);
+			if (state.areLiquidsCorrupted(world)) {
 				player.extinguish();
 				player.addStatusEffect(new StatusEffectInstance(StatusEffects.REGENERATION, 60, 0, false, true));
 				cir.setReturnValue(false);
@@ -63,14 +63,15 @@ public abstract class LivingEntityMixin extends Entity {
 			return;
 		}
 
-		int tier = VirusWorldState.get(serverWorld).getCurrentTier().getIndex();
-		boolean liquidsEnabled = serverWorld.getGameRules().getBoolean(TheVirusBlock.VIRUS_LIQUID_MUTATION_ENABLED);
-		if (liquidsEnabled && tier >= 2 && player.isInLava()) {
+		VirusWorldState state = VirusWorldState.get(serverWorld);
+		int tier = state.getCurrentTier().getIndex();
+		boolean liquidsCorrupted = state.areLiquidsCorrupted(serverWorld);
+		if (liquidsCorrupted && player.isInLava()) {
 			player.extinguish();
 			player.addStatusEffect(new StatusEffectInstance(StatusEffects.REGENERATION, 80, 0, false, true));
 		}
 
-		if (liquidsEnabled && tier >= 1 && (player.isTouchingWater() || player.isSubmergedInWater()) && player instanceof ServerPlayerEntity serverPlayer) {
+		if (liquidsCorrupted && (player.isTouchingWater() || player.isSubmergedInWater()) && player instanceof ServerPlayerEntity serverPlayer) {
 			theVirusBlock$degradeArmorInWater(serverPlayer, tier, serverWorld);
 		}
 	}
@@ -91,8 +92,18 @@ public abstract class LivingEntityMixin extends Entity {
 			if (stack.isEmpty()) {
 				continue;
 			}
+			if (isNetheriteArmor(stack)) {
+				continue;
+			}
 			stack.damage(1 + tier, world, player, item -> player.sendEquipmentBreakStatus(item, slot));
 		}
+	}
+
+	private static boolean isNetheriteArmor(ItemStack stack) {
+		return stack.isOf(Items.NETHERITE_HELMET)
+				|| stack.isOf(Items.NETHERITE_CHESTPLATE)
+				|| stack.isOf(Items.NETHERITE_LEGGINGS)
+				|| stack.isOf(Items.NETHERITE_BOOTS);
 	}
 }
 

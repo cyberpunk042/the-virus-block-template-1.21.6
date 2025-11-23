@@ -25,6 +25,18 @@ public enum InfectionTier {
 		return index;
 	}
 
+	public int getLevel() {
+		return index + 1;
+	}
+
+	public boolean isAtLeast(InfectionTier other) {
+		return this.index >= other.index;
+	}
+
+	public boolean isBelow(InfectionTier other) {
+		return this.index < other.index;
+	}
+
 	public int getDurationTicks() {
 		return durationTicks;
 	}

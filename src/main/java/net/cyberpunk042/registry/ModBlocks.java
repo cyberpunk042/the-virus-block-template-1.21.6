@@ -7,17 +7,21 @@ import net.cyberpunk042.block.BacteriaBlock;
 import net.cyberpunk042.block.InfectedBlock;
 import net.cyberpunk042.block.InfectedGrassBlock;
 import net.cyberpunk042.block.InfectiousCubeBlock;
+import net.cyberpunk042.block.CuredInfectiousCubeBlock;
 import net.cyberpunk042.block.MatrixCubeBlock;
 import net.cyberpunk042.block.VirusBlock;
 import net.cyberpunk042.block.corrupted.CorruptedCryingObsidianBlock;
 import net.cyberpunk042.block.corrupted.CorruptedDiamondBlock;
 import net.cyberpunk042.block.corrupted.CorruptedDirtBlock;
 import net.cyberpunk042.block.corrupted.CorruptedGlassBlock;
+import net.cyberpunk042.block.corrupted.CorruptedGoldBlock;
 import net.cyberpunk042.block.corrupted.CorruptedIceBlock;
 import net.cyberpunk042.block.corrupted.CorruptedIronBlock;
+import net.cyberpunk042.block.corrupted.CorruptedSandBlock;
+import net.cyberpunk042.block.corrupted.CorruptedSnowBlock;
+import net.cyberpunk042.block.corrupted.CorruptedSnowCarpetBlock;
 import net.cyberpunk042.block.corrupted.CorruptedStoneBlock;
 import net.cyberpunk042.block.corrupted.CorruptedWoodBlock;
-import net.cyberpunk042.block.corrupted.CorruptedGoldBlock;
 import net.minecraft.block.AbstractBlock;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
@@ -89,6 +93,33 @@ public final class ModBlocks {
 					.ticksRandomly()
 					.mapColor(MapColor.CYAN));
 
+	public static final Block CORRUPTED_PACKED_ICE = register("corrupted_packed_ice", CorruptedIceBlock::new,
+			AbstractBlock.Settings.copy(Blocks.PACKED_ICE)
+					.nonOpaque()
+					.mapColor(MapColor.DIAMOND_BLUE)
+					.slipperiness(0.98F));
+
+	public static final Block CORRUPTED_SAND = register("corrupted_sand", CorruptedSandBlock::new,
+			AbstractBlock.Settings.copy(Blocks.SAND)
+					.mapColor(MapColor.YELLOW)
+					.ticksRandomly()
+					.sounds(BlockSoundGroup.SAND)
+					.strength(0.5F, 0.5F));
+
+	public static final Block CORRUPTED_SNOW_BLOCK = register("corrupted_snow_block", CorruptedSnowBlock::new,
+			AbstractBlock.Settings.copy(Blocks.SNOW_BLOCK)
+					.ticksRandomly()
+					.mapColor(MapColor.WHITE)
+					.sounds(BlockSoundGroup.SNOW)
+					.strength(0.4F));
+
+	public static final Block CORRUPTED_SNOW = register("corrupted_snow", CorruptedSnowCarpetBlock::new,
+			AbstractBlock.Settings.copy(Blocks.WHITE_CARPET)
+					.ticksRandomly()
+					.sounds(BlockSoundGroup.SNOW)
+					.nonOpaque()
+					.strength(0.1F));
+
 	public static final CorruptedCryingObsidianBlock CORRUPTED_CRYING_OBSIDIAN = register("corrupted_crying_obsidian", CorruptedCryingObsidianBlock::new,
 			AbstractBlock.Settings.copy(Blocks.CRYING_OBSIDIAN)
 					.mapColor(MapColor.DEEPSLATE_GRAY)
@@ -135,6 +166,13 @@ public final class ModBlocks {
 					.nonOpaque()
 					.sounds(BlockSoundGroup.AMETHYST_BLOCK)
 					.luminance(state -> 7)
+					.strength(0.8F, 2.0F));
+	public static final Block CURED_INFECTIOUS_CUBE = register("cured_infectious_cube", CuredInfectiousCubeBlock::new,
+			AbstractBlock.Settings.create()
+					.mapColor(MapColor.PALE_PURPLE)
+					.nonOpaque()
+					.sounds(BlockSoundGroup.AMETHYST_BLOCK)
+					.luminance(state -> 5)
 					.strength(0.8F, 2.0F));
 
 	public static final Block BACTERIA = register("bacteria", BacteriaBlock::new,

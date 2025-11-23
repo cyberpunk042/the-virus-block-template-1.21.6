@@ -20,16 +20,21 @@ public final class ModItemGroups {
 						entries.add(ModBlocks.CORRUPTED_STONE);
 						entries.add(ModBlocks.CORRUPTED_GLASS);
 						entries.add(ModBlocks.CORRUPTED_DIRT);
+						entries.add(ModBlocks.CORRUPTED_SAND);
 						entries.add(ModBlocks.INFECTED_GRASS);
 						entries.add(ModBlocks.CORRUPTED_WOOD);
+						entries.add(ModBlocks.CORRUPTED_SNOW_BLOCK);
+						entries.add(ModBlocks.CORRUPTED_SNOW);
 						entries.add(ModBlocks.CORRUPTED_IRON);
 						entries.add(ModBlocks.CORRUPTED_ICE);
+						entries.add(ModBlocks.CORRUPTED_PACKED_ICE);
 						entries.add(ModBlocks.CORRUPTED_CRYING_OBSIDIAN);
 						entries.add(ModBlocks.CORRUPTED_DIAMOND);
 						entries.add(ModBlocks.CORRUPTED_GOLD);
 						entries.add(ModBlocks.MATRIX_CUBE);
 						entries.add(ModBlocks.INFECTED_BLOCK);
 						entries.add(ModBlocks.INFECTIOUS_CUBE);
+						entries.add(ModBlocks.CURED_INFECTIOUS_CUBE);
 						entries.add(ModBlocks.BACTERIA);
 						entries.add(ModItems.PURIFICATION_TOTEM);
 					})

@@ -12,6 +12,8 @@ import java.util.Set;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.block.corrupted.CorruptedGlassBlock;
 import net.cyberpunk042.block.corrupted.CorruptedStoneBlock;
@@ -20,6 +22,9 @@ import net.cyberpunk042.block.entity.MatrixCubeBlockEntity;
 import net.cyberpunk042.entity.FallingMatrixCubeEntity;
 import net.cyberpunk042.infection.mutation.BlockMutationHelper;
 import net.cyberpunk042.infection.singularity.SingularityManager;
+import net.cyberpunk042.infection.TierCookbook;
+import net.cyberpunk042.infection.TierFeature;
+import net.cyberpunk042.infection.TierFeatureGroup;
 import net.cyberpunk042.registry.ModBlocks;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
@@ -31,6 +36,8 @@ import net.minecraft.entity.FallingBlockEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.SpawnReason;
 import net.minecraft.entity.TntEntity;
+import net.minecraft.entity.attribute.EntityAttributeInstance;
+import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.mob.HostileEntity;
@@ -62,6 +69,8 @@ import net.minecraft.world.WorldEvents;
 
 public class VirusWorldState extends PersistentState {
 	public static final String ID = TheVirusBlock.MOD_ID + "_infection_state";
+	private static final double HALF_HEALTH_VALUE = 10.0D;
+	private static final double DEFAULT_MAX_HEALTH = 20.0D;
 	private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(instance -> instance.group(
 			Codec.BOOL.optionalFieldOf("infected", false).forGetter(state -> state.infected),
 			Codec.INT.optionalFieldOf("tierIndex", 0).forGetter(state -> state.tierIndex),
@@ -74,10 +83,12 @@ public class VirusWorldState extends PersistentState {
 			Codec.BOOL.optionalFieldOf("terrainCorrupted", false).forGetter(state -> state.terrainCorrupted),
 			Codec.BOOL.optionalFieldOf("shellsCollapsed", false).forGetter(state -> state.shellsCollapsed),
 			Codec.BOOL.optionalFieldOf("cleansingActive", false).forGetter(state -> state.cleansingActive),
+			Codec.BOOL.optionalFieldOf("halfHealthMode", false).forGetter(state -> state.halfHealthMode),
+			Codec.LONG.listOf().optionalFieldOf("pillarChunks", List.of()).forGetter(VirusWorldState::getPillarChunksSnapshot),
 			BlockPos.CODEC.listOf().optionalFieldOf("virusSources", List.of()).forGetter(VirusWorldState::getVirusSourceList),
 			Codec.unboundedMap(VirusEventType.CODEC, Codec.LONG).optionalFieldOf("eventHistory", Map.of()).forGetter(VirusWorldState::getEventHistorySnapshot),
 			Codec.LONG.optionalFieldOf("lastMatrixCubeTick", 0L).forGetter(state -> state.lastMatrixCubeTick)
-	).apply(instance, (infected, tierIndex, totalTicks, ticksInTier, calmUntilTick, containmentLevel, singularitySummoned, apocalypseMode, terrainCorrupted, shellsCollapsed, cleansingActive, sources, events, lastMatrixCubeTick) -> {
+	).apply(instance, (infected, tierIndex, totalTicks, ticksInTier, calmUntilTick, containmentLevel, singularitySummoned, apocalypseMode, terrainCorrupted, shellsCollapsed, cleansingActive, halfHealthMode, pillarChunks, sources, events, lastMatrixCubeTick) -> {
 		VirusWorldState state = new VirusWorldState();
 		state.infected = infected;
 		state.tierIndex = tierIndex;
@@ -90,6 +101,8 @@ public class VirusWorldState extends PersistentState {
 		state.terrainCorrupted = terrainCorrupted;
 		state.shellsCollapsed = shellsCollapsed;
 		state.cleansingActive = cleansingActive;
+		state.halfHealthMode = halfHealthMode;
+		pillarChunks.forEach(chunk -> state.pillarChunks.add(chunk.longValue()));
 		sources.forEach(pos -> state.virusSources.add(pos.toImmutable()));
 		state.eventHistory.putAll(events);
 		state.lastMatrixCubeTick = lastMatrixCubeTick;
@@ -100,6 +113,7 @@ public class VirusWorldState extends PersistentState {
 	private final Set<BlockPos> virusSources = new HashSet<>();
 	private final EnumMap<VirusEventType, Long> eventHistory = new EnumMap<>(VirusEventType.class);
 	private final Map<BlockPos, Long> shellCooldowns = new HashMap<>();
+	private final LongSet pillarChunks = new LongOpenHashSet();
 
 	private boolean infected;
 	private int tierIndex;
@@ -112,6 +126,7 @@ public class VirusWorldState extends PersistentState {
 	private boolean terrainCorrupted;
 	private boolean shellsCollapsed;
 	private boolean cleansingActive;
+	private boolean halfHealthMode;
 	@SuppressWarnings("unused")
 	private long lastMatrixCubeTick;
 
@@ -128,6 +143,9 @@ public class VirusWorldState extends PersistentState {
 		ticksInTier++;
 
 		removeMissingSources(world);
+		if (halfHealthMode && totalTicks % 20 == 0) {
+			enforceHalfHealth(world);
+		}
 
 		InfectionTier tier = InfectionTier.byIndex(tierIndex);
 
@@ -152,11 +170,9 @@ public class VirusWorldState extends PersistentState {
 	}
 
 	private void runEvents(ServerWorld world, InfectionTier tier) {
-		if (tier.getIndex() < 2) {
-			return;
-		}
-		boolean tier2Enabled = world.getGameRules().getBoolean(TheVirusBlock.VIRUS_TIER2_EVENTS_ENABLED);
-		if (!tier2Enabled) {
+		boolean tier2Active = TierCookbook.anyEnabled(world, tier, apocalypseMode, TierFeatureGroup.TIER2_EVENT);
+		boolean tier3Active = TierCookbook.anyEnabled(world, tier, apocalypseMode, TierFeatureGroup.TIER3_EXTRA);
+		if (!tier2Active && !tier3Active) {
 			return;
 		}
 		Random random = world.getRandom();
@@ -165,28 +181,25 @@ public class VirusWorldState extends PersistentState {
 			return;
 		}
 
-		maybeMutationPulse(world, tier, random);
-		maybeSkyfall(world, origin, tier, random);
-		maybeCollapseSurge(world, origin, tier, random);
-		maybePassiveRevolt(world, origin, tier, random);
-		maybeMobBuffStorm(world, origin, tier, random);
-		maybeVirusBloom(world, origin, tier, random);
-
-		boolean tier3ExtrasEnabled = tier.getIndex() >= 3
-				&& world.getGameRules().getBoolean(TheVirusBlock.VIRUS_TIER3_EXTRAS_ENABLED);
-		if (tier3ExtrasEnabled) {
-			maybeVoidTear(world, origin, tier, random);
-			maybeInversion(world, origin, tier, random);
+		if (tier2Active) {
+			maybeMutationPulse(world, tier, random);
+			maybeSkyfall(world, origin, tier, random);
+			maybeCollapseSurge(world, origin, tier, random);
+			maybePassiveRevolt(world, origin, tier, random);
+			maybeMobBuffStorm(world, origin, tier, random);
+			maybeVirusBloom(world, origin, tier, random);
 		}
 
-		if (tier.getIndex() >= 4 && tier3ExtrasEnabled) {
+		if (tier3Active) {
+			maybeVoidTear(world, origin, tier, random);
+			maybeInversion(world, origin, tier, random);
 			maybeEntityDuplication(world, origin, tier, random);
 			maybeSpawnSingularity(world, origin);
 		}
 	}
 
 	private void maybeMutationPulse(ServerWorld world, InfectionTier tier, Random random) {
-		if (!isEventEnabled(world, TheVirusBlock.VIRUS_EVENT_MUTATION_PULSE_ENABLED)) {
+		if (!TierCookbook.isEnabled(world, tier, apocalypseMode, TierFeature.EVENT_MUTATION_PULSE)) {
 			return;
 		}
 		if (!canTrigger(VirusEventType.MUTATION_PULSE, 400)) {
@@ -212,7 +225,7 @@ public class VirusWorldState extends PersistentState {
 	}
 
 	private void maybeSkyfall(ServerWorld world, BlockPos origin, InfectionTier tier, Random random) {
-		if (!isEventEnabled(world, TheVirusBlock.VIRUS_EVENT_SKYFALL_ENABLED)) {
+		if (!TierCookbook.isEnabled(world, tier, apocalypseMode, TierFeature.EVENT_SKYFALL)) {
 			return;
 		}
 		if (!canTrigger(VirusEventType.SKYFALL, 360)) {
@@ -283,7 +296,7 @@ public class VirusWorldState extends PersistentState {
 	}
 
 	private void maybePassiveRevolt(ServerWorld world, BlockPos origin, InfectionTier tier, Random random) {
-		if (!isEventEnabled(world, TheVirusBlock.VIRUS_EVENT_PASSIVE_REVOLT_ENABLED)) {
+		if (!TierCookbook.isEnabled(world, tier, apocalypseMode, TierFeature.EVENT_PASSIVE_REVOLT)) {
 			return;
 		}
 		if (!canTrigger(VirusEventType.PASSIVE_REVOLT, 800)) {
@@ -314,7 +327,7 @@ public class VirusWorldState extends PersistentState {
 	}
 
 	private void maybeMobBuffStorm(ServerWorld world, BlockPos origin, InfectionTier tier, Random random) {
-		if (!isEventEnabled(world, TheVirusBlock.VIRUS_EVENT_MOB_BUFF_STORM_ENABLED)) {
+		if (!TierCookbook.isEnabled(world, tier, apocalypseMode, TierFeature.EVENT_MOB_BUFF_STORM)) {
 			return;
 		}
 		if (!canTrigger(VirusEventType.MOB_BUFF_STORM, 700)) {
@@ -350,7 +363,7 @@ public class VirusWorldState extends PersistentState {
 	}
 
 	private void maybeCollapseSurge(ServerWorld world, BlockPos origin, InfectionTier tier, Random random) {
-		if (!isEventEnabled(world, TheVirusBlock.VIRUS_EVENT_COLLAPSE_SURGE_ENABLED)) {
+		if (!TierCookbook.isEnabled(world, tier, apocalypseMode, TierFeature.EVENT_COLLAPSE_SURGE)) {
 			return;
 		}
 		if (!canTrigger(VirusEventType.COLLAPSE_SURGE, 900)) {
@@ -381,7 +394,7 @@ public class VirusWorldState extends PersistentState {
 	}
 
 	private void maybeVirusBloom(ServerWorld world, BlockPos origin, InfectionTier tier, Random random) {
-		if (!isEventEnabled(world, TheVirusBlock.VIRUS_EVENT_VIRUS_BLOOM_ENABLED)) {
+		if (!TierCookbook.isEnabled(world, tier, apocalypseMode, TierFeature.EVENT_VIRUS_BLOOM)) {
 			return;
 		}
 		if (!canTrigger(VirusEventType.VIRUS_BLOOM, 900)) {
@@ -399,7 +412,7 @@ public class VirusWorldState extends PersistentState {
 	}
 
 	private void maybeVoidTear(ServerWorld world, BlockPos origin, InfectionTier tier, Random random) {
-		if (!isEventEnabled(world, TheVirusBlock.VIRUS_EVENT_VOID_TEAR_ENABLED)) {
+		if (!TierCookbook.isEnabled(world, tier, apocalypseMode, TierFeature.EVENT_VOID_TEAR)) {
 			return;
 		}
 		if (!canTrigger(VirusEventType.VOID_TEAR, 1000)) {
@@ -430,7 +443,7 @@ public class VirusWorldState extends PersistentState {
 	}
 
 	private void maybeInversion(ServerWorld world, BlockPos origin, InfectionTier tier, Random random) {
-		if (!isEventEnabled(world, TheVirusBlock.VIRUS_EVENT_INVERSION_ENABLED)) {
+		if (!TierCookbook.isEnabled(world, tier, apocalypseMode, TierFeature.EVENT_INVERSION)) {
 			return;
 		}
 		if (!canTrigger(VirusEventType.INVERSION, 1100)) {
@@ -453,7 +466,7 @@ public class VirusWorldState extends PersistentState {
 	}
 
 	private void maybeEntityDuplication(ServerWorld world, BlockPos origin, InfectionTier tier, Random random) {
-		if (!isEventEnabled(world, TheVirusBlock.VIRUS_EVENT_ENTITY_DUPLICATION_ENABLED)) {
+		if (!TierCookbook.isEnabled(world, tier, apocalypseMode, TierFeature.EVENT_ENTITY_DUPLICATION)) {
 			return;
 		}
 		if (!canTrigger(VirusEventType.ENTITY_DUPLICATION, 1200)) {
@@ -486,7 +499,7 @@ public class VirusWorldState extends PersistentState {
 	}
 
 	private void maybeSpawnSingularity(ServerWorld world, BlockPos origin) {
-		if (!isEventEnabled(world, TheVirusBlock.VIRUS_EVENT_SINGULARITY_ENABLED)) {
+		if (!TierCookbook.isEnabled(world, getCurrentTier(), apocalypseMode, TierFeature.EVENT_SINGULARITY)) {
 			return;
 		}
 		if (singularitySummoned || !canTrigger(VirusEventType.SINGULARITY, 0)) {
@@ -543,6 +556,12 @@ public class VirusWorldState extends PersistentState {
 		return List.copyOf(virusSources);
 	}
 
+	private List<Long> getPillarChunksSnapshot() {
+		List<Long> list = new ArrayList<>(pillarChunks.size());
+		pillarChunks.forEach((long value) -> list.add(value));
+		return list;
+	}
+
 	public Set<BlockPos> getVirusSources() {
 		return Set.copyOf(virusSources);
 	}
@@ -551,8 +570,8 @@ public class VirusWorldState extends PersistentState {
 		return Map.copyOf(eventHistory);
 	}
 
-	private boolean isEventEnabled(ServerWorld world, GameRules.Key<GameRules.BooleanRule> rule) {
-		return world.getGameRules().getBoolean(rule);
+	public boolean areLiquidsCorrupted(ServerWorld world) {
+		return infected && TierCookbook.isEnabled(world, getCurrentTier(), apocalypseMode, TierFeature.LIQUID_CORRUPTION);
 	}
 
 	private boolean canTrigger(VirusEventType type, long cooldown) {
@@ -574,6 +593,9 @@ public class VirusWorldState extends PersistentState {
 		}
 
 		int tierIndex = tier.getIndex();
+		if (tierIndex >= 2) {
+			spawnCorruptedPillars(world, tierIndex);
+		}
 		if (tierIndex < 3) {
 			return;
 		}
@@ -655,6 +677,56 @@ private static final int MAX_SHELL_HEIGHT = 2;
 			BlockState newState = stageState(block, tierIndex);
 			world.setBlockState(pos, newState, Block.NOTIFY_LISTENERS);
 		});
+	}
+
+	private void spawnCorruptedPillars(ServerWorld world, int tierIndex) {
+		Random random = world.getRandom();
+		for (BlockPos core : virusSources) {
+			ChunkPos chunk = new ChunkPos(core);
+			long key = chunk.toLong();
+			if (pillarChunks.contains(key)) {
+				continue;
+			}
+			if (!world.isChunkLoaded(chunk.x, chunk.z)) {
+				continue;
+			}
+			BlockPos base = findPillarBase(world, chunk, random);
+			if (base == null) {
+				continue;
+			}
+			buildPillar(world, base, tierIndex, random);
+			pillarChunks.add(key);
+			markDirty();
+		}
+	}
+
+	private BlockPos findPillarBase(ServerWorld world, ChunkPos chunk, Random random) {
+		for (int attempt = 0; attempt < 8; attempt++) {
+			int x = chunk.getStartX() + random.nextBetween(1, 14);
+			int z = chunk.getStartZ() + random.nextBetween(1, 14);
+			if (!world.isChunkLoaded(chunk.x, chunk.z)) {
+				continue;
+			}
+			int topY = world.getTopY(Heightmap.Type.MOTION_BLOCKING, x, z) - 1;
+			if (topY < world.getBottomY()) {
+				continue;
+			}
+			return new BlockPos(x, topY, z);
+		}
+		return null;
+	}
+
+	private void buildPillar(ServerWorld world, BlockPos base, int tierIndex, Random random) {
+		int height = 4 + random.nextBetween(0, 3);
+		BlockState state = ModBlocks.CORRUPTED_STONE.getDefaultState();
+		CorruptionStage stage = tierIndex >= 4 ? CorruptionStage.STAGE_2 : CorruptionStage.STAGE_1;
+		if (state.contains(CorruptedStoneBlock.STAGE)) {
+			state = state.with(CorruptedStoneBlock.STAGE, stage);
+		}
+		for (int i = 0; i < height; i++) {
+			BlockPos target = base.up(i);
+			world.setBlockState(target, state, Block.NOTIFY_LISTENERS);
+		}
 	}
 
 	private BlockState stageState(Block block, int tierIndex) {
@@ -956,6 +1028,8 @@ private static final int MAX_SHELL_HEIGHT = 2;
 			terrainCorrupted = false;
 			shellsCollapsed = false;
 			cleansingActive = false;
+			halfHealthMode = false;
+			pillarChunks.clear();
 			eventHistory.clear();
 			markDirty();
 			GlobalTerrainCorruption.trigger(world, pos);
@@ -1008,6 +1082,7 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		GlobalTerrainCorruption.cleanse(world);
 		MatrixCubeBlockEntity.destroyAll(world);
 		shellCooldowns.clear();
+		pillarChunks.clear();
 		singularitySummoned = false;
 		apocalypseMode = false;
 		terrainCorrupted = false;
@@ -1030,14 +1105,20 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		singularitySummoned = false;
 		terrainCorrupted = false;
 		shellsCollapsed = false;
+		boolean wasHalfHealth = halfHealthMode;
+		halfHealthMode = false;
 		beginCleansing();
 		eventHistory.clear();
 		shellCooldowns.clear();
+		pillarChunks.clear();
 		markDirty();
 
 		MatrixCubeBlockEntity.destroyAll(world);
 		SingularityManager.clearWaveMobs(world);
 		SingularityManager.stop(world);
+		if (wasHalfHealth) {
+			restoreFullHealth(world);
+		}
 		Text message = Text.translatable("message.the-virus-block.cleansed").formatted(Formatting.AQUA);
 		world.getPlayers(PlayerEntity::isAlive).forEach(player -> player.sendMessage(message, false));
 	}
@@ -1127,5 +1208,46 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		markDirty();
 	}
 
+	public boolean enableHalfHealth(ServerWorld world) {
+		if (!infected) {
+			return false;
+		}
+		if (!halfHealthMode) {
+			halfHealthMode = true;
+			markDirty();
+		}
+		enforceHalfHealth(world);
+		return true;
+	}
+
+	private void enforceHalfHealth(ServerWorld world) {
+		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
+			EntityAttributeInstance attribute = player.getAttributeInstance(EntityAttributes.MAX_HEALTH);
+			if (attribute == null) {
+				continue;
+			}
+			if (Math.abs(attribute.getBaseValue() - HALF_HEALTH_VALUE) > 0.001D) {
+				attribute.setBaseValue(HALF_HEALTH_VALUE);
+			}
+			if (player.getHealth() > HALF_HEALTH_VALUE) {
+				player.setHealth((float) HALF_HEALTH_VALUE);
+			}
+		}
+	}
+
+	private void restoreFullHealth(ServerWorld world) {
+		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
+			EntityAttributeInstance attribute = player.getAttributeInstance(EntityAttributes.MAX_HEALTH);
+			if (attribute == null) {
+				continue;
+			}
+			if (attribute.getBaseValue() < DEFAULT_MAX_HEALTH) {
+				attribute.setBaseValue(DEFAULT_MAX_HEALTH);
+			}
+			if (player.getHealth() > attribute.getBaseValue()) {
+				player.setHealth((float) attribute.getBaseValue());
+			}
+		}
+	}
 }
 

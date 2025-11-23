@@ -78,6 +78,11 @@ public class FallingMatrixCubeEntity extends FallingBlockEntity {
 		BlockPos landing = this.getBlockPos();
 		BlockState carried = this.getBlockState();
 		BlockState current = world.getBlockState(landing);
+		if (isUnbreakable(world, landing, current)) {
+			unregister(world);
+			this.discard();
+			return;
+		}
 		if (!current.isAir() && !isProtected(world, landing, current)) {
 			world.breakBlock(landing, false);
 		}
@@ -97,6 +102,10 @@ public class FallingMatrixCubeEntity extends FallingBlockEntity {
 		if (state.isOf(ModBlocks.MATRIX_CUBE) || state.isOf(ModBlocks.VIRUS_BLOCK)) {
 			return true;
 		}
+		return isUnbreakable(world, pos, state);
+	}
+
+	private static boolean isUnbreakable(ServerWorld world, BlockPos pos, BlockState state) {
 		return state.isOf(Blocks.BEDROCK) || state.getHardness(world, pos) < 0.0F;
 	}
 

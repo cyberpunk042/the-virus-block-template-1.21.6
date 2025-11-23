@@ -2,6 +2,7 @@ package net.cyberpunk042.block;
 
 import com.mojang.serialization.MapCodec;
 import net.cyberpunk042.infection.GlobalTerrainCorruption;
+import net.cyberpunk042.infection.VirusWorldState;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.LivingEntity;
@@ -26,7 +27,10 @@ public class InfectedGrassBlock extends Block {
 	public void onPlaced(World world, BlockPos pos, BlockState state, LivingEntity placer, ItemStack itemStack) {
 		super.onPlaced(world, pos, state, placer, itemStack);
 		if (!world.isClient && world instanceof ServerWorld serverWorld) {
-			GlobalTerrainCorruption.trigger(serverWorld, pos);
+			VirusWorldState infection = VirusWorldState.get(serverWorld);
+			if (infection.isInfected()) {
+				GlobalTerrainCorruption.trigger(serverWorld, pos);
+			}
 		}
 	}
 }

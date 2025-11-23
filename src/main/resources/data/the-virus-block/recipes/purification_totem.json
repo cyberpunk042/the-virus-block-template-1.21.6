@@ -1,16 +1,23 @@
 {
   "type": "minecraft:crafting_shaped",
+  "category": "misc",
   "pattern": [
-    "CGC",
-    "GTG",
-    "CGC"
+    " C ",
+    "GTI",
+    " D "
   ],
   "key": {
-    "C": {
-      "item": "the-virus-block:corrupted_crying_obsidian"
+    "D": {
+      "item": "the-virus-block:corrupted_diamond"
+    },
+    "I": {
+      "item": "the-virus-block:corrupted_iron"
     },
     "G": {
       "item": "the-virus-block:corrupted_gold"
+    },
+    "C": {
+      "item": "the-virus-block:cured_infectious_cube"
     },
     "T": {
       "item": "minecraft:totem_of_undying"

@@ -4,17 +4,26 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import net.cyberpunk042.infection.VirusInfectionSystem;
+import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.registry.ModBlockEntities;
 import net.cyberpunk042.registry.ModBlocks;
 import net.cyberpunk042.registry.ModEntities;
 import net.cyberpunk042.registry.ModItemGroups;
 import net.cyberpunk042.registry.ModItems;
 import net.cyberpunk042.command.VirusDebugCommands;
+import net.cyberpunk042.network.PurificationTotemSelectPayload;
+import net.cyberpunk042.screen.ModScreenHandlers;
+import net.cyberpunk042.screen.handler.PurificationTotemScreenHandler;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleFactory;
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleRegistry;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.cyberpunk042.network.SkyTintPayload;
+import net.minecraft.item.ItemStack;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.world.GameRules;
 
@@ -72,7 +81,15 @@ public class TheVirusBlock implements ModInitializer {
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_BACTERIA_PULSE_INTERVAL =
 			GameRuleRegistry.register("virusBacteriaPulseInterval", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(80, 10, 400));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_INFECTED_BLOCK_EXPLODE_CHANCE =
-			GameRuleRegistry.register("virusInfectedBlockExplodeChance", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(10, 0, 1000));
+			GameRuleRegistry.register("virusInfectedBlockExplodeChance", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(150, 0, 1000));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_CORRUPT_SAND_ENABLED =
+			GameRuleRegistry.register("virusCorruptSandEnabled", GameRules.Category.UPDATES, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_CORRUPT_ICE_ENABLED =
+			GameRuleRegistry.register("virusCorruptIceEnabled", GameRules.Category.UPDATES, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_CORRUPT_SNOW_ENABLED =
+			GameRuleRegistry.register("virusCorruptSnowEnabled", GameRules.Category.UPDATES, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_SURFACE_CORRUPT_ATTEMPTS =
+			GameRuleRegistry.register("virusSurfaceCorruptAttempts", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(640, 0, 4096));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_BOOBYTRAP_PLAYER_DAMAGE =
 			GameRuleRegistry.register("virusBoobytrapPlayerDamage", GameRules.Category.PLAYER, GameRuleFactory.createIntRule(8, 0, 40));
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_BOOBYTRAP_DAMAGE_PLAYERS_ONLY =
@@ -117,20 +134,57 @@ public class TheVirusBlock implements ModInitializer {
 			GameRuleRegistry.register("virusEventEntityDuplicationEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_EVENT_SINGULARITY_ENABLED =
 			GameRuleRegistry.register("virusEventSingularityEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_WORMS_ENABLED =
+			GameRuleRegistry.register("virusWormsEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_WORM_SPAWN_CHANCE =
+			GameRuleRegistry.register("virusWormSpawnChance", GameRules.Category.MOBS, GameRuleFactory.createIntRule(6, 0, 1000));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_WORM_TRAP_SPAWN_CHANCE =
+			GameRuleRegistry.register("virusWormTrapSpawnChance", GameRules.Category.MOBS, GameRuleFactory.createIntRule(45, 0, 1000));
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_LIQUID_MUTATION_ENABLED =
 			GameRuleRegistry.register("virusLiquidMutationEnabled", GameRules.Category.MISC, GameRuleFactory.createBooleanRule(true));
 
 	@Override
 	public void onInitialize() {
 		PayloadTypeRegistry.playS2C().register(SkyTintPayload.ID, SkyTintPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(PurificationTotemSelectPayload.ID, PurificationTotemSelectPayload.CODEC);
 		ModBlocks.bootstrap();
 		ModItems.bootstrap();
 		ModBlockEntities.bootstrap();
 		ModEntities.bootstrap();
 		ModItemGroups.bootstrap();
+		ModScreenHandlers.bootstrap();
 		VirusDebugCommands.register();
 		VirusInfectionSystem.init();
+		ServerPlayNetworking.registerGlobalReceiver(PurificationTotemSelectPayload.ID, (payload, context) ->
+				context.player().getServer().execute(() -> handlePurificationSelection(context.player(), payload)));
 
 		LOGGER.info("The Virus Block is primed. Containment is impossible.");
+	}
+
+	private static void handlePurificationSelection(ServerPlayerEntity player, PurificationTotemSelectPayload payload) {
+		if (!(player.currentScreenHandler instanceof PurificationTotemScreenHandler handler)) {
+			return;
+		}
+		if (handler.syncId != payload.syncId()) {
+			return;
+		}
+		ServerWorld world = (ServerWorld) player.getWorld();
+		VirusWorldState state = VirusWorldState.get(world);
+		if (!state.isInfected()) {
+			player.sendMessage(Text.translatable("message.the-virus-block.purification_totem.dormant"), true);
+			player.closeHandledScreen();
+			return;
+		}
+		ItemStack stack = player.getStackInHand(handler.getHand());
+		if (!player.getAbilities().creativeMode) {
+			if (!stack.isOf(ModItems.PURIFICATION_TOTEM)) {
+				player.sendMessage(Text.translatable("message.the-virus-block.purification_totem.missing"), true);
+				player.closeHandledScreen();
+				return;
+			}
+			stack.decrement(1);
+		}
+		payload.option().apply(world, player, state);
+		player.closeHandledScreen();
 	}
 }

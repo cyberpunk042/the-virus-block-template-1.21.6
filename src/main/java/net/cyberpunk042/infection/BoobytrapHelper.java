@@ -6,6 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.registry.ModBlocks;
+import net.cyberpunk042.registry.ModItems;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.effect.StatusEffectInstance;
@@ -103,6 +104,9 @@ public final class BoobytrapHelper {
 			List<ServerPlayerEntity> players = world.getEntitiesByClass(ServerPlayerEntity.class, area, ServerPlayerEntity::isAlive);
 			float damage = Math.max(0, world.getGameRules().getInt(TheVirusBlock.VIRUS_BOOBYTRAP_PLAYER_DAMAGE));
 			for (ServerPlayerEntity player : players) {
+				if (isHoldingPurificationTotem(player)) {
+					continue;
+				}
 				player.damage(world, world.getDamageSources().explosion(null, null), damage);
 				applyMalus(world, player);
 			}
@@ -235,6 +239,10 @@ public final class BoobytrapHelper {
 			return Type.BACTERIA;
 		}
 		return null;
+	}
+
+	private static boolean isHoldingPurificationTotem(ServerPlayerEntity player) {
+		return player.getMainHandStack().isOf(ModItems.PURIFICATION_TOTEM) || player.getOffHandStack().isOf(ModItems.PURIFICATION_TOTEM);
 	}
 }
 

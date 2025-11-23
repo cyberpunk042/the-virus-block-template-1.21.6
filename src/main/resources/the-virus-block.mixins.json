@@ -7,7 +7,8 @@
 		"LivingEntityMixin",
 		"ZombieEntityMixin",
 		"AbstractSkeletonEntityMixin",
-		"FallingBlockEntityAccessor"
+		"FallingBlockEntityAccessor",
+		"ServerRecipeManagerMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
