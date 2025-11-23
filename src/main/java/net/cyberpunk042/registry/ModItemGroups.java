@@ -30,6 +30,7 @@ public final class ModItemGroups {
 						entries.add(ModBlocks.MATRIX_CUBE);
 						entries.add(ModBlocks.INFECTED_BLOCK);
 						entries.add(ModBlocks.INFECTIOUS_CUBE);
+						entries.add(ModBlocks.BACTERIA);
 						entries.add(ModItems.PURIFICATION_TOTEM);
 					})
 					.build()

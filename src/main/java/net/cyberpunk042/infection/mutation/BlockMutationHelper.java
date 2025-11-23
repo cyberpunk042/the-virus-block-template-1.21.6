@@ -18,6 +18,7 @@ import net.minecraft.block.Blocks;
 import net.minecraft.block.PaneBlock;
 import net.minecraft.block.TransparentBlock;
 import net.minecraft.registry.tag.BlockTags;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
@@ -30,40 +31,63 @@ public final class BlockMutationHelper {
 	}
 
 	public static void mutateAroundSources(ServerWorld world, Set<BlockPos> sources, InfectionTier tier, boolean apocalypseMode) {
-		if (sources.isEmpty()) {
-			return;
-		}
-
 		Random random = world.getRandom();
-		List<BlockPos> sourceList = new ArrayList<>(sources);
-		int tierIndex = tier.getIndex();
-		int attemptsPerSource = 2 + tierIndex;
-		int baseAttempts = Math.min(64, attemptsPerSource * sourceList.size());
-		int attemptsCap = MathHelper.clamp(world.getGameRules().getInt(TheVirusBlock.VIRUS_MUTATION_ATTEMPTS), 0, 256);
-		int attempts = Math.min(baseAttempts, attemptsCap);
-		if (attempts <= 0) {
-			return;
-		}
-		if (apocalypseMode) {
-			attempts *= 2;
+		boolean mutated = false;
+
+		List<ServerPlayerEntity> players = world.getPlayers(ServerPlayerEntity::isAlive);
+		if (!players.isEmpty()) {
+			List<BlockPos> playerAnchors = players.stream().map(ServerPlayerEntity::getBlockPos).toList();
+			int attemptsRule = MathHelper.clamp(world.getGameRules().getInt(TheVirusBlock.VIRUS_SPREAD_PLAYER_ATTEMPTS), 0, 4096);
+			int radiusRule = MathHelper.clamp(world.getGameRules().getInt(TheVirusBlock.VIRUS_SPREAD_PLAYER_RADIUS), 4, 256);
+			mutated |= mutateFromAnchors(world, playerAnchors, attemptsRule, radiusRule, tier, apocalypseMode, random);
 		}
 
-		int baseRadius = MathHelper.clamp(world.getGameRules().getInt(TheVirusBlock.VIRUS_MUTATION_RADIUS), 4, 64);
-		int radius = baseRadius + tierIndex * 8;
-		radius = Math.min(64, radius);
-		if (apocalypseMode) {
-			radius += 16;
-			radius = Math.min(64, radius);
+		if (!sources.isEmpty()) {
+			List<BlockPos> sourceAnchors = new ArrayList<>(sources);
+			int attemptsRule = MathHelper.clamp(world.getGameRules().getInt(TheVirusBlock.VIRUS_SPREAD_SOURCE_ATTEMPTS), 0, 4096);
+			int radiusRule = MathHelper.clamp(world.getGameRules().getInt(TheVirusBlock.VIRUS_SPREAD_SOURCE_RADIUS), 4, 256);
+			mutated |= mutateFromAnchors(world, sourceAnchors, attemptsRule, radiusRule, tier, apocalypseMode, random);
 		}
 
+		if (!mutated && !sources.isEmpty()) {
+			mutateFromAnchors(world, new ArrayList<>(sources), 32, 16, tier, apocalypseMode, random);
+		}
+	}
+
+	private static boolean mutateFromAnchors(ServerWorld world, List<BlockPos> anchors, int attemptsRule, int radiusRule, InfectionTier tier, boolean apocalypseMode, Random random) {
+		if (anchors.isEmpty() || attemptsRule <= 0 || radiusRule <= 0) {
+			return false;
+		}
+
+		int attempts = scaleAttempts(attemptsRule, tier, apocalypseMode);
+		int radius = scaleRadius(radiusRule, tier, apocalypseMode);
+		boolean mutated = false;
 		for (int i = 0; i < attempts; i++) {
-			BlockPos origin = sourceList.get(random.nextInt(sourceList.size()));
+			BlockPos origin = anchors.get(random.nextInt(anchors.size()));
 			BlockPos target = randomOffset(world, origin, radius, random);
 			if (target == null) {
 				continue;
 			}
 			mutateBlock(world, target, random, tier, apocalypseMode);
+			mutated = true;
 		}
+		return mutated;
+	}
+
+	private static int scaleAttempts(int base, InfectionTier tier, boolean apocalypseMode) {
+		int attempts = base + Math.max(1, base / 4) * tier.getIndex();
+		if (apocalypseMode) {
+			attempts += base;
+		}
+		return Math.min(4096, attempts);
+	}
+
+	private static int scaleRadius(int base, InfectionTier tier, boolean apocalypseMode) {
+		int radius = base + tier.getIndex() * Math.max(2, base / 8);
+		if (apocalypseMode) {
+			radius += 8;
+		}
+		return MathHelper.clamp(radius, 4, 256);
 	}
 
 	@Nullable
@@ -96,7 +120,10 @@ public final class BlockMutationHelper {
 			return;
 		}
 
-		if (original.isOf(ModBlocks.VIRUS_BLOCK)) {
+		if (original.isOf(ModBlocks.VIRUS_BLOCK)
+				|| original.isOf(ModBlocks.INFECTED_BLOCK)
+				|| original.isOf(ModBlocks.INFECTIOUS_CUBE)
+				|| original.isOf(ModBlocks.BACTERIA)) {
 			return;
 		}
 
@@ -183,6 +210,9 @@ public final class BlockMutationHelper {
 			}
 
 			BlockState state = world.getBlockState(target);
+			if (state.isOf(ModBlocks.INFECTED_BLOCK) || state.isOf(ModBlocks.INFECTIOUS_CUBE) || state.isOf(ModBlocks.BACTERIA)) {
+				continue;
+			}
 			if (state.isIn(BlockTags.SAPLINGS) || state.isOf(Blocks.SHORT_GRASS) || state.isOf(Blocks.FERN) || state.isOf(Blocks.TALL_GRASS)) {
 				world.setBlockState(target, ModBlocks.CORRUPTED_WOOD.getDefaultState(), Block.NOTIFY_ALL);
 			} else if (state.isIn(BlockTags.LEAVES)) {

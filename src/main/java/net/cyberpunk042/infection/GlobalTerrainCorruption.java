@@ -19,6 +19,7 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.BlockPos.Mutable;
 import net.minecraft.util.math.ChunkPos;
+import net.minecraft.world.Heightmap;
 import net.minecraft.world.chunk.WorldChunk;
 
 public final class GlobalTerrainCorruption {
@@ -50,7 +51,7 @@ public final class GlobalTerrainCorruption {
 		}
 	}
 
-	private static BlockState convert(BlockState state) {
+	static BlockState convert(BlockState state) {
 		Block block = state.getBlock();
 		if (block == Blocks.GRASS_BLOCK) {
 			return ModBlocks.INFECTED_GRASS.getDefaultState();
@@ -86,8 +87,11 @@ public final class GlobalTerrainCorruption {
 		if (block == ModBlocks.VIRUS_BLOCK || block == ModBlocks.MATRIX_CUBE) {
 			return Blocks.AIR.getDefaultState();
 		}
-		if (block == ModBlocks.CORRUPTED_DIRT || block == ModBlocks.INFECTED_BLOCK || block == ModBlocks.INFECTIOUS_CUBE) {
+		if (block == ModBlocks.CORRUPTED_DIRT || block == ModBlocks.INFECTED_BLOCK) {
 			return Blocks.DIRT.getDefaultState();
+		}
+		if (block == ModBlocks.INFECTIOUS_CUBE || block == ModBlocks.BACTERIA) {
+			return Blocks.AIR.getDefaultState();
 		}
 		if (block == ModBlocks.INFECTED_GRASS) {
 			return Blocks.GRASS_BLOCK.getDefaultState();
@@ -197,8 +201,16 @@ public final class GlobalTerrainCorruption {
 			for (int z = 0; z < 16; z++) {
 				for (int y = minY; y < maxY; y++) {
 					mutable.set(startX + x, y, startZ + z);
-					BlockState replacement = convert(chunk.getBlockState(mutable));
+					BlockState current = chunk.getBlockState(mutable);
+					BlockState replacement = convert(current);
 					if (replacement != null) {
+						BoobytrapHelper.TrapSelection trap = BoobytrapHelper.selectTrap(world);
+						if (trap != null) {
+							BlockPos placed = BoobytrapHelper.placeTrap(world, chunk, mutable, current, trap);
+							tracker.recordMutation(chunkLong, placed.asLong());
+							conversions++;
+							continue;
+						}
 						chunk.setBlockState(mutable, replacement, Block.NOTIFY_LISTENERS);
 						tracker.recordMutation(chunkLong, mutable.asLong());
 						conversions++;
@@ -208,9 +220,9 @@ public final class GlobalTerrainCorruption {
 		}
 		if (conversions > 0) {
 			CorruptionProfiler.logChunkRewrite(world, chunk.getPos(), conversions, false);
-			return true;
 		}
-		return false;
+		plantSurfaceTraps(world, chunk, tracker);
+		return conversions > 0;
 	}
 
 	private static boolean cleanseRecorded(ServerWorld world, WorldChunk chunk, LongOpenHashSet recorded) {
@@ -262,6 +274,32 @@ public final class GlobalTerrainCorruption {
 
 	private static int worldTop(ServerWorld world) {
 		return world.getBottomY() + world.getDimension().height();
+	}
+
+	private static void plantSurfaceTraps(ServerWorld world, WorldChunk chunk, ChunkWorkTracker tracker) {
+		BoobytrapHelper.TrapSelection trapSample;
+		int startX = chunk.getPos().getStartX();
+		int startZ = chunk.getPos().getStartZ();
+		BlockPos.Mutable mutable = new BlockPos.Mutable();
+		for (int x = 0; x < 16; x++) {
+			for (int z = 0; z < 16; z++) {
+				int surfaceY = world.getTopY(Heightmap.Type.MOTION_BLOCKING, startX + x, startZ + z) - 1;
+				if (surfaceY < world.getBottomY()) {
+					continue;
+				}
+				mutable.set(startX + x, surfaceY, startZ + z);
+				BlockState state = chunk.getBlockState(mutable);
+				if (!BoobytrapHelper.canReplaceSurface(state)) {
+					continue;
+				}
+				trapSample = BoobytrapHelper.selectTrap(world);
+				if (trapSample == null) {
+					continue;
+				}
+				BlockPos placed = BoobytrapHelper.placeTrap(world, chunk, mutable, state, trapSample);
+				tracker.recordMutation(chunk.getPos().toLong(), placed.asLong());
+			}
+		}
 	}
 
 	private static final class ChunkWorkTracker {

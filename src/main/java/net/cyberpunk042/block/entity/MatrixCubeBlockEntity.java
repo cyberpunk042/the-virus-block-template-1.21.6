@@ -1,17 +1,23 @@
 package net.cyberpunk042.block.entity;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.registry.ModBlockEntities;
 import net.cyberpunk042.registry.ModBlocks;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.World;
 
@@ -27,24 +33,29 @@ public class MatrixCubeBlockEntity extends BlockEntity {
 			return;
 		}
 
-		BlockPos below = pos.down();
-		if (below.getY() <= world.getBottomY()) {
-			world.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_LISTENERS);
-			return;
-		}
+		for (int i = 0; i < 1; i++) {
+			BlockPos below = pos.down();
+			if (below.getY() <= world.getBottomY()) {
+				world.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_LISTENERS);
+				return;
+			}
 
-		if (!serverWorld.isChunkLoaded(ChunkPos.toLong(below))) {
-			return;
-		}
+			if (!serverWorld.isChunkLoaded(ChunkPos.toLong(below))) {
+				return;
+			}
 
-		BlockState targetState = serverWorld.getBlockState(below);
-		if (isProtected(targetState)) {
+			dealContactDamage(serverWorld, below);
+
+			BlockState targetState = serverWorld.getBlockState(below);
+			if (isProtected(targetState)) {
+				serverWorld.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_LISTENERS);
+				return;
+			}
+
 			serverWorld.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_LISTENERS);
-			return;
+			serverWorld.setBlockState(below, state, Block.NOTIFY_LISTENERS);
+			pos = below;
 		}
-
-		serverWorld.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_LISTENERS);
-		serverWorld.setBlockState(below, state, Block.NOTIFY_LISTENERS);
 	}
 
 	@Override
@@ -88,18 +99,19 @@ public class MatrixCubeBlockEntity extends BlockEntity {
 			return false;
 		}
 		Block block = state.getBlock();
-		return block == ModBlocks.VIRUS_BLOCK
-				|| block == ModBlocks.CORRUPTED_STONE
-				|| block == ModBlocks.CORRUPTED_IRON
-				|| block == ModBlocks.CORRUPTED_CRYING_OBSIDIAN
-				|| block == ModBlocks.CORRUPTED_DIAMOND
-				|| block == ModBlocks.CORRUPTED_GOLD
-				|| block == ModBlocks.CORRUPTED_GLASS
-				|| block == ModBlocks.CORRUPTED_DIRT
-				|| block == ModBlocks.CORRUPTED_WOOD
-				|| block == ModBlocks.CORRUPTED_ICE
-				|| block == ModBlocks.INFECTED_BLOCK
-				|| block == ModBlocks.INFECTIOUS_CUBE;
+		return block == ModBlocks.VIRUS_BLOCK || block == ModBlocks.MATRIX_CUBE;
+	}
+
+	private static void dealContactDamage(ServerWorld world, BlockPos pos) {
+		int damage = Math.max(0, world.getGameRules().getInt(TheVirusBlock.VIRUS_MATRIX_CUBE_DAMAGE));
+		if (damage <= 0) {
+			return;
+		}
+		List<LivingEntity> entities = world.getEntitiesByClass(LivingEntity.class, new Box(pos).expand(0.5D), Entity::isAlive);
+		for (LivingEntity entity : entities) {
+			DamageSource source = world.getDamageSources().explosion(null, null);
+			entity.damage(world, source, damage);
+		}
 	}
 }
 

@@ -3,6 +3,7 @@ package net.cyberpunk042.registry;
 import java.util.function.Function;
 
 import net.cyberpunk042.TheVirusBlock;
+import net.cyberpunk042.block.BacteriaBlock;
 import net.cyberpunk042.block.InfectedBlock;
 import net.cyberpunk042.block.InfectedGrassBlock;
 import net.cyberpunk042.block.InfectiousCubeBlock;
@@ -121,6 +122,7 @@ public final class ModBlocks {
 	public static final Block INFECTED_BLOCK = register("infected_block", InfectedBlock::new,
 			AbstractBlock.Settings.create()
 					.mapColor(MapColor.PALE_GREEN)
+					.ticksRandomly()
 					.requiresTool()
 					.sounds(BlockSoundGroup.BASALT)
 					.strength(1.2F, 9.0F)
@@ -129,10 +131,20 @@ public final class ModBlocks {
 	public static final Block INFECTIOUS_CUBE = register("infectious_cube", InfectiousCubeBlock::new,
 			AbstractBlock.Settings.create()
 					.mapColor(MapColor.PURPLE)
+					.ticksRandomly()
 					.nonOpaque()
 					.sounds(BlockSoundGroup.AMETHYST_BLOCK)
 					.luminance(state -> 7)
 					.strength(0.8F, 2.0F));
+
+	public static final Block BACTERIA = register("bacteria", BacteriaBlock::new,
+			AbstractBlock.Settings.create()
+					.mapColor(MapColor.MAGENTA)
+					.nonOpaque()
+					.ticksRandomly()
+					.sounds(BlockSoundGroup.SLIME)
+					.luminance(state -> 4)
+					.strength(0.4F, 1.0F));
 
 	private ModBlocks() {
 	}

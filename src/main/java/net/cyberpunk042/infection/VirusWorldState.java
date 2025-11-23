@@ -149,7 +149,7 @@ public class VirusWorldState extends PersistentState {
 	}
 
 	private void runEvents(ServerWorld world, InfectionTier tier) {
-		if (tier.getIndex() < 2) {
+		if (tier.getIndex() < 2 || !world.getGameRules().getBoolean(TheVirusBlock.VIRUS_TIER2_EVENTS_ENABLED)) {
 			return;
 		}
 		Random random = world.getRandom();
@@ -158,25 +158,21 @@ public class VirusWorldState extends PersistentState {
 			return;
 		}
 
-		maybeMutationPulse(world, tier, random);
-
-		if (tier.getIndex() >= 1) {
+		if (world.getGameRules().getBoolean(TheVirusBlock.VIRUS_TIER2_EVENTS_ENABLED)) {
+			maybeMutationPulse(world, tier, random);
 			maybeSkyfall(world, origin, tier, random);
 			maybeCollapseSurge(world, origin, tier, random);
-		}
-
-		if (tier.getIndex() >= 2) {
 			maybePassiveRevolt(world, origin, tier, random);
 			maybeMobBuffStorm(world, origin, tier, random);
 			maybeVirusBloom(world, origin, tier, random);
 		}
 
-		if (tier.getIndex() >= 3) {
+		if (tier.getIndex() >= 3 && world.getGameRules().getBoolean(TheVirusBlock.VIRUS_TIER2_EVENTS_ENABLED)) {
 			maybeVoidTear(world, origin, tier, random);
 			maybeInversion(world, origin, tier, random);
 		}
 
-		if (tier.getIndex() >= 4) {
+		if (tier.getIndex() >= 4 && world.getGameRules().getBoolean(TheVirusBlock.VIRUS_TIER2_EVENTS_ENABLED)) {
 			maybeEntityDuplication(world, origin, tier, random);
 			maybeSpawnSingularity(world, origin);
 		}
@@ -786,14 +782,15 @@ private static final int MAX_SHELL_HEIGHT = 2;
 	}
 
 	private void maybeSpawnMatrixCube(ServerWorld world, InfectionTier tier) {
-		final int maxActive = 12;
+		int maxActive = Math.max(1, world.getGameRules().getInt(TheVirusBlock.VIRUS_MATRIX_CUBE_MAX_ACTIVE));
 		int active = MatrixCubeBlockEntity.getActiveCount(world);
-		if (tier.getIndex() < 3 || active >= maxActive) {
+		if (active >= maxActive) {
 			return;
 		}
 
 		Random random = world.getRandom();
-		if (totalTicks - lastMatrixCubeTick < 2000) {
+		int interval = Math.max(100, world.getGameRules().getInt(TheVirusBlock.VIRUS_MATRIX_CUBE_SPAWN_INTERVAL));
+		if (totalTicks - lastMatrixCubeTick < interval) {
 			return;
 		}
 

@@ -12,6 +12,7 @@
   "block.the-virus-block.matrix_cube": "Matrix Cube",
   "block.the-virus-block.infected_block": "Infected Block",
   "block.the-virus-block.infectious_cube": "Infectious Cube",
+  "block.the-virus-block.bacteria": "Corrupted Bacteria",
   "block.the-virus-block.infected_grass": "Infected Grass",
   "item.the-virus-block.virus_block": "Virus Block",
   "item.the-virus-block.corrupted_stone": "Corrupted Stone",
@@ -26,6 +27,7 @@
   "item.the-virus-block.matrix_cube": "Matrix Cube",
   "item.the-virus-block.infected_block": "Infected Block",
   "item.the-virus-block.infectious_cube": "Infectious Cube",
+  "item.the-virus-block.bacteria": "Corrupted Bacteria",
   "item.the-virus-block.infected_grass": "Infected Grass",
 
   "item.the-virus-block.purification_totem": "Purification Totem",

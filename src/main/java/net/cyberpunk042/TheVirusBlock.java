@@ -8,6 +8,7 @@ import net.cyberpunk042.registry.ModBlockEntities;
 import net.cyberpunk042.registry.ModBlocks;
 import net.cyberpunk042.registry.ModItemGroups;
 import net.cyberpunk042.registry.ModItems;
+import net.cyberpunk042.command.VirusDebugCommands;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleFactory;
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleRegistry;
@@ -51,6 +52,48 @@ public class TheVirusBlock implements ModInitializer {
 			GameRuleRegistry.register("virusMutationRadius", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(16, 4, 64));
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_CHUNK_REWRITE_ON_LOAD =
 			GameRuleRegistry.register("virusCorruptChunksOnLoad", GameRules.Category.UPDATES, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_BOOBYTRAPS_ENABLED =
+			GameRuleRegistry.register("virusBoobytrapsEnabled", GameRules.Category.UPDATES, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_BOOBYTRAP_CHANCE_INFECTED =
+			GameRuleRegistry.register("virusBoobytrapChanceInfected", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(35, 0, 1000));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_BOOBYTRAP_CHANCE_INFECTIOUS =
+			GameRuleRegistry.register("virusBoobytrapChanceInfectious", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(30, 0, 1000));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_BOOBYTRAP_CHANCE_BACTERIA =
+			GameRuleRegistry.register("virusBoobytrapChanceBacteria", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(27, 0, 1000));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_INFECTIOUS_SPREAD_ATTEMPTS =
+			GameRuleRegistry.register("virusInfectiousSpreadAttempts", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(12, 0, 512));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_INFECTIOUS_SPREAD_RADIUS =
+			GameRuleRegistry.register("virusInfectiousSpreadRadius", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(6, 1, 64));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_BACTERIA_SPREAD_ATTEMPTS =
+			GameRuleRegistry.register("virusBacteriaSpreadAttempts", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(10, 0, 512));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_BACTERIA_SPREAD_RADIUS =
+			GameRuleRegistry.register("virusBacteriaSpreadRadius", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(5, 1, 64));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_BACTERIA_PULSE_INTERVAL =
+			GameRuleRegistry.register("virusBacteriaPulseInterval", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(80, 10, 400));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_INFECTED_BLOCK_EXPLODE_CHANCE =
+			GameRuleRegistry.register("virusInfectedBlockExplodeChance", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(10, 0, 1000));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_BOOBYTRAP_PLAYER_DAMAGE =
+			GameRuleRegistry.register("virusBoobytrapPlayerDamage", GameRules.Category.PLAYER, GameRuleFactory.createIntRule(8, 0, 40));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_BOOBYTRAP_DAMAGE_PLAYERS_ONLY =
+			GameRuleRegistry.register("virusBoobytrapDamagePlayersOnly", GameRules.Category.PLAYER, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_BOOBYTRAP_DAMAGE_BLOCKS =
+			GameRuleRegistry.register("virusBoobytrapDamageBlocks", GameRules.Category.UPDATES, GameRuleFactory.createBooleanRule(false));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_BOOBYTRAP_POWER_INFECTED =
+			GameRuleRegistry.register("virusBoobytrapPowerInfected", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(4, 0, 10));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_BOOBYTRAP_POWER_INFECTIOUS =
+			GameRuleRegistry.register("virusBoobytrapPowerInfectious", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(3, 0, 10));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_BOOBYTRAP_POWER_BACTERIA =
+			GameRuleRegistry.register("virusBoobytrapPowerBacteria", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(3, 0, 10));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_MATRIX_CUBE_DAMAGE =
+			GameRuleRegistry.register("virusMatrixCubeDamage", GameRules.Category.PLAYER, GameRuleFactory.createIntRule(8, 0, 40));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_MATRIX_CUBE_MAX_ACTIVE =
+			GameRuleRegistry.register("virusMatrixCubeMaxActive", GameRules.Category.MOBS, GameRuleFactory.createIntRule(100, 1, 500));
+	public static final GameRules.Key<GameRules.IntRule> VIRUS_MATRIX_CUBE_SPAWN_INTERVAL =
+			GameRuleRegistry.register("virusMatrixCubeSpawnInterval", GameRules.Category.MOBS, GameRuleFactory.createIntRule(600, 100, 6000));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_TIER2_EVENTS_ENABLED =
+			GameRuleRegistry.register("virusTier2EventsEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_LIQUID_MUTATION_ENABLED =
+			GameRuleRegistry.register("virusLiquidMutationEnabled", GameRules.Category.MISC, GameRuleFactory.createBooleanRule(true));
 
 	@Override
 	public void onInitialize() {
@@ -59,6 +102,7 @@ public class TheVirusBlock implements ModInitializer {
 		ModItems.bootstrap();
 		ModBlockEntities.bootstrap();
 		ModItemGroups.bootstrap();
+		VirusDebugCommands.register();
 		VirusInfectionSystem.init();
 
 		LOGGER.info("The Virus Block is primed. Containment is impossible.");
