@@ -87,17 +87,23 @@ public final class ModBlocks {
 					.strength(1.8F, 12.0F));
 
 	public static final CorruptedIceBlock CORRUPTED_ICE = register("corrupted_ice", CorruptedIceBlock::new,
-			AbstractBlock.Settings.copy(Blocks.ICE)
+			AbstractBlock.Settings.create()
+					.mapColor(MapColor.CYAN)
+					.sounds(BlockSoundGroup.GLASS)
 					.slipperiness(1.2F)
-					.nonOpaque()
 					.ticksRandomly()
-					.mapColor(MapColor.CYAN));
+					.nonOpaque()
+					.velocityMultiplier(0.98F)
+					.breakInstantly());
 
 	public static final Block CORRUPTED_PACKED_ICE = register("corrupted_packed_ice", CorruptedIceBlock::new,
-			AbstractBlock.Settings.copy(Blocks.PACKED_ICE)
-					.nonOpaque()
+			AbstractBlock.Settings.create()
 					.mapColor(MapColor.DIAMOND_BLUE)
-					.slipperiness(0.98F));
+					.sounds(BlockSoundGroup.GLASS)
+					.slipperiness(0.98F)
+					.nonOpaque()
+					.velocityMultiplier(0.98F)
+					.breakInstantly());
 
 	public static final Block CORRUPTED_SAND = register("corrupted_sand", CorruptedSandBlock::new,
 			AbstractBlock.Settings.copy(Blocks.SAND)

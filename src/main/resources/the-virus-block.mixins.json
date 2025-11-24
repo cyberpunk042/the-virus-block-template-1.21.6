@@ -9,6 +9,8 @@
 		"AbstractSkeletonEntityMixin",
 		"FallingBlockEntityAccessor",
 		"ServerRecipeManagerMixin",
+		"BedBlockMixin",
+		"GuardianEntityAccessor",
 		"ExplosionMixin"
 	],
 	"injectors": {

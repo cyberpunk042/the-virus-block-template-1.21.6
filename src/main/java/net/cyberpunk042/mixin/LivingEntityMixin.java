@@ -23,6 +23,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityMixin extends Entity {
+	private static final int CORRUPTED_REGEN_DURATION = 80;
+	private static final int CORRUPTED_REGEN_REFRESH_THRESHOLD = 20;
+
 	private LivingEntityMixin(EntityType<?> type, World world) {
 		super(type, world);
 	}
@@ -35,7 +38,7 @@ public abstract class LivingEntityMixin extends Entity {
 			VirusWorldState state = VirusWorldState.get(world);
 			if (state.areLiquidsCorrupted(world)) {
 				player.extinguish();
-				player.addStatusEffect(new StatusEffectInstance(StatusEffects.REGENERATION, 60, 0, false, true));
+				theVirusBlock$grantCorruptedRegen(player);
 				cir.setReturnValue(false);
 				return;
 			}
@@ -64,7 +67,7 @@ public abstract class LivingEntityMixin extends Entity {
 		boolean liquidsCorrupted = state.areLiquidsCorrupted(serverWorld);
 		if (liquidsCorrupted && player.isInLava()) {
 			player.extinguish();
-			player.addStatusEffect(new StatusEffectInstance(StatusEffects.REGENERATION, 80, 0, false, true));
+			theVirusBlock$grantCorruptedRegen(player);
 		}
 
 		if (liquidsCorrupted && (player.isTouchingWater() || player.isSubmergedInWater()) && player instanceof ServerPlayerEntity serverPlayer) {
@@ -100,6 +103,14 @@ public abstract class LivingEntityMixin extends Entity {
 				|| stack.isOf(Items.NETHERITE_CHESTPLATE)
 				|| stack.isOf(Items.NETHERITE_LEGGINGS)
 				|| stack.isOf(Items.NETHERITE_BOOTS);
+	}
+
+	private static void theVirusBlock$grantCorruptedRegen(PlayerEntity player) {
+		StatusEffectInstance current = player.getStatusEffect(StatusEffects.REGENERATION);
+		if (current != null && current.getDuration() > CORRUPTED_REGEN_REFRESH_THRESHOLD) {
+			return;
+		}
+		player.addStatusEffect(new StatusEffectInstance(StatusEffects.REGENERATION, CORRUPTED_REGEN_DURATION, 0, false, true));
 	}
 }
 

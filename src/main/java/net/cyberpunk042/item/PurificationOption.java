@@ -2,6 +2,8 @@ package net.cyberpunk042.item;
 
 import java.util.function.Supplier;
 
+import org.jetbrains.annotations.Nullable;
+
 import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.minecraft.item.ItemStack;
@@ -12,24 +14,37 @@ import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.Identifier;
 import net.minecraft.world.GameRules;
 
 public enum PurificationOption {
 	NO_BOOBYTRAPS("no_boobytraps", () -> new ItemStack(Items.TNT)),
 	NO_SHELL("no_shell", () -> new ItemStack(Items.OBSIDIAN)),
-	HALF_HP("half_hp", () -> new ItemStack(Items.HEART_OF_THE_SEA)),
-	BLEED_HP("bleed_hp", () -> new ItemStack(Items.GLISTERING_MELON_SLICE));
+	HALF_HP("half_hp", () -> ItemStack.EMPTY, Identifier.of(TheVirusBlock.MOD_ID, "textures/gui/heart.png")),
+	BLEED_HP("bleed_hp", () -> ItemStack.EMPTY, Identifier.of(TheVirusBlock.MOD_ID, "textures/gui/blood.png"));
 
 	private final String key;
 	private final Supplier<ItemStack> iconSupplier;
+	@Nullable
+	private final Identifier iconTexture;
 
 	PurificationOption(String key, Supplier<ItemStack> iconSupplier) {
+		this(key, iconSupplier, null);
+	}
+
+	PurificationOption(String key, Supplier<ItemStack> iconSupplier, @Nullable Identifier iconTexture) {
 		this.key = key;
 		this.iconSupplier = iconSupplier;
+		this.iconTexture = iconTexture;
 	}
 
 	public ItemStack createIcon() {
 		return iconSupplier.get().copy();
+	}
+
+	@Nullable
+	public Identifier iconTexture() {
+		return iconTexture;
 	}
 
 	public Text title() {

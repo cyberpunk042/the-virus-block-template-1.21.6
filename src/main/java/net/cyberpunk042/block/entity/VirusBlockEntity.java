@@ -5,6 +5,7 @@ import java.util.UUID;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import net.cyberpunk042.infection.InfectionTier;
+import net.cyberpunk042.item.PurificationTotemUtil;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.registry.ModBlockEntities;
 import net.minecraft.block.BlockState;
@@ -51,21 +52,21 @@ public class VirusBlockEntity extends BlockEntity {
 
 	private void applyAura(ServerWorld world, BlockPos pos, VirusWorldState infection) {
 		InfectionTier tier = infection.getCurrentTier();
-		double radius = Math.max(3.0D, tier.getBaseAuraRadius() - infection.getContainmentLevel() * 0.6D);
-		if (infection.isApocalypseMode()) {
-			radius += 4.0D;
-		}
+		double radius = infection.getActiveAuraRadius();
 
 		long now = world.getTime();
 		Box area = new Box(pos).expand(radius);
-		for (LivingEntity living : world.getEntitiesByClass(LivingEntity.class, area, entity -> entity.isAlive() && entity instanceof ServerPlayerEntity)) {
-			if (!shouldAffect(living, infection, now)) {
+		for (ServerPlayerEntity player : world.getEntitiesByClass(ServerPlayerEntity.class, area, ServerPlayerEntity::isAlive)) {
+			if (PurificationTotemUtil.isHolding(player)) {
+				continue;
+			}
+			if (!shouldAffect(player, infection, now)) {
 				continue;
 			}
 
-			applyStatusEffects(world.getRandom(), living, tier, infection);
-			if (living.squaredDistanceTo(pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D) <= radius * radius) {
-				degradeArmor(world, living, tier);
+			applyStatusEffects(world.getRandom(), player, tier, infection);
+			if (player.squaredDistanceTo(pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D) <= radius * radius) {
+				degradeArmor(world, player, tier);
 			}
 		}
 	}

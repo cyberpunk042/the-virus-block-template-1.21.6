@@ -6,9 +6,11 @@ import org.jetbrains.annotations.Nullable;
 
 import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.registry.ModBlocks;
-import net.cyberpunk042.registry.ModItems;
+import net.cyberpunk042.item.PurificationTotemUtil;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.BedBlock;
+import net.minecraft.block.Blocks;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -104,7 +106,7 @@ public final class BoobytrapHelper {
 			List<ServerPlayerEntity> players = world.getEntitiesByClass(ServerPlayerEntity.class, area, ServerPlayerEntity::isAlive);
 			float damage = Math.max(0, world.getGameRules().getInt(TheVirusBlock.VIRUS_BOOBYTRAP_PLAYER_DAMAGE));
 			for (ServerPlayerEntity player : players) {
-				if (isHoldingPurificationTotem(player)) {
+				if (PurificationTotemUtil.isHolding(player)) {
 					continue;
 				}
 				player.damage(world, world.getDamageSources().explosion(null, null), damage);
@@ -187,13 +189,15 @@ public final class BoobytrapHelper {
 
 	public static BlockPos placeTrap(ServerWorld world, WorldChunk chunk, BlockPos.Mutable original, BlockState originalState, TrapSelection trap) {
 		BlockPos target = snapToSurface(world, original, originalState);
-		chunk.setBlockState(target, trap.state(), Block.NOTIFY_LISTENERS);
+		world.setBlockState(target, trap.state(), Block.NOTIFY_LISTENERS);
+		world.getChunkManager().markForUpdate(target);
 		CorruptionProfiler.logBoobytrapPlacement(world, target, trap.type().name());
 		return target;
 	}
 
 	public static void applyTrap(ServerWorld world, BlockPos pos, TrapSelection trap) {
 		world.setBlockState(pos, trap.state(), Block.NOTIFY_LISTENERS);
+		world.getChunkManager().markForUpdate(pos);
 		CorruptionProfiler.logBoobytrapPlacement(world, pos, trap.type().name());
 	}
 
@@ -222,7 +226,15 @@ public final class BoobytrapHelper {
 			return false;
 		}
 		Block block = state.getBlock();
-		if (block == ModBlocks.VIRUS_BLOCK || block == ModBlocks.MATRIX_CUBE || isTrap(block)) {
+		if (block == ModBlocks.VIRUS_BLOCK || block == ModBlocks.MATRIX_CUBE || isTrap(block)
+				|| block instanceof BedBlock
+				|| block == Blocks.OBSIDIAN
+				|| block == Blocks.CRYING_OBSIDIAN
+				|| block == Blocks.NETHER_PORTAL
+				|| block == Blocks.END_PORTAL
+				|| block == Blocks.END_PORTAL_FRAME
+				|| block == Blocks.END_GATEWAY
+				|| block == Blocks.RESPAWN_ANCHOR) {
 			return false;
 		}
 		return true;
@@ -241,8 +253,5 @@ public final class BoobytrapHelper {
 		return null;
 	}
 
-	private static boolean isHoldingPurificationTotem(ServerPlayerEntity player) {
-		return player.getMainHandStack().isOf(ModItems.PURIFICATION_TOTEM) || player.getOffHandStack().isOf(ModItems.PURIFICATION_TOTEM);
-	}
 }
 

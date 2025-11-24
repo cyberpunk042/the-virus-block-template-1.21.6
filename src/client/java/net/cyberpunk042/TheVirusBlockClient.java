@@ -1,6 +1,7 @@
 package net.cyberpunk042;
 
 import net.cyberpunk042.client.color.CorruptedColorProviders;
+import net.cyberpunk042.client.render.CorruptedFireTextures;
 import net.cyberpunk042.client.render.VirusFluidRenderers;
 import net.cyberpunk042.client.render.VirusSkyClientState;
 import net.cyberpunk042.client.render.entity.CorruptedWormRenderer;
@@ -21,12 +22,13 @@ import net.minecraft.client.gui.screen.ingame.HandledScreens;
 public class TheVirusBlockClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
-		BlockRenderLayerMap.putBlocks(BlockRenderLayer.TRANSLUCENT, ModBlocks.CORRUPTED_GLASS, ModBlocks.CORRUPTED_ICE);
+		BlockRenderLayerMap.putBlocks(BlockRenderLayer.TRANSLUCENT, ModBlocks.CORRUPTED_GLASS, ModBlocks.CORRUPTED_ICE, ModBlocks.CORRUPTED_PACKED_ICE);
 		CorruptedColorProviders.register();
 		VirusFluidRenderers.register();
 		EntityRendererRegistry.register(ModEntities.FALLING_MATRIX_CUBE, FallingBlockEntityRenderer::new);
 		EntityRendererRegistry.register(ModEntities.CORRUPTED_WORM, CorruptedWormRenderer::new);
 		HandledScreens.register(ModScreenHandlers.PURIFICATION_TOTEM, PurificationTotemScreen::new);
+		CorruptedFireTextures.bootstrap();
 		ClientPlayNetworking.registerGlobalReceiver(SkyTintPayload.ID, (payload, context) ->
 				context.client().execute(() -> VirusSkyClientState.setState(payload.skyCorrupted(), payload.fluidsCorrupted())));
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) ->

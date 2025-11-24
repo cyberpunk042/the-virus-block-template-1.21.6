@@ -8,10 +8,15 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2LongMap.Entry;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.cyberpunk042.TheVirusBlock;
@@ -21,15 +26,14 @@ import net.cyberpunk042.block.corrupted.CorruptionStage;
 import net.cyberpunk042.block.entity.MatrixCubeBlockEntity;
 import net.cyberpunk042.entity.FallingMatrixCubeEntity;
 import net.cyberpunk042.infection.mutation.BlockMutationHelper;
-import net.cyberpunk042.infection.TierCookbook;
-import net.cyberpunk042.infection.TierFeature;
-import net.cyberpunk042.infection.TierFeatureGroup;
+import net.cyberpunk042.mixin.GuardianEntityAccessor;
 import net.cyberpunk042.registry.ModBlocks;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.BlockState;
 import net.minecraft.datafixer.DataFixTypes;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityStatuses;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.FallingBlockEntity;
 import net.minecraft.entity.LivingEntity;
@@ -37,6 +41,7 @@ import net.minecraft.entity.SpawnReason;
 import net.minecraft.entity.TntEntity;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
+import net.minecraft.entity.mob.GuardianEntity;
 import net.minecraft.entity.mob.HostileEntity;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.passive.AnimalEntity;
@@ -58,7 +63,6 @@ import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.random.Random;
-import net.minecraft.world.GameRules;
 import net.minecraft.world.Heightmap;
 import net.minecraft.world.PersistentState;
 import net.minecraft.world.PersistentStateType;
@@ -110,6 +114,7 @@ public class VirusWorldState extends PersistentState {
 	private final Set<BlockPos> virusSources = new HashSet<>();
 	private final EnumMap<VirusEventType, Long> eventHistory = new EnumMap<>(VirusEventType.class);
 	private final Map<BlockPos, Long> shellCooldowns = new HashMap<>();
+	private final Object2LongMap<UUID> guardianBeams = new Object2LongOpenHashMap<>();
 	private final LongSet pillarChunks = new LongOpenHashSet();
 
 	private boolean infected;
@@ -142,6 +147,7 @@ public class VirusWorldState extends PersistentState {
 		ticksInTier++;
 
 		removeMissingSources(world);
+		tickGuardianBeams(world);
 
 		InfectionTier tier = InfectionTier.byIndex(tierIndex);
 		ensureHealthInitialized(tier);
@@ -192,6 +198,24 @@ public class VirusWorldState extends PersistentState {
 			maybeVoidTear(world, origin, tier, random);
 			maybeInversion(world, origin, tier, random);
 			maybeEntityDuplication(world, origin, tier, random);
+		}
+	}
+
+	private void tickGuardianBeams(ServerWorld world) {
+		if (guardianBeams.isEmpty()) {
+			return;
+		}
+		long now = world.getTime();
+		ObjectIterator<Entry<UUID>> iterator = guardianBeams.object2LongEntrySet().iterator();
+		while (iterator.hasNext()) {
+			Entry<UUID> entry = iterator.next();
+			if (now >= entry.getLongValue()) {
+				Entity entity = world.getEntity(entry.getKey());
+				if (entity != null) {
+					entity.discard();
+				}
+				iterator.remove();
+			}
 		}
 	}
 
@@ -548,6 +572,29 @@ public class VirusWorldState extends PersistentState {
 		return Set.copyOf(virusSources);
 	}
 
+	public double getActiveAuraRadius() {
+		double radius = Math.max(3.0D, getCurrentTier().getBaseAuraRadius() - getContainmentLevel() * 0.6D);
+		if (apocalypseMode) {
+			radius += 4.0D;
+		}
+		return radius;
+	}
+
+	public boolean isWithinAura(BlockPos pos) {
+		if (!infected || virusSources.isEmpty()) {
+			return false;
+		}
+		double radius = getActiveAuraRadius();
+		double radiusSq = radius * radius;
+		Vec3d target = Vec3d.ofCenter(pos);
+		for (BlockPos source : virusSources) {
+			if (source.toCenterPos().squaredDistanceTo(target) <= radiusSq) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private Map<VirusEventType, Long> getEventHistorySnapshot() {
 		return Map.copyOf(eventHistory);
 	}
@@ -657,28 +704,105 @@ private static final int MAX_SHELL_HEIGHT = 2;
 
 			shellCooldowns.remove(key);
 			BlockState newState = stageState(block, tierIndex);
+			if (shouldPushDuringShell()) {
+				pushPlayersFromBlock(world, pos, radius);
+			}
 			world.setBlockState(pos, newState, Block.NOTIFY_LISTENERS);
 		});
 	}
 
+	private boolean shouldPushDuringShell() {
+		InfectionTier tier = getCurrentTier();
+		return tier.getIndex() < 3 || ticksInTier < tier.getDurationTicks() / 2;
+	}
+	
+	private void pushPlayersFromBlock(ServerWorld world, BlockPos formingPos, int radius) {
+		Vec3d origin = Vec3d.ofCenter(formingPos);
+		double pushRadius = Math.max(4.0D, radius + 4.0D);
+		double pushRadiusSq = pushRadius * pushRadius;
+		double baseStrength = 1.2D + radius * 0.15D;
+		double verticalBoost = 0.5D + radius * 0.05D;
+
+		int affected = 0;
+		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
+			double distSq = player.squaredDistanceTo(origin);
+			if (distSq > pushRadiusSq) {
+				continue;
+			}
+			Vec3d offset = player.getPos().subtract(origin);
+			Vec3d horizontal = new Vec3d(offset.x, 0.0D, offset.z);
+			if (horizontal.lengthSquared() < 1.0E-4) {
+				double angle = world.getRandom().nextDouble() * Math.PI * 2.0D;
+				horizontal = new Vec3d(Math.cos(angle), 0.0D, Math.sin(angle));
+			}
+			Vec3d pushVec = horizontal.normalize().multiply(baseStrength);
+			player.addVelocity(pushVec.x, verticalBoost, pushVec.z);
+			player.velocityModified = true;
+			spawnGuardianBeam(world, formingPos, player);
+			affected++;
+		}
+
+		if (affected > 0) {
+			world.playSound(
+					null,
+					formingPos,
+					SoundEvents.BLOCK_RESPAWN_ANCHOR_DEPLETE.value(),
+					SoundCategory.HOSTILE,
+					1.25F,
+					0.55F);
+		}
+	}
+
+	private static final int GUARDIAN_BEAM_DURATION = 60;
+
+	private void spawnGuardianBeam(ServerWorld world, BlockPos origin, ServerPlayerEntity target) {
+		GuardianEntity guardian = EntityType.GUARDIAN.create(world, SpawnReason.TRIGGERED);
+		if (guardian == null) {
+			return;
+		}
+		guardian.refreshPositionAndAngles(origin.getX() + 0.5D, origin.getY() + 0.5D, origin.getZ() + 0.5D, world.getRandom().nextFloat() * 360.0F, 0.0F);
+		guardian.setAiDisabled(true);
+		guardian.setInvisible(true);
+		guardian.clearStatusEffects();
+		guardian.addStatusEffect(new StatusEffectInstance(StatusEffects.INVISIBILITY, GUARDIAN_BEAM_DURATION + 20, 0, false, false));
+		guardian.setGlowing(false);
+		guardian.setCustomNameVisible(false);
+		guardian.setSilent(true);
+		guardian.setNoGravity(true);
+		guardian.setInvulnerable(true);
+		guardian.setTarget(target);
+		if (!world.spawnEntity(guardian)) {
+			return;
+		}
+		((GuardianEntityAccessor) guardian).theVirusBlock$setBeamTarget(target.getId());
+		world.sendEntityStatus(guardian, EntityStatuses.PLAY_GUARDIAN_ATTACK_SOUND);
+		guardianBeams.put(guardian.getUuid(), world.getTime() + GUARDIAN_BEAM_DURATION);
+	}
+
 	private void spawnCorruptedPillars(ServerWorld world, int tierIndex) {
 		Random random = world.getRandom();
+		int chunkRadius = MathHelper.clamp(1 + tierIndex, 1, 8);
 		for (BlockPos core : virusSources) {
-			ChunkPos chunk = new ChunkPos(core);
-			long key = chunk.toLong();
-			if (pillarChunks.contains(key)) {
-				continue;
+			ChunkPos origin = new ChunkPos(core);
+			for (int dx = -chunkRadius; dx <= chunkRadius; dx++) {
+				for (int dz = -chunkRadius; dz <= chunkRadius; dz++) {
+					ChunkPos chunk = new ChunkPos(origin.x + dx, origin.z + dz);
+					long key = chunk.toLong();
+					if (pillarChunks.contains(key)) {
+						continue;
+					}
+					if (!world.isChunkLoaded(chunk.x, chunk.z)) {
+						continue;
+					}
+					BlockPos base = findPillarBase(world, chunk, random);
+					if (base == null) {
+						continue;
+					}
+					buildPillar(world, base, tierIndex, random);
+					pillarChunks.add(key);
+					markDirty();
+				}
 			}
-			if (!world.isChunkLoaded(chunk.x, chunk.z)) {
-				continue;
-			}
-			BlockPos base = findPillarBase(world, chunk, random);
-			if (base == null) {
-				continue;
-			}
-			buildPillar(world, base, tierIndex, random);
-			pillarChunks.add(key);
-			markDirty();
 		}
 	}
 
@@ -729,6 +853,9 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		}
 		shellsCollapsed = true;
 		shellCooldowns.clear();
+		guardianBeams.clear();
+		guardianBeams.clear();
+		guardianBeams.clear();
 		for (BlockPos core : virusSources) {
 			stripShells(world, core);
 		}
@@ -782,6 +909,7 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		}
 		if (moved) {
 			shellCooldowns.clear();
+			guardianBeams.clear();
 			world.getPlayers(PlayerEntity::isAlive)
 					.forEach(player -> player.sendMessage(Text.translatable("message.the-virus-block.teleport").formatted(Formatting.DARK_PURPLE), false));
 			markDirty();

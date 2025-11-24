@@ -10,6 +10,7 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.registry.ModBlocks;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.minecraft.block.BedBlock;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
@@ -53,6 +54,9 @@ public final class GlobalTerrainCorruption {
 
 	static BlockState convert(BlockState state) {
 		Block block = state.getBlock();
+		if (isPortalCriticalBlock(block)) {
+			return null;
+		}
 		if (block == Blocks.GRASS_BLOCK) {
 			return ModBlocks.INFECTED_GRASS.getDefaultState();
 		}
@@ -84,6 +88,9 @@ public final class GlobalTerrainCorruption {
 
 	private static BlockState cleanseBlock(BlockState state) {
 		Block block = state.getBlock();
+		if (isPortalCriticalBlock(block)) {
+			return null;
+		}
 		if (block == ModBlocks.VIRUS_BLOCK || block == ModBlocks.MATRIX_CUBE) {
 			return Blocks.AIR.getDefaultState();
 		}
@@ -211,7 +218,8 @@ public final class GlobalTerrainCorruption {
 							conversions++;
 							continue;
 						}
-						chunk.setBlockState(mutable, replacement, Block.NOTIFY_LISTENERS);
+						world.setBlockState(mutable, replacement, Block.NOTIFY_LISTENERS);
+						world.getChunkManager().markForUpdate(mutable);
 						tracker.recordMutation(chunkLong, mutable.asLong());
 						conversions++;
 					}
@@ -237,7 +245,8 @@ public final class GlobalTerrainCorruption {
 			mutable.set(BlockPos.fromLong(posLong));
 			BlockState replacement = cleanseBlock(chunk.getBlockState(mutable));
 			if (replacement != null) {
-				chunk.setBlockState(mutable, replacement, Block.NOTIFY_LISTENERS);
+				world.setBlockState(mutable, replacement, Block.NOTIFY_LISTENERS);
+				world.getChunkManager().markForUpdate(mutable);
 				conversions++;
 			}
 		}
@@ -259,7 +268,8 @@ public final class GlobalTerrainCorruption {
 					mutable.set(startX + x, y, startZ + z);
 					BlockState replacement = cleanseBlock(chunk.getBlockState(mutable));
 					if (replacement != null) {
-						chunk.setBlockState(mutable, replacement, Block.NOTIFY_LISTENERS);
+						world.setBlockState(mutable, replacement, Block.NOTIFY_LISTENERS);
+						world.getChunkManager().markForUpdate(mutable);
 						conversions++;
 					}
 				}
@@ -270,6 +280,17 @@ public final class GlobalTerrainCorruption {
 			return true;
 		}
 		return false;
+	}
+
+	private static boolean isPortalCriticalBlock(Block block) {
+		return block == Blocks.OBSIDIAN
+				|| block == Blocks.CRYING_OBSIDIAN
+				|| block == Blocks.NETHER_PORTAL
+				|| block == Blocks.END_PORTAL
+				|| block == Blocks.END_PORTAL_FRAME
+				|| block == Blocks.END_GATEWAY
+				|| block == Blocks.RESPAWN_ANCHOR
+				|| block instanceof BedBlock;
 	}
 
 	private static int worldTop(ServerWorld world) {

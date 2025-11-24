@@ -1,7 +1,8 @@
 {
   "variants": {
     "": {
-      "model": "the-virus-block:block/corrupted_ice"
+      "model": "the-virus-block:block/corrupted_ice",
+      "render_type": "translucent"
     }
   }
 }

@@ -18,6 +18,7 @@ import net.cyberpunk042.infection.TierFeature;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.registry.ModBlocks;
 import net.minecraft.block.Block;
+import net.minecraft.block.BedBlock;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.PaneBlock;
@@ -128,6 +129,9 @@ public final class BlockMutationHelper {
 			return;
 		}
 		if (!original.getFluidState().isEmpty()) {
+			return;
+		}
+		if (isPortalCriticalBlock(original)) {
 			return;
 		}
 
@@ -363,6 +367,18 @@ public final class BlockMutationHelper {
 			return state.with(CorruptedGlassBlock.STAGE, stage);
 		}
 		return state;
+	}
+
+	private static boolean isPortalCriticalBlock(BlockState state) {
+		Block block = state.getBlock();
+		return block == Blocks.OBSIDIAN
+				|| block == Blocks.CRYING_OBSIDIAN
+				|| block == Blocks.NETHER_PORTAL
+				|| block == Blocks.END_PORTAL
+				|| block == Blocks.END_PORTAL_FRAME
+				|| block == Blocks.END_GATEWAY
+				|| block == Blocks.RESPAWN_ANCHOR
+				|| block instanceof BedBlock;
 	}
 }
 

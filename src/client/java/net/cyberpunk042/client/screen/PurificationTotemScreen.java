@@ -13,10 +13,12 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ingame.HandledScreen;
 import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
 import net.minecraft.client.gui.screen.narration.NarrationPart;
+import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.widget.PressableWidget;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 
 public class PurificationTotemScreen extends HandledScreen<PurificationTotemScreenHandler> {
 	private final List<OptionButton> optionButtons = new ArrayList<>();
@@ -25,8 +27,8 @@ public class PurificationTotemScreen extends HandledScreen<PurificationTotemScre
 
 	public PurificationTotemScreen(PurificationTotemScreenHandler handler, PlayerInventory inventory, Text title) {
 		super(handler, inventory, title);
-		this.backgroundWidth = 196;
-		this.backgroundHeight = 110;
+		this.backgroundWidth = 280;
+		this.backgroundHeight = 100;
 	}
 
 	@Override
@@ -35,16 +37,17 @@ public class PurificationTotemScreen extends HandledScreen<PurificationTotemScre
 		clearChildren();
 		optionButtons.clear();
 
-		int buttonWidth = 36;
-		int spacing = 52;
-		int totalWidth = buttonWidth + spacing * (PurificationOption.values().length - 1);
+		int buttonSize = 42;
+		int count = PurificationOption.values().length;
+		int gap = 22;
+		int totalWidth = buttonSize * count + gap * (count - 1);
 		int startX = x + (backgroundWidth - totalWidth) / 2;
-		int yPos = y + backgroundHeight / 2 - buttonWidth / 2;
+		int yPos = y + (backgroundHeight - buttonSize) / 2;
 
 		for (int i = 0; i < PurificationOption.values().length; i++) {
 			PurificationOption option = PurificationOption.values()[i];
-			int buttonX = startX + i * spacing;
-			OptionButton button = new OptionButton(buttonX, yPos, option);
+			int buttonX = startX + i * (buttonSize + gap);
+			OptionButton button = new OptionButton(buttonX, yPos, buttonSize, option);
 			optionButtons.add(button);
 			addDrawableChild(button);
 		}
@@ -83,11 +86,14 @@ public class PurificationTotemScreen extends HandledScreen<PurificationTotemScre
 	private class OptionButton extends PressableWidget {
 		private final PurificationOption option;
 		private final ItemStack icon;
+		@Nullable
+		private final Identifier iconTexture;
 
-		OptionButton(int x, int y, PurificationOption option) {
-			super(x, y, 36, 36, option.title());
+		OptionButton(int x, int y, int size, PurificationOption option) {
+			super(x, y, size, size, option.title());
 			this.option = option;
 			this.icon = option.createIcon();
+			this.iconTexture = option.iconTexture();
 		}
 
 		@Override
@@ -106,7 +112,13 @@ public class PurificationTotemScreen extends HandledScreen<PurificationTotemScre
 			context.fill(getX(), getY(), getX() + width, getY() + height, fillColor);
 			context.drawBorder(getX(), getY(), width, height, borderColor);
 			context.drawCenteredTextWithShadow(PurificationTotemScreen.this.textRenderer, option.title(), getX() + width / 2, getY() - 12, 0xFFFFFF);
-			context.drawItem(icon, getX() + width / 2 - 8, getY() + height / 2 - 8);
+			int iconX = getX() + width / 2 - 8;
+			int iconY = getY() + height / 2 - 8;
+			if (iconTexture != null) {
+				context.drawTexture(RenderPipelines.GUI_TEXTURED, iconTexture, iconX, iconY, 0.0F, 0.0F, 16, 16, 16, 16);
+			} else if (!icon.isEmpty()) {
+				context.drawItem(icon, iconX, iconY);
+			}
 			if (hovered) {
 				pendingTooltip = option.description();
 			}

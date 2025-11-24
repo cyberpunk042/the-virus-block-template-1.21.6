@@ -65,11 +65,11 @@ public class TheVirusBlock implements ModInitializer {
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_BOOBYTRAPS_ENABLED =
 			GameRuleRegistry.register("virusBoobytrapsEnabled", GameRules.Category.UPDATES, GameRuleFactory.createBooleanRule(true));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_BOOBYTRAP_CHANCE_INFECTED =
-			GameRuleRegistry.register("virusBoobytrapChanceInfected", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(35, 0, 1000));
+			GameRuleRegistry.register("virusBoobytrapChanceInfected", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(20, 0, 1000));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_BOOBYTRAP_CHANCE_INFECTIOUS =
-			GameRuleRegistry.register("virusBoobytrapChanceInfectious", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(30, 0, 1000));
+			GameRuleRegistry.register("virusBoobytrapChanceInfectious", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(15, 0, 1000));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_BOOBYTRAP_CHANCE_BACTERIA =
-			GameRuleRegistry.register("virusBoobytrapChanceBacteria", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(27, 0, 1000));
+			GameRuleRegistry.register("virusBoobytrapChanceBacteria", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(10, 0, 1000));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_INFECTIOUS_SPREAD_ATTEMPTS =
 			GameRuleRegistry.register("virusInfectiousSpreadAttempts", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(12, 0, 512));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_INFECTIOUS_SPREAD_RADIUS =
@@ -137,7 +137,7 @@ public class TheVirusBlock implements ModInitializer {
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_WORM_SPAWN_CHANCE =
 			GameRuleRegistry.register("virusWormSpawnChance", GameRules.Category.MOBS, GameRuleFactory.createIntRule(6, 0, 1000));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_WORM_TRAP_SPAWN_CHANCE =
-			GameRuleRegistry.register("virusWormTrapSpawnChance", GameRules.Category.MOBS, GameRuleFactory.createIntRule(45, 0, 1000));
+			GameRuleRegistry.register("virusWormTrapSpawnChance", GameRules.Category.MOBS, GameRuleFactory.createIntRule(135, 0, 1000));
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_LIQUID_MUTATION_ENABLED =
 			GameRuleRegistry.register("virusLiquidMutationEnabled", GameRules.Category.MISC, GameRuleFactory.createBooleanRule(true));
 

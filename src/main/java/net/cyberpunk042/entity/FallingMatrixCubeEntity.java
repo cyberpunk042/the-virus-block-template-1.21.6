@@ -58,6 +58,14 @@ public class FallingMatrixCubeEntity extends FallingBlockEntity {
 		}
 
 		BlockState stateBelow = world.getBlockState(below);
+		if (stateBelow.isOf(Blocks.BEDROCK)) {
+			world.setBlockState(below, Blocks.AIR.getDefaultState(), Block.NOTIFY_LISTENERS);
+			return true;
+		}
+		if (hitsCoreOrShell(stateBelow)) {
+			despawn(world);
+			return false;
+		}
 		if (isProtected(world, below, stateBelow)) {
 			settle(world);
 			return false;
@@ -71,13 +79,22 @@ public class FallingMatrixCubeEntity extends FallingBlockEntity {
 	}
 
 	private boolean shouldSettle(ServerWorld world, BlockPos below) {
-		return below.getY() <= world.getBottomY() || this.age > MAX_FALL_TICKS;
+		return this.age > MAX_FALL_TICKS;
 	}
 
 	private void settle(ServerWorld world) {
 		BlockPos landing = this.getBlockPos();
+		if (landing.getY() < world.getBottomY()) {
+			unregister(world);
+			this.discard();
+			return;
+		}
 		BlockState carried = this.getBlockState();
 		BlockState current = world.getBlockState(landing);
+		if (hitsCoreOrShell(current)) {
+			despawn(world);
+			return;
+		}
 		if (isUnbreakable(world, landing, current)) {
 			unregister(world);
 			this.discard();
@@ -99,10 +116,26 @@ public class FallingMatrixCubeEntity extends FallingBlockEntity {
 		if (state.isAir()) {
 			return false;
 		}
-		if (state.isOf(ModBlocks.MATRIX_CUBE) || state.isOf(ModBlocks.VIRUS_BLOCK)) {
+		if (state.isOf(ModBlocks.MATRIX_CUBE)) {
 			return true;
 		}
 		return isUnbreakable(world, pos, state);
+	}
+
+	private static boolean hitsCoreOrShell(BlockState state) {
+		Block block = state.getBlock();
+		return block == ModBlocks.VIRUS_BLOCK
+				|| block == ModBlocks.CORRUPTED_STONE
+				|| block == ModBlocks.CORRUPTED_CRYING_OBSIDIAN
+				|| block == ModBlocks.CORRUPTED_DIAMOND
+				|| block == ModBlocks.CORRUPTED_GOLD
+				|| block == ModBlocks.CORRUPTED_IRON;
+	}
+
+	private void despawn(ServerWorld world) {
+		unregister(world);
+		world.playSound(null, this.getBlockPos(), SoundEvents.BLOCK_AMETHYST_BLOCK_BREAK, SoundCategory.HOSTILE, 0.8F, 0.5F);
+		this.discard();
 	}
 
 	private static boolean isUnbreakable(ServerWorld world, BlockPos pos, BlockState state) {

@@ -1,7 +1,7 @@
 package net.cyberpunk042.block.corrupted;
 
-import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.TranslucentBlock;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.effect.StatusEffectInstance;
@@ -11,7 +11,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.world.World;
 
-public class CorruptedIceBlock extends Block {
+public class CorruptedIceBlock extends TranslucentBlock {
 	public CorruptedIceBlock(Settings settings) {
 		super(settings);
 	}

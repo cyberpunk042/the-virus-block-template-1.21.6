@@ -30,6 +30,10 @@ public final class VirusTierBossBar {
 
 	public static void init() {
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> SKY_TINT.removeByte(handler.player.getUuid()));
+		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+			SKY_TINT.removeByte(handler.player.getUuid());
+			ServerPlayNetworking.send(handler.player, new SkyTintPayload(false, false));
+		});
 	}
 
 	public static void update(ServerWorld world, VirusWorldState state) {

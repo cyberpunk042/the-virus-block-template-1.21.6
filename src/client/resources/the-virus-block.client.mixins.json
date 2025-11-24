@@ -6,6 +6,7 @@
     "ClientWorldMixin",
     "RainSplashParticleFactoryMixin",
     "SnowflakeParticleFactoryMixin",
+    "SpriteContentsAccessor",
     "WeatherRenderingMixin"
   ],
 	"injectors": {
