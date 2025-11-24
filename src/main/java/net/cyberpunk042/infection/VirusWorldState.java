@@ -69,7 +69,6 @@ import net.minecraft.world.WorldEvents;
 
 public class VirusWorldState extends PersistentState {
 	public static final String ID = TheVirusBlock.MOD_ID + "_infection_state";
-	private static final double HALF_HEALTH_VALUE = 10.0D;
 	private static final double DEFAULT_MAX_HEALTH = 20.0D;
 	private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(instance -> instance.group(
 			Codec.BOOL.optionalFieldOf("infected", false).forGetter(state -> state.infected),
@@ -127,6 +126,8 @@ public class VirusWorldState extends PersistentState {
 	private boolean shellsCollapsed;
 	private boolean cleansingActive;
 	private boolean halfHealthMode;
+	private int surfaceMutationBudget;
+	private long surfaceMutationBudgetTick = -1L;
 	@SuppressWarnings("unused")
 	private long lastMatrixCubeTick;
 
@@ -139,13 +140,16 @@ public class VirusWorldState extends PersistentState {
 			return;
 		}
 
+		if (halfHealthMode) {
+			halfHealthMode = false;
+			restoreFullHealth(world);
+			markDirty();
+		}
+
 		totalTicks++;
 		ticksInTier++;
 
 		removeMissingSources(world);
-		if (halfHealthMode && totalTicks % 20 == 0) {
-			enforceHalfHealth(world);
-		}
 
 		InfectionTier tier = InfectionTier.byIndex(tierIndex);
 
@@ -1069,6 +1073,29 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		markDirty();
 	}
 
+	public boolean drainVirusHealth(ServerWorld world, double fraction) {
+		if (!infected || fraction <= 0.0D) {
+			return false;
+		}
+
+		InfectionTier tier = InfectionTier.byIndex(tierIndex);
+		int duration = tier.getDurationTicks();
+		if (duration <= 0) {
+			return false;
+		}
+
+		long reduction = Math.max(1L, Math.round(duration * fraction));
+		long previous = ticksInTier;
+		ticksInTier = Math.max(0L, ticksInTier - reduction);
+		if (ticksInTier == previous) {
+			return false;
+		}
+
+		markDirty();
+		VirusTierBossBar.update(world, this);
+		return true;
+	}
+
 	public void forceContainmentReset(ServerWorld world) {
 		for (BlockPos pos : new ArrayList<>(virusSources)) {
 			if (world.isChunkLoaded(ChunkPos.toLong(pos))) {
@@ -1208,31 +1235,28 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		markDirty();
 	}
 
-	public boolean enableHalfHealth(ServerWorld world) {
-		if (!infected) {
-			return false;
+	public int claimSurfaceMutations(ServerWorld world, InfectionTier tier, boolean apocalypseMode, int requested) {
+		if (!infected || requested <= 0) {
+			return 0;
 		}
-		if (!halfHealthMode) {
-			halfHealthMode = true;
-			markDirty();
-		}
-		enforceHalfHealth(world);
-		return true;
-	}
 
-	private void enforceHalfHealth(ServerWorld world) {
-		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
-			EntityAttributeInstance attribute = player.getAttributeInstance(EntityAttributes.MAX_HEALTH);
-			if (attribute == null) {
-				continue;
+		if (surfaceMutationBudgetTick != totalTicks) {
+			int base = MathHelper.clamp(world.getGameRules().getInt(TheVirusBlock.VIRUS_SURFACE_CORRUPT_ATTEMPTS), 0, 4096);
+			int scaled = MathHelper.clamp(base * Math.max(1, tier.getLevel()), 0, 4096);
+			if (apocalypseMode) {
+				scaled = Math.min(4096, scaled + base / 2);
 			}
-			if (Math.abs(attribute.getBaseValue() - HALF_HEALTH_VALUE) > 0.001D) {
-				attribute.setBaseValue(HALF_HEALTH_VALUE);
-			}
-			if (player.getHealth() > HALF_HEALTH_VALUE) {
-				player.setHealth((float) HALF_HEALTH_VALUE);
-			}
+			surfaceMutationBudget = scaled;
+			surfaceMutationBudgetTick = totalTicks;
 		}
+
+		if (surfaceMutationBudget <= 0) {
+			return 0;
+		}
+
+		int granted = Math.min(requested, surfaceMutationBudget);
+		surfaceMutationBudget -= granted;
+		return granted;
 	}
 
 	private void restoreFullHealth(ServerWorld world) {

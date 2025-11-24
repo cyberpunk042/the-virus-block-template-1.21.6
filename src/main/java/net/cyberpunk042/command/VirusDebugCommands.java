@@ -1,7 +1,5 @@
 package net.cyberpunk042.command;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
@@ -20,6 +18,7 @@ import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
+import net.minecraft.world.GameRules;
 
 public final class VirusDebugCommands {
 
@@ -56,41 +55,58 @@ public final class VirusDebugCommands {
 
 		source.sendFeedback(() -> Text.literal("Virus Tier: " + tier.getLevel() + (apocalypse ? " (Apocalypse)" : "")), false);
 
-		EnumMap<TierFeatureGroup, List<TierFeature>> grouped = new EnumMap<>(TierFeatureGroup.class);
-		for (TierFeature feature : TierCookbook.activeFeatures(world, tier, apocalypse)) {
-			grouped.computeIfAbsent(feature.getGroup(), key -> new ArrayList<>()).add(feature);
-		}
-		if (grouped.isEmpty()) {
-			source.sendFeedback(() -> Text.literal("No tier features are currently active."), false);
-			return 1;
-		}
-
-		for (TierFeatureGroup group : TierFeatureGroup.values()) {
-			List<TierFeature> features = grouped.get(group);
-			if (features == null || features.isEmpty()) {
-				continue;
-			}
-			features.sort(Comparator.comparing(TierFeature::getId));
-			source.sendFeedback(() -> Text.literal(group.name() + ":"), false);
-			for (TierFeature feature : features) {
-				String line = " - " + feature.getId() + " (>= Tier " + feature.getMinTier().getLevel() + ")";
-				source.sendFeedback(() -> Text.literal(line), false);
-			}
+		source.sendFeedback(() -> Text.literal("Feature status:"), false);
+		for (TierFeature feature : TierFeature.values()) {
+			String line = describeFeature(world, tier, apocalypse, feature);
+			source.sendFeedback(() -> Text.literal(line), false);
 		}
 
 		source.sendFeedback(() -> Text.literal("Default unlock plan:"), false);
 		EnumMap<InfectionTier, List<TierFeature>> defaultPlan = TierCookbook.defaultPlan();
 		for (InfectionTier tierKey : InfectionTier.values()) {
-			List<TierFeature> features = defaultPlan.get(tierKey);
-			if (features == null || features.isEmpty()) {
-				continue;
+			List<TierFeature> features = defaultPlan.getOrDefault(tierKey, List.of());
+			if (features.isEmpty()) {
+				source.sendFeedback(() -> Text.literal("Tier " + tierKey.getLevel() + ": (no gated features)"), false);
+			} else {
+				String list = features.stream()
+						.map(feature -> feature.getId() + " [" + feature.getGroup().name().toLowerCase(Locale.ROOT) + "]")
+						.collect(Collectors.joining(", "));
+				source.sendFeedback(() -> Text.literal("Tier " + tierKey.getLevel() + ": " + list), false);
 			}
-			String list = features.stream()
-					.map(feature -> feature.getId() + " [" + feature.getGroup().name().toLowerCase(Locale.ROOT) + "]")
-					.collect(Collectors.joining(", "));
-			source.sendFeedback(() -> Text.literal("Tier " + tierKey.getLevel() + ": " + list), false);
 		}
-		return grouped.values().stream().mapToInt(List::size).sum();
+		return TierFeature.values().length;
+	}
+
+	private static String describeFeature(ServerWorld world, InfectionTier currentTier, boolean apocalypse, TierFeature feature) {
+		boolean enabled = TierCookbook.isEnabled(world, currentTier, apocalypse, feature);
+		boolean tierUnlocked = apocalypse || !currentTier.isBelow(feature.getMinTier());
+		boolean groupEnabled = feature.getGroup().isGroupEnabled(world);
+		boolean gameruleEnabled = feature.getToggleRule().map(rule -> world.getGameRules().getBoolean(rule)).orElse(true);
+
+		StringBuilder builder = new StringBuilder();
+		builder.append(" - [").append(enabled ? "ON" : "OFF").append("] ")
+				.append(feature.getId())
+				.append(" (Tier ").append(feature.getMinTier().getLevel()).append("+ / ")
+				.append(feature.getGroup().name().toLowerCase(Locale.ROOT)).append(")");
+
+		feature.getToggleRule().ifPresent(rule -> builder.append(" rule=")
+				.append(rule.getName()).append('=')
+				.append(world.getGameRules().getBoolean(rule)));
+
+		if (!enabled) {
+			builder.append(" <- ");
+			if (!groupEnabled) {
+				builder.append("group disabled");
+			} else if (!tierUnlocked) {
+				builder.append("requires tier ").append(feature.getMinTier().getLevel());
+			} else if (!gameruleEnabled) {
+				builder.append(feature.getToggleRule().map(GameRules.Key::getName).orElse("rule")).append("=false");
+			} else {
+				builder.append("suppressed");
+			}
+		}
+
+		return builder.toString();
 	}
 }
 

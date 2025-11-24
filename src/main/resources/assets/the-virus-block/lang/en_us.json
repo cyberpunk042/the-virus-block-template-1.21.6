@@ -48,7 +48,7 @@
   "screen.the-virus-block.purification_totem.option.half_hp": "Half HP",
   "screen.the-virus-block.purification_totem.description.no_boobytraps": "Disable boobytraps and starve the worms.",
   "screen.the-virus-block.purification_totem.description.no_shell": "Strip away every protective layer around the Virus Block.",
-  "screen.the-virus-block.purification_totem.description.half_hp": "Force the Virus Block to run at half max HP.",
+  "screen.the-virus-block.purification_totem.description.half_hp": "Bleed away half of the Virus Block's remaining health.",
 
   "itemGroup.the-virus-block": "The Virus Block",
 
@@ -59,8 +59,8 @@
   "message.the-virus-block.shells_collapsed": "The Virus Block shells collapse and cannot reform!",
   "message.the-virus-block.purification.no_boobytraps": "Trap placements disabled. Worm activity will plummet.",
   "message.the-virus-block.purification.no_shell": "Shell defenses collapse around the Virus Block!",
-  "message.the-virus-block.purification.half_hp": "Containment ritual enforces half max HP.",
-  "message.the-virus-block.purification.half_hp_enabled": "Half-health protocol already active.",
+  "message.the-virus-block.purification.half_hp": "Stability surge! The Virus Block loses half of its power.",
+  "message.the-virus-block.purification.half_hp_failed": "The Virus Block is already at minimum stability.",
   "message.the-virus-block.purification_totem.missing": "Keep the totem in your hand to finish the ritual.",
   "message.the-virus-block.purification_totem.dormant": "The totem hums quietly. The infection must be active first.",
   "bossbar.the-virus-block.tier": "Tier %s \u2013 %s",

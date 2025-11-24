@@ -63,11 +63,11 @@ public enum PurificationOption {
 	}
 
 	private static void applyHalfHp(ServerWorld world, ServerPlayerEntity player, VirusWorldState state) {
-		boolean changed = state.enableHalfHealth(world);
+		boolean drained = state.drainVirusHealth(world, 0.5D);
 		player.sendMessage(Text.translatable(
-				changed
+				drained
 						? "message.the-virus-block.purification.half_hp"
-						: "message.the-virus-block.purification.half_hp_enabled").formatted(Formatting.DARK_RED), false);
+						: "message.the-virus-block.purification.half_hp_failed").formatted(Formatting.DARK_RED), false);
 	}
 }
 

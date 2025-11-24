@@ -15,6 +15,7 @@ import net.cyberpunk042.infection.BoobytrapHelper.TrapSelection;
 import net.cyberpunk042.infection.InfectionTier;
 import net.cyberpunk042.infection.TierCookbook;
 import net.cyberpunk042.infection.TierFeature;
+import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.registry.ModBlocks;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
@@ -242,11 +243,17 @@ public final class BlockMutationHelper {
 			return false;
 		}
 
+		VirusWorldState state = VirusWorldState.get(world);
 		int radius = MathHelper.clamp(radiusRule * 2, 8, 192);
 		int tierScale = Math.max(1, tier.getLevel());
 		int attempts = MathHelper.clamp(attemptsRule * tierScale, 0, 4096);
 		attempts = Math.max(attempts, anchors.size() * 40);
 		attempts = Math.min(attempts, 4096);
+		int budget = state.claimSurfaceMutations(world, tier, apocalypseMode, attempts);
+		if (budget <= 0) {
+			return false;
+		}
+		attempts = budget;
 		boolean mutated = false;
 		for (int i = 0; i < attempts; i++) {
 			BlockPos anchor = anchors.get(random.nextInt(anchors.size()));

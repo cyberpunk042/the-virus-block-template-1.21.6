@@ -28,7 +28,7 @@ public final class VirusFluidRenderers {
 			@Override
 			public int getFluidColor(BlockRenderView view, BlockPos pos, FluidState state) {
 				if (VirusSkyClientState.areFluidsCorrupted()) {
-					return 0x8A18FF;
+					return 0xFF8A1818; // deep red accent while keeping the fluid fully opaque
 				}
 				return vanillaLava.getFluidColor(view, pos, state);
 			}
@@ -43,7 +43,7 @@ public final class VirusFluidRenderers {
 			@Override
 			public int getFluidColor(BlockRenderView view, BlockPos pos, FluidState state) {
 				if (VirusSkyClientState.areFluidsCorrupted()) {
-					return 0x2F7A2F;
+					return 0xFF2F7A2F; // swampy green tint with full alpha
 				}
 				return vanillaWater.getFluidColor(view, pos, state);
 			}

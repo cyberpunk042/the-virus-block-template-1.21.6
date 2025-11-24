@@ -1,6 +1,8 @@
 package net.cyberpunk042.infection;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import it.unimi.dsi.fastutil.objects.Object2ByteMap;
@@ -8,46 +10,70 @@ import it.unimi.dsi.fastutil.objects.Object2ByteOpenHashMap;
 import net.cyberpunk042.network.SkyTintPayload;
 import net.minecraft.entity.boss.BossBar;
 import net.minecraft.entity.boss.ServerBossBar;
+import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.world.World;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 
 public final class VirusTierBossBar {
-	private static final ServerBossBar BAR = new ServerBossBar(
-			Text.literal("Virus Tier"),
-			BossBar.Color.PURPLE,
-			BossBar.Style.NOTCHED_10);
+	private static final Map<RegistryKey<World>, ServerBossBar> BARS = new HashMap<>();
 	private static final Object2ByteMap<UUID> SKY_TINT = new Object2ByteOpenHashMap<>();
 
 	private VirusTierBossBar() {
 	}
 
 	public static void init() {
-		BAR.setVisible(false);
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> SKY_TINT.removeByte(handler.player.getUuid()));
 	}
 
 	public static void update(ServerWorld world, VirusWorldState state) {
-		syncPlayers(world);
 		syncSkyTint(world, state);
+		RegistryKey<World> key = world.getRegistryKey();
+		ServerBossBar bar = BARS.get(key);
 
 		if (!state.isInfected()) {
-			BAR.setVisible(false);
-			BAR.setPercent(0.0F);
+			if (bar != null) {
+				clearBar(bar);
+				BARS.remove(key);
+			}
 			return;
 		}
 
-		BAR.setVisible(true);
-		setTitle(state);
-		setProgress(state);
-		setColor(state);
+		if (bar == null) {
+			bar = createBar();
+			BARS.put(key, bar);
+		}
+
+		syncPlayers(world, bar);
+		bar.setVisible(true);
+		setTitle(bar, state);
+		setProgress(bar, state);
+		setColor(bar, state);
 	}
 
-	private static void setTitle(VirusWorldState state) {
+	private static ServerBossBar createBar() {
+		ServerBossBar bar = new ServerBossBar(
+				Text.literal("Virus Tier"),
+				BossBar.Color.PURPLE,
+				BossBar.Style.NOTCHED_10);
+		bar.setVisible(false);
+		return bar;
+	}
+
+	private static void clearBar(ServerBossBar bar) {
+		bar.setVisible(false);
+		bar.setPercent(0.0F);
+		for (ServerPlayerEntity player : List.copyOf(bar.getPlayers())) {
+			bar.removePlayer(player);
+		}
+	}
+
+	private static void setTitle(ServerBossBar bar, VirusWorldState state) {
 		int displayTier = state.getCurrentTier().getIndex() + 1;
 		String key = state.isCalm() ? "bossbar.the-virus-block.state.calm" : "bossbar.the-virus-block.state.active";
 		MutableText text = Text.translatable("bossbar.the-virus-block.tier", displayTier, Text.translatable(key));
@@ -56,40 +82,40 @@ public final class VirusTierBossBar {
 		} else {
 			text.formatted(Formatting.DARK_PURPLE);
 		}
-		BAR.setName(text);
+		bar.setName(text);
 	}
 
-	private static void setProgress(VirusWorldState state) {
+	private static void setProgress(ServerBossBar bar, VirusWorldState state) {
 		int duration = state.getCurrentTier().getDurationTicks();
 		if (duration <= 0) {
-			BAR.setPercent(1.0F);
+			bar.setPercent(1.0F);
 			return;
 		}
 
 		float percent = Math.min(1.0F, (float) state.getTicksInTier() / (float) duration);
-		BAR.setPercent(percent);
+		bar.setPercent(percent);
 	}
 
-	private static void setColor(VirusWorldState state) {
+	private static void setColor(ServerBossBar bar, VirusWorldState state) {
 		switch (state.getCurrentTier().getIndex()) {
-			case 0 -> BAR.setColor(BossBar.Color.BLUE);
-			case 1 -> BAR.setColor(BossBar.Color.GREEN);
-			case 2 -> BAR.setColor(BossBar.Color.YELLOW);
-			case 3 -> BAR.setColor(BossBar.Color.PINK);
-			default -> BAR.setColor(BossBar.Color.RED);
+			case 0 -> bar.setColor(BossBar.Color.BLUE);
+			case 1 -> bar.setColor(BossBar.Color.GREEN);
+			case 2 -> bar.setColor(BossBar.Color.YELLOW);
+			case 3 -> bar.setColor(BossBar.Color.PINK);
+			default -> bar.setColor(BossBar.Color.RED);
 		}
 	}
 
-	private static void syncPlayers(ServerWorld world) {
-		for (ServerPlayerEntity player : List.copyOf(BAR.getPlayers())) {
+	private static void syncPlayers(ServerWorld world, ServerBossBar bar) {
+		for (ServerPlayerEntity player : List.copyOf(bar.getPlayers())) {
 			if (player.getWorld() != world) {
-				BAR.removePlayer(player);
+				bar.removePlayer(player);
 			}
 		}
 
 		for (ServerPlayerEntity player : world.getPlayers()) {
-			if (!BAR.getPlayers().contains(player)) {
-				BAR.addPlayer(player);
+			if (!bar.getPlayers().contains(player)) {
+				bar.addPlayer(player);
 			}
 		}
 	}
