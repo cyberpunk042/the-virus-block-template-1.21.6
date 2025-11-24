@@ -21,7 +21,6 @@ import net.cyberpunk042.block.corrupted.CorruptionStage;
 import net.cyberpunk042.block.entity.MatrixCubeBlockEntity;
 import net.cyberpunk042.entity.FallingMatrixCubeEntity;
 import net.cyberpunk042.infection.mutation.BlockMutationHelper;
-import net.cyberpunk042.infection.singularity.SingularityManager;
 import net.cyberpunk042.infection.TierCookbook;
 import net.cyberpunk042.infection.TierFeature;
 import net.cyberpunk042.infection.TierFeatureGroup;
@@ -64,10 +63,10 @@ import net.minecraft.world.Heightmap;
 import net.minecraft.world.PersistentState;
 import net.minecraft.world.PersistentStateType;
 import net.minecraft.world.WorldEvents;
+import org.jetbrains.annotations.Nullable;
 
 public class VirusWorldState extends PersistentState {
 	public static final String ID = TheVirusBlock.MOD_ID + "_infection_state";
-	private static final int FLAG_SINGULARITY = 1;
 	private static final int FLAG_APOCALYPSE = 1 << 1;
 	private static final int FLAG_TERRAIN = 1 << 2;
 	private static final int FLAG_SHELLS = 1 << 3;
@@ -94,7 +93,6 @@ public class VirusWorldState extends PersistentState {
 		state.ticksInTier = ticksInTier;
 		state.calmUntilTick = calmUntilTick;
 		state.containmentLevel = containmentLevel;
-		state.singularitySummoned = (stateFlags & FLAG_SINGULARITY) != 0;
 		state.apocalypseMode = (stateFlags & FLAG_APOCALYPSE) != 0;
 		state.terrainCorrupted = (stateFlags & FLAG_TERRAIN) != 0;
 		state.shellsCollapsed = (stateFlags & FLAG_SHELLS) != 0;
@@ -120,7 +118,6 @@ public class VirusWorldState extends PersistentState {
 	private long ticksInTier;
 	private long calmUntilTick;
 	private int containmentLevel;
-	private boolean singularitySummoned;
 	private boolean apocalypseMode;
 	private boolean terrainCorrupted;
 	private boolean shellsCollapsed;
@@ -195,7 +192,6 @@ public class VirusWorldState extends PersistentState {
 			maybeVoidTear(world, origin, tier, random);
 			maybeInversion(world, origin, tier, random);
 			maybeEntityDuplication(world, origin, tier, random);
-			maybeSpawnSingularity(world, origin);
 		}
 	}
 
@@ -255,11 +251,13 @@ public class VirusWorldState extends PersistentState {
 				double y = top + 20.0D;
 
 				ArrowEntity arrow = new ArrowEntity(world, x, y, z, new ItemStack(Items.ARROW), null);
+				arrow.addCommandTag(TheVirusBlock.CORRUPTION_PROJECTILE_TAG);
 				arrow.setVelocity(0.0D, -1.6D - random.nextDouble(), 0.0D);
 				world.spawnEntity(arrow);
 
 				if (tier.getIndex() >= 1 && random.nextFloat() < 0.35F + tier.getIndex() * 0.15F) {
 					TntEntity tnt = new TntEntity(world, x, y, z, null);
+					tnt.addCommandTag(TheVirusBlock.CORRUPTION_EXPLOSIVE_TAG);
 					tnt.setFuse(Math.max(15, 50 - tier.getIndex() * 8));
 					world.spawnEntity(tnt);
 					tntSpawned++;
@@ -285,12 +283,14 @@ public class VirusWorldState extends PersistentState {
 			double offsetZ = player.getZ() + random.nextBetween(-2, 2) + random.nextDouble();
 			double y = player.getY() + 10.0D + i;
 			ArrowEntity arrow = new ArrowEntity(world, offsetX, y, offsetZ, new ItemStack(Items.ARROW), null);
+			arrow.addCommandTag(TheVirusBlock.CORRUPTION_PROJECTILE_TAG);
 			arrow.setVelocity(0.0D, -1.9D - random.nextDouble() * 0.6D, 0.0D);
 			world.spawnEntity(arrow);
 		}
 
 		if (tier.getIndex() >= 3) {
 			TntEntity tnt = new TntEntity(world, player.getX(), player.getY() + 12.0D, player.getZ(), null);
+			tnt.addCommandTag(TheVirusBlock.CORRUPTION_EXPLOSIVE_TAG);
 			tnt.setFuse(Math.max(20, 40 - tier.getIndex() * 6));
 			world.spawnEntity(tnt);
 		}
@@ -497,25 +497,6 @@ public class VirusWorldState extends PersistentState {
 			CorruptionProfiler.logTierEvent(world, VirusEventType.ENTITY_DUPLICATION, spawnPos,
 					"type=" + spawned.getType().toString());
 		}
-	}
-
-	private void maybeSpawnSingularity(ServerWorld world, BlockPos origin) {
-		if (!TierCookbook.isEnabled(world, getCurrentTier(), apocalypseMode, TierFeature.EVENT_SINGULARITY)) {
-			return;
-		}
-		if (singularitySummoned || !canTrigger(VirusEventType.SINGULARITY, 0)) {
-			return;
-		}
-
-		BlockPos beaconPos = origin.up(6);
-		world.playSound(null, beaconPos, SoundEvents.BLOCK_BEACON_ACTIVATE, SoundCategory.HOSTILE, 2.0F, 0.6F);
-		world.playSound(null, beaconPos, SoundEvents.ENTITY_WITHER_SPAWN, SoundCategory.HOSTILE, 3.0F, 0.5F);
-
-		singularitySummoned = true;
-		apocalypseMode = true;
-		markEvent(VirusEventType.SINGULARITY);
-		CorruptionProfiler.logTierEvent(world, VirusEventType.SINGULARITY, beaconPos, null);
-		markDirty();
 	}
 
 	private void removeMissingSources(ServerWorld world) {
@@ -1026,7 +1007,6 @@ private static final int MAX_SHELL_HEIGHT = 2;
 			calmUntilTick = 0;
 			containmentLevel = 0;
 			apocalypseMode = false;
-			singularitySummoned = false;
 			terrainCorrupted = false;
 			shellsCollapsed = false;
 			cleansingActive = false;
@@ -1114,7 +1094,6 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		MatrixCubeBlockEntity.destroyAll(world);
 		shellCooldowns.clear();
 		pillarChunks.clear();
-		singularitySummoned = false;
 		apocalypseMode = false;
 		terrainCorrupted = false;
 		shellsCollapsed = false;
@@ -1133,7 +1112,6 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		calmUntilTick = 0;
 		containmentLevel = 0;
 		apocalypseMode = false;
-		singularitySummoned = false;
 		terrainCorrupted = false;
 		shellsCollapsed = false;
 		healthScale = 1.0D;
@@ -1145,8 +1123,6 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		markDirty();
 
 		MatrixCubeBlockEntity.destroyAll(world);
-		SingularityManager.clearWaveMobs(world);
-		SingularityManager.stop(world);
 		Text message = Text.translatable("message.the-virus-block.cleansed").formatted(Formatting.AQUA);
 		world.getPlayers(PlayerEntity::isAlive).forEach(player -> player.sendMessage(message, false));
 	}
@@ -1217,10 +1193,6 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		return totalTicks < calmUntilTick;
 	}
 
-	public boolean isSingularitySummoned() {
-		return singularitySummoned;
-	}
-
 	public void disturbByPlayer(ServerWorld world) {
 		if (!infected) {
 			return;
@@ -1230,9 +1202,6 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		long bonus = 40L + tier.getIndex() * 30L;
 		if (tier.getIndex() >= 3) {
 			bonus += 60L;
-		}
-		if (singularitySummoned) {
-			bonus += 80L;
 		}
 		applyDisturbance(world, bonus);
 		BlockPos disturbance = representativePos(world, world.getRandom());
@@ -1287,24 +1256,19 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		markDirty();
 	}
 
-	public void reflectCoreDamage(ServerWorld world, float fraction) {
-		if (!infected || fraction <= 0.0F || !SingularityManager.isActive(world)) {
+	public void handleExplosionImpact(ServerWorld world, @Nullable Entity source, Vec3d center, double radius) {
+		if (!infected || radius <= 0.0D || virusSources.isEmpty()) {
 			return;
 		}
 
-		double damage = Math.max(1.0D, getMaxHealth() * MathHelper.clamp(fraction, 0.0F, 1.0F));
-		applyHealthDamage(world, damage);
-	}
-
-	public void handleExplosionImpact(ServerWorld world, Vec3d center, double radius) {
-		if (!infected || radius <= 0.0D || virusSources.isEmpty()) {
+		if (source != null && source.getCommandTags().contains(TheVirusBlock.CORRUPTION_EXPLOSIVE_TAG)) {
 			return;
 		}
 
 		double radiusSq = radius * radius;
 		boolean hit = false;
-		for (BlockPos source : virusSources) {
-			if (source.toCenterPos().squaredDistanceTo(center) <= radiusSq) {
+		for (BlockPos core : virusSources) {
+			if (core.toCenterPos().squaredDistanceTo(center) <= radiusSq) {
 				hit = true;
 				break;
 			}
@@ -1315,13 +1279,6 @@ private static final int MAX_SHELL_HEIGHT = 2;
 
 		long bonus = MathHelper.floor(60L + radius * 6.0D);
 		bonus = MathHelper.clamp(bonus, 40L, 400L);
-		if (SingularityManager.isActive(world)) {
-			double damageScale = MathHelper.clamp(radius / 4.0D, 0.5D, 3.5D);
-			float coreDamage = SingularityManager.EXPLOSION_DAMAGE * (float) damageScale;
-			SingularityManager.onVirusBlockDamage(world, coreDamage);
-			applyHealthDamage(world, getMaxHealth() * (damageScale * 0.02D));
-			return;
-		}
 
 		if (apocalypseMode) {
 			double damageScale = MathHelper.clamp(radius / 4.0D, 0.5D, 3.5D);
@@ -1390,9 +1347,6 @@ private static final int MAX_SHELL_HEIGHT = 2;
 
 	private static int encodeFlags(VirusWorldState state) {
 		int flags = 0;
-		if (state.singularitySummoned) {
-			flags |= FLAG_SINGULARITY;
-		}
 		if (state.apocalypseMode) {
 			flags |= FLAG_APOCALYPSE;
 		}

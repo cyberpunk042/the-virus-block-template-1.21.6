@@ -4,8 +4,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import net.cyberpunk042.infection.InfectionTier;
-import net.cyberpunk042.infection.singularity.SingularityManager;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.registry.ModBlocks;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
@@ -17,7 +15,6 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 
 public final class VirusBlockProtection {
-	public static final int MIN_SURVIVAL_BREAK_TIER = 3;
 	private static final int COOLDOWN_TICKS = 10;
 
 	private static final Map<UUID, Long> blockedUntil = new ConcurrentHashMap<>();
@@ -34,10 +31,6 @@ public final class VirusBlockProtection {
 			}
 
 			VirusWorldState infection = VirusWorldState.get(serverWorld);
-			if (SingularityManager.canBreakVirusBlock(serverWorld)) {
-				return true;
-			}
-
 			if (shouldBlockBreak(serverWorld, serverPlayer, infection)) {
 				resyncBlock(serverPlayer, serverWorld, pos, state);
 				return false;
@@ -60,8 +53,7 @@ public final class VirusBlockProtection {
 			return true;
 		}
 
-		InfectionTier tier = infection.getCurrentTier();
-		boolean blocked = !player.isCreative() && tier.getIndex() < MIN_SURVIVAL_BREAK_TIER;
+		boolean blocked = !player.isCreative() && !infection.isApocalypseMode();
 		if (blocked) {
 			recordBlockedAttempt(player, world);
 		}

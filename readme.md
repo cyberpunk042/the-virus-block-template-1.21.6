@@ -72,9 +72,17 @@ The Virus spreads through **five escalating tiers**:
 - Massive TNT/Arrow barrages  
 - Terrain waves rise and fall  
 - Entity duplication events  
-- Boss anomaly spawns: **THE SINGULARITY**
+- Virus Block bossbar locks at 100%—once it fills, **Apocalypse Mode** begins.
 
-Optional **Apocalypse Mode** unlocks beyond Tier 5.
+### 🔻 Apocalypse Mode (Post-Tier 5)
+
+Once the Tier 5 progress bar finishes, every Virus Block sheds its shells, the bossbar switches to a red health readout, and the corruption enters its terminal phase:
+
+- The Virus Block becomes fully vulnerable; melee hits, arrows, TNT, and Purification option 4 all drain its health.
+- Purification option 3 still halves the block’s max health, shortening the fight without rewinding progress.
+- The calm/progress bossbar is hidden; only the red health bar remains while vulnerable.
+- When Virus HP reaches zero *or* you finish mining the exposed block, the infection is cleansed and the world begins to recover.
+- (Future roadmap: a Singularity-style fail-safe may return later if players ignore Apocalypse Mode for too long, but it is currently disabled.)
 
 ---
 
@@ -149,23 +157,14 @@ Aura strength scales with infection tier.
 
 ---
 
-## ⚔️ Singularity Boss (Tier 5)
+## ⚔️ Ending the Infection
 
-Once the corruption reaches maximum intensity, the dimension summons:
+Apocalypse Mode is the last phase—there is no separate boss arena right now. Survive the Tier 5 chaos, keep accelerating the Virus Block’s progress, and once the bar flips to red health you can finally fight back:
 
-### 🌀 THE SINGULARITY
-
-A corrupted anomaly boss that:
-
-- Sucks blocks toward itself  
-- Fires corruption beams  
-- Distorts chunks and terrain  
-- Summons corrupted mobs  
-- Causes random teleports  
-- Warps physics around it  
-
-Defeating it stabilizes the dimension.  
-Failing allows it to begin **deleting chunks** and collapsing the world.
+- Every hit against the Virus Block removes health instead of rewinding progress.
+- TNT, bed explosions, and projectiles all deal chunk-based damage; larger blasts chew away more HP.
+- Purification totems remain powerful finishers—option 3 reduces max HP, option 4 burns current HP.
+- When the health bar empties, the Virus Block disintegrates and the infection resets to zero sources.
 
 ---
 
@@ -191,7 +190,7 @@ Purifies or cancels one mutation event. Choose between:
 
 ### End the Apocalypse
 
-Defeat **The Singularity** to freeze corruption where it stands.  
+Drain the Virus Block’s health during Apocalypse Mode (or finish mining the exposed block) to wipe the infection.  
 The world remains scarred, but no longer worsens.
 
 ---
@@ -220,7 +219,7 @@ This is a “progressive chaos” mod designed for content creation and challeng
 
 - **Tier 2:** liquid corruption, corrupted sand/ice/snow surfaces, Mutation Pulse, Skyfall, Collapse Surge, Passive Revolt, Mob Buff Storm, Virus Bloom.
 - **Tier 3:** Void Tear, Inversion.
-- **Tier 4:** Entity Duplication, Singularity.
+- **Tier 4:** Entity Duplication.
 - **Tier 5:** (Reserved – apocalypse add-ons only.)
 
 ## 🛡️ Admin Commands
@@ -263,8 +262,8 @@ Most tuning happens through gamerules. Here are the high-impact ones (defaults i
 | `virusLiquidMutationEnabled` | `true` | Enables corrupted water/lava once Tier 2 is reached. |
 | `virusCorruptSandEnabled` / `virusCorruptIceEnabled` / `virusCorruptSnowEnabled` | `true` | Opt individual surface conversions in/out. |
 | `virusTier2EventsEnabled` | `true` | Master toggle for Tier‑2 global events (Mutation Pulse, Skyfall, etc.). |
-| `virusTier3ExtrasEnabled` | `false` | Unlocks Tier‑3+ extras (Void Tear, Inversion, Entity Duplication, Singularity). |
-| `virusEventMutationPulseEnabled` … `virusEventSingularityEnabled` | `true` | Fine-grained switches for each event (Mutation Pulse, Skyfall, Collapse Surge, Passive Revolt, Mob Buff Storm, Virus Bloom, Void Tear, Inversion, Entity Duplication, Singularity). Use these if you want to cherry-pick specific events without disabling the whole tier. |
+| `virusTier3ExtrasEnabled` | `false` | Unlocks Tier‑3+ extras (Void Tear, Inversion, Entity Duplication). |
+| `virusEventMutationPulseEnabled` … `virusEventEntityDuplicationEnabled` | `true` | Fine-grained switches for each event (Mutation Pulse, Skyfall, Collapse Surge, Passive Revolt, Mob Buff Storm, Virus Bloom, Void Tear, Inversion, Entity Duplication). Use these if you want to cherry-pick specific events without disabling the whole tier. |
 | `virusMatrixCubeMaxActive` | `200` | Cap on simultaneous Matrix Cubes raining from the sky. |
 | `virusBoobytrapsEnabled` | `true` | Controls spontaneous boobytrap placement/explosions. |
 | `virusWormsEnabled` | `true` | Allows corrupted dirt/boobytraps to spawn corrupted worms. |

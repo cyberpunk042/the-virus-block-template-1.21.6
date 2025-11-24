@@ -6,9 +6,9 @@ import com.mojang.serialization.MapCodec;
 
 import java.util.function.BiConsumer;
 
+import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.block.entity.VirusBlockEntity;
 import net.cyberpunk042.infection.VirusWorldState;
-import net.cyberpunk042.infection.singularity.SingularityManager;
 import net.cyberpunk042.registry.ModBlockEntities;
 import net.minecraft.block.BlockRenderType;
 import net.minecraft.block.BlockState;
@@ -16,6 +16,7 @@ import net.minecraft.block.BlockWithEntity;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.entity.BlockEntityTicker;
 import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -36,6 +37,8 @@ import net.minecraft.text.Text;
 
 public class VirusBlock extends BlockWithEntity {
 	private static final int LOCK_MESSAGE_INTERVAL = 20;
+	private static final double VULNERABLE_EXPLOSION_FRACTION = 0.01D;
+	private static final double VULNERABLE_CONTACT_FRACTION = 0.0008333333333333334D;
 
 	public static final MapCodec<VirusBlock> CODEC = createCodec(VirusBlock::new);
 
@@ -119,13 +122,13 @@ public class VirusBlock extends BlockWithEntity {
 	@Override
 	protected void onExploded(BlockState state, ServerWorld world, BlockPos pos, Explosion explosion, BiConsumer<ItemStack, BlockPos> stackMerger) {
 		VirusWorldState infection = VirusWorldState.get(world);
-		if (SingularityManager.isActive(world)) {
-			SingularityManager.onVirusBlockDamage(world, SingularityManager.EXPLOSION_DAMAGE);
+		Entity source = explosion.getEntity();
+		if (source != null && source.getCommandTags().contains(TheVirusBlock.CORRUPTION_EXPLOSIVE_TAG)) {
 			return;
 		}
 
 		if (infection.isApocalypseMode()) {
-			infection.bleedHealth(world, SingularityManager.EXPLOSION_DAMAGE);
+			infection.bleedHealth(world, VULNERABLE_EXPLOSION_FRACTION);
 		} else {
 			infection.disturbByPlayer(world);
 		}
@@ -138,13 +141,12 @@ public class VirusBlock extends BlockWithEntity {
 			return;
 		}
 		VirusWorldState infection = VirusWorldState.get(serverWorld);
-		if (SingularityManager.isActive(serverWorld)) {
-			SingularityManager.onVirusBlockDamage(serverWorld, SingularityManager.HIT_DAMAGE);
+		if (projectile.getCommandTags().contains(TheVirusBlock.CORRUPTION_PROJECTILE_TAG)) {
 			return;
 		}
 
 		if (infection.isApocalypseMode()) {
-			infection.bleedHealth(serverWorld, SingularityManager.HIT_DAMAGE);
+			infection.bleedHealth(serverWorld, VULNERABLE_CONTACT_FRACTION);
 		} else {
 			infection.disturbByPlayer(serverWorld);
 		}
@@ -160,34 +162,21 @@ public class VirusBlock extends BlockWithEntity {
 	protected float calcBlockBreakingDelta(BlockState state, PlayerEntity player, BlockView world, BlockPos pos) {
 		if (player.getWorld() instanceof ServerWorld serverWorld) {
 			VirusWorldState infection = VirusWorldState.get(serverWorld);
-			if (SingularityManager.isActive(serverWorld)) {
-				SingularityManager.onVirusBlockDamage(serverWorld, SingularityManager.HIT_DAMAGE);
-				if (!SingularityManager.canBreakVirusBlock(serverWorld) && !player.isCreative()) {
-					return 0.0F;
-				}
-			} else if (infection.isApocalypseMode()) {
-				infection.bleedHealth(serverWorld, SingularityManager.HIT_DAMAGE);
-			}
+			boolean vulnerable = infection.isApocalypseMode();
 
-			if (!player.isCreative()) {
-				int tierIndex = infection.getCurrentTier().getIndex();
-				if (tierIndex < VirusBlockProtection.MIN_SURVIVAL_BREAK_TIER) {
-					infection.disturbByPlayer(serverWorld);
-					if (player instanceof ServerPlayerEntity serverPlayer) {
-						VirusBlockProtection.recordBlockedAttempt(serverPlayer, serverWorld);
-					}
-					if (player instanceof ServerPlayerEntity serverPlayer && serverPlayer.age % LOCK_MESSAGE_INTERVAL == 0) {
+			if (vulnerable) {
+				if (!player.isCreative()) {
+					infection.bleedHealth(serverWorld, VULNERABLE_CONTACT_FRACTION);
+				}
+			} else if (!player.isCreative()) {
+				infection.disturbByPlayer(serverWorld);
+				if (player instanceof ServerPlayerEntity serverPlayer) {
+					VirusBlockProtection.recordBlockedAttempt(serverPlayer, serverWorld);
+					if (serverPlayer.age % LOCK_MESSAGE_INTERVAL == 0) {
 						serverPlayer.sendMessage(Text.translatable("message.the-virus-block.block_locked"), true);
 					}
-					return 0.0F;
 				}
-
-				if (!infection.isSingularitySummoned()
-						&& tierIndex >= VirusBlockProtection.MIN_SURVIVAL_BREAK_TIER
-						&& player instanceof ServerPlayerEntity serverPlayer
-						&& serverPlayer.age % 5 == 0) {
-					infection.disturbByPlayer(serverWorld);
-				}
+				return 0.0F;
 			}
 		}
 

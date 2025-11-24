@@ -1,7 +1,6 @@
 package net.cyberpunk042.mixin;
 
 import net.cyberpunk042.infection.VirusWorldState;
-import net.cyberpunk042.infection.singularity.SingularityManager;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
@@ -51,9 +50,6 @@ public abstract class LivingEntityMixin extends Entity {
 			return;
 		}
 
-		if (SingularityManager.shouldPreventFriendlyFire(world, attacker, self)) {
-			cir.setReturnValue(false);
-		}
 	}
 
 	@Inject(method = "baseTick", at = @At("TAIL"))

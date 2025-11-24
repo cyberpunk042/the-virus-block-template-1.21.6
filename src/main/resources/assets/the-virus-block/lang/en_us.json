@@ -71,7 +71,6 @@
   "bossbar.the-virus-block.state.calm": "Dormant",
   "bossbar.the-virus-block.state.active": "Active",
   "bossbar.the-virus-block.vulnerable": "Virus Block Vulnerable",
-  "bossbar.the-virus-block.singularity": "Singularity Collapse",
 
   "entity.the-virus-block.corrupted_passive": "Corrupted Husk",
   "entity.the-virus-block.corrupted_worm": "Bitey Worm"

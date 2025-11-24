@@ -2,7 +2,6 @@ package net.cyberpunk042.infection;
 
 import net.cyberpunk042.block.VirusBlockProtection;
 import net.cyberpunk042.command.VirusCommand;
-import net.cyberpunk042.infection.singularity.SingularityManager;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
@@ -26,7 +25,6 @@ public final class VirusInfectionSystem {
 		VirusWorldState state = VirusWorldState.get(world);
 		state.tick(world);
 		VirusTierBossBar.update(world, state);
-		SingularityManager.tick(world, state);
 	}
 }
 

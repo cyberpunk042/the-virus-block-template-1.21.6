@@ -1,13 +1,11 @@
 package net.cyberpunk042.mixin;
 
-import java.util.List;
-
+import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.infection.VirusWorldState;
+import net.minecraft.entity.Entity;
 import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
-import net.minecraft.world.explosion.Explosion;
+import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -29,6 +27,11 @@ public abstract class ExplosionMixin {
 	@Final
 	private float power;
 
+	@Shadow
+	@Final
+	@Nullable
+	private Entity entity;
+
 	@Inject(method = "explode", at = @At("TAIL"))
 	private void theVirusBlock$handleExplosion(CallbackInfo ci) {
 		VirusWorldState state = VirusWorldState.get(world);
@@ -36,8 +39,12 @@ public abstract class ExplosionMixin {
 			return;
 		}
 
+		if (entity != null && entity.getCommandTags().contains(TheVirusBlock.CORRUPTION_EXPLOSIVE_TAG)) {
+			return;
+		}
+
 		double radius = Math.max(3.0D, power * 6.0F);
-		state.handleExplosionImpact(world, pos, radius);
+		state.handleExplosionImpact(world, entity, pos, radius);
 	}
 }
 

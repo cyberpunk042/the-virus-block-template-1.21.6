@@ -23,8 +23,7 @@ public enum TierFeature {
 
 	EVENT_VOID_TEAR("void_tear", InfectionTier.THREE, TierFeatureGroup.TIER3_EXTRA, TheVirusBlock.VIRUS_EVENT_VOID_TEAR_ENABLED),
 	EVENT_INVERSION("inversion", InfectionTier.THREE, TierFeatureGroup.TIER3_EXTRA, TheVirusBlock.VIRUS_EVENT_INVERSION_ENABLED),
-	EVENT_ENTITY_DUPLICATION("entity_duplication", InfectionTier.FOUR, TierFeatureGroup.TIER3_EXTRA, TheVirusBlock.VIRUS_EVENT_ENTITY_DUPLICATION_ENABLED),
-	EVENT_SINGULARITY("singularity", InfectionTier.FOUR, TierFeatureGroup.TIER3_EXTRA, TheVirusBlock.VIRUS_EVENT_SINGULARITY_ENABLED);
+	EVENT_ENTITY_DUPLICATION("entity_duplication", InfectionTier.FOUR, TierFeatureGroup.TIER3_EXTRA, TheVirusBlock.VIRUS_EVENT_ENTITY_DUPLICATION_ENABLED);
 
 	private final String id;
 	private final InfectionTier minTier;

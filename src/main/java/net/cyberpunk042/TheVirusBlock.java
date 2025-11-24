@@ -31,8 +31,8 @@ public class TheVirusBlock implements ModInitializer {
 	public static final String MOD_ID = "the-virus-block";
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 	public static final Identifier SKY_TINT_PACKET = Identifier.of(MOD_ID, "sky_tint");
-	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_WAVE_FRIENDLY_FIRE =
-			GameRuleRegistry.register("virusWaveFriendlyFire", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(false));
+	public static final String CORRUPTION_PROJECTILE_TAG = MOD_ID + ".corruption_projectile";
+	public static final String CORRUPTION_EXPLOSIVE_TAG = MOD_ID + ".corruption_explosive";
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_BLOCK_TELEPORT_ENABLED =
 			GameRuleRegistry.register("virusBlockTeleportEnabled", GameRules.Category.MISC, GameRuleFactory.createBooleanRule(true));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_BLOCK_TELEPORT_RADIUS =
@@ -132,8 +132,6 @@ public class TheVirusBlock implements ModInitializer {
 			GameRuleRegistry.register("virusEventInversionEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_EVENT_ENTITY_DUPLICATION_ENABLED =
 			GameRuleRegistry.register("virusEventEntityDuplicationEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
-	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_EVENT_SINGULARITY_ENABLED =
-			GameRuleRegistry.register("virusEventSingularityEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_WORMS_ENABLED =
 			GameRuleRegistry.register("virusWormsEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_WORM_SPAWN_CHANCE =

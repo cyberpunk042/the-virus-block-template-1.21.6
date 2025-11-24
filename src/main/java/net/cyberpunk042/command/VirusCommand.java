@@ -14,11 +14,6 @@ public final class VirusCommand {
 	public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
 		dispatcher.register(CommandManager.literal("virusblock")
 				.requires(source -> source.hasPermissionLevel(2))
-				.then(CommandManager.literal("waves")
-						.then(CommandManager.literal("friendlyfire")
-								.then(CommandManager.literal("enable").executes(ctx -> setFriendlyFire(ctx.getSource(), true)))
-								.then(CommandManager.literal("disable").executes(ctx -> setFriendlyFire(ctx.getSource(), false))))
-						.then(CommandManager.literal("status").executes(ctx -> reportFriendlyFire(ctx.getSource()))))
 				.then(CommandManager.literal("teleport")
 						.then(CommandManager.literal("enable").executes(ctx -> setTeleportEnabled(ctx.getSource(), true)))
 						.then(CommandManager.literal("disable").executes(ctx -> setTeleportEnabled(ctx.getSource(), false)))
@@ -26,18 +21,6 @@ public final class VirusCommand {
 								.then(CommandManager.argument("chunks", IntegerArgumentType.integer(0, 64))
 										.executes(ctx -> setTeleportRadius(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "chunks")))))
 						.then(CommandManager.literal("status").executes(ctx -> reportTeleport(ctx.getSource())))));
-	}
-
-	private static int setFriendlyFire(ServerCommandSource source, boolean enabled) {
-		source.getServer().getGameRules().get(TheVirusBlock.VIRUS_WAVE_FRIENDLY_FIRE).set(enabled, source.getServer());
-		source.sendFeedback(() -> Text.literal("Virus wave friendly fire set to " + enabled), true);
-		return enabled ? 1 : 0;
-	}
-
-	private static int reportFriendlyFire(ServerCommandSource source) {
-		boolean enabled = source.getServer().getGameRules().getBoolean(TheVirusBlock.VIRUS_WAVE_FRIENDLY_FIRE);
-		source.sendFeedback(() -> Text.literal("Virus wave friendly fire is currently " + (enabled ? "enabled" : "disabled")), false);
-		return enabled ? 1 : 0;
 	}
 
 	private static int setTeleportEnabled(ServerCommandSource source, boolean enabled) {
