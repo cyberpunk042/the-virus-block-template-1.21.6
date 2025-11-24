@@ -16,6 +16,7 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.World;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -35,7 +36,6 @@ public final class VirusTierBossBar {
 		syncSkyTint(world, state);
 		RegistryKey<World> key = world.getRegistryKey();
 		ServerBossBar bar = BARS.get(key);
-
 		if (!state.isInfected()) {
 			if (bar != null) {
 				clearBar(bar);
@@ -51,9 +51,7 @@ public final class VirusTierBossBar {
 
 		syncPlayers(world, bar);
 		bar.setVisible(true);
-		setTitle(bar, state);
-		setProgress(bar, state);
-		setColor(bar, state);
+		updateBarSegments(bar, state);
 	}
 
 	private static ServerBossBar createBar() {
@@ -73,37 +71,38 @@ public final class VirusTierBossBar {
 		}
 	}
 
-	private static void setTitle(ServerBossBar bar, VirusWorldState state) {
+	private static void updateBarSegments(ServerBossBar bar, VirusWorldState state) {
+		float progressRatio = getProgressRatio(state);
+		float healthRatio = (float) state.getHealthPercent();
 		int displayTier = state.getCurrentTier().getIndex() + 1;
 		String key = state.isCalm() ? "bossbar.the-virus-block.state.calm" : "bossbar.the-virus-block.state.active";
-		MutableText text = Text.translatable("bossbar.the-virus-block.tier", displayTier, Text.translatable(key));
-		if (state.isCalm()) {
-			text.formatted(Formatting.AQUA);
-		} else {
-			text.formatted(Formatting.DARK_PURPLE);
-		}
-		bar.setName(text);
-	}
 
-	private static void setProgress(ServerBossBar bar, VirusWorldState state) {
-		int duration = state.getCurrentTier().getDurationTicks();
-		if (duration <= 0) {
-			bar.setPercent(1.0F);
+		if (state.isApocalypseMode()) {
+			MutableText vulnerableTitle = Text.translatable("bossbar.the-virus-block.vulnerable")
+					.formatted(Formatting.RED)
+					.append(Text.literal(String.format(" [%d%%]", Math.round(healthRatio * 100))).formatted(Formatting.DARK_RED));
+			bar.setName(vulnerableTitle);
+			bar.setPercent(MathHelper.clamp(healthRatio, 0.0F, 1.0F));
+			bar.setColor(BossBar.Color.RED);
 			return;
 		}
 
-		float percent = Math.min(1.0F, (float) state.getTicksInTier() / (float) duration);
-		bar.setPercent(percent);
+		MutableText title = Text.translatable("bossbar.the-virus-block.tier", displayTier, Text.translatable(key))
+				.formatted(state.isCalm() ? Formatting.AQUA : Formatting.DARK_PURPLE)
+				.append(Text.literal(String.format("  [P:%d%%] ", Math.round(progressRatio * 100))).formatted(Formatting.AQUA))
+				.append(Text.literal(String.format("[H:%d%%]", Math.round(healthRatio * 100))).formatted(Formatting.DARK_RED));
+		bar.setName(title);
+
+		bar.setPercent(progressRatio);
+		bar.setColor(progressRatio >= 1.0F ? BossBar.Color.RED : BossBar.Color.PURPLE);
 	}
 
-	private static void setColor(ServerBossBar bar, VirusWorldState state) {
-		switch (state.getCurrentTier().getIndex()) {
-			case 0 -> bar.setColor(BossBar.Color.BLUE);
-			case 1 -> bar.setColor(BossBar.Color.GREEN);
-			case 2 -> bar.setColor(BossBar.Color.YELLOW);
-			case 3 -> bar.setColor(BossBar.Color.PINK);
-			default -> bar.setColor(BossBar.Color.RED);
+	private static float getProgressRatio(VirusWorldState state) {
+		int duration = state.getCurrentTierDuration();
+		if (duration <= 0) {
+			return 1.0F;
 		}
+		return MathHelper.clamp((float) state.getTicksInTier() / (float) duration, 0.0F, 1.0F);
 	}
 
 	private static void syncPlayers(ServerWorld world, ServerBossBar bar) {

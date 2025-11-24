@@ -182,7 +182,12 @@ Build a containment structure around it (configurable effects).
 ### Temporary Reversion
 
 Craft a **Purification Totem** (expensive, late-game).  
-Purifies or cancels one mutation event.
+Purifies or cancels one mutation event. Choose between:
+
+- **No Boobytraps** – disables trap placement and throttles corrupted worm influx.
+- **No Shell** – collapses every defensive shell wrapped around the Virus Block.
+- **Half HP** – halves the Virus Block’s *maximum* health for the current tier, shortening the remaining timeline without triggering shell collapse.
+- **Bleed HP** – halves the Virus Block’s *current* health, rolling its boss bar backward immediately.
 
 ### End the Apocalypse
 

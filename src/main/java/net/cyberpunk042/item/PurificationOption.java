@@ -17,7 +17,8 @@ import net.minecraft.world.GameRules;
 public enum PurificationOption {
 	NO_BOOBYTRAPS("no_boobytraps", () -> new ItemStack(Items.TNT)),
 	NO_SHELL("no_shell", () -> new ItemStack(Items.OBSIDIAN)),
-	HALF_HP("half_hp", () -> new ItemStack(Items.HEART_OF_THE_SEA));
+	HALF_HP("half_hp", () -> new ItemStack(Items.HEART_OF_THE_SEA)),
+	BLEED_HP("bleed_hp", () -> new ItemStack(Items.GLISTERING_MELON_SLICE));
 
 	private final String key;
 	private final Supplier<ItemStack> iconSupplier;
@@ -44,6 +45,7 @@ public enum PurificationOption {
 			case NO_BOOBYTRAPS -> applyNoBoobytraps(world, player);
 			case NO_SHELL -> applyNoShell(world, player, state);
 			case HALF_HP -> applyHalfHp(world, player, state);
+			case BLEED_HP -> applyBleedHp(world, player, state);
 		}
 		state.applyPurification(20 * 120L);
 		world.playSound(null, player.getBlockPos(), SoundEvents.BLOCK_AMETHYST_BLOCK_RESONATE, SoundCategory.PLAYERS, 1.0F, 0.7F);
@@ -63,11 +65,19 @@ public enum PurificationOption {
 	}
 
 	private static void applyHalfHp(ServerWorld world, ServerPlayerEntity player, VirusWorldState state) {
-		boolean drained = state.drainVirusHealth(world, 0.5D);
+		boolean reduced = state.reduceMaxHealth(world, 0.5D);
+		player.sendMessage(Text.translatable(
+				reduced
+						? "message.the-virus-block.purification.max_hp"
+						: "message.the-virus-block.purification.max_hp_failed").formatted(Formatting.DARK_RED), false);
+	}
+
+	private static void applyBleedHp(ServerWorld world, ServerPlayerEntity player, VirusWorldState state) {
+		boolean drained = state.bleedHealth(world, 0.5D);
 		player.sendMessage(Text.translatable(
 				drained
-						? "message.the-virus-block.purification.half_hp"
-						: "message.the-virus-block.purification.half_hp_failed").formatted(Formatting.DARK_RED), false);
+						? "message.the-virus-block.purification.bleed_hp"
+						: "message.the-virus-block.purification.bleed_hp_failed").formatted(Formatting.DARK_RED), false);
 	}
 }
 

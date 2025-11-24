@@ -36,8 +36,6 @@ import net.minecraft.entity.FallingBlockEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.SpawnReason;
 import net.minecraft.entity.TntEntity;
-import net.minecraft.entity.attribute.EntityAttributeInstance;
-import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.mob.HostileEntity;
@@ -69,7 +67,11 @@ import net.minecraft.world.WorldEvents;
 
 public class VirusWorldState extends PersistentState {
 	public static final String ID = TheVirusBlock.MOD_ID + "_infection_state";
-	private static final double DEFAULT_MAX_HEALTH = 20.0D;
+	private static final int FLAG_SINGULARITY = 1;
+	private static final int FLAG_APOCALYPSE = 1 << 1;
+	private static final int FLAG_TERRAIN = 1 << 2;
+	private static final int FLAG_SHELLS = 1 << 3;
+	private static final int FLAG_CLEANSING = 1 << 4;
 	private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(instance -> instance.group(
 			Codec.BOOL.optionalFieldOf("infected", false).forGetter(state -> state.infected),
 			Codec.INT.optionalFieldOf("tierIndex", 0).forGetter(state -> state.tierIndex),
@@ -77,17 +79,14 @@ public class VirusWorldState extends PersistentState {
 			Codec.LONG.optionalFieldOf("ticksInTier", 0L).forGetter(state -> state.ticksInTier),
 			Codec.LONG.optionalFieldOf("calmUntilTick", 0L).forGetter(state -> state.calmUntilTick),
 			Codec.INT.optionalFieldOf("containmentLevel", 0).forGetter(state -> state.containmentLevel),
-			Codec.BOOL.optionalFieldOf("singularitySummoned", false).forGetter(state -> state.singularitySummoned),
-			Codec.BOOL.optionalFieldOf("apocalypseMode", false).forGetter(state -> state.apocalypseMode),
-			Codec.BOOL.optionalFieldOf("terrainCorrupted", false).forGetter(state -> state.terrainCorrupted),
-			Codec.BOOL.optionalFieldOf("shellsCollapsed", false).forGetter(state -> state.shellsCollapsed),
-			Codec.BOOL.optionalFieldOf("cleansingActive", false).forGetter(state -> state.cleansingActive),
-			Codec.BOOL.optionalFieldOf("halfHealthMode", false).forGetter(state -> state.halfHealthMode),
+			Codec.INT.optionalFieldOf("stateFlags", 0).forGetter(VirusWorldState::encodeFlags),
+			Codec.DOUBLE.optionalFieldOf("healthScale", 1.0D).forGetter(state -> state.healthScale),
+			Codec.DOUBLE.optionalFieldOf("currentHealth", 0.0D).forGetter(state -> state.currentHealth),
 			Codec.LONG.listOf().optionalFieldOf("pillarChunks", List.of()).forGetter(VirusWorldState::getPillarChunksSnapshot),
 			BlockPos.CODEC.listOf().optionalFieldOf("virusSources", List.of()).forGetter(VirusWorldState::getVirusSourceList),
 			Codec.unboundedMap(VirusEventType.CODEC, Codec.LONG).optionalFieldOf("eventHistory", Map.of()).forGetter(VirusWorldState::getEventHistorySnapshot),
 			Codec.LONG.optionalFieldOf("lastMatrixCubeTick", 0L).forGetter(state -> state.lastMatrixCubeTick)
-	).apply(instance, (infected, tierIndex, totalTicks, ticksInTier, calmUntilTick, containmentLevel, singularitySummoned, apocalypseMode, terrainCorrupted, shellsCollapsed, cleansingActive, halfHealthMode, pillarChunks, sources, events, lastMatrixCubeTick) -> {
+	).apply(instance, (infected, tierIndex, totalTicks, ticksInTier, calmUntilTick, containmentLevel, stateFlags, healthScale, currentHealth, pillarChunks, sources, events, lastMatrixCubeTick) -> {
 		VirusWorldState state = new VirusWorldState();
 		state.infected = infected;
 		state.tierIndex = tierIndex;
@@ -95,12 +94,13 @@ public class VirusWorldState extends PersistentState {
 		state.ticksInTier = ticksInTier;
 		state.calmUntilTick = calmUntilTick;
 		state.containmentLevel = containmentLevel;
-		state.singularitySummoned = singularitySummoned;
-		state.apocalypseMode = apocalypseMode;
-		state.terrainCorrupted = terrainCorrupted;
-		state.shellsCollapsed = shellsCollapsed;
-		state.cleansingActive = cleansingActive;
-		state.halfHealthMode = halfHealthMode;
+		state.singularitySummoned = (stateFlags & FLAG_SINGULARITY) != 0;
+		state.apocalypseMode = (stateFlags & FLAG_APOCALYPSE) != 0;
+		state.terrainCorrupted = (stateFlags & FLAG_TERRAIN) != 0;
+		state.shellsCollapsed = (stateFlags & FLAG_SHELLS) != 0;
+		state.cleansingActive = (stateFlags & FLAG_CLEANSING) != 0;
+		state.healthScale = healthScale;
+		state.currentHealth = currentHealth;
 		pillarChunks.forEach(chunk -> state.pillarChunks.add(chunk.longValue()));
 		sources.forEach(pos -> state.virusSources.add(pos.toImmutable()));
 		state.eventHistory.putAll(events);
@@ -125,7 +125,8 @@ public class VirusWorldState extends PersistentState {
 	private boolean terrainCorrupted;
 	private boolean shellsCollapsed;
 	private boolean cleansingActive;
-	private boolean halfHealthMode;
+	private double healthScale = 1.0D;
+	private double currentHealth;
 	private int surfaceMutationBudget;
 	private long surfaceMutationBudgetTick = -1L;
 	@SuppressWarnings("unused")
@@ -140,20 +141,16 @@ public class VirusWorldState extends PersistentState {
 			return;
 		}
 
-		if (halfHealthMode) {
-			halfHealthMode = false;
-			restoreFullHealth(world);
-			markDirty();
-		}
-
 		totalTicks++;
 		ticksInTier++;
 
 		removeMissingSources(world);
 
 		InfectionTier tier = InfectionTier.byIndex(tierIndex);
+		ensureHealthInitialized(tier);
+		int tierDuration = getTierDuration(tier);
 
-		if (!apocalypseMode && tier.getDurationTicks() > 0 && ticksInTier >= tier.getDurationTicks()) {
+		if (!apocalypseMode && tierDuration > 0 && ticksInTier >= tierDuration) {
 			advanceTier(world);
 		}
 
@@ -1001,6 +998,7 @@ private static final int MAX_SHELL_HEIGHT = 2;
 
 		tierIndex++;
 		ticksInTier = 0;
+		resetHealthForTier(InfectionTier.byIndex(tierIndex));
 		BlockPos pos = representativePos(world, world.getRandom());
 		if (pos != null) {
 			world.playSound(null, pos, SoundEvents.ENTITY_WITHER_AMBIENT, SoundCategory.BLOCKS, 2.5F, 1.0F);
@@ -1032,7 +1030,7 @@ private static final int MAX_SHELL_HEIGHT = 2;
 			terrainCorrupted = false;
 			shellsCollapsed = false;
 			cleansingActive = false;
-			halfHealthMode = false;
+			resetHealthForTier(InfectionTier.byIndex(tierIndex));
 			pillarChunks.clear();
 			eventHistory.clear();
 			markDirty();
@@ -1073,27 +1071,33 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		markDirty();
 	}
 
-	public boolean drainVirusHealth(ServerWorld world, double fraction) {
+	public boolean reduceMaxHealth(ServerWorld world, double factor) {
+		if (!infected || factor <= 0.0D || factor >= 1.0D) {
+			return false;
+		}
+
+		double previousMax = Math.max(1.0D, getMaxHealth());
+		double newMax = Math.max(1.0D, previousMax * factor);
+		if (Math.abs(newMax - previousMax) < 0.0001D) {
+			return false;
+		}
+
+		double percent = previousMax <= 0.0D ? 1.0D : MathHelper.clamp(currentHealth / previousMax, 0.0D, 1.0D);
+		healthScale = Math.max(0.1D, healthScale * factor);
+		double actualMax = getMaxHealth();
+		currentHealth = Math.max(1.0D, Math.min(actualMax, percent * actualMax));
+		markDirty();
+		VirusTierBossBar.update(world, this);
+		return true;
+	}
+
+	public boolean bleedHealth(ServerWorld world, double fraction) {
 		if (!infected || fraction <= 0.0D) {
 			return false;
 		}
 
-		InfectionTier tier = InfectionTier.byIndex(tierIndex);
-		int duration = tier.getDurationTicks();
-		if (duration <= 0) {
-			return false;
-		}
-
-		long reduction = Math.max(1L, Math.round(duration * fraction));
-		long previous = ticksInTier;
-		ticksInTier = Math.max(0L, ticksInTier - reduction);
-		if (ticksInTier == previous) {
-			return false;
-		}
-
-		markDirty();
-		VirusTierBossBar.update(world, this);
-		return true;
+		double amount = Math.max(1.0D, getMaxHealth() * MathHelper.clamp(fraction, 0.0D, 1.0D));
+		return applyHealthDamage(world, amount);
 	}
 
 	public void forceContainmentReset(ServerWorld world) {
@@ -1132,8 +1136,8 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		singularitySummoned = false;
 		terrainCorrupted = false;
 		shellsCollapsed = false;
-		boolean wasHalfHealth = halfHealthMode;
-		halfHealthMode = false;
+		healthScale = 1.0D;
+		currentHealth = 0.0D;
 		beginCleansing();
 		eventHistory.clear();
 		shellCooldowns.clear();
@@ -1143,9 +1147,6 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		MatrixCubeBlockEntity.destroyAll(world);
 		SingularityManager.clearWaveMobs(world);
 		SingularityManager.stop(world);
-		if (wasHalfHealth) {
-			restoreFullHealth(world);
-		}
 		Text message = Text.translatable("message.the-virus-block.cleansed").formatted(Formatting.AQUA);
 		world.getPlayers(PlayerEntity::isAlive).forEach(player -> player.sendMessage(message, false));
 	}
@@ -1164,6 +1165,22 @@ private static final int MAX_SHELL_HEIGHT = 2;
 
 	public int getContainmentLevel() {
 		return containmentLevel;
+	}
+
+	public double getMaxHealth() {
+		return getMaxHealthForTier(getCurrentTier());
+	}
+
+	public double getCurrentHealth() {
+		return currentHealth;
+	}
+
+	public double getHealthPercent() {
+		double max = getMaxHealth();
+		if (max <= 0.0D) {
+			return 0.0D;
+		}
+		return MathHelper.clamp(currentHealth / max, 0.0D, 1.0D);
 	}
 
 	public boolean isApocalypseMode() {
@@ -1210,7 +1227,6 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		}
 
 		InfectionTier tier = InfectionTier.byIndex(tierIndex);
-		long duration = tier.getDurationTicks();
 		long bonus = 40L + tier.getIndex() * 30L;
 		if (tier.getIndex() >= 3) {
 			bonus += 60L;
@@ -1218,12 +1234,7 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		if (singularitySummoned) {
 			bonus += 80L;
 		}
-		ticksInTier += bonus;
-		if (duration > 0) {
-			ticksInTier = Math.min(ticksInTier, duration);
-		}
-
-		calmUntilTick = Math.min(calmUntilTick, totalTicks);
+		applyDisturbance(world, bonus);
 		BlockPos disturbance = representativePos(world, world.getRandom());
 		if (disturbance == null && !virusSources.isEmpty()) {
 			disturbance = virusSources.iterator().next();
@@ -1259,19 +1270,143 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		return granted;
 	}
 
-	private void restoreFullHealth(ServerWorld world) {
-		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
-			EntityAttributeInstance attribute = player.getAttributeInstance(EntityAttributes.MAX_HEALTH);
-			if (attribute == null) {
-				continue;
-			}
-			if (attribute.getBaseValue() < DEFAULT_MAX_HEALTH) {
-				attribute.setBaseValue(DEFAULT_MAX_HEALTH);
-			}
-			if (player.getHealth() > attribute.getBaseValue()) {
-				player.setHealth((float) attribute.getBaseValue());
-			}
+	private void ensureHealthInitialized(InfectionTier tier) {
+		if (healthScale <= 0.0D) {
+			healthScale = 1.0D;
+		}
+		double max = getMaxHealthForTier(tier);
+		if (currentHealth <= 0.0D || currentHealth > max) {
+			currentHealth = max;
+			markDirty();
 		}
 	}
+
+	private void resetHealthForTier(InfectionTier tier) {
+		healthScale = 1.0D;
+		currentHealth = getMaxHealthForTier(tier);
+		markDirty();
+	}
+
+	public void reflectCoreDamage(ServerWorld world, float fraction) {
+		if (!infected || fraction <= 0.0F || !SingularityManager.isActive(world)) {
+			return;
+		}
+
+		double damage = Math.max(1.0D, getMaxHealth() * MathHelper.clamp(fraction, 0.0F, 1.0F));
+		applyHealthDamage(world, damage);
+	}
+
+	public void handleExplosionImpact(ServerWorld world, Vec3d center, double radius) {
+		if (!infected || radius <= 0.0D || virusSources.isEmpty()) {
+			return;
+		}
+
+		double radiusSq = radius * radius;
+		boolean hit = false;
+		for (BlockPos source : virusSources) {
+			if (source.toCenterPos().squaredDistanceTo(center) <= radiusSq) {
+				hit = true;
+				break;
+			}
+		}
+		if (!hit) {
+			return;
+		}
+
+		long bonus = MathHelper.floor(60L + radius * 6.0D);
+		bonus = MathHelper.clamp(bonus, 40L, 400L);
+		if (SingularityManager.isActive(world)) {
+			double damageScale = MathHelper.clamp(radius / 4.0D, 0.5D, 3.5D);
+			float coreDamage = SingularityManager.EXPLOSION_DAMAGE * (float) damageScale;
+			SingularityManager.onVirusBlockDamage(world, coreDamage);
+			applyHealthDamage(world, getMaxHealth() * (damageScale * 0.02D));
+			return;
+		}
+
+		if (apocalypseMode) {
+			double damageScale = MathHelper.clamp(radius / 4.0D, 0.5D, 3.5D);
+			applyHealthDamage(world, getMaxHealth() * (damageScale * 0.02D));
+			return;
+		}
+
+		applyDisturbance(world, bonus);
+	}
+
+	private void applyDisturbance(ServerWorld world, long bonus) {
+		if (bonus <= 0) {
+			return;
+		}
+
+		ticksInTier += bonus;
+		int duration = getTierDuration(getCurrentTier());
+		if (duration > 0 && ticksInTier > duration) {
+			ticksInTier = duration;
+		}
+		calmUntilTick = Math.min(calmUntilTick, totalTicks);
+		markDirty();
+	}
+
+	public boolean applyHealthDamage(ServerWorld world, double amount) {
+		if (!infected || amount <= 0.0D) {
+			return false;
+		}
+
+		double previous = currentHealth;
+		currentHealth = Math.max(0.0D, currentHealth - amount);
+		if (Math.abs(previous - currentHealth) < 0.0001D) {
+			return false;
+		}
+
+		double max = getMaxHealth();
+		if (!shellsCollapsed && previous > max * 0.5D && currentHealth <= max * 0.5D) {
+			collapseShells(world);
+		}
+
+		markDirty();
+		VirusTierBossBar.update(world, this);
+		if (currentHealth <= 0.0D) {
+			handleVirusDefeat(world);
+		}
+		return true;
+	}
+
+	private void handleVirusDefeat(ServerWorld world) {
+		forceContainmentReset(world);
+	}
+
+	private double getMaxHealthForTier(InfectionTier tier) {
+		double base = Math.max(1.0D, tier.getBaseHealth());
+		double scale = MathHelper.clamp(healthScale, 0.1D, 2.5D);
+		return Math.max(1.0D, base * scale);
+	}
+
+	public int getCurrentTierDuration() {
+		return getTierDuration(getCurrentTier());
+	}
+
+	private int getTierDuration(InfectionTier tier) {
+		return tier.getDurationTicks();
+	}
+
+	private static int encodeFlags(VirusWorldState state) {
+		int flags = 0;
+		if (state.singularitySummoned) {
+			flags |= FLAG_SINGULARITY;
+		}
+		if (state.apocalypseMode) {
+			flags |= FLAG_APOCALYPSE;
+		}
+		if (state.terrainCorrupted) {
+			flags |= FLAG_TERRAIN;
+		}
+		if (state.shellsCollapsed) {
+			flags |= FLAG_SHELLS;
+		}
+		if (state.cleansingActive) {
+			flags |= FLAG_CLEANSING;
+		}
+		return flags;
+	}
+
 }
 

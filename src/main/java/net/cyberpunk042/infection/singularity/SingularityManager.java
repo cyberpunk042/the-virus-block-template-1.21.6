@@ -85,6 +85,7 @@ public final class SingularityManager {
 		}
 
 		data.reduceProgress(world, amount);
+		VirusWorldState.get(world).reflectCoreDamage(world, amount);
 	}
 
 	public static boolean canBreakVirusBlock(ServerWorld world) {

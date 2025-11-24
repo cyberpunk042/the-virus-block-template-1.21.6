@@ -19,6 +19,7 @@ import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.entity.projectile.ProjectileEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.server.world.ServerWorld;
@@ -117,7 +118,36 @@ public class VirusBlock extends BlockWithEntity {
 
 	@Override
 	protected void onExploded(BlockState state, ServerWorld world, BlockPos pos, Explosion explosion, BiConsumer<ItemStack, BlockPos> stackMerger) {
-		SingularityManager.onVirusBlockDamage(world, SingularityManager.EXPLOSION_DAMAGE);
+		VirusWorldState infection = VirusWorldState.get(world);
+		if (SingularityManager.isActive(world)) {
+			SingularityManager.onVirusBlockDamage(world, SingularityManager.EXPLOSION_DAMAGE);
+			return;
+		}
+
+		if (infection.isApocalypseMode()) {
+			infection.bleedHealth(world, SingularityManager.EXPLOSION_DAMAGE);
+		} else {
+			infection.disturbByPlayer(world);
+		}
+	}
+
+	@Override
+	public void onProjectileHit(World world, BlockState state, BlockHitResult hit, ProjectileEntity projectile) {
+		super.onProjectileHit(world, state, hit, projectile);
+		if (!(world instanceof ServerWorld serverWorld)) {
+			return;
+		}
+		VirusWorldState infection = VirusWorldState.get(serverWorld);
+		if (SingularityManager.isActive(serverWorld)) {
+			SingularityManager.onVirusBlockDamage(serverWorld, SingularityManager.HIT_DAMAGE);
+			return;
+		}
+
+		if (infection.isApocalypseMode()) {
+			infection.bleedHealth(serverWorld, SingularityManager.HIT_DAMAGE);
+		} else {
+			infection.disturbByPlayer(serverWorld);
+		}
 	}
 
 	@Nullable
@@ -135,6 +165,8 @@ public class VirusBlock extends BlockWithEntity {
 				if (!SingularityManager.canBreakVirusBlock(serverWorld) && !player.isCreative()) {
 					return 0.0F;
 				}
+			} else if (infection.isApocalypseMode()) {
+				infection.bleedHealth(serverWorld, SingularityManager.HIT_DAMAGE);
 			}
 
 			if (!player.isCreative()) {

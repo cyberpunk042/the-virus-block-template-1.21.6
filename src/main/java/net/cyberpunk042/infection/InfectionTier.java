@@ -3,22 +3,24 @@ package net.cyberpunk042.infection;
 import java.util.Arrays;
 
 public enum InfectionTier {
-	ONE(0, 2400, 3, 4.5F),
-	TWO(1, 3600, 5, 5.5F),
-	THREE(2, 4800, 7, 6.5F),
-	FOUR(3, 3600, 9, 8.0F),
-	FIVE(4, 4800, 12, 10.0F);
+	ONE(0, 2400, 3, 4.5F, 120.0D),
+	TWO(1, 3600, 5, 5.5F, 220.0D),
+	THREE(2, 4800, 7, 6.5F, 320.0D),
+	FOUR(3, 3600, 9, 8.0F, 420.0D),
+	FIVE(4, 4800, 12, 10.0F, 600.0D);
 
 	private final int index;
 	private final int durationTicks;
 	private final int mutationBursts;
 	private final float baseAuraRadius;
+	private final double baseHealth;
 
-	InfectionTier(int index, int durationTicks, int mutationBursts, float baseAuraRadius) {
+	InfectionTier(int index, int durationTicks, int mutationBursts, float baseAuraRadius, double baseHealth) {
 		this.index = index;
 		this.durationTicks = durationTicks;
 		this.mutationBursts = mutationBursts;
 		this.baseAuraRadius = baseAuraRadius;
+		this.baseHealth = baseHealth;
 	}
 
 	public int getIndex() {
@@ -47,6 +49,10 @@ public enum InfectionTier {
 
 	public float getBaseAuraRadius() {
 		return baseAuraRadius;
+	}
+
+	public double getBaseHealth() {
+		return baseHealth;
 	}
 
 	public InfectionTier next() {
