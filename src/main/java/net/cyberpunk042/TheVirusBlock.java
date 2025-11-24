@@ -5,15 +5,21 @@ import org.slf4j.LoggerFactory;
 
 import net.cyberpunk042.infection.VirusInfectionSystem;
 import net.cyberpunk042.infection.VirusWorldState;
+import net.cyberpunk042.infection.VirusDifficulty;
 import net.cyberpunk042.registry.ModBlockEntities;
 import net.cyberpunk042.registry.ModBlocks;
 import net.cyberpunk042.registry.ModEntities;
 import net.cyberpunk042.registry.ModItemGroups;
 import net.cyberpunk042.registry.ModItems;
 import net.cyberpunk042.command.VirusDebugCommands;
+import net.cyberpunk042.command.VirusDifficultyCommand;
+import net.cyberpunk042.network.DifficultySyncPayload;
 import net.cyberpunk042.network.PurificationTotemSelectPayload;
+import net.cyberpunk042.network.VirusDifficultySelectPayload;
 import net.cyberpunk042.screen.ModScreenHandlers;
 import net.cyberpunk042.screen.handler.PurificationTotemScreenHandler;
+import net.cyberpunk042.screen.handler.VirusDifficultyScreenHandler;
+import net.cyberpunk042.util.DelayedServerTasks;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleFactory;
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleRegistry;
@@ -25,7 +31,13 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.Formatting;
 import net.minecraft.world.GameRules;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
+import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
 
 public class TheVirusBlock implements ModInitializer {
 	public static final String MOD_ID = "the-virus-block";
@@ -33,6 +45,10 @@ public class TheVirusBlock implements ModInitializer {
 	public static final Identifier SKY_TINT_PACKET = Identifier.of(MOD_ID, "sky_tint");
 	public static final String CORRUPTION_PROJECTILE_TAG = MOD_ID + ".corruption_projectile";
 	public static final String CORRUPTION_EXPLOSIVE_TAG = MOD_ID + ".corruption_explosive";
+	private static final String STARTER_TAG = MOD_ID + ".starter_kit";
+	private static final String STARTER_TOTEM_TAG = MOD_ID + ".starter_totem";
+	public static final Identifier DIFFICULTY_SYNC_PACKET = Identifier.of(MOD_ID, "difficulty_sync");
+	public static final Identifier DIFFICULTY_SELECT_PACKET = Identifier.of(MOD_ID, "difficulty_select");
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_BLOCK_TELEPORT_ENABLED =
 			GameRuleRegistry.register("virusBlockTeleportEnabled", GameRules.Category.MISC, GameRuleFactory.createBooleanRule(true));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_BLOCK_TELEPORT_RADIUS =
@@ -140,11 +156,19 @@ public class TheVirusBlock implements ModInitializer {
 			GameRuleRegistry.register("virusWormTrapSpawnChance", GameRules.Category.MOBS, GameRuleFactory.createIntRule(135, 0, 1000));
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_LIQUID_MUTATION_ENABLED =
 			GameRuleRegistry.register("virusLiquidMutationEnabled", GameRules.Category.MISC, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_DIFFICULTY_LOCKED =
+			GameRuleRegistry.register("virusDifficultyLocked", GameRules.Category.MISC, GameRuleFactory.createBooleanRule(false));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_ALLOW_FAST_FLIGHT =
+			GameRuleRegistry.register("virusAllowFastFlight", GameRules.Category.PLAYER, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_VERBOSE_INVENTORY_ALERTS =
+			GameRuleRegistry.register("virusVerboseInventoryAlerts", GameRules.Category.CHAT, GameRuleFactory.createBooleanRule(true));
 
 	@Override
 	public void onInitialize() {
 		PayloadTypeRegistry.playS2C().register(SkyTintPayload.ID, SkyTintPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(DifficultySyncPayload.ID, DifficultySyncPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(PurificationTotemSelectPayload.ID, PurificationTotemSelectPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(VirusDifficultySelectPayload.ID, VirusDifficultySelectPayload.CODEC);
 		ModBlocks.bootstrap();
 		ModItems.bootstrap();
 		ModBlockEntities.bootstrap();
@@ -155,6 +179,10 @@ public class TheVirusBlock implements ModInitializer {
 		VirusInfectionSystem.init();
 		ServerPlayNetworking.registerGlobalReceiver(PurificationTotemSelectPayload.ID, (payload, context) ->
 				context.player().getServer().execute(() -> handlePurificationSelection(context.player(), payload)));
+		ServerPlayNetworking.registerGlobalReceiver(VirusDifficultySelectPayload.ID, (payload, context) ->
+				context.player().getServer().execute(() -> handleDifficultySelection(context.player(), payload)));
+		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
+				server.execute(() -> handlePlayerJoin(handler.player)));
 
 		LOGGER.info("The Virus Block is primed. Containment is impossible.");
 	}
@@ -184,5 +212,131 @@ public class TheVirusBlock implements ModInitializer {
 		}
 		payload.option().apply(world, player, state);
 		player.closeHandledScreen();
+	}
+
+	private static void handleDifficultySelection(ServerPlayerEntity player, VirusDifficultySelectPayload payload) {
+		if (!(player.currentScreenHandler instanceof VirusDifficultyScreenHandler handler)) {
+			return;
+		}
+		if (handler.syncId != payload.syncId()) {
+			return;
+		}
+		ServerWorld world = (ServerWorld) player.getWorld();
+		if (world.getGameRules().getBoolean(VIRUS_DIFFICULTY_LOCKED) && !player.hasPermissionLevel(2)) {
+			player.sendMessage(Text.translatable("message.the-virus-block.difficulty.locked"), true);
+			player.closeHandledScreen();
+			return;
+		}
+		VirusWorldState state = VirusWorldState.get(world);
+		state.setDifficulty(world, payload.difficulty());
+		player.closeHandledScreen();
+		player.sendMessage(Text.translatable("message.the-virus-block.difficulty.set", payload.difficulty().getDisplayName()), true);
+		if (payload.difficulty() == VirusDifficulty.EASY || payload.difficulty() == VirusDifficulty.MEDIUM) {
+			grantPurificationTotem(player);
+		}
+	}
+
+	private static void handlePlayerJoin(ServerPlayerEntity player) {
+		ServerWorld world = (ServerWorld) player.getWorld();
+		VirusWorldState state = VirusWorldState.get(world);
+		warnIfInfected(player, state);
+		grantStarterKit(player);
+		ensureFastFlight(player);
+		maybePromptDifficulty(player);
+	}
+
+	private static void grantStarterKit(ServerPlayerEntity player) {
+		if (player.getCommandTags().contains(STARTER_TAG)) {
+			return;
+		}
+		ItemStack stack = new ItemStack(ModBlocks.VIRUS_BLOCK.asItem());
+		if (!player.giveItemStack(stack.copy())) {
+			player.dropItem(stack, false);
+		}
+		player.addCommandTag(STARTER_TAG);
+		player.sendMessage(Text.translatable("message.the-virus-block.starter.granted"), false);
+		grantPurificationTotem(player);
+	}
+
+	private static void grantPurificationTotem(ServerPlayerEntity player) {
+		if (player.getCommandTags().contains(STARTER_TOTEM_TAG)) {
+			return;
+		}
+		ServerWorld world = (ServerWorld) player.getWorld();
+		VirusDifficulty difficulty = VirusWorldState.get(world).getDifficulty();
+		if (difficulty != VirusDifficulty.EASY && difficulty != VirusDifficulty.MEDIUM) {
+			return;
+		}
+		ItemStack totem = new ItemStack(ModItems.PURIFICATION_TOTEM);
+		if (!player.giveItemStack(totem.copy())) {
+			player.dropItem(totem, false);
+		}
+		player.addCommandTag(STARTER_TOTEM_TAG);
+		player.sendMessage(Text.translatable("message.the-virus-block.starter.totem"), false);
+	}
+
+	private static void maybePromptDifficulty(ServerPlayerEntity player) {
+		ServerWorld world = (ServerWorld) player.getWorld();
+		VirusWorldState state = VirusWorldState.get(world);
+		if (state.hasShownDifficultyPrompt()) {
+			return;
+		}
+		var server = player.getServer();
+		if (server == null) {
+			return;
+		}
+		DelayedServerTasks.schedule(server, 100, () -> {
+			if (player.isDisconnected() || player.isRemoved()) {
+				return;
+			}
+			showCenteredMessage(player, Text.literal("Virus Block Mod Detected..").formatted(net.minecraft.util.Formatting.DARK_PURPLE), 10, 40, 10);
+			player.playSound(SoundEvents.BLOCK_BEACON_ACTIVATE, 0.8F, 1.0F);
+			DelayedServerTasks.schedule(server, 40, () -> {
+				if (player.isDisconnected() || player.isRemoved()) {
+					return;
+				}
+				showCenteredMessage(player, Text.literal("please be careful ..."), 5, 30, 5);
+				DelayedServerTasks.schedule(server, 50, () -> {
+					if (player.isDisconnected() || player.isRemoved()) {
+						return;
+					}
+					if (VirusDifficultyCommand.openMenuFor(player)) {
+						state.markDifficultyPromptShown();
+					}
+				});
+			});
+		});
+	}
+
+	private static void ensureFastFlight(ServerPlayerEntity player) {
+		ServerWorld world = (ServerWorld) player.getWorld();
+		if (!world.getGameRules().getBoolean(VIRUS_ALLOW_FAST_FLIGHT)) {
+			return;
+		}
+		var server = player.getServer();
+		if (server == null) {
+			return;
+		}
+		GameRules.BooleanRule elytraRule = world.getGameRules().get(GameRules.DISABLE_ELYTRA_MOVEMENT_CHECK);
+		if (!elytraRule.get()) {
+			elytraRule.set(true, server);
+		}
+		GameRules.BooleanRule movementRule = world.getGameRules().get(GameRules.DISABLE_PLAYER_MOVEMENT_CHECK);
+		if (!movementRule.get()) {
+			movementRule.set(true, server);
+		}
+	}
+
+	private static void showCenteredMessage(ServerPlayerEntity player, Text text, int fadeIn, int stay, int fadeOut) {
+		player.networkHandler.sendPacket(new TitleFadeS2CPacket(fadeIn, stay, fadeOut));
+		player.networkHandler.sendPacket(new TitleS2CPacket(text));
+	}
+
+	private static void warnIfInfected(ServerPlayerEntity player, VirusWorldState state) {
+		if (!state.isInfected()) {
+			return;
+		}
+		showCenteredMessage(player, Text.translatable("message.the-virus-block.infection.warning")
+				.formatted(Formatting.DARK_RED), 10, 60, 10);
 	}
 }

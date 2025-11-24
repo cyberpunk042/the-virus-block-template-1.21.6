@@ -14,7 +14,6 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
-import it.unimi.dsi.fastutil.objects.Object2LongMap.Entry;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
@@ -27,6 +26,7 @@ import net.cyberpunk042.block.entity.MatrixCubeBlockEntity;
 import net.cyberpunk042.entity.FallingMatrixCubeEntity;
 import net.cyberpunk042.infection.mutation.BlockMutationHelper;
 import net.cyberpunk042.mixin.GuardianEntityAccessor;
+import net.cyberpunk042.network.DifficultySyncPayload;
 import net.cyberpunk042.registry.ModBlocks;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
@@ -39,6 +39,11 @@ import net.minecraft.entity.FallingBlockEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.SpawnReason;
 import net.minecraft.entity.TntEntity;
+import net.minecraft.entity.attribute.EntityAttributeInstance;
+import net.minecraft.entity.attribute.EntityAttributeModifier;
+import net.minecraft.entity.attribute.EntityAttributeModifier.Operation;
+import net.minecraft.entity.attribute.EntityAttributes;
+import net.minecraft.util.Identifier;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.mob.GuardianEntity;
@@ -53,6 +58,7 @@ import net.minecraft.item.Items;
 import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
@@ -85,11 +91,13 @@ public class VirusWorldState extends PersistentState {
 			Codec.INT.optionalFieldOf("stateFlags", 0).forGetter(VirusWorldState::encodeFlags),
 			Codec.DOUBLE.optionalFieldOf("healthScale", 1.0D).forGetter(state -> state.healthScale),
 			Codec.DOUBLE.optionalFieldOf("currentHealth", 0.0D).forGetter(state -> state.currentHealth),
+			Codec.STRING.optionalFieldOf("difficulty", VirusDifficulty.HARD.getId()).forGetter(state -> state.difficulty.getId()),
+			Codec.BOOL.optionalFieldOf("difficultyPromptShown", false).forGetter(state -> state.difficultyPromptShown),
 			Codec.LONG.listOf().optionalFieldOf("pillarChunks", List.of()).forGetter(VirusWorldState::getPillarChunksSnapshot),
 			BlockPos.CODEC.listOf().optionalFieldOf("virusSources", List.of()).forGetter(VirusWorldState::getVirusSourceList),
 			Codec.unboundedMap(VirusEventType.CODEC, Codec.LONG).optionalFieldOf("eventHistory", Map.of()).forGetter(VirusWorldState::getEventHistorySnapshot),
 			Codec.LONG.optionalFieldOf("lastMatrixCubeTick", 0L).forGetter(state -> state.lastMatrixCubeTick)
-	).apply(instance, (infected, tierIndex, totalTicks, ticksInTier, calmUntilTick, containmentLevel, stateFlags, healthScale, currentHealth, pillarChunks, sources, events, lastMatrixCubeTick) -> {
+	).apply(instance, (infected, tierIndex, totalTicks, ticksInTier, calmUntilTick, containmentLevel, stateFlags, healthScale, currentHealth, difficultyId, difficultyPromptShown, pillarChunks, sources, events, lastMatrixCubeTick) -> {
 		VirusWorldState state = new VirusWorldState();
 		state.infected = infected;
 		state.tierIndex = tierIndex;
@@ -103,6 +111,8 @@ public class VirusWorldState extends PersistentState {
 		state.cleansingActive = (stateFlags & FLAG_CLEANSING) != 0;
 		state.healthScale = healthScale;
 		state.currentHealth = currentHealth;
+		state.difficulty = VirusDifficulty.fromId(difficultyId);
+		state.difficultyPromptShown = difficultyPromptShown;
 		pillarChunks.forEach(chunk -> state.pillarChunks.add(chunk.longValue()));
 		sources.forEach(pos -> state.virusSources.add(pos.toImmutable()));
 		state.eventHistory.putAll(events);
@@ -133,9 +143,44 @@ public class VirusWorldState extends PersistentState {
 	private long surfaceMutationBudgetTick = -1L;
 	@SuppressWarnings("unused")
 	private long lastMatrixCubeTick;
+	private VirusDifficulty difficulty = VirusDifficulty.HARD;
+	private boolean difficultyPromptShown;
+	private static final Identifier EXTREME_HEALTH_MODIFIER_ID = Identifier.of(TheVirusBlock.MOD_ID, "extreme_health_penalty");
 
 	public static VirusWorldState get(ServerWorld world) {
 		return world.getPersistentStateManager().getOrCreate(TYPE);
+	}
+
+	public VirusDifficulty getDifficulty() {
+		return difficulty;
+	}
+
+	public boolean hasShownDifficultyPrompt() {
+		return difficultyPromptShown;
+	}
+
+	public void markDifficultyPromptShown() {
+		if (!difficultyPromptShown) {
+			difficultyPromptShown = true;
+			markDirty();
+		}
+	}
+
+	public void setDifficulty(ServerWorld world, VirusDifficulty newDifficulty) {
+		if (this.difficulty == newDifficulty) {
+			return;
+		}
+		this.difficulty = newDifficulty;
+		markDirty();
+		applyDifficultyRules(world, getCurrentTier());
+		syncDifficulty(world);
+	}
+
+	private void syncDifficulty(ServerWorld world) {
+		DifficultySyncPayload payload = new DifficultySyncPayload(difficulty);
+		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
+			ServerPlayNetworking.send(player, payload);
+		}
 	}
 
 	public void tick(ServerWorld world) {
@@ -166,6 +211,7 @@ public class VirusWorldState extends PersistentState {
 		reinforceCores(world, tier);
 		maybeSpawnMatrixCube(world, tier);
 
+		applyDifficultyRules(world, tier);
 		if (totalTicks < calmUntilTick) {
 			return;
 		}
@@ -201,14 +247,51 @@ public class VirusWorldState extends PersistentState {
 		}
 	}
 
+	private void applyDifficultyRules(ServerWorld world, InfectionTier tier) {
+		if (difficulty == VirusDifficulty.EXTREME) {
+			applyExtremeHealthPenalty(world, tier);
+		} else {
+			clearExtremeHealthPenalty(world);
+		}
+	}
+
+	private void applyExtremeHealthPenalty(ServerWorld world, InfectionTier tier) {
+		double penalty = difficulty.getHealthPenaltyForTier(tier.getIndex());
+		if (penalty >= 0.0D) {
+			clearExtremeHealthPenalty(world);
+			return;
+		}
+		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
+			EntityAttributeInstance attribute = player.getAttributeInstance(EntityAttributes.MAX_HEALTH);
+			if (attribute == null) {
+				continue;
+			}
+			attribute.removeModifier(EXTREME_HEALTH_MODIFIER_ID);
+			attribute.addPersistentModifier(new EntityAttributeModifier(EXTREME_HEALTH_MODIFIER_ID, penalty, Operation.ADD_VALUE));
+			double max = attribute.getValue();
+			if (player.getHealth() > max) {
+				player.setHealth((float) max);
+			}
+		}
+	}
+
+	private void clearExtremeHealthPenalty(ServerWorld world) {
+		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
+			EntityAttributeInstance attribute = player.getAttributeInstance(EntityAttributes.MAX_HEALTH);
+			if (attribute != null) {
+				attribute.removeModifier(EXTREME_HEALTH_MODIFIER_ID);
+			}
+		}
+	}
+
 	private void tickGuardianBeams(ServerWorld world) {
 		if (guardianBeams.isEmpty()) {
 			return;
 		}
 		long now = world.getTime();
-		ObjectIterator<Entry<UUID>> iterator = guardianBeams.object2LongEntrySet().iterator();
+		ObjectIterator<Object2LongMap.Entry<UUID>> iterator = guardianBeams.object2LongEntrySet().iterator();
 		while (iterator.hasNext()) {
-			Entry<UUID> entry = iterator.next();
+			Object2LongMap.Entry<UUID> entry = iterator.next();
 			if (now >= entry.getLongValue()) {
 				Entity entity = world.getEntity(entry.getKey());
 				if (entity != null) {
@@ -604,8 +687,10 @@ public class VirusWorldState extends PersistentState {
 	}
 
 	private boolean canTrigger(VirusEventType type, long cooldown) {
-		long last = eventHistory.getOrDefault(type, -cooldown);
-		return totalTicks - last >= cooldown;
+		double modifier = Math.max(0.1D, difficulty.getEventOddsMultiplier());
+		long adjustedCooldown = Math.max(20L, MathHelper.floor(cooldown / modifier));
+		long last = eventHistory.getOrDefault(type, -adjustedCooldown);
+		return totalTicks - last >= adjustedCooldown;
 	}
 
 	private void markEvent(VirusEventType type) {
@@ -720,8 +805,12 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		Vec3d origin = Vec3d.ofCenter(formingPos);
 		double pushRadius = Math.max(4.0D, radius + 4.0D);
 		double pushRadiusSq = pushRadius * pushRadius;
-		double baseStrength = 1.2D + radius * 0.15D;
-		double verticalBoost = 0.5D + radius * 0.05D;
+		double difficultyKnockback = difficulty.getKnockbackMultiplier();
+		if (difficultyKnockback <= 0.0D) {
+			return;
+		}
+		double baseStrength = (1.2D + radius * 0.15D) * difficultyKnockback;
+		double verticalBoost = (0.5D + radius * 0.05D) * difficultyKnockback;
 
 		int affected = 0;
 		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
@@ -853,8 +942,6 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		}
 		shellsCollapsed = true;
 		shellCooldowns.clear();
-		guardianBeams.clear();
-		guardianBeams.clear();
 		guardianBeams.clear();
 		for (BlockPos core : virusSources) {
 			stripShells(world, core);
@@ -1248,6 +1335,7 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		eventHistory.clear();
 		shellCooldowns.clear();
 		pillarChunks.clear();
+		guardianBeams.clear();
 		markDirty();
 
 		MatrixCubeBlockEntity.destroyAll(world);
@@ -1470,7 +1558,7 @@ private static final int MAX_SHELL_HEIGHT = 2;
 	}
 
 	private int getTierDuration(InfectionTier tier) {
-		return tier.getDurationTicks();
+		return Math.max(1, MathHelper.ceil(tier.getDurationTicks() * difficulty.getDurationMultiplier()));
 	}
 
 	private static int encodeFlags(VirusWorldState state) {

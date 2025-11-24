@@ -2,6 +2,7 @@ package net.cyberpunk042.infection;
 
 import net.cyberpunk042.block.VirusBlockProtection;
 import net.cyberpunk042.command.VirusCommand;
+import net.cyberpunk042.util.DelayedServerTasks;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
@@ -14,7 +15,9 @@ public final class VirusInfectionSystem {
 	public static void init() {
 		VirusBlockProtection.init();
 		VirusTierBossBar.init();
+		VirusInventoryAnnouncements.init();
 		GlobalTerrainCorruption.init();
+		DelayedServerTasks.init();
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> VirusCommand.register(dispatcher));
 
 		ServerWorldEvents.LOAD.register((server, world) -> VirusWorldState.get(world));
@@ -25,6 +28,7 @@ public final class VirusInfectionSystem {
 		VirusWorldState state = VirusWorldState.get(world);
 		state.tick(world);
 		VirusTierBossBar.update(world, state);
+		VirusInventoryAnnouncements.tick(world);
 	}
 }
 

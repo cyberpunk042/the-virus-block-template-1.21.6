@@ -9,6 +9,7 @@ import net.minecraft.block.BlockState;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.random.Random;
 
 public class CorruptedDirtBlock extends Block {
@@ -26,6 +27,7 @@ public class CorruptedDirtBlock extends Block {
 			return;
 		}
 		int chance = Math.max(0, world.getGameRules().getInt(TheVirusBlock.VIRUS_WORM_SPAWN_CHANCE));
+		chance = MathHelper.clamp(MathHelper.floor(chance * infection.getDifficulty().getWormSpawnMultiplier()), 0, 1000);
 		if (chance <= 0) {
 			return;
 		}

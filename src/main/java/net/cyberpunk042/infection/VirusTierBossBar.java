@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import it.unimi.dsi.fastutil.objects.Object2ByteMap;
 import it.unimi.dsi.fastutil.objects.Object2ByteOpenHashMap;
+import net.cyberpunk042.network.DifficultySyncPayload;
 import net.cyberpunk042.network.SkyTintPayload;
 import net.minecraft.entity.boss.BossBar;
 import net.minecraft.entity.boss.ServerBossBar;
@@ -33,6 +34,9 @@ public final class VirusTierBossBar {
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
 			SKY_TINT.removeByte(handler.player.getUuid());
 			ServerPlayNetworking.send(handler.player, new SkyTintPayload(false, false));
+			ServerWorld world = (ServerWorld) handler.player.getWorld();
+			VirusWorldState state = VirusWorldState.get(world);
+			ServerPlayNetworking.send(handler.player, new DifficultySyncPayload(state.getDifficulty()));
 		});
 	}
 

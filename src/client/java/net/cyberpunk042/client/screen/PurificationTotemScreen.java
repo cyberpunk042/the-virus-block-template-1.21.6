@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
+import net.cyberpunk042.client.state.VirusDifficultyClientState;
 import net.cyberpunk042.item.PurificationOption;
 import net.cyberpunk042.network.PurificationTotemSelectPayload;
 import net.cyberpunk042.screen.handler.PurificationTotemScreenHandler;
@@ -38,14 +39,23 @@ public class PurificationTotemScreen extends HandledScreen<PurificationTotemScre
 		optionButtons.clear();
 
 		int buttonSize = 42;
-		int count = PurificationOption.values().length;
+		List<PurificationOption> visible = new ArrayList<>();
+		for (PurificationOption option : PurificationOption.values()) {
+			if (option.isVisible(VirusDifficultyClientState.get())) {
+				visible.add(option);
+			}
+		}
+		int count = visible.size();
 		int gap = 22;
-		int totalWidth = buttonSize * count + gap * (count - 1);
+		int totalWidth = buttonSize * count + gap * Math.max(0, count - 1);
+		this.backgroundWidth = Math.max(220, totalWidth + 40);
+		this.x = (width - backgroundWidth) / 2;
+		this.y = (height - backgroundHeight) / 2;
 		int startX = x + (backgroundWidth - totalWidth) / 2;
 		int yPos = y + (backgroundHeight - buttonSize) / 2;
 
-		for (int i = 0; i < PurificationOption.values().length; i++) {
-			PurificationOption option = PurificationOption.values()[i];
+		for (int i = 0; i < visible.size(); i++) {
+			PurificationOption option = visible.get(i);
 			int buttonX = startX + i * (buttonSize + gap);
 			OptionButton button = new OptionButton(buttonX, yPos, buttonSize, option);
 			optionButtons.add(button);

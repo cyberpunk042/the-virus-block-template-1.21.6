@@ -5,8 +5,12 @@ import net.cyberpunk042.client.render.CorruptedFireTextures;
 import net.cyberpunk042.client.render.VirusFluidRenderers;
 import net.cyberpunk042.client.render.VirusSkyClientState;
 import net.cyberpunk042.client.render.entity.CorruptedWormRenderer;
+import net.cyberpunk042.client.state.VirusDifficultyClientState;
 import net.cyberpunk042.client.screen.PurificationTotemScreen;
+import net.cyberpunk042.client.screen.VirusDifficultyScreen;
+import net.cyberpunk042.infection.VirusDifficulty;
 import net.cyberpunk042.network.SkyTintPayload;
+import net.cyberpunk042.network.DifficultySyncPayload;
 import net.cyberpunk042.registry.ModBlocks;
 import net.cyberpunk042.registry.ModEntities;
 import net.cyberpunk042.screen.ModScreenHandlers;
@@ -28,10 +32,16 @@ public class TheVirusBlockClient implements ClientModInitializer {
 		EntityRendererRegistry.register(ModEntities.FALLING_MATRIX_CUBE, FallingBlockEntityRenderer::new);
 		EntityRendererRegistry.register(ModEntities.CORRUPTED_WORM, CorruptedWormRenderer::new);
 		HandledScreens.register(ModScreenHandlers.PURIFICATION_TOTEM, PurificationTotemScreen::new);
+		HandledScreens.register(ModScreenHandlers.VIRUS_DIFFICULTY, VirusDifficultyScreen::new);
 		CorruptedFireTextures.bootstrap();
 		ClientPlayNetworking.registerGlobalReceiver(SkyTintPayload.ID, (payload, context) ->
 				context.client().execute(() -> VirusSkyClientState.setState(payload.skyCorrupted(), payload.fluidsCorrupted())));
+		ClientPlayNetworking.registerGlobalReceiver(DifficultySyncPayload.ID, (payload, context) ->
+				context.client().execute(() -> VirusDifficultyClientState.set(payload.difficulty())));
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) ->
-				client.execute(VirusSkyClientState::reset));
+				client.execute(() -> {
+					VirusSkyClientState.reset();
+					VirusDifficultyClientState.set(VirusDifficulty.HARD);
+				}));
 	}
 }

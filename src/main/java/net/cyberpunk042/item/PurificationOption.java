@@ -5,6 +5,7 @@ import java.util.function.Supplier;
 import org.jetbrains.annotations.Nullable;
 
 import net.cyberpunk042.TheVirusBlock;
+import net.cyberpunk042.infection.VirusDifficulty;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
@@ -55,7 +56,15 @@ public enum PurificationOption {
 		return Text.translatable("screen.the-virus-block.purification_totem.description." + key);
 	}
 
+	public boolean isVisible(VirusDifficulty difficulty) {
+		return this != BLEED_HP || difficulty.allowsBleedOption();
+	}
+
 	public void apply(ServerWorld world, ServerPlayerEntity player, VirusWorldState state) {
+		if (!isVisible(state.getDifficulty())) {
+			player.sendMessage(Text.translatable("message.the-virus-block.purification.bleed_hp_locked").formatted(Formatting.RED), true);
+			return;
+		}
 		switch (this) {
 			case NO_BOOBYTRAPS -> applyNoBoobytraps(world, player);
 			case NO_SHELL -> applyNoShell(world, player, state);

@@ -21,6 +21,8 @@ public final class VirusCommand {
 								.then(CommandManager.argument("chunks", IntegerArgumentType.integer(0, 64))
 										.executes(ctx -> setTeleportRadius(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "chunks")))))
 						.then(CommandManager.literal("status").executes(ctx -> reportTeleport(ctx.getSource())))));
+
+		VirusDifficultyCommand.register(dispatcher);
 	}
 
 	private static int setTeleportEnabled(ServerCommandSource source, boolean enabled) {
