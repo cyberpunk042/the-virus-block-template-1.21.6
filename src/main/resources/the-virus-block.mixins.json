@@ -11,7 +11,8 @@
 		"ServerRecipeManagerMixin",
 		"BedBlockMixin",
 		"GuardianEntityAccessor",
-		"ExplosionMixin"
+		"ExplosionMixin",
+		"ItemEntityMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

@@ -15,9 +15,6 @@ import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.inventory.Inventory;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.network.packet.s2c.play.SubtitleS2CPacket;
-import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
-import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -28,8 +25,8 @@ import net.minecraft.world.GameRules;
 import net.minecraft.world.World;
 
 public final class VirusInventoryAnnouncements {
-	private static final int CHAT_INTERVAL_TICKS = 2000;
-	private static final int TOAST_INTERVAL_TICKS = 6000;
+	private static final int CHAT_INTERVAL_TICKS = 1500;
+	private static final int TOAST_INTERVAL_TICKS = 1000;
 	private static final Map<ServerWorld, Set<BlockEntity>> TRACKED_CONTAINERS = new WeakHashMap<>();
 
 	private VirusInventoryAnnouncements() {
@@ -61,6 +58,9 @@ public final class VirusInventoryAnnouncements {
 		if (world.getRegistryKey() != World.OVERWORLD) {
 			return;
 		}
+		if (VirusWorldState.get(world).isInfected()) {
+			return;
+		}
 		long time = world.getTime();
 		boolean chatWindow = time % CHAT_INTERVAL_TICKS == 0;
 		boolean toastWindow = time % TOAST_INTERVAL_TICKS == 0;
@@ -89,7 +89,7 @@ public final class VirusInventoryAnnouncements {
 	}
 
 	private static void dispatchChatAlert(MinecraftServer server, Map<String, Integer> playerCounts, Map<String, Integer> containerCounts) {
-		MutableText message = Text.literal("[Virus Alert] ").formatted(Formatting.DARK_PURPLE);
+		MutableText message = Text.literal("[Virus Alert] ").formatted(Formatting.DARK_AQUA);
 		if (!playerCounts.isEmpty()) {
 			message.append(Text.translatable("message.the-virus-block.inventory.verbose.players",
 					formatEntries(playerCounts)).formatted(Formatting.GOLD));
@@ -128,10 +128,9 @@ public final class VirusInventoryAnnouncements {
 			return;
 		}
 		for (ServerPlayerEntity player : world.getPlayers()) {
-			player.networkHandler.sendPacket(new TitleFadeS2CPacket(5, 40, 5));
-			player.networkHandler.sendPacket(new TitleS2CPacket(title));
+			player.sendMessage(title.copy().formatted(Formatting.GRAY), true);
 			if (!subtitle.getString().isEmpty()) {
-				player.networkHandler.sendPacket(new SubtitleS2CPacket(subtitle));
+				player.sendMessage(subtitle.copy().formatted(Formatting.DARK_GRAY), true);
 			}
 		}
 	}

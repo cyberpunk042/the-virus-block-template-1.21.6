@@ -34,7 +34,6 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.Formatting;
 import net.minecraft.world.GameRules;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
 import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
@@ -332,11 +331,15 @@ public class TheVirusBlock implements ModInitializer {
 		player.networkHandler.sendPacket(new TitleS2CPacket(text));
 	}
 
+	private static void showActionBar(ServerPlayerEntity player, Text text) {
+		player.sendMessage(text, true);
+	}
+
 	private static void warnIfInfected(ServerPlayerEntity player, VirusWorldState state) {
 		if (!state.isInfected()) {
 			return;
 		}
-		showCenteredMessage(player, Text.translatable("message.the-virus-block.infection.warning")
-				.formatted(Formatting.DARK_RED), 10, 60, 10);
+		showActionBar(player, Text.translatable("message.the-virus-block.infection.warning")
+				.formatted(Formatting.DARK_RED));
 	}
 }

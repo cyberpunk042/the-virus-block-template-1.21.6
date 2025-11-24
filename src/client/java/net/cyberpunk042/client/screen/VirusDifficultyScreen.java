@@ -20,7 +20,6 @@ import net.minecraft.text.Text;
 public class VirusDifficultyScreen extends HandledScreen<VirusDifficultyScreenHandler> {
 	private final List<DifficultyButton> buttons = new ArrayList<>();
 
-	private final Text heading = Text.translatable("screen.the-virus-block.difficulty.heading");
 	private final Text warningLine1 = Text.translatable("screen.the-virus-block.difficulty.warning.line1");
 	private final Text warningLine2 = Text.translatable("screen.the-virus-block.difficulty.warning.line2");
 
@@ -35,6 +34,9 @@ public class VirusDifficultyScreen extends HandledScreen<VirusDifficultyScreenHa
 		super.init();
 		buttons.clear();
 		clearChildren();
+		this.titleX = backgroundWidth / 2 - textRenderer.getWidth(title) / 2;
+		this.titleY = 18;
+		this.playerInventoryTitleY = Integer.MAX_VALUE;
 		int buttonSize = 52;
 		int gap = 14;
 		int count = VirusDifficulty.values().length;
@@ -58,17 +60,6 @@ public class VirusDifficultyScreen extends HandledScreen<VirusDifficultyScreenHa
 	}
 
 	@Override
-	protected void drawForeground(DrawContext context, int mouseX, int mouseY) {
-		int titleWidth = textRenderer.getWidth(heading);
-		context.drawTextWithShadow(textRenderer, heading, (backgroundWidth - titleWidth) / 2, 8, 0xFFFFFF);
-		int warningY = backgroundHeight - 32;
-		int warningWidth1 = textRenderer.getWidth(warningLine1);
-		int warningWidth2 = textRenderer.getWidth(warningLine2);
-		context.drawText(textRenderer, warningLine1, (backgroundWidth - warningWidth1) / 2, warningY, 0xFFCC5555, false);
-		context.drawText(textRenderer, warningLine2, (backgroundWidth - warningWidth2) / 2, warningY + 12, 0xFFCC5555, false);
-	}
-
-	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
 		renderBackground(context, mouseX, mouseY, delta);
 		super.render(context, mouseX, mouseY, delta);
@@ -78,6 +69,15 @@ public class VirusDifficultyScreen extends HandledScreen<VirusDifficultyScreenHa
 				break;
 			}
 		}
+	}
+
+	@Override
+	protected void drawForeground(DrawContext context, int mouseX, int mouseY) {
+		super.drawForeground(context, mouseX, mouseY);
+		int centerX = backgroundWidth / 2;
+		int warningY = backgroundHeight - 32;
+		context.drawCenteredTextWithShadow(textRenderer, warningLine1, centerX, warningY, 0xFFCC5555);
+		context.drawCenteredTextWithShadow(textRenderer, warningLine2, centerX, warningY + 12, 0xFFCC5555);
 	}
 
 	private class DifficultyButton extends PressableWidget {
