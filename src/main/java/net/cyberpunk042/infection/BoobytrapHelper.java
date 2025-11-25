@@ -69,6 +69,7 @@ public final class BoobytrapHelper {
 		if (!world.getGameRules().getBoolean(TheVirusBlock.VIRUS_BOOBYTRAPS_ENABLED)) {
 			return 0;
 		}
+		VirusWorldState state = VirusWorldState.get(world);
 		int cappedAttempts = Math.min(512, Math.max(0, attempts));
 		int cappedRadius = Math.min(64, Math.max(1, radius));
 		Random random = world.getRandom();
@@ -76,6 +77,9 @@ public final class BoobytrapHelper {
 		for (int i = 0; i < cappedAttempts; i++) {
 			BlockPos target = randomOffset(world, random, origin, cappedRadius);
 			if (target == null || !world.isChunkLoaded(ChunkPos.toLong(target))) {
+				continue;
+			}
+			if (state.isShielded(target)) {
 				continue;
 			}
 			BlockState replacement = GlobalTerrainCorruption.convert(world.getBlockState(target));
@@ -93,6 +97,9 @@ public final class BoobytrapHelper {
 
 	public static void triggerExplosion(ServerWorld world, BlockPos pos, Type type, String reason) {
 		if (!world.getGameRules().getBoolean(TheVirusBlock.VIRUS_BOOBYTRAPS_ENABLED)) {
+			return;
+		}
+		if (VirusWorldState.get(world).isShielded(pos)) {
 			return;
 		}
 		float power = getPower(world, type);
@@ -189,6 +196,9 @@ public final class BoobytrapHelper {
 
 	public static BlockPos placeTrap(ServerWorld world, WorldChunk chunk, BlockPos.Mutable original, BlockState originalState, TrapSelection trap) {
 		BlockPos target = snapToSurface(world, original, originalState);
+		if (VirusWorldState.get(world).isShielded(target)) {
+			return target;
+		}
 		world.setBlockState(target, trap.state(), Block.NOTIFY_LISTENERS);
 		world.getChunkManager().markForUpdate(target);
 		CorruptionProfiler.logBoobytrapPlacement(world, target, trap.type().name());
@@ -196,6 +206,9 @@ public final class BoobytrapHelper {
 	}
 
 	public static void applyTrap(ServerWorld world, BlockPos pos, TrapSelection trap) {
+		if (VirusWorldState.get(world).isShielded(pos)) {
+			return;
+		}
 		world.setBlockState(pos, trap.state(), Block.NOTIFY_LISTENERS);
 		world.getChunkManager().markForUpdate(pos);
 		CorruptionProfiler.logBoobytrapPlacement(world, pos, trap.type().name());

@@ -91,8 +91,8 @@ public class VirusBlockEntity extends BlockEntity {
 		int tierIndex = tier.getIndex();
 		target.addStatusEffect(new StatusEffectInstance(StatusEffects.POISON, 60 + tierIndex * 20, tierIndex >= 3 ? 1 : 0, false, true));
 
-		if (tierIndex >= 1) {
-			target.addStatusEffect(new StatusEffectInstance(StatusEffects.HUNGER, 80, 0, false, true));
+		if (tierIndex >= 1 && target instanceof ServerPlayerEntity player) {
+			forceHungerDrop(player, tierIndex, infection.isApocalypseMode());
 		}
 
 		if (tierIndex >= 2) {
@@ -110,6 +110,14 @@ public class VirusBlockEntity extends BlockEntity {
 		if (infection.isApocalypseMode() && random.nextFloat() < 0.2F) {
 			target.addStatusEffect(new StatusEffectInstance(StatusEffects.WITHER, 50, 0));
 		}
+	}
+
+	private static void forceHungerDrop(ServerPlayerEntity player, int tierIndex, boolean apocalypseMode) {
+		if (player.isCreative() || player.isSpectator()) {
+			return;
+		}
+		float exhaustion = 1.0F + tierIndex * 0.3F + (apocalypseMode ? 0.5F : 0.0F);
+		player.addExhaustion(exhaustion);
 	}
 
 	private static void degradeArmor(ServerWorld world, LivingEntity living, InfectionTier tier) {

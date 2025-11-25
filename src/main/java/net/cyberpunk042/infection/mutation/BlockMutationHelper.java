@@ -38,6 +38,7 @@ public final class BlockMutationHelper {
 
 	public static void mutateAroundSources(ServerWorld world, Set<BlockPos> sources, InfectionTier tier, boolean apocalypseMode) {
 		Random random = world.getRandom();
+		VirusWorldState state = VirusWorldState.get(world);
 		boolean mutated = false;
 
 		List<ServerPlayerEntity> players = world.getPlayers(ServerPlayerEntity::isAlive);
@@ -46,24 +47,24 @@ public final class BlockMutationHelper {
 			List<BlockPos> playerAnchors = players.stream().map(ServerPlayerEntity::getBlockPos).toList();
 			int attemptsRule = MathHelper.clamp(world.getGameRules().getInt(TheVirusBlock.VIRUS_SPREAD_PLAYER_ATTEMPTS), 0, 4096);
 			int radiusRule = MathHelper.clamp(world.getGameRules().getInt(TheVirusBlock.VIRUS_SPREAD_PLAYER_RADIUS), 4, 256);
-			mutated |= mutateFromAnchors(world, playerAnchors, attemptsRule, radiusRule, tier, apocalypseMode, random);
-			mutated |= mutateSurfaceLayers(world, playerAnchors, radiusRule, surfaceAttemptsRule, tier, apocalypseMode, random);
+			mutated |= mutateFromAnchors(world, playerAnchors, attemptsRule, radiusRule, tier, apocalypseMode, random, state);
+			mutated |= mutateSurfaceLayers(world, playerAnchors, radiusRule, surfaceAttemptsRule, tier, apocalypseMode, random, state);
 		}
 
 		if (!sources.isEmpty()) {
 			List<BlockPos> sourceAnchors = new ArrayList<>(sources);
 			int attemptsRule = MathHelper.clamp(world.getGameRules().getInt(TheVirusBlock.VIRUS_SPREAD_SOURCE_ATTEMPTS), 0, 4096);
 			int radiusRule = MathHelper.clamp(world.getGameRules().getInt(TheVirusBlock.VIRUS_SPREAD_SOURCE_RADIUS), 4, 256);
-			mutated |= mutateFromAnchors(world, sourceAnchors, attemptsRule, radiusRule, tier, apocalypseMode, random);
-			mutated |= mutateSurfaceLayers(world, sourceAnchors, radiusRule, surfaceAttemptsRule, tier, apocalypseMode, random);
+			mutated |= mutateFromAnchors(world, sourceAnchors, attemptsRule, radiusRule, tier, apocalypseMode, random, state);
+			mutated |= mutateSurfaceLayers(world, sourceAnchors, radiusRule, surfaceAttemptsRule, tier, apocalypseMode, random, state);
 		}
 
 		if (!mutated && !sources.isEmpty()) {
-			mutateFromAnchors(world, new ArrayList<>(sources), 32, 16, tier, apocalypseMode, random);
+			mutateFromAnchors(world, new ArrayList<>(sources), 32, 16, tier, apocalypseMode, random, state);
 		}
 	}
 
-	private static boolean mutateFromAnchors(ServerWorld world, List<BlockPos> anchors, int attemptsRule, int radiusRule, InfectionTier tier, boolean apocalypseMode, Random random) {
+	private static boolean mutateFromAnchors(ServerWorld world, List<BlockPos> anchors, int attemptsRule, int radiusRule, InfectionTier tier, boolean apocalypseMode, Random random, VirusWorldState state) {
 		if (anchors.isEmpty() || attemptsRule <= 0 || radiusRule <= 0) {
 			return false;
 		}
@@ -77,7 +78,7 @@ public final class BlockMutationHelper {
 			if (target == null) {
 				continue;
 			}
-			mutateBlock(world, target, random, tier, apocalypseMode);
+			mutateBlock(world, target, random, tier, apocalypseMode, state);
 			mutated = true;
 		}
 		return mutated;
@@ -119,8 +120,11 @@ public final class BlockMutationHelper {
 		return null;
 	}
 
-	private static void mutateBlock(ServerWorld world, BlockPos pos, Random random, InfectionTier tier, boolean apocalypseMode) {
+	private static void mutateBlock(ServerWorld world, BlockPos pos, Random random, InfectionTier tier, boolean apocalypseMode, VirusWorldState state) {
 		if (!isChunkLoaded(world, pos)) {
+			return;
+		}
+		if (state.isShielded(pos)) {
 			return;
 		}
 
@@ -235,7 +239,7 @@ public final class BlockMutationHelper {
 		};
 	}
 
-	private static boolean mutateSurfaceLayers(ServerWorld world, List<BlockPos> anchors, int radiusRule, int attemptsRule, InfectionTier tier, boolean apocalypseMode, Random random) {
+	private static boolean mutateSurfaceLayers(ServerWorld world, List<BlockPos> anchors, int radiusRule, int attemptsRule, InfectionTier tier, boolean apocalypseMode, Random random, VirusWorldState state) {
 		if (anchors.isEmpty() || attemptsRule <= 0) {
 			return false;
 		}
@@ -247,7 +251,6 @@ public final class BlockMutationHelper {
 			return false;
 		}
 
-		VirusWorldState state = VirusWorldState.get(world);
 		int radius = MathHelper.clamp(radiusRule * 2, 8, 192);
 		int tierScale = Math.max(1, tier.getLevel());
 		int attempts = MathHelper.clamp(attemptsRule * tierScale, 0, 4096);
@@ -265,7 +268,7 @@ public final class BlockMutationHelper {
 			if (surface == null) {
 				continue;
 			}
-			if (convertSurfaceBlock(world, surface, sandEnabled, iceEnabled, snowEnabled)) {
+			if (convertSurfaceBlock(world, surface, sandEnabled, iceEnabled, snowEnabled, state)) {
 				mutated = true;
 			}
 		}
@@ -289,24 +292,27 @@ public final class BlockMutationHelper {
 		return null;
 	}
 
-	private static boolean convertSurfaceBlock(ServerWorld world, BlockPos pos, boolean sandEnabled, boolean iceEnabled, boolean snowEnabled) {
-		BlockState state = world.getBlockState(pos);
+	private static boolean convertSurfaceBlock(ServerWorld world, BlockPos pos, boolean sandEnabled, boolean iceEnabled, boolean snowEnabled, VirusWorldState worldState) {
+		if (worldState.isShielded(pos)) {
+			return false;
+		}
+		BlockState blockState = world.getBlockState(pos);
 		boolean mutated = false;
 
-		if (!state.isAir()) {
-			if (sandEnabled && (state.isOf(Blocks.SAND) || state.isOf(Blocks.RED_SAND))) {
+		if (!blockState.isAir()) {
+			if (sandEnabled && (blockState.isOf(Blocks.SAND) || blockState.isOf(Blocks.RED_SAND))) {
 				world.setBlockState(pos, ModBlocks.CORRUPTED_SAND.getDefaultState(), Block.NOTIFY_LISTENERS);
 				mutated = true;
-			} else if (iceEnabled && state.isOf(Blocks.ICE)) {
+			} else if (iceEnabled && blockState.isOf(Blocks.ICE)) {
 				world.setBlockState(pos, ModBlocks.CORRUPTED_ICE.getDefaultState(), Block.NOTIFY_LISTENERS);
 				mutated = true;
-			} else if (iceEnabled && (state.isOf(Blocks.PACKED_ICE) || state.isOf(Blocks.BLUE_ICE))) {
+			} else if (iceEnabled && (blockState.isOf(Blocks.PACKED_ICE) || blockState.isOf(Blocks.BLUE_ICE))) {
 				world.setBlockState(pos, ModBlocks.CORRUPTED_PACKED_ICE.getDefaultState(), Block.NOTIFY_LISTENERS);
 				mutated = true;
-			} else if (snowEnabled && (state.isOf(Blocks.SNOW_BLOCK) || state.isOf(Blocks.POWDER_SNOW))) {
+			} else if (snowEnabled && (blockState.isOf(Blocks.SNOW_BLOCK) || blockState.isOf(Blocks.POWDER_SNOW))) {
 				world.setBlockState(pos, ModBlocks.CORRUPTED_SNOW_BLOCK.getDefaultState(), Block.NOTIFY_LISTENERS);
 				mutated = true;
-			} else if (snowEnabled && state.isOf(Blocks.SNOW)) {
+			} else if (snowEnabled && blockState.isOf(Blocks.SNOW)) {
 				world.setBlockState(pos, ModBlocks.CORRUPTED_SNOW.getDefaultState(), Block.NOTIFY_LISTENERS);
 				mutated = true;
 			}
@@ -326,6 +332,7 @@ public final class BlockMutationHelper {
 
 	public static void corruptFlora(ServerWorld world, BlockPos origin, int radius) {
 		Random random = world.getRandom();
+		VirusWorldState worldState = VirusWorldState.get(world);
 		for (int i = 0; i < 32; i++) {
 			BlockPos target = randomOffset(world, origin, radius, random);
 			if (target == null) {
@@ -334,14 +341,17 @@ public final class BlockMutationHelper {
 			if (!isChunkLoaded(world, target)) {
 				continue;
 			}
-
-			BlockState state = world.getBlockState(target);
-			if (state.isOf(ModBlocks.INFECTED_BLOCK) || state.isOf(ModBlocks.INFECTIOUS_CUBE) || state.isOf(ModBlocks.BACTERIA)) {
+			if (worldState.isShielded(target)) {
 				continue;
 			}
-			if (state.isIn(BlockTags.SAPLINGS) || state.isOf(Blocks.SHORT_GRASS) || state.isOf(Blocks.FERN) || state.isOf(Blocks.TALL_GRASS)) {
+
+			BlockState blockState = world.getBlockState(target);
+			if (blockState.isOf(ModBlocks.INFECTED_BLOCK) || blockState.isOf(ModBlocks.INFECTIOUS_CUBE) || blockState.isOf(ModBlocks.BACTERIA)) {
+				continue;
+			}
+			if (blockState.isIn(BlockTags.SAPLINGS) || blockState.isOf(Blocks.SHORT_GRASS) || blockState.isOf(Blocks.FERN) || blockState.isOf(Blocks.TALL_GRASS)) {
 				world.setBlockState(target, ModBlocks.CORRUPTED_WOOD.getDefaultState(), Block.NOTIFY_ALL);
-			} else if (state.isIn(BlockTags.LEAVES)) {
+			} else if (blockState.isIn(BlockTags.LEAVES)) {
 				world.setBlockState(target, Blocks.COBWEB.getDefaultState(), Block.NOTIFY_ALL);
 			}
 		}

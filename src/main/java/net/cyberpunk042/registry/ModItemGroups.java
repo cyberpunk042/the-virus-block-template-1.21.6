@@ -21,6 +21,7 @@ public final class ModItemGroups {
 						entries.add(ModBlocks.CORRUPTED_GLASS);
 						entries.add(ModBlocks.CORRUPTED_DIRT);
 						entries.add(ModBlocks.CORRUPTED_SAND);
+						entries.add(ModBlocks.CORRUPTED_TNT);
 						entries.add(ModBlocks.INFECTED_GRASS);
 						entries.add(ModBlocks.CORRUPTED_WOOD);
 						entries.add(ModBlocks.CORRUPTED_SNOW_BLOCK);

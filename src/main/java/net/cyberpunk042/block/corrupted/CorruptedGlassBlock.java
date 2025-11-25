@@ -31,6 +31,9 @@ public class CorruptedGlassBlock extends TransparentBlock {
 	@Override
 	public BlockState onBreak(World world, BlockPos pos, BlockState state, PlayerEntity player) {
 		if (!world.isClient) {
+			if (world instanceof ServerWorld serverWorld && VirusWorldState.get(serverWorld).isShielded(pos)) {
+				return super.onBreak(world, pos, state, player);
+			}
 			world.createExplosion(null, pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D, 1.8F, World.ExplosionSourceType.BLOCK);
 		}
 

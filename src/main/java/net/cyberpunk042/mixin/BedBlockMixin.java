@@ -39,6 +39,9 @@ public abstract class BedBlockMixin {
 		if (!infection.isWithinAura(headPos)) {
 			return;
 		}
+		if (infection.isShielded(headPos)) {
+			return;
+		}
 		explode(serverWorld, headPos, headState, bedBlock);
 		cir.setReturnValue(ActionResult.SUCCESS_SERVER);
 	}

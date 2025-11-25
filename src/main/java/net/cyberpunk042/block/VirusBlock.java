@@ -8,6 +8,7 @@ import java.util.function.BiConsumer;
 
 import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.block.entity.VirusBlockEntity;
+import net.cyberpunk042.item.PurificationOption;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.registry.ModBlockEntities;
 import net.minecraft.block.BlockRenderType;
@@ -102,8 +103,8 @@ public class VirusBlock extends BlockWithEntity {
 		} else if (stack.isOf(Items.OBSIDIAN) || stack.isOf(Items.CRYING_OBSIDIAN)) {
 			infection.applyContainmentCharge(stack.isOf(Items.CRYING_OBSIDIAN) ? 2 : 1);
 			world.playSound(null, pos, SoundEvents.BLOCK_RESPAWN_ANCHOR_CHARGE, SoundCategory.BLOCKS, 0.7F, 0.9F);
-		} else if (stack.isOf(Items.TOTEM_OF_UNDYING)) {
-			infection.applyPurification(20 * 120L);
+		} else if (stack.isOf(Items.TOTEM_OF_UNDYING) && player instanceof ServerPlayerEntity serverPlayer) {
+			PurificationOption.NO_BOOBYTRAPS.apply(serverWorld, serverPlayer, infection);
 		}
 
 		if (!player.getAbilities().creativeMode) {

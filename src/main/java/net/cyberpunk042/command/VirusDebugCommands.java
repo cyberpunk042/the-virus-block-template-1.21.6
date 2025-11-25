@@ -11,13 +11,15 @@ import net.cyberpunk042.infection.BoobytrapHelper;
 import net.cyberpunk042.infection.InfectionTier;
 import net.cyberpunk042.infection.TierCookbook;
 import net.cyberpunk042.infection.TierFeature;
-import net.cyberpunk042.infection.TierFeatureGroup;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.random.Random;
 import net.minecraft.world.GameRules;
 
 public final class VirusDebugCommands {
@@ -36,6 +38,10 @@ public final class VirusDebugCommands {
 			dispatcher.register(CommandManager.literal("virustiers")
 					.requires(source -> source.hasPermissionLevel(2))
 					.executes(ctx -> showTierPlan(ctx.getSource())));
+
+			dispatcher.register(CommandManager.literal("virusvoidtear")
+					.requires(source -> source.hasPermissionLevel(2))
+					.executes(ctx -> spawnVoidTear(ctx.getSource())));
 		});
 	}
 
@@ -75,6 +81,27 @@ public final class VirusDebugCommands {
 			}
 		}
 		return TierFeature.values().length;
+	}
+
+	private static int spawnVoidTear(ServerCommandSource source) {
+		ServerPlayerEntity player = source.getPlayer();
+		if (player == null) {
+			source.sendError(Text.literal("Player-only command."));
+			return 0;
+		}
+		ServerWorld world = source.getWorld();
+		VirusWorldState state = VirusWorldState.get(world);
+		Random random = world.getRandom();
+		BlockPos target = player.getBlockPos().add(
+				random.nextBetween(-4, 4),
+				random.nextBetween(-1, 2),
+				random.nextBetween(-4, 4));
+		if (state.spawnVoidTearForCommand(world, target)) {
+			source.sendFeedback(() -> Text.literal("Spawned Void Tear at " + target.toShortString()), false);
+			return 1;
+		}
+		source.sendError(Text.literal("Unable to spawn Void Tear."));
+		return 0;
 	}
 
 	private static String describeFeature(ServerWorld world, InfectionTier currentTier, boolean apocalypse, TierFeature feature) {

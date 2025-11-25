@@ -3,19 +3,25 @@ package net.cyberpunk042;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import net.cyberpunk042.command.VirusDebugCommands;
+import net.cyberpunk042.command.VirusDifficultyCommand;
+import net.cyberpunk042.infection.VirusDifficulty;
 import net.cyberpunk042.infection.VirusInfectionSystem;
 import net.cyberpunk042.infection.VirusWorldState;
-import net.cyberpunk042.infection.VirusDifficulty;
+import net.cyberpunk042.item.PurificationOption;
+import net.cyberpunk042.network.DifficultySyncPayload;
+import net.cyberpunk042.network.PurificationTotemSelectPayload;
+import net.cyberpunk042.network.ShieldFieldRemovePayload;
+import net.cyberpunk042.network.ShieldFieldSpawnPayload;
+import net.cyberpunk042.network.SkyTintPayload;
+import net.cyberpunk042.network.VirusDifficultySelectPayload;
+import net.cyberpunk042.network.VoidTearBurstPayload;
+import net.cyberpunk042.network.VoidTearSpawnPayload;
 import net.cyberpunk042.registry.ModBlockEntities;
 import net.cyberpunk042.registry.ModBlocks;
 import net.cyberpunk042.registry.ModEntities;
 import net.cyberpunk042.registry.ModItemGroups;
 import net.cyberpunk042.registry.ModItems;
-import net.cyberpunk042.command.VirusDebugCommands;
-import net.cyberpunk042.command.VirusDifficultyCommand;
-import net.cyberpunk042.network.DifficultySyncPayload;
-import net.cyberpunk042.network.PurificationTotemSelectPayload;
-import net.cyberpunk042.network.VirusDifficultySelectPayload;
 import net.cyberpunk042.screen.ModScreenHandlers;
 import net.cyberpunk042.screen.handler.PurificationTotemScreenHandler;
 import net.cyberpunk042.screen.handler.VirusDifficultyScreenHandler;
@@ -25,18 +31,17 @@ import net.fabricmc.fabric.api.gamerule.v1.GameRuleFactory;
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleRegistry;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.cyberpunk042.network.SkyTintPayload;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.item.ItemStack;
+import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
+import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.Formatting;
-import net.minecraft.world.GameRules;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.sound.SoundEvents;
-import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
-import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.Identifier;
+import net.minecraft.world.GameRules;
 
 public class TheVirusBlock implements ModInitializer {
 	public static final String MOD_ID = "the-virus-block";
@@ -48,6 +53,10 @@ public class TheVirusBlock implements ModInitializer {
 	private static final String STARTER_TOTEM_TAG = MOD_ID + ".starter_totem";
 	public static final Identifier DIFFICULTY_SYNC_PACKET = Identifier.of(MOD_ID, "difficulty_sync");
 	public static final Identifier DIFFICULTY_SELECT_PACKET = Identifier.of(MOD_ID, "difficulty_select");
+	public static final Identifier VOID_TEAR_SPAWN_PACKET = Identifier.of(MOD_ID, "void_tear_spawn");
+	public static final Identifier VOID_TEAR_BURST_PACKET = Identifier.of(MOD_ID, "void_tear_burst");
+	public static final Identifier SHIELD_FIELD_SPAWN_PACKET = Identifier.of(MOD_ID, "shield_field_spawn");
+	public static final Identifier SHIELD_FIELD_REMOVE_PACKET = Identifier.of(MOD_ID, "shield_field_remove");
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_BLOCK_TELEPORT_ENABLED =
 			GameRuleRegistry.register("virusBlockTeleportEnabled", GameRules.Category.MISC, GameRuleFactory.createBooleanRule(true));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_BLOCK_TELEPORT_RADIUS =
@@ -128,7 +137,7 @@ public class TheVirusBlock implements ModInitializer {
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_TIER2_EVENTS_ENABLED =
 			GameRuleRegistry.register("virusTier2EventsEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_TIER3_EXTRAS_ENABLED =
-			GameRuleRegistry.register("virusTier3ExtrasEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(false));
+			GameRuleRegistry.register("virusTier3ExtrasEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_EVENT_MUTATION_PULSE_ENABLED =
 			GameRuleRegistry.register("virusEventMutationPulseEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_EVENT_SKYFALL_ENABLED =
@@ -166,6 +175,10 @@ public class TheVirusBlock implements ModInitializer {
 	public void onInitialize() {
 		PayloadTypeRegistry.playS2C().register(SkyTintPayload.ID, SkyTintPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(DifficultySyncPayload.ID, DifficultySyncPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(VoidTearSpawnPayload.ID, VoidTearSpawnPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(VoidTearBurstPayload.ID, VoidTearBurstPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(ShieldFieldSpawnPayload.ID, ShieldFieldSpawnPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(ShieldFieldRemovePayload.ID, ShieldFieldRemovePayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(PurificationTotemSelectPayload.ID, PurificationTotemSelectPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(VirusDifficultySelectPayload.ID, VirusDifficultySelectPayload.CODEC);
 		ModBlocks.bootstrap();
@@ -196,6 +209,11 @@ public class TheVirusBlock implements ModInitializer {
 		ServerWorld world = (ServerWorld) player.getWorld();
 		VirusWorldState state = VirusWorldState.get(world);
 		if (!state.isInfected()) {
+			player.sendMessage(Text.translatable("message.the-virus-block.purification_totem.inactive"), true);
+			player.closeHandledScreen();
+			return;
+		}
+		if (state.isDormant() && payload.option() == PurificationOption.NO_BOOBYTRAPS) {
 			player.sendMessage(Text.translatable("message.the-virus-block.purification_totem.dormant"), true);
 			player.closeHandledScreen();
 			return;
@@ -239,6 +257,7 @@ public class TheVirusBlock implements ModInitializer {
 		ServerWorld world = (ServerWorld) player.getWorld();
 		VirusWorldState state = VirusWorldState.get(world);
 		warnIfInfected(player, state);
+		state.sendShieldSnapshots(player);
 		grantStarterKit(player);
 		ensureFastFlight(player);
 		maybePromptDifficulty(player);

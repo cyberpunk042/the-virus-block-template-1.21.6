@@ -209,6 +209,9 @@ public final class GlobalTerrainCorruption {
 				for (int y = minY; y < maxY; y++) {
 					mutable.set(startX + x, y, startZ + z);
 					BlockState current = chunk.getBlockState(mutable);
+					if (VirusWorldState.get(world).isShielded(mutable)) {
+						continue;
+					}
 					BlockState replacement = convert(current);
 					if (replacement != null) {
 						BoobytrapHelper.TrapSelection trap = BoobytrapHelper.selectTrap(world);
@@ -243,6 +246,9 @@ public final class GlobalTerrainCorruption {
 		while (iterator.hasNext()) {
 			long posLong = iterator.nextLong();
 			mutable.set(BlockPos.fromLong(posLong));
+			if (VirusWorldState.get(world).isShielded(mutable)) {
+				continue;
+			}
 			BlockState replacement = cleanseBlock(chunk.getBlockState(mutable));
 			if (replacement != null) {
 				world.setBlockState(mutable, replacement, Block.NOTIFY_LISTENERS);
@@ -266,6 +272,9 @@ public final class GlobalTerrainCorruption {
 			for (int z = 0; z < 16; z++) {
 				for (int y = minY; y < maxY; y++) {
 					mutable.set(startX + x, y, startZ + z);
+					if (VirusWorldState.get(world).isShielded(mutable)) {
+						continue;
+					}
 					BlockState replacement = cleanseBlock(chunk.getBlockState(mutable));
 					if (replacement != null) {
 						world.setBlockState(mutable, replacement, Block.NOTIFY_LISTENERS);
@@ -310,6 +319,9 @@ public final class GlobalTerrainCorruption {
 				}
 				mutable.set(startX + x, surfaceY, startZ + z);
 				BlockState state = chunk.getBlockState(mutable);
+				if (VirusWorldState.get(world).isShielded(mutable)) {
+					continue;
+				}
 				if (!BoobytrapHelper.canReplaceSurface(state)) {
 					continue;
 				}

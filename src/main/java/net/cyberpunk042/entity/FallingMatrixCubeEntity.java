@@ -4,6 +4,7 @@ import java.util.Objects;
 
 import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.block.entity.MatrixCubeBlockEntity;
+import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.mixin.FallingBlockEntityAccessor;
 import net.cyberpunk042.registry.ModBlocks;
 import net.cyberpunk042.registry.ModEntities;
@@ -17,6 +18,7 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.world.World;
 
@@ -47,9 +49,13 @@ public class FallingMatrixCubeEntity extends FallingBlockEntity {
 
 	private boolean handleServerTick(ServerWorld world) {
 		ensureRegistered(world);
+		if (VirusWorldState.get(world).isShielded(this.getBlockPos())) {
+			despawn(world);
+			return false;
+		}
 
 		BlockPos below = this.getBlockPos().down();
-		if (!world.isChunkLoaded(below)) {
+		if (!world.isChunkLoaded(ChunkPos.toLong(below))) {
 			return true;
 		}
 		if (shouldSettle(world, below)) {
@@ -129,7 +135,10 @@ public class FallingMatrixCubeEntity extends FallingBlockEntity {
 				|| block == ModBlocks.CORRUPTED_CRYING_OBSIDIAN
 				|| block == ModBlocks.CORRUPTED_DIAMOND
 				|| block == ModBlocks.CORRUPTED_GOLD
-				|| block == ModBlocks.CORRUPTED_IRON;
+				|| block == ModBlocks.CORRUPTED_IRON
+				|| block == ModBlocks.CURED_INFECTIOUS_CUBE
+				|| block == Blocks.OBSIDIAN
+				|| block == Blocks.CRYING_OBSIDIAN;
 	}
 
 	private void despawn(ServerWorld world) {
@@ -139,7 +148,11 @@ public class FallingMatrixCubeEntity extends FallingBlockEntity {
 	}
 
 	private static boolean isUnbreakable(ServerWorld world, BlockPos pos, BlockState state) {
-		return state.isOf(Blocks.BEDROCK) || state.getHardness(world, pos) < 0.0F;
+		return state.isOf(Blocks.BEDROCK)
+				|| state.isOf(Blocks.OBSIDIAN)
+				|| state.isOf(Blocks.CRYING_OBSIDIAN)
+				|| state.isOf(ModBlocks.CURED_INFECTIOUS_CUBE)
+				|| state.getHardness(world, pos) < 0.0F;
 	}
 
 	private void dealDamage(ServerWorld world, BlockPos pos) {

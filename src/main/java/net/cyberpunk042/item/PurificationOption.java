@@ -16,7 +16,6 @@ import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
-import net.minecraft.world.GameRules;
 
 public enum PurificationOption {
 	NO_BOOBYTRAPS("no_boobytraps", () -> new ItemStack(Items.TNT)),
@@ -66,21 +65,21 @@ public enum PurificationOption {
 			return;
 		}
 		switch (this) {
-			case NO_BOOBYTRAPS -> applyNoBoobytraps(world, player);
+			case NO_BOOBYTRAPS -> applyNoBoobytraps(world, player, state);
 			case NO_SHELL -> applyNoShell(world, player, state);
 			case HALF_HP -> applyHalfHp(world, player, state);
 			case BLEED_HP -> applyBleedHp(world, player, state);
 		}
-		state.applyPurification(20 * 120L);
 		world.playSound(null, player.getBlockPos(), SoundEvents.BLOCK_AMETHYST_BLOCK_RESONATE, SoundCategory.PLAYERS, 1.0F, 0.7F);
 	}
 
-	private static void applyNoBoobytraps(ServerWorld world, ServerPlayerEntity player) {
-		GameRules gameRules = world.getGameRules();
-		gameRules.get(TheVirusBlock.VIRUS_BOOBYTRAPS_ENABLED).set(false, world.getServer());
-		gameRules.get(TheVirusBlock.VIRUS_WORM_SPAWN_CHANCE).set(Math.max(1, gameRules.getInt(TheVirusBlock.VIRUS_WORM_SPAWN_CHANCE) / 3), world.getServer());
-		gameRules.get(TheVirusBlock.VIRUS_WORM_TRAP_SPAWN_CHANCE).set(Math.max(1, gameRules.getInt(TheVirusBlock.VIRUS_WORM_TRAP_SPAWN_CHANCE) / 3), world.getServer());
-		player.sendMessage(Text.translatable("message.the-virus-block.purification.no_boobytraps").formatted(Formatting.GREEN), false);
+	private static void applyNoBoobytraps(ServerWorld world, ServerPlayerEntity player, VirusWorldState state) {
+		if (!state.isDormant()) {
+			state.disableBoobytraps(world);
+			player.sendMessage(Text.translatable("message.the-virus-block.purification.no_boobytraps").formatted(Formatting.GREEN), false);
+		} else {
+			player.sendMessage(Text.translatable("message.the-virus-block.purification_totem.dormant").formatted(Formatting.GRAY), true);
+		}
 	}
 
 	private static void applyNoShell(ServerWorld world, ServerPlayerEntity player, VirusWorldState state) {

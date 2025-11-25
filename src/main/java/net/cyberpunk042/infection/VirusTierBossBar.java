@@ -83,7 +83,7 @@ public final class VirusTierBossBar {
 		float progressRatio = getProgressRatio(state);
 		float healthRatio = (float) state.getHealthPercent();
 		int displayTier = state.getCurrentTier().getIndex() + 1;
-		String key = state.isCalm() ? "bossbar.the-virus-block.state.calm" : "bossbar.the-virus-block.state.active";
+		String key = state.isDormant() ? "bossbar.the-virus-block.state.calm" : "bossbar.the-virus-block.state.active";
 
 		if (state.isApocalypseMode()) {
 			MutableText vulnerableTitle = Text.translatable("bossbar.the-virus-block.vulnerable")
@@ -96,7 +96,7 @@ public final class VirusTierBossBar {
 		}
 
 		MutableText title = Text.translatable("bossbar.the-virus-block.tier", displayTier, Text.translatable(key))
-				.formatted(state.isCalm() ? Formatting.AQUA : Formatting.DARK_PURPLE)
+				.formatted(state.isDormant() ? Formatting.AQUA : Formatting.DARK_PURPLE)
 				.append(Text.literal(String.format("  [P:%d%%] ", Math.round(progressRatio * 100))).formatted(Formatting.AQUA))
 				.append(Text.literal(String.format("[H:%d%%]", Math.round(healthRatio * 100))).formatted(Formatting.DARK_RED));
 		bar.setName(title);

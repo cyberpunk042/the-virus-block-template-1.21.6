@@ -1,6 +1,7 @@
 package net.cyberpunk042.registry;
 
 import net.cyberpunk042.TheVirusBlock;
+import net.cyberpunk042.entity.CorruptedTntEntity;
 import net.cyberpunk042.entity.CorruptedWormEntity;
 import net.cyberpunk042.entity.FallingMatrixCubeEntity;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
@@ -22,6 +23,8 @@ public final class ModEntities {
 			RegistryKey.of(RegistryKeys.ENTITY_TYPE, Identifier.of(TheVirusBlock.MOD_ID, "falling_matrix_cube"));
 	public static final RegistryKey<EntityType<?>> CORRUPTED_WORM_KEY =
 			RegistryKey.of(RegistryKeys.ENTITY_TYPE, Identifier.of(TheVirusBlock.MOD_ID, "corrupted_worm"));
+	public static final RegistryKey<EntityType<?>> CORRUPTED_TNT_KEY =
+			RegistryKey.of(RegistryKeys.ENTITY_TYPE, Identifier.of(TheVirusBlock.MOD_ID, "corrupted_tnt"));
 
 	public static final EntityType<FallingMatrixCubeEntity> FALLING_MATRIX_CUBE =
 			FabricEntityTypeBuilder.<FallingMatrixCubeEntity>create(SpawnGroup.MISC, FallingMatrixCubeEntity::new)
@@ -35,6 +38,13 @@ public final class ModEntities {
 					.trackRangeBlocks(32)
 					.trackedUpdateRate(3)
 					.build(CORRUPTED_WORM_KEY);
+	public static final EntityType<CorruptedTntEntity> CORRUPTED_TNT =
+			FabricEntityTypeBuilder.<CorruptedTntEntity>create(SpawnGroup.MISC, CorruptedTntEntity::new)
+					.dimensions(EntityDimensions.fixed(0.98F, 0.98F))
+					.trackRangeBlocks(10)
+					.trackedUpdateRate(10)
+					.fireImmune()
+					.build(CORRUPTED_TNT_KEY);
 
 	private ModEntities() {
 	}
@@ -42,6 +52,7 @@ public final class ModEntities {
 	public static void bootstrap() {
 		Registry.register(Registries.ENTITY_TYPE, FALLING_MATRIX_CUBE_KEY, FALLING_MATRIX_CUBE);
 		Registry.register(Registries.ENTITY_TYPE, CORRUPTED_WORM_KEY, CORRUPTED_WORM);
+		Registry.register(Registries.ENTITY_TYPE, CORRUPTED_TNT_KEY, CORRUPTED_TNT);
 		FabricDefaultAttributeRegistry.register(CORRUPTED_WORM, SilverfishEntity.createSilverfishAttributes());
 	}
 }

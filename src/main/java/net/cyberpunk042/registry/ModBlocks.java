@@ -22,6 +22,7 @@ import net.cyberpunk042.block.corrupted.CorruptedSnowBlock;
 import net.cyberpunk042.block.corrupted.CorruptedSnowCarpetBlock;
 import net.cyberpunk042.block.corrupted.CorruptedStoneBlock;
 import net.cyberpunk042.block.corrupted.CorruptedWoodBlock;
+import net.cyberpunk042.block.corrupted.CorruptedTntBlock;
 import net.minecraft.block.AbstractBlock;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
@@ -189,6 +190,11 @@ public final class ModBlocks {
 					.sounds(BlockSoundGroup.SLIME)
 					.luminance(state -> 4)
 					.strength(0.4F, 1.0F));
+
+	public static final Block CORRUPTED_TNT = register("corrupted_tnt", CorruptedTntBlock::new,
+			AbstractBlock.Settings.copy(Blocks.TNT)
+					.mapColor(MapColor.MAGENTA)
+					.luminance(state -> 8));
 
 	private ModBlocks() {
 	}

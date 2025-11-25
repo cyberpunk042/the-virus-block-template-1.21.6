@@ -5,6 +5,7 @@ import org.jetbrains.annotations.Nullable;
 import com.mojang.serialization.MapCodec;
 
 import net.cyberpunk042.block.entity.MatrixCubeBlockEntity;
+import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.registry.ModBlockEntities;
 import net.minecraft.block.AbstractBlock;
 import net.minecraft.block.Block;
@@ -63,6 +64,9 @@ public class MatrixCubeBlock extends BlockWithEntity {
 	public void onProjectileHit(World world, BlockState state, BlockHitResult hit, ProjectileEntity projectile) {
 		super.onProjectileHit(world, state, hit, projectile);
 		if (!world.isClient && world instanceof ServerWorld serverWorld) {
+			if (VirusWorldState.get(serverWorld).isShielded(hit.getBlockPos())) {
+				return;
+			}
 			serverWorld.createExplosion(projectile, hit.getBlockPos().getX() + 0.5, hit.getBlockPos().getY() + 0.5, hit.getBlockPos().getZ() + 0.5, 2.5F, World.ExplosionSourceType.BLOCK);
 			world.breakBlock(hit.getBlockPos(), false);
 		}
@@ -70,6 +74,9 @@ public class MatrixCubeBlock extends BlockWithEntity {
 	@Override
 	public BlockState onBreak(World world, BlockPos pos, BlockState state, PlayerEntity player) {
 		if (!world.isClient) {
+			if (world instanceof ServerWorld serverWorld && VirusWorldState.get(serverWorld).isShielded(pos)) {
+				return super.onBreak(world, pos, state, player);
+			}
 			world.createExplosion(null, pos.getX(), pos.getY(), pos.getZ(), 1.2F, World.ExplosionSourceType.BLOCK);
 		}
 		return super.onBreak(world, pos, state, player);

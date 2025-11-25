@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -23,10 +24,15 @@ import net.cyberpunk042.block.corrupted.CorruptedGlassBlock;
 import net.cyberpunk042.block.corrupted.CorruptedStoneBlock;
 import net.cyberpunk042.block.corrupted.CorruptionStage;
 import net.cyberpunk042.block.entity.MatrixCubeBlockEntity;
+import net.cyberpunk042.entity.CorruptedTntEntity;
 import net.cyberpunk042.entity.FallingMatrixCubeEntity;
 import net.cyberpunk042.infection.mutation.BlockMutationHelper;
 import net.cyberpunk042.mixin.GuardianEntityAccessor;
 import net.cyberpunk042.network.DifficultySyncPayload;
+import net.cyberpunk042.network.VoidTearBurstPayload;
+import net.cyberpunk042.network.VoidTearSpawnPayload;
+import net.cyberpunk042.network.ShieldFieldSpawnPayload;
+import net.cyberpunk042.network.ShieldFieldRemovePayload;
 import net.cyberpunk042.registry.ModBlocks;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
@@ -38,7 +44,6 @@ import net.minecraft.entity.EntityType;
 import net.minecraft.entity.FallingBlockEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.SpawnReason;
-import net.minecraft.entity.TntEntity;
 import net.minecraft.entity.attribute.EntityAttributeInstance;
 import net.minecraft.entity.attribute.EntityAttributeModifier;
 import net.minecraft.entity.attribute.EntityAttributeModifier.Operation;
@@ -59,6 +64,7 @@ import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
@@ -66,12 +72,15 @@ import net.minecraft.util.Formatting;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.ChunkPos;
+import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.random.Random;
+import net.minecraft.world.GameRules;
 import net.minecraft.world.Heightmap;
 import net.minecraft.world.PersistentState;
 import net.minecraft.world.PersistentStateType;
+import net.minecraft.world.World.ExplosionSourceType;
 import net.minecraft.world.WorldEvents;
 import org.jetbrains.annotations.Nullable;
 
@@ -81,29 +90,46 @@ public class VirusWorldState extends PersistentState {
 	private static final int FLAG_TERRAIN = 1 << 2;
 	private static final int FLAG_SHELLS = 1 << 3;
 	private static final int FLAG_CLEANSING = 1 << 4;
-	private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+	private static final Codec<ShieldField> SHIELD_FIELD_CODEC = RecordCodecBuilder.create(instance -> instance.group(
+			Codec.LONG.fieldOf("id").forGetter(ShieldField::id),
+			BlockPos.CODEC.fieldOf("center").forGetter(ShieldField::center),
+			Codec.DOUBLE.fieldOf("radius").forGetter(ShieldField::radius),
+			Codec.LONG.fieldOf("createdTick").forGetter(ShieldField::createdTick)
+	).apply(instance, ShieldField::new));
+private static final Codec<BoobytrapDefaults> BOOBYTRAP_CODEC = RecordCodecBuilder.create(instance -> instance.group(
+			Codec.BOOL.fieldOf("captured").forGetter(BoobytrapDefaults::captured),
+			Codec.BOOL.fieldOf("enabled").forGetter(BoobytrapDefaults::enabled),
+			Codec.INT.fieldOf("spawn").forGetter(BoobytrapDefaults::spawn),
+			Codec.INT.fieldOf("trap").forGetter(BoobytrapDefaults::trap)
+	).apply(instance, BoobytrapDefaults::new));
+private static final Codec<SpreadSnapshot> SPREAD_CODEC = RecordCodecBuilder.create(instance -> instance.group(
+			Codec.LONG.listOf().fieldOf("pillarChunks").forGetter(SpreadSnapshot::pillars),
+			BlockPos.CODEC.listOf().fieldOf("virusSources").forGetter(SpreadSnapshot::sources)
+	).apply(instance, SpreadSnapshot::new));
+private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(instance -> instance.group(
 			Codec.BOOL.optionalFieldOf("infected", false).forGetter(state -> state.infected),
+			Codec.BOOL.optionalFieldOf("dormant", false).forGetter(state -> state.dormant),
 			Codec.INT.optionalFieldOf("tierIndex", 0).forGetter(state -> state.tierIndex),
 			Codec.LONG.optionalFieldOf("totalTicks", 0L).forGetter(state -> state.totalTicks),
 			Codec.LONG.optionalFieldOf("ticksInTier", 0L).forGetter(state -> state.ticksInTier),
-			Codec.LONG.optionalFieldOf("calmUntilTick", 0L).forGetter(state -> state.calmUntilTick),
 			Codec.INT.optionalFieldOf("containmentLevel", 0).forGetter(state -> state.containmentLevel),
 			Codec.INT.optionalFieldOf("stateFlags", 0).forGetter(VirusWorldState::encodeFlags),
 			Codec.DOUBLE.optionalFieldOf("healthScale", 1.0D).forGetter(state -> state.healthScale),
 			Codec.DOUBLE.optionalFieldOf("currentHealth", 0.0D).forGetter(state -> state.currentHealth),
 			Codec.STRING.optionalFieldOf("difficulty", VirusDifficulty.HARD.getId()).forGetter(state -> state.difficulty.getId()),
 			Codec.BOOL.optionalFieldOf("difficultyPromptShown", false).forGetter(state -> state.difficultyPromptShown),
-			Codec.LONG.listOf().optionalFieldOf("pillarChunks", List.of()).forGetter(VirusWorldState::getPillarChunksSnapshot),
-			BlockPos.CODEC.listOf().optionalFieldOf("virusSources", List.of()).forGetter(VirusWorldState::getVirusSourceList),
+			BOOBYTRAP_CODEC.optionalFieldOf("boobytrapDefaults").forGetter(VirusWorldState::getBoobytrapDefaultsRecord),
+			SPREAD_CODEC.optionalFieldOf("spreadData").forGetter(state -> state.getSpreadSnapshot()),
 			Codec.unboundedMap(VirusEventType.CODEC, Codec.LONG).optionalFieldOf("eventHistory", Map.of()).forGetter(VirusWorldState::getEventHistorySnapshot),
-			Codec.LONG.optionalFieldOf("lastMatrixCubeTick", 0L).forGetter(state -> state.lastMatrixCubeTick)
-	).apply(instance, (infected, tierIndex, totalTicks, ticksInTier, calmUntilTick, containmentLevel, stateFlags, healthScale, currentHealth, difficultyId, difficultyPromptShown, pillarChunks, sources, events, lastMatrixCubeTick) -> {
+			Codec.LONG.optionalFieldOf("lastMatrixCubeTick", 0L).forGetter(state -> state.lastMatrixCubeTick),
+			SHIELD_FIELD_CODEC.listOf().optionalFieldOf("shieldFields", List.of()).forGetter(VirusWorldState::getShieldFieldsSnapshot)
+	).apply(instance, (infected, dormant, tierIndex, totalTicks, ticksInTier, containmentLevel, stateFlags, healthScale, currentHealth, difficultyId, difficultyPromptShown, boobytrapDefaults, spreadData, events, lastMatrixCubeTick, shields) -> {
 		VirusWorldState state = new VirusWorldState();
 		state.infected = infected;
+		state.dormant = dormant;
 		state.tierIndex = tierIndex;
 		state.totalTicks = totalTicks;
 		state.ticksInTier = ticksInTier;
-		state.calmUntilTick = calmUntilTick;
 		state.containmentLevel = containmentLevel;
 		state.apocalypseMode = (stateFlags & FLAG_APOCALYPSE) != 0;
 		state.terrainCorrupted = (stateFlags & FLAG_TERRAIN) != 0;
@@ -113,10 +139,19 @@ public class VirusWorldState extends PersistentState {
 		state.currentHealth = currentHealth;
 		state.difficulty = VirusDifficulty.fromId(difficultyId);
 		state.difficultyPromptShown = difficultyPromptShown;
-		pillarChunks.forEach(chunk -> state.pillarChunks.add(chunk.longValue()));
-		sources.forEach(pos -> state.virusSources.add(pos.toImmutable()));
+		boobytrapDefaults.ifPresent(def -> {
+			state.boobytrapDefaultsCaptured = def.captured();
+			state.defaultBoobytrapsEnabled = def.enabled();
+			state.defaultWormSpawnChance = def.spawn();
+			state.defaultWormTrapSpawnChance = def.trap();
+		});
+		spreadData.ifPresent(data -> {
+			data.pillars().forEach(chunk -> state.pillarChunks.add(chunk.longValue()));
+			data.sources().forEach(pos -> state.virusSources.add(pos.toImmutable()));
+		});
 		state.eventHistory.putAll(events);
 		state.lastMatrixCubeTick = lastMatrixCubeTick;
+		shields.forEach(field -> state.activeShields.put(field.id(), field));
 		return state;
 	}));
 	public static final PersistentStateType<VirusWorldState> TYPE = new PersistentStateType<>(ID, VirusWorldState::new, CODEC, DataFixTypes.LEVEL);
@@ -126,12 +161,17 @@ public class VirusWorldState extends PersistentState {
 	private final Map<BlockPos, Long> shellCooldowns = new HashMap<>();
 	private final Object2LongMap<UUID> guardianBeams = new Object2LongOpenHashMap<>();
 	private final LongSet pillarChunks = new LongOpenHashSet();
+	private final List<VoidTearInstance> activeVoidTears = new ArrayList<>();
+	private final List<PendingVoidTear> pendingVoidTears = new ArrayList<>();
+	private final Map<Long, ShieldField> activeShields = new HashMap<>();
+	private long nextVoidTearId;
+	private static final double CLEANSE_PURGE_RADIUS = 32.0D;
 
 	private boolean infected;
+	private boolean dormant;
 	private int tierIndex;
 	private long totalTicks;
 	private long ticksInTier;
-	private long calmUntilTick;
 	private int containmentLevel;
 	private boolean apocalypseMode;
 	private boolean terrainCorrupted;
@@ -139,6 +179,10 @@ public class VirusWorldState extends PersistentState {
 	private boolean cleansingActive;
 	private double healthScale = 1.0D;
 	private double currentHealth;
+	private boolean boobytrapDefaultsCaptured;
+	private boolean defaultBoobytrapsEnabled = true;
+	private int defaultWormSpawnChance = -1;
+	private int defaultWormTrapSpawnChance = -1;
 	private int surfaceMutationBudget;
 	private long surfaceMutationBudgetTick = -1L;
 	@SuppressWarnings("unused")
@@ -146,6 +190,21 @@ public class VirusWorldState extends PersistentState {
 	private VirusDifficulty difficulty = VirusDifficulty.HARD;
 	private boolean difficultyPromptShown;
 	private static final Identifier EXTREME_HEALTH_MODIFIER_ID = Identifier.of(TheVirusBlock.MOD_ID, "extreme_health_penalty");
+	private Optional<BoobytrapDefaults> getBoobytrapDefaultsRecord() {
+		if (!boobytrapDefaultsCaptured) {
+			return Optional.empty();
+		}
+		return Optional.of(new BoobytrapDefaults(true, defaultBoobytrapsEnabled, defaultWormSpawnChance, defaultWormTrapSpawnChance));
+	}
+
+	private Optional<SpreadSnapshot> getSpreadSnapshot() {
+		List<Long> pillars = getPillarChunksSnapshot();
+		List<BlockPos> sources = getVirusSourceList();
+		if (pillars.isEmpty() && sources.isEmpty()) {
+			return Optional.empty();
+		}
+		return Optional.of(new SpreadSnapshot(pillars, sources));
+	}
 
 	public static VirusWorldState get(ServerWorld world) {
 		return world.getPersistentStateManager().getOrCreate(TYPE);
@@ -153,6 +212,57 @@ public class VirusWorldState extends PersistentState {
 
 	public VirusDifficulty getDifficulty() {
 		return difficulty;
+	}
+
+	public boolean isDormant() {
+		return dormant;
+	}
+
+	public void setDormant(boolean dormant) {
+		if (this.dormant != dormant) {
+			this.dormant = dormant;
+			markDirty();
+		}
+	}
+
+	private void captureBoobytrapDefaults(ServerWorld world) {
+		if (boobytrapDefaultsCaptured) {
+			return;
+		}
+		GameRules rules = world.getGameRules();
+		defaultBoobytrapsEnabled = rules.getBoolean(TheVirusBlock.VIRUS_BOOBYTRAPS_ENABLED);
+		defaultWormSpawnChance = rules.getInt(TheVirusBlock.VIRUS_WORM_SPAWN_CHANCE);
+		defaultWormTrapSpawnChance = rules.getInt(TheVirusBlock.VIRUS_WORM_TRAP_SPAWN_CHANCE);
+		boobytrapDefaultsCaptured = true;
+		markDirty();
+	}
+
+	public void disableBoobytraps(ServerWorld world) {
+		captureBoobytrapDefaults(world);
+		GameRules rules = world.getGameRules();
+		rules.get(TheVirusBlock.VIRUS_BOOBYTRAPS_ENABLED).set(false, world.getServer());
+		int spawnRate = Math.max(1, getDefaultWormSpawnChance() / 3);
+		int trapRate = Math.max(1, getDefaultWormTrapSpawnChance() / 3);
+		rules.get(TheVirusBlock.VIRUS_WORM_SPAWN_CHANCE).set(spawnRate, world.getServer());
+		rules.get(TheVirusBlock.VIRUS_WORM_TRAP_SPAWN_CHANCE).set(trapRate, world.getServer());
+		setDormant(true);
+	}
+
+	private void restoreBoobytrapRules(ServerWorld world) {
+		captureBoobytrapDefaults(world);
+		GameRules rules = world.getGameRules();
+		rules.get(TheVirusBlock.VIRUS_BOOBYTRAPS_ENABLED).set(defaultBoobytrapsEnabled, world.getServer());
+		rules.get(TheVirusBlock.VIRUS_WORM_SPAWN_CHANCE).set(getDefaultWormSpawnChance(), world.getServer());
+		rules.get(TheVirusBlock.VIRUS_WORM_TRAP_SPAWN_CHANCE).set(getDefaultWormTrapSpawnChance(), world.getServer());
+		setDormant(false);
+	}
+
+	private int getDefaultWormSpawnChance() {
+		return defaultWormSpawnChance > 0 ? defaultWormSpawnChance : 6;
+	}
+
+	private int getDefaultWormTrapSpawnChance() {
+		return defaultWormTrapSpawnChance > 0 ? defaultWormTrapSpawnChance : 135;
 	}
 
 	public boolean hasShownDifficultyPrompt() {
@@ -184,10 +294,11 @@ public class VirusWorldState extends PersistentState {
 	}
 
 	public void tick(ServerWorld world) {
+		tickVoidTears(world);
+		tickShieldFields(world);
 		if (!infected) {
 			return;
 		}
-
 		totalTicks++;
 		ticksInTier++;
 
@@ -212,11 +323,8 @@ public class VirusWorldState extends PersistentState {
 		maybeSpawnMatrixCube(world, tier);
 
 		applyDifficultyRules(world, tier);
-		if (totalTicks < calmUntilTick) {
-			return;
-		}
-
 		runEvents(world, tier);
+		boostAmbientSpawns(world, tier);
 	}
 
 	private void runEvents(ServerWorld world, InfectionTier tier) {
@@ -245,6 +353,83 @@ public class VirusWorldState extends PersistentState {
 			maybeInversion(world, origin, tier, random);
 			maybeEntityDuplication(world, origin, tier, random);
 		}
+	}
+
+	private void boostAmbientSpawns(ServerWorld world, InfectionTier tier) {
+		if (!world.getGameRules().getBoolean(GameRules.DO_MOB_SPAWNING)) {
+			return;
+		}
+		int difficultyScale = switch (difficulty) {
+			case EASY -> 0;
+			case MEDIUM -> 1;
+			case HARD -> 2;
+			case EXTREME -> 3;
+		};
+		if (difficultyScale <= 0) {
+			return;
+		}
+		int tierIndex = tier.getIndex();
+		int attempts = Math.max(1, tierIndex + 1) * difficultyScale;
+		if (apocalypseMode) {
+			attempts += 2;
+		}
+		Random random = world.getRandom();
+		List<ServerPlayerEntity> anchors = world.getPlayers(player -> player.isAlive() && !player.isSpectator() && isWithinAura(player.getBlockPos()));
+		if (anchors.isEmpty()) {
+			return;
+		}
+		for (int i = 0; i < attempts; i++) {
+			ServerPlayerEntity anchor = anchors.get(random.nextInt(anchors.size()));
+			BlockPos spawnPos = findBoostSpawnPos(world, anchor.getBlockPos(), 16 + tierIndex * 6, random);
+			if (spawnPos == null) {
+				continue;
+			}
+			EntityType<? extends MobEntity> type = pickBoostMobType(tierIndex, random);
+			if (type == null) {
+				continue;
+			}
+			type.spawn(world, entity -> entity.refreshPositionAndAngles(spawnPos, random.nextFloat() * 360.0F, 0.0F),
+					spawnPos, SpawnReason.EVENT, true, false);
+		}
+	}
+
+	private BlockPos findBoostSpawnPos(ServerWorld world, BlockPos origin, int radius, Random random) {
+		for (int tries = 0; tries < 6; tries++) {
+			int dx = random.nextBetween(-radius, radius);
+			int dz = random.nextBetween(-radius, radius);
+			int x = origin.getX() + dx;
+			int z = origin.getZ() + dz;
+			int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, x, z);
+			BlockPos pos = new BlockPos(x, y, z);
+			if (!world.isChunkLoaded(ChunkPos.toLong(pos))) {
+				continue;
+			}
+			if (!world.getWorldBorder().contains(pos)) {
+				continue;
+			}
+			BlockState state = world.getBlockState(pos);
+			BlockState below = world.getBlockState(pos.down());
+			if (!state.isAir() || below.isAir()) {
+				continue;
+			}
+			return pos;
+		}
+		return null;
+	}
+
+	@Nullable
+	private EntityType<? extends MobEntity> pickBoostMobType(int tierIndex, Random random) {
+		if (tierIndex >= 3 && random.nextFloat() < 0.25F) {
+			return EntityType.ENDERMAN;
+		}
+		if (tierIndex >= 2 && random.nextFloat() < 0.35F) {
+			return random.nextBoolean() ? EntityType.HUSK : EntityType.DROWNED;
+		}
+		return switch (random.nextInt(3)) {
+			case 0 -> EntityType.ZOMBIE;
+			case 1 -> EntityType.SKELETON;
+			default -> EntityType.SPIDER;
+		};
 	}
 
 	private void applyDifficultyRules(ServerWorld world, InfectionTier tier) {
@@ -341,6 +526,7 @@ public class VirusWorldState extends PersistentState {
 		}
 
 		List<ServerPlayerEntity> players = world.getPlayers(player -> player.squaredDistanceTo(origin.getX(), origin.getY(), origin.getZ()) < 4096.0D);
+		players.removeIf(this::isPlayerShielded);
 		if (players.isEmpty()) {
 			return;
 		}
@@ -363,16 +549,15 @@ public class VirusWorldState extends PersistentState {
 				world.spawnEntity(arrow);
 
 				if (tier.getIndex() >= 1 && random.nextFloat() < 0.35F + tier.getIndex() * 0.15F) {
-					TntEntity tnt = new TntEntity(world, x, y, z, null);
+					CorruptedTntEntity tnt = CorruptedTntEntity.spawn(world, x, y, z, null,
+							Math.max(15, 50 - tier.getIndex() * 8));
 					tnt.addCommandTag(TheVirusBlock.CORRUPTION_EXPLOSIVE_TAG);
-					tnt.setFuse(Math.max(15, 50 - tier.getIndex() * 8));
-					world.spawnEntity(tnt);
 					tntSpawned++;
 				}
 			}
 			totalArrows += volleys;
 
-			if (random.nextFloat() < 0.4F + tier.getIndex() * 0.1F) {
+			if (tier.getIndex() >= 2 && random.nextFloat() < 0.4F + tier.getIndex() * 0.1F) {
 				spawnArrowBarrage(world, player, tier, random);
 				arrowBarrageCount++;
 			}
@@ -396,10 +581,9 @@ public class VirusWorldState extends PersistentState {
 		}
 
 		if (tier.getIndex() >= 3) {
-			TntEntity tnt = new TntEntity(world, player.getX(), player.getY() + 12.0D, player.getZ(), null);
+			CorruptedTntEntity tnt = CorruptedTntEntity.spawn(world, player.getX(), player.getY() + 12.0D, player.getZ(), null,
+					Math.max(20, 40 - tier.getIndex() * 6));
 			tnt.addCommandTag(TheVirusBlock.CORRUPTION_EXPLOSIVE_TAG);
-			tnt.setFuse(Math.max(20, 40 - tier.getIndex() * 6));
-			world.spawnEntity(tnt);
 		}
 	}
 
@@ -523,31 +707,44 @@ public class VirusWorldState extends PersistentState {
 		if (!TierCookbook.isEnabled(world, tier, apocalypseMode, TierFeature.EVENT_VOID_TEAR)) {
 			return;
 		}
-		if (!canTrigger(VirusEventType.VOID_TEAR, 1000)) {
+		if (!isVoidTearAllowed(tier)) {
+			return;
+		}
+		if (!canTrigger(VirusEventType.VOID_TEAR, 200)) {
 			return;
 		}
 
-		if (random.nextFloat() > 0.12F) {
+		if (random.nextFloat() > 0.2F) {
 			return;
 		}
 
 		markEvent(VirusEventType.VOID_TEAR);
 
-		BlockPos tearPos = origin.up(random.nextBetween(3, 12));
-		double radius = 8.0D + tier.getIndex() * 2.0D;
-		Box box = new Box(tearPos).expand(radius);
-		Vec3d center = Vec3d.ofCenter(tearPos);
-
-		int affected = 0;
-		for (LivingEntity living : world.getEntitiesByClass(LivingEntity.class, box, Entity::isAlive)) {
-			Vec3d offset = center.subtract(living.getPos());
-			Vec3d pull = offset.normalize().multiply(0.25D + tier.getIndex() * 0.05D);
-			living.addVelocity(pull.x, pull.y, pull.z);
-			affected++;
+		boolean targetPlayer = random.nextFloat() < getPlayerVoidTearChance();
+		BlockPos targetPos;
+		if (targetPlayer) {
+			targetPos = pickPlayerVoidTearPos(world, random);
+			if (targetPos == null) {
+				return;
+			}
+		} else {
+			if (origin == null) {
+				return;
+			}
+			targetPos = sampleTearOffset(world, origin, random, 12, 6);
+			if (targetPos == null) {
+				return;
+			}
 		}
+		createVoidTear(world, targetPos, tier, targetPlayer ? "player" : "core");
+	}
 
-		world.syncWorldEvent(WorldEvents.COMPOSTER_USED, tearPos, 0);
-		CorruptionProfiler.logTierEvent(world, VirusEventType.VOID_TEAR, tearPos, "affected=" + affected + " radius=" + radius);
+	public boolean spawnVoidTearForCommand(ServerWorld world, BlockPos center) {
+		if (center == null) {
+			return false;
+		}
+		createVoidTear(world, center, getCurrentTier(), "command");
+		return true;
 	}
 
 	private void maybeInversion(ServerWorld world, BlockPos origin, InfectionTier tier, Random random) {
@@ -682,6 +879,10 @@ public class VirusWorldState extends PersistentState {
 		return Map.copyOf(eventHistory);
 	}
 
+	private List<ShieldField> getShieldFieldsSnapshot() {
+		return activeShields.isEmpty() ? List.of() : List.copyOf(activeShields.values());
+	}
+
 	public boolean areLiquidsCorrupted(ServerWorld world) {
 		return infected && TierCookbook.isEnabled(world, getCurrentTier(), apocalypseMode, TierFeature.LIQUID_CORRUPTION);
 	}
@@ -735,6 +936,7 @@ public class VirusWorldState extends PersistentState {
 	private static final long LOW_TIER_DELAY = 80L;
 	private static final long SHELL_JITTER = 60L;
 	private static final long PLAYER_OCCUPANCY_DELAY = 40L;
+	private static final double SHIELD_FIELD_RADIUS = 12.0D;
 private static final Set<Block> SHELL_BLOCKS = Set.of(
 		ModBlocks.CORRUPTED_STONE,
 		ModBlocks.CORRUPTED_CRYING_OBSIDIAN,
@@ -982,8 +1184,9 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		int radius = chunkRadius * 16;
 		boolean moved = false;
 		Random random = world.getRandom();
+		float teleportChance = getTeleportChance();
 		for (BlockPos source : List.copyOf(virusSources)) {
-			if (random.nextFloat() > 0.25F) {
+			if (random.nextFloat() > teleportChance) {
 				continue;
 			}
 			BlockPos target = findTeleportTarget(world, source, radius, random);
@@ -1216,10 +1419,12 @@ private static final int MAX_SHELL_HEIGHT = 2;
 
 		if (!infected) {
 			infected = true;
+			captureBoobytrapDefaults(world);
+			restoreBoobytrapRules(world);
+			dormant = false;
 			tierIndex = 0;
 			totalTicks = 0;
 			ticksInTier = 0;
-			calmUntilTick = 0;
 			containmentLevel = 0;
 			apocalypseMode = false;
 			terrainCorrupted = false;
@@ -1261,11 +1466,6 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		markDirty();
 	}
 
-	public void applyPurification(long ticks) {
-		calmUntilTick = Math.max(calmUntilTick, totalTicks + ticks);
-		markDirty();
-	}
-
 	public boolean reduceMaxHealth(ServerWorld world, double factor) {
 		if (!infected || factor <= 0.0D || factor >= 1.0D) {
 			return false;
@@ -1296,7 +1496,9 @@ private static final int MAX_SHELL_HEIGHT = 2;
 	}
 
 	public void forceContainmentReset(ServerWorld world) {
-		for (BlockPos pos : new ArrayList<>(virusSources)) {
+		List<BlockPos> snapshot = new ArrayList<>(virusSources);
+		purgeHostilesAround(world, snapshot);
+		for (BlockPos pos : snapshot) {
 			if (world.isChunkLoaded(ChunkPos.toLong(pos))) {
 				world.breakBlock(pos, false);
 			}
@@ -1312,6 +1514,7 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		apocalypseMode = false;
 		terrainCorrupted = false;
 		shellsCollapsed = false;
+		dormant = false;
 		endInfection(world);
 	}
 
@@ -1320,11 +1523,12 @@ private static final int MAX_SHELL_HEIGHT = 2;
 			return;
 		}
 
+		restoreBoobytrapRules(world);
 		infected = false;
+		dormant = false;
 		tierIndex = 0;
 		totalTicks = 0;
 		ticksInTier = 0;
-		calmUntilTick = 0;
 		containmentLevel = 0;
 		apocalypseMode = false;
 		terrainCorrupted = false;
@@ -1336,11 +1540,674 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		shellCooldowns.clear();
 		pillarChunks.clear();
 		guardianBeams.clear();
+		for (VoidTearInstance tear : activeVoidTears) {
+			sendVoidTearBurst(world, tear);
+		}
+		activeVoidTears.clear();
+		pendingVoidTears.clear();
 		markDirty();
 
 		MatrixCubeBlockEntity.destroyAll(world);
 		Text message = Text.translatable("message.the-virus-block.cleansed").formatted(Formatting.AQUA);
 		world.getPlayers(PlayerEntity::isAlive).forEach(player -> player.sendMessage(message, false));
+	}
+
+	private void createVoidTear(ServerWorld world, BlockPos basePos, InfectionTier tier, String source) {
+		BlockPos tearPos = basePos.toImmutable();
+		double radius = (8.0D + tier.getIndex() * 2.0D) * 0.7D;
+		double pullStrength = 0.25D + tier.getIndex() * 0.08D;
+		double damageRadius = Math.max(2.0D, radius * 0.4D);
+		float damage = 1.5F + tier.getIndex() * 0.75F;
+		int durationTicks = 100;
+		long activationTick = world.getTime() + VOID_TEAR_WARNING_DELAY;
+		long tearId = ++nextVoidTearId;
+		pendingVoidTears.add(new PendingVoidTear(
+				tearId,
+				tearPos,
+				radius,
+				pullStrength,
+				damageRadius * damageRadius,
+				damage,
+				activationTick,
+				durationTicks,
+				tier.getIndex(),
+				source));
+		warnPlayersNearTear(world, tearPos, radius);
+	}
+
+	private void tickVoidTears(ServerWorld world) {
+		long now = world.getTime();
+		Random random = world.getRandom();
+		armPendingVoidTears(world, random, now);
+		if (activeVoidTears.isEmpty()) {
+			return;
+		}
+		Iterator<VoidTearInstance> iterator = activeVoidTears.iterator();
+		while (iterator.hasNext()) {
+			VoidTearInstance tear = iterator.next();
+			if (now >= tear.expiryTick()) {
+				applyVoidTearForce(world, tear, true);
+				sendVoidTearBurst(world, tear);
+				spawnVoidTearBurst(world, tear);
+				iterator.remove();
+				continue;
+			}
+			applyVoidTearForce(world, tear, false);
+			notifyPlayersDuringVoidTear(world, tear, now);
+			erodeVoidTearBlocks(world, tear, random);
+			spawnVoidTearParticles(world, tear);
+		}
+	}
+
+	private void armPendingVoidTears(ServerWorld world, Random random, long now) {
+		if (pendingVoidTears.isEmpty()) {
+			return;
+		}
+		Iterator<PendingVoidTear> iterator = pendingVoidTears.iterator();
+		while (iterator.hasNext()) {
+			PendingVoidTear pending = iterator.next();
+			if (now < pending.activationTick()) {
+				continue;
+			}
+			iterator.remove();
+			activatePendingVoidTear(world, pending, random);
+		}
+	}
+
+	private void activatePendingVoidTear(ServerWorld world, PendingVoidTear pending, Random random) {
+		BlockPos tearPos = pending.centerBlock();
+		long expiry = pending.activationTick() + pending.durationTicks();
+		VoidTearInstance tear = new VoidTearInstance(
+				pending.id(),
+				tearPos,
+				Vec3d.ofCenter(tearPos),
+				pending.radius(),
+				pending.pullStrength(),
+				pending.damageRadiusSq(),
+				pending.damage(),
+				expiry,
+				pending.durationTicks(),
+				pending.tierIndex());
+		activeVoidTears.add(tear);
+		carveVoidTearChamber(world, tearPos, pending.radius());
+		sendVoidTearSpawn(world, tear);
+		world.syncWorldEvent(WorldEvents.COMPOSTER_USED, tearPos, 0);
+		int affected = applyVoidTearForce(world, tear, false);
+		erodeVoidTearBlocks(world, tear, random);
+		spawnVoidTearParticles(world, tear);
+		CorruptionProfiler.logTierEvent(world, VirusEventType.VOID_TEAR,
+				tearPos,
+				"source=" + pending.source() + " affected=" + affected + " radius=" + pending.radius() + " duration=100");
+	}
+
+	private void tickShieldFields(ServerWorld world) {
+		if (activeShields.isEmpty()) {
+			return;
+		}
+		Iterator<Map.Entry<Long, ShieldField>> iterator = activeShields.entrySet().iterator();
+		while (iterator.hasNext()) {
+			ShieldField field = iterator.next().getValue();
+			BlockPos center = field.center();
+			if (!world.isChunkLoaded(ChunkPos.toLong(center))) {
+				continue;
+			}
+			if (isWithinAura(center)) {
+				triggerShieldFailure(world, center);
+				continue;
+			}
+			if (!isShieldAnchorIntact(world, center)) {
+				iterator.remove();
+				broadcastShieldRemoval(world, field.id());
+				world.playSound(null, center, SoundEvents.BLOCK_BEACON_DEACTIVATE, SoundCategory.BLOCKS, 1.0F, 0.8F);
+				notifyShieldStatus(world, center, false);
+				continue;
+			}
+			world.spawnParticles(
+					ParticleTypes.END_ROD,
+					center.getX() + 0.5D,
+					center.getY() + 1.2D,
+					center.getZ() + 0.5D,
+					4,
+					0.25D,
+					0.25D,
+					0.25D,
+					0.0D);
+		}
+	}
+
+	private static final double TEAR_BURST_VERTICAL_BOOST = 0.35D;
+
+	private int applyVoidTearForce(ServerWorld world, VoidTearInstance tear, boolean finalBlast) {
+		long now = world.getTime();
+		double effectRadius = Math.max(6.0D, tear.radius() * 1.4D);
+		Box box = new Box(tear.centerBlock()).expand(effectRadius);
+		int affected = 0;
+		for (LivingEntity living : world.getEntitiesByClass(LivingEntity.class, box, Entity::isAlive)) {
+			if (isShielding(living.getBlockPos())) {
+				continue;
+			}
+			Vec3d center = tear.centerVec();
+			Vec3d offset;
+			long ticksRemaining = tear.expiryTick() - now;
+			double duration = Math.max(1.0D, tear.durationTicks());
+			double lifeFrac = MathHelper.clamp(1.0D - (ticksRemaining / duration), 0.0D, 1.0D);
+			boolean pushPhase = finalBlast || lifeFrac >= 0.75D;
+			boolean pullPhase = !pushPhase && lifeFrac < 0.5D;
+			if (!pullPhase && !pushPhase) {
+				continue;
+			}
+			offset = pushPhase ? living.getPos().subtract(center) : center.subtract(living.getPos());
+			double distanceSq = offset.lengthSquared();
+			if (distanceSq < 1.0E-4) {
+				continue;
+			}
+			double distance = Math.sqrt(distanceSq);
+			if (distance > effectRadius) {
+				continue;
+			}
+			double proximity = 1.0D - Math.min(1.0D, distance / effectRadius);
+			Vec3d direction = offset.normalize();
+			double baseStrength = tear.pullStrength() * (pushPhase ? 4.2D : 3.2D);
+			double strength = baseStrength * (0.15D + 0.85D * proximity);
+			Vec3d impulse = direction.multiply(strength);
+			double vertical = MathHelper.clamp(impulse.y + (pushPhase ? TEAR_BURST_VERTICAL_BOOST * 0.5D : 0.0D),
+					-0.25D,
+					0.25D);
+			living.addVelocity(impulse.x, vertical, impulse.z);
+			living.velocityModified = true;
+			living.velocityDirty = true;
+			living.fallDistance = 0.0F;
+			affected++;
+			if (pullPhase && distanceSq <= tear.damageRadiusSq()) {
+				living.damage(world, world.getDamageSources().explosion(null, null), tear.damage());
+			}
+		}
+		return affected;
+	}
+
+	private void erodeVoidTearBlocks(ServerWorld world, VoidTearInstance tear, Random random) {
+		int attempts = Math.max(2, 2 + tear.tierIndex());
+		double radiusSq = tear.radius() * tear.radius();
+		for (int i = 0; i < attempts; i++) {
+			BlockPos target = sampleVoidTearPos(random, tear, radiusSq);
+			if (!world.isChunkLoaded(ChunkPos.toLong(target))) {
+				continue;
+			}
+			if (isShielding(target)) {
+				continue;
+			}
+			BlockState state = world.getBlockState(target);
+			if (state.isAir() || state.getHardness(world, target) < 0.0F || state.isOf(ModBlocks.VIRUS_BLOCK)) {
+				continue;
+			}
+			if (state.isIn(BlockTags.BASE_STONE_OVERWORLD)) {
+				world.setBlockState(target, ModBlocks.CORRUPTED_STONE.getDefaultState(), Block.FORCE_STATE);
+			} else {
+				world.setBlockState(target, ModBlocks.CORRUPTED_GLASS.getDefaultState(), Block.FORCE_STATE);
+			}
+		}
+	}
+
+	private BlockPos sampleVoidTearPos(Random random, VoidTearInstance tear, double radiusSq) {
+		for (int tries = 0; tries < 6; tries++) {
+			double dx = (random.nextDouble() * 2.0D - 1.0D) * tear.radius();
+			double dy = (random.nextDouble() * 2.0D - 1.0D) * tear.radius();
+			double dz = (random.nextDouble() * 2.0D - 1.0D) * tear.radius();
+			if (dx * dx + dy * dy + dz * dz > radiusSq) {
+				continue;
+			}
+			return BlockPos.ofFloored(tear.centerVec().x + dx, tear.centerVec().y + dy, tear.centerVec().z + dz);
+		}
+		return tear.centerBlock();
+	}
+
+	private void spawnVoidTearParticles(ServerWorld world, VoidTearInstance tear) {
+		world.spawnParticles(
+				ParticleTypes.REVERSE_PORTAL,
+				tear.centerVec().x,
+				tear.centerVec().y,
+				tear.centerVec().z,
+				24,
+				tear.radius() * 0.2D,
+				tear.radius() * 0.2D,
+				tear.radius() * 0.2D,
+				0.02D);
+	}
+
+	private void spawnVoidTearBurst(ServerWorld world, VoidTearInstance tear) {
+		world.spawnParticles(
+				ParticleTypes.SONIC_BOOM,
+				tear.centerVec().x,
+				tear.centerVec().y,
+				tear.centerVec().z,
+				2,
+				tear.radius() * 0.1D,
+				tear.radius() * 0.1D,
+				tear.radius() * 0.1D,
+				0.0D);
+		world.playSound(
+				null,
+				tear.centerBlock(),
+				SoundEvents.ENTITY_WITHER_BREAK_BLOCK,
+				SoundCategory.HOSTILE,
+				0.8F,
+				0.5F);
+	}
+
+	private void sendVoidTearSpawn(ServerWorld world, VoidTearInstance tear) {
+		int duration = tear.durationTicks();
+		VoidTearSpawnPayload payload = new VoidTearSpawnPayload(tear.id(), tear.centerVec().x, tear.centerVec().y,
+				tear.centerVec().z, (float) tear.radius(), duration, tear.tierIndex());
+		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
+			ServerPlayNetworking.send(player, payload);
+		}
+	}
+
+	private void sendVoidTearBurst(ServerWorld world, VoidTearInstance tear) {
+		VoidTearBurstPayload payload = new VoidTearBurstPayload(tear.id(), tear.centerVec().x, tear.centerVec().y,
+				tear.centerVec().z, (float) tear.radius());
+		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
+			ServerPlayNetworking.send(player, payload);
+		}
+	}
+
+	private record VoidTearInstance(long id, BlockPos centerBlock, Vec3d centerVec, double radius, double pullStrength,
+	                                double damageRadiusSq, float damage, long expiryTick, int durationTicks, int tierIndex) {
+	}
+
+	private record PendingVoidTear(long id, BlockPos centerBlock, double radius, double pullStrength,
+	                               double damageRadiusSq, float damage, long activationTick, int durationTicks,
+	                               int tierIndex, String source) {
+	}
+
+private record ShieldField(long id, BlockPos center, double radius, long createdTick) {
+}
+
+	private record BoobytrapDefaults(boolean captured, boolean enabled, int spawn, int trap) {
+	}
+
+	private record SpreadSnapshot(List<Long> pillars, List<BlockPos> sources) {
+	}
+
+	private float getTeleportChance() {
+		return switch (difficulty) {
+			case EASY -> 0.20F;
+			case MEDIUM -> 0.30F;
+			case HARD -> 0.40F;
+			case EXTREME -> 0.50F;
+		};
+	}
+
+	private boolean isVoidTearAllowed(InfectionTier tier) {
+		int tierIndex = tier.getIndex();
+		int tierThreeIndex = InfectionTier.THREE.getIndex();
+		if (tierIndex < tierThreeIndex) {
+			return false;
+		}
+		if (tierIndex == tierThreeIndex) {
+			return true;
+		}
+		return difficulty == VirusDifficulty.HARD || difficulty == VirusDifficulty.EXTREME;
+	}
+
+	private float getPlayerVoidTearChance() {
+		return switch (difficulty) {
+			case EXTREME -> 0.4F;
+			case HARD -> 0.25F;
+			default -> 0.15F;
+		};
+	}
+
+	@Nullable
+	private BlockPos pickPlayerVoidTearPos(ServerWorld world, Random random) {
+		List<ServerPlayerEntity> players = world.getPlayers(PlayerEntity::isAlive);
+		if (players.isEmpty()) {
+			return null;
+		}
+		ServerPlayerEntity player = players.get(random.nextInt(players.size()));
+		return sampleTearOffset(world, player.getBlockPos(), random, 16, 8);
+	}
+
+	private BlockPos sampleTearOffset(ServerWorld world, BlockPos base, Random random, int horizontalRange, int verticalRange) {
+		if (base == null) {
+			return null;
+		}
+		BlockPos candidate = base;
+		for (int attempts = 0; attempts < 12; attempts++) {
+			int offsetX = random.nextBetween(-horizontalRange, horizontalRange);
+			int offsetY = random.nextBetween(-verticalRange, verticalRange);
+			int offsetZ = random.nextBetween(-horizontalRange, horizontalRange);
+			BlockPos test = base.add(offsetX, offsetY, offsetZ);
+			int topY = world.getTopY(Heightmap.Type.WORLD_SURFACE, test.getX(), test.getZ());
+			int clampedY = MathHelper.clamp(test.getY(), world.getBottomY() + 4, topY - 4);
+			test = new BlockPos(test.getX(), clampedY, test.getZ());
+			if (!world.isChunkLoaded(ChunkPos.toLong(test))) {
+				continue;
+			}
+			return test;
+		}
+		return candidate;
+	}
+
+	private void warnPlayersNearTear(ServerWorld world, BlockPos center, double radius) {
+		if (center == null) {
+			return;
+		}
+		double warnRange = Math.max(20.0D, radius * 2.5D);
+		double warnRangeSq = warnRange * warnRange;
+		Vec3d centerVec = Vec3d.ofCenter(center);
+		Text warning = Text.translatable("message.the-virus-block.void_tear.warning").formatted(Formatting.LIGHT_PURPLE);
+		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
+			if (player.squaredDistanceTo(centerVec) <= warnRangeSq) {
+				player.sendMessage(warning, true);
+			}
+		}
+	}
+
+	private static final int VOID_TEAR_WARNING_DELAY = 20;
+	private static final int VOID_TEAR_PULL_NOTICE_INTERVAL = 5;
+
+	private void notifyPlayersDuringVoidTear(ServerWorld world, VoidTearInstance tear, long now) {
+		if ((now + tear.id()) % VOID_TEAR_PULL_NOTICE_INTERVAL != 0) {
+			return;
+		}
+		double notifyRadius = Math.max(8.0D, tear.radius() * 1.6D);
+		double notifyRadiusSq = notifyRadius * notifyRadius;
+		Vec3d center = tear.centerVec();
+		long ticksRemaining = tear.expiryTick() - now;
+		double duration = Math.max(1.0D, tear.durationTicks());
+		double lifeFrac = MathHelper.clamp(1.0D - (ticksRemaining / duration), 0.0D, 1.0D);
+		boolean pushPhase = lifeFrac >= 0.65D;
+		boolean pullPhase = !pushPhase && lifeFrac < 0.5D;
+		if (!pushPhase && !pullPhase) {
+			return;
+		}
+		Text message = pushPhase
+				? Text.translatable("message.the-virus-block.void_tear.push").formatted(Formatting.LIGHT_PURPLE)
+				: Text.translatable("message.the-virus-block.void_tear.pull").formatted(Formatting.LIGHT_PURPLE);
+		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
+			if (player.squaredDistanceTo(center) <= notifyRadiusSq) {
+				player.sendMessage(message, true);
+			}
+		}
+	}
+
+	private void carveVoidTearChamber(ServerWorld world, BlockPos center, double radius) {
+		int carveRadius = Math.max(2, MathHelper.ceil(radius * 0.325D));
+		int depth = Math.max(2, carveRadius + 1);
+		int radiusSq = carveRadius * carveRadius;
+		BlockPos.Mutable mutable = new BlockPos.Mutable();
+		for (int dx = -carveRadius; dx <= carveRadius; dx++) {
+			for (int dz = -carveRadius; dz <= carveRadius; dz++) {
+				if (dx * dx + dz * dz > radiusSq) {
+					continue;
+				}
+				for (int dy = 0; dy <= depth; dy++) {
+					mutable.set(center.getX() + dx, center.getY() - dy, center.getZ() + dz);
+					if (!world.isChunkLoaded(ChunkPos.toLong(mutable))) {
+						continue;
+					}
+					if (isShielding(mutable)) {
+						continue;
+					}
+					BlockState state = world.getBlockState(mutable);
+					if (isVoidTearProtected(state)) {
+						continue;
+					}
+					if (!state.isAir()) {
+						world.setBlockState(mutable, Blocks.AIR.getDefaultState(), Block.NOTIFY_LISTENERS);
+					}
+				}
+				for (int dy = 1; dy <= 2; dy++) {
+					mutable.set(center.getX() + dx, center.getY() + dy, center.getZ() + dz);
+					if (!world.isChunkLoaded(ChunkPos.toLong(mutable))) {
+						continue;
+					}
+					if (isShielding(mutable)) {
+						continue;
+					}
+					BlockState state = world.getBlockState(mutable);
+					if (isVoidTearProtected(state)) {
+						continue;
+					}
+					if (!state.isAir()) {
+						world.setBlockState(mutable, Blocks.AIR.getDefaultState(), Block.NOTIFY_LISTENERS);
+					}
+				}
+			}
+		}
+	}
+
+	private boolean isVoidTearProtected(BlockState state) {
+		return state.isOf(Blocks.OBSIDIAN)
+				|| state.isOf(Blocks.CRYING_OBSIDIAN)
+				|| state.isOf(Blocks.NETHER_PORTAL)
+				|| state.isOf(Blocks.END_PORTAL)
+				|| state.isOf(Blocks.END_PORTAL_FRAME);
+	}
+
+	public void evaluateShieldCandidate(ServerWorld world, BlockPos pos) {
+		if (world == null || pos == null) {
+			return;
+		}
+		BlockState state = world.getBlockState(pos);
+		if (!state.isOf(ModBlocks.CURED_INFECTIOUS_CUBE)) {
+			deactivateShield(world, pos);
+			return;
+		}
+		if (!isShieldCocoonComplete(world, pos)) {
+			deactivateShield(world, pos);
+			return;
+		}
+		if (isWithinVirusInfluence(pos)) {
+			triggerShieldFailure(world, pos);
+			return;
+		}
+		activateShield(world, pos);
+	}
+
+	public void removeShieldAt(ServerWorld world, BlockPos pos) {
+		if (world == null || pos == null) {
+			return;
+		}
+		deactivateShield(world, pos);
+	}
+
+	private void activateShield(ServerWorld world, BlockPos pos) {
+		long key = pos.asLong();
+		if (activeShields.containsKey(key)) {
+			return;
+		}
+		ShieldField field = new ShieldField(key, pos.toImmutable(), SHIELD_FIELD_RADIUS, world.getTime());
+		activeShields.put(key, field);
+		markDirty();
+		world.playSound(null, pos, SoundEvents.BLOCK_BEACON_ACTIVATE, SoundCategory.BLOCKS, 1.0F, 1.05F);
+		broadcastShieldSpawn(world, field);
+		openShieldSkyshaft(world, pos);
+		notifyShieldStatus(world, pos, true);
+	}
+
+	private void purgeHostilesAround(ServerWorld world, List<BlockPos> centers) {
+		if (centers.isEmpty()) {
+			return;
+		}
+		Set<HostileEntity> victims = new HashSet<>();
+		for (BlockPos center : centers) {
+			Box bounds = new Box(center).expand(CLEANSE_PURGE_RADIUS);
+			victims.addAll(world.getEntitiesByClass(HostileEntity.class, bounds, Entity::isAlive));
+		}
+		if (victims.isEmpty()) {
+			return;
+		}
+		for (HostileEntity mob : victims) {
+			mob.kill(world);
+		}
+		world.playSound(
+				null,
+				centers.get(0),
+				SoundEvents.ENTITY_LIGHTNING_BOLT_THUNDER,
+				SoundCategory.HOSTILE,
+				1.2F,
+				0.4F);
+	}
+
+	private void deactivateShield(ServerWorld world, BlockPos pos) {
+		long key = pos.asLong();
+		ShieldField removed = activeShields.remove(key);
+		if (removed == null) {
+			return;
+		}
+		markDirty();
+		world.playSound(null, pos, SoundEvents.BLOCK_BEACON_DEACTIVATE, SoundCategory.BLOCKS, 1.0F, 0.85F);
+		broadcastShieldRemoval(world, removed.id());
+		notifyShieldStatus(world, pos, false);
+	}
+
+	private void triggerShieldFailure(ServerWorld world, BlockPos pos) {
+		long key = pos.asLong();
+		ShieldField removed = activeShields.remove(key);
+		if (removed != null) {
+			broadcastShieldRemoval(world, removed.id());
+			markDirty();
+		}
+		world.playSound(null, pos, SoundEvents.BLOCK_BEACON_DEACTIVATE, SoundCategory.BLOCKS, 1.0F, 0.7F);
+		world.playSound(null, pos, SoundEvents.ENTITY_WITHER_SPAWN, SoundCategory.HOSTILE, 0.8F, 0.4F);
+		world.createExplosion(
+				null,
+				pos.getX() + 0.5D,
+				pos.getY() + 0.5D,
+				pos.getZ() + 0.5D,
+				20.0F,
+				ExplosionSourceType.NONE);
+		world.breakBlock(pos, false);
+		notifyShieldFailure(world, pos);
+	}
+
+	private boolean isShieldCocoonComplete(ServerWorld world, BlockPos center) {
+		for (Direction direction : Direction.values()) {
+			if (!world.getBlockState(center.offset(direction)).isOf(Blocks.OBSIDIAN)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private boolean isShieldAnchorIntact(ServerWorld world, BlockPos center) {
+		BlockState state = world.getBlockState(center);
+		if (!state.isOf(ModBlocks.CURED_INFECTIOUS_CUBE)) {
+			return false;
+		}
+		return isShieldCocoonComplete(world, center);
+	}
+
+	private boolean isWithinVirusInfluence(BlockPos pos) {
+		return isWithinAura(pos);
+	}
+
+	private boolean isShielding(BlockPos pos) {
+		if (activeShields.isEmpty()) {
+			return false;
+		}
+		Vec3d sample = Vec3d.ofCenter(pos);
+		for (ShieldField field : activeShields.values()) {
+			double radius = field.radius();
+			double radiusSq = radius * radius;
+			if (field.center().toCenterPos().squaredDistanceTo(sample) <= radiusSq) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean isPlayerShielded(ServerPlayerEntity player) {
+		return isShielding(player.getBlockPos());
+	}
+
+	public boolean isShielded(BlockPos pos) {
+		return isShielding(pos);
+	}
+
+
+	private void notifyShieldStatus(ServerWorld world, BlockPos pos, boolean active) {
+		Text message = active
+				? Text.translatable("message.the-virus-block.shield_field.online").formatted(Formatting.AQUA)
+				: Text.translatable("message.the-virus-block.shield_field.offline").formatted(Formatting.GRAY);
+		Vec3d center = Vec3d.ofCenter(pos);
+		double radiusSq = (SHIELD_FIELD_RADIUS * SHIELD_FIELD_RADIUS) * 2.0D;
+		world.getPlayers(player -> player.squaredDistanceTo(center) <= radiusSq)
+				.forEach(player -> player.sendMessage(message, true));
+	}
+
+	private void notifyShieldFailure(ServerWorld world, BlockPos pos) {
+		Text message = Text.translatable("message.the-virus-block.shield_field.rejected").formatted(Formatting.RED);
+		Vec3d center = Vec3d.ofCenter(pos);
+		world.getPlayers(player -> player.squaredDistanceTo(center) <= 1024.0D)
+				.forEach(player -> player.sendMessage(message, true));
+	}
+
+	private void broadcastShieldSpawn(ServerWorld world, ShieldField field) {
+		Vec3d center = Vec3d.ofCenter(field.center());
+		ShieldFieldSpawnPayload payload = new ShieldFieldSpawnPayload(field.id(), center.x, center.y, center.z,
+				(float) field.radius());
+		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
+			ServerPlayNetworking.send(player, payload);
+		}
+	}
+
+	private void broadcastShieldRemoval(ServerWorld world, long id) {
+		ShieldFieldRemovePayload payload = new ShieldFieldRemovePayload(id);
+		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
+			ServerPlayNetworking.send(player, payload);
+		}
+	}
+
+	public void sendShieldSnapshots(ServerPlayerEntity player) {
+		if (activeShields.isEmpty()) {
+			return;
+		}
+		for (ShieldField field : activeShields.values()) {
+			Vec3d center = Vec3d.ofCenter(field.center());
+			ShieldFieldSpawnPayload payload = new ShieldFieldSpawnPayload(
+					field.id(),
+					center.x,
+					center.y,
+					center.z,
+					(float) field.radius());
+			ServerPlayNetworking.send(player, payload);
+		}
+	}
+
+	private void openShieldSkyshaft(ServerWorld world, BlockPos center) {
+		BlockPos.Mutable cursor = new BlockPos.Mutable();
+		int ceiling = world.getBottomY() + world.getDimension().height();
+		int startY = center.getY() + 2;
+		for (int y = startY; y < ceiling; y++) {
+			cursor.set(center.getX(), y, center.getZ());
+			if (!world.isChunkLoaded(ChunkPos.toLong(cursor))) {
+				continue;
+			}
+			BlockState state = world.getBlockState(cursor);
+			if (state.isAir()) {
+				continue;
+			}
+			if (state.isOf(Blocks.OBSIDIAN) || state.isOf(Blocks.CRYING_OBSIDIAN)) {
+				continue;
+			}
+			if (state.getHardness(world, cursor) < 0.0F || state.isOf(Blocks.BEDROCK)) {
+				continue;
+			}
+			world.setBlockState(cursor, Blocks.AIR.getDefaultState(), Block.NOTIFY_LISTENERS);
+		}
+		world.spawnParticles(
+				ParticleTypes.END_ROD,
+				center.getX() + 0.5D,
+				center.getY() + 1.2D,
+				center.getZ() + 0.5D,
+				16,
+				0.2D,
+				0.4D,
+				0.2D,
+				0.02D);
 	}
 
 	public boolean isInfected() {
@@ -1405,10 +2272,6 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		}
 	}
 
-	public boolean isCalm() {
-		return totalTicks < calmUntilTick;
-	}
-
 	public void disturbByPlayer(ServerWorld world) {
 		if (!infected) {
 			return;
@@ -1419,7 +2282,9 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		if (tier.getIndex() >= 3) {
 			bonus += 60L;
 		}
+		dormant = false;
 		applyDisturbance(world, bonus);
+		dormant = false;
 		BlockPos disturbance = representativePos(world, world.getRandom());
 		if (disturbance == null && !virusSources.isEmpty()) {
 			disturbance = virusSources.iterator().next();
@@ -1515,7 +2380,6 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		if (duration > 0 && ticksInTier > duration) {
 			ticksInTier = duration;
 		}
-		calmUntilTick = Math.min(calmUntilTick, totalTicks);
 		markDirty();
 	}
 

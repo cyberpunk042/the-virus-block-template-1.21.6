@@ -14,15 +14,15 @@ public enum TierFeature {
 	CORRUPT_ICE("corrupt_ice", InfectionTier.TWO, TierFeatureGroup.CORE, TheVirusBlock.VIRUS_CORRUPT_ICE_ENABLED),
 	CORRUPT_SNOW("corrupt_snow", InfectionTier.TWO, TierFeatureGroup.CORE, TheVirusBlock.VIRUS_CORRUPT_SNOW_ENABLED),
 
-	EVENT_MUTATION_PULSE("mutation_pulse", InfectionTier.TWO, TierFeatureGroup.TIER2_EVENT, TheVirusBlock.VIRUS_EVENT_MUTATION_PULSE_ENABLED),
-	EVENT_SKYFALL("skyfall", InfectionTier.TWO, TierFeatureGroup.TIER2_EVENT, TheVirusBlock.VIRUS_EVENT_SKYFALL_ENABLED),
+	EVENT_MUTATION_PULSE("mutation_pulse", InfectionTier.THREE, TierFeatureGroup.TIER2_EVENT, TheVirusBlock.VIRUS_EVENT_MUTATION_PULSE_ENABLED),
+	EVENT_SKYFALL("skyfall", InfectionTier.ONE, TierFeatureGroup.TIER2_EVENT, TheVirusBlock.VIRUS_EVENT_SKYFALL_ENABLED),
 	EVENT_COLLAPSE_SURGE("collapse_surge", InfectionTier.TWO, TierFeatureGroup.TIER2_EVENT, TheVirusBlock.VIRUS_EVENT_COLLAPSE_SURGE_ENABLED),
-	EVENT_PASSIVE_REVOLT("passive_revolt", InfectionTier.TWO, TierFeatureGroup.TIER2_EVENT, TheVirusBlock.VIRUS_EVENT_PASSIVE_REVOLT_ENABLED),
-	EVENT_MOB_BUFF_STORM("mob_buff_storm", InfectionTier.TWO, TierFeatureGroup.TIER2_EVENT, TheVirusBlock.VIRUS_EVENT_MOB_BUFF_STORM_ENABLED),
-	EVENT_VIRUS_BLOOM("virus_bloom", InfectionTier.TWO, TierFeatureGroup.TIER2_EVENT, TheVirusBlock.VIRUS_EVENT_VIRUS_BLOOM_ENABLED),
+	EVENT_PASSIVE_REVOLT("passive_revolt", InfectionTier.THREE, TierFeatureGroup.TIER2_EVENT, TheVirusBlock.VIRUS_EVENT_PASSIVE_REVOLT_ENABLED),
+	EVENT_MOB_BUFF_STORM("mob_buff_storm", InfectionTier.FOUR, TierFeatureGroup.TIER2_EVENT, TheVirusBlock.VIRUS_EVENT_MOB_BUFF_STORM_ENABLED),
+	EVENT_VIRUS_BLOOM("virus_bloom", InfectionTier.FIVE, TierFeatureGroup.TIER2_EVENT, TheVirusBlock.VIRUS_EVENT_VIRUS_BLOOM_ENABLED),
 
 	EVENT_VOID_TEAR("void_tear", InfectionTier.THREE, TierFeatureGroup.TIER3_EXTRA, TheVirusBlock.VIRUS_EVENT_VOID_TEAR_ENABLED),
-	EVENT_INVERSION("inversion", InfectionTier.THREE, TierFeatureGroup.TIER3_EXTRA, TheVirusBlock.VIRUS_EVENT_INVERSION_ENABLED),
+	EVENT_INVERSION("inversion", InfectionTier.FOUR, TierFeatureGroup.TIER3_EXTRA, TheVirusBlock.VIRUS_EVENT_INVERSION_ENABLED),
 	EVENT_ENTITY_DUPLICATION("entity_duplication", InfectionTier.FOUR, TierFeatureGroup.TIER3_EXTRA, TheVirusBlock.VIRUS_EVENT_ENTITY_DUPLICATION_ENABLED);
 
 	private final String id;

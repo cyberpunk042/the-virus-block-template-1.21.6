@@ -262,7 +262,7 @@ Most tuning happens through gamerules. Here are the high-impact ones (defaults i
 | `virusLiquidMutationEnabled` | `true` | Enables corrupted water/lava once Tier 2 is reached. |
 | `virusCorruptSandEnabled` / `virusCorruptIceEnabled` / `virusCorruptSnowEnabled` | `true` | Opt individual surface conversions in/out. |
 | `virusTier2EventsEnabled` | `true` | Master toggle for Tier‑2 global events (Mutation Pulse, Skyfall, etc.). |
-| `virusTier3ExtrasEnabled` | `false` | Unlocks Tier‑3+ extras (Void Tear, Inversion, Entity Duplication). |
+| `virusTier3ExtrasEnabled` | `true` | Unlocks Tier‑3+ extras (Void Tear, Inversion, Entity Duplication). |
 | `virusEventMutationPulseEnabled` … `virusEventEntityDuplicationEnabled` | `true` | Fine-grained switches for each event (Mutation Pulse, Skyfall, Collapse Surge, Passive Revolt, Mob Buff Storm, Virus Bloom, Void Tear, Inversion, Entity Duplication). Use these if you want to cherry-pick specific events without disabling the whole tier. |
 | `virusMatrixCubeMaxActive` | `200` | Cap on simultaneous Matrix Cubes raining from the sky. |
 | `virusBoobytrapsEnabled` | `true` | Controls spontaneous boobytrap placement/explosions. |
