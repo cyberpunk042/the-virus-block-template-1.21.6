@@ -46,19 +46,21 @@ public final class BoobytrapHelper {
 		if (!world.getGameRules().getBoolean(TheVirusBlock.VIRUS_BOOBYTRAPS_ENABLED)) {
 			return null;
 		}
+		VirusWorldState state = VirusWorldState.get(world);
+		float intensity = Math.max(0.05F, state.getBoobytrapIntensity());
 		Random random = world.getRandom();
 		int roll = random.nextInt(1000);
-		int infectedChance = clampChance(world.getGameRules().getInt(TheVirusBlock.VIRUS_BOOBYTRAP_CHANCE_INFECTED));
+		int infectedChance = scaleChance(world.getGameRules().getInt(TheVirusBlock.VIRUS_BOOBYTRAP_CHANCE_INFECTED), intensity);
 		if (roll < infectedChance) {
 			return new TrapSelection(Type.INFECTED_BLOCK, ModBlocks.INFECTED_BLOCK.getDefaultState());
 		}
 		roll -= infectedChance;
-		int infectiousChance = clampChance(world.getGameRules().getInt(TheVirusBlock.VIRUS_BOOBYTRAP_CHANCE_INFECTIOUS));
+		int infectiousChance = scaleChance(world.getGameRules().getInt(TheVirusBlock.VIRUS_BOOBYTRAP_CHANCE_INFECTIOUS), intensity);
 		if (roll < infectiousChance) {
 			return new TrapSelection(Type.INFECTIOUS_CUBE, ModBlocks.INFECTIOUS_CUBE.getDefaultState());
 		}
 		roll -= infectiousChance;
-		int bacteriaChance = clampChance(world.getGameRules().getInt(TheVirusBlock.VIRUS_BOOBYTRAP_CHANCE_BACTERIA));
+		int bacteriaChance = scaleChance(world.getGameRules().getInt(TheVirusBlock.VIRUS_BOOBYTRAP_CHANCE_BACTERIA), intensity);
 		if (roll < bacteriaChance) {
 			return new TrapSelection(Type.BACTERIA, ModBlocks.BACTERIA.getDefaultState());
 		}
@@ -70,11 +72,16 @@ public final class BoobytrapHelper {
 			return 0;
 		}
 		VirusWorldState state = VirusWorldState.get(world);
+		float intensity = Math.max(0.05F, state.getBoobytrapIntensity());
 		int cappedAttempts = Math.min(512, Math.max(0, attempts));
 		int cappedRadius = Math.min(64, Math.max(1, radius));
+		int scaledAttempts = Math.max(0, Math.round(cappedAttempts * intensity));
+		if (cappedAttempts > 0 && scaledAttempts == 0) {
+			scaledAttempts = 1;
+		}
 		Random random = world.getRandom();
 		int conversions = 0;
-		for (int i = 0; i < cappedAttempts; i++) {
+		for (int i = 0; i < scaledAttempts; i++) {
 			BlockPos target = randomOffset(world, random, origin, cappedRadius);
 			if (target == null || !world.isChunkLoaded(ChunkPos.toLong(target))) {
 				continue;
@@ -132,6 +139,11 @@ public final class BoobytrapHelper {
 
 	private static int clampChance(int value) {
 		return Math.max(0, Math.min(1000, value));
+	}
+
+	private static int scaleChance(int value, float intensity) {
+		int scaled = Math.round(value * intensity);
+		return clampChance(scaled);
 	}
 
 	private static float getPower(ServerWorld world, Type type) {

@@ -2,9 +2,11 @@ package net.cyberpunk042.block.corrupted;
 
 import java.util.List;
 
+import net.cyberpunk042.util.SilkTouchFallbacks;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.ItemEntity;
+import net.minecraft.item.ItemStack;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
@@ -41,6 +43,14 @@ public class CorruptedIronBlock extends Block {
 				item.addVelocity(velocity.x, velocity.y, velocity.z);
 			}
 		}
+	}
+
+	@Override
+	public void onStacksDropped(BlockState state, ServerWorld world, BlockPos pos, ItemStack stack, boolean dropExperience) {
+		if (SilkTouchFallbacks.dropSelfIfSilkTouch(this, world, pos, stack)) {
+			return;
+		}
+		super.onStacksDropped(state, world, pos, stack, dropExperience);
 	}
 }
 

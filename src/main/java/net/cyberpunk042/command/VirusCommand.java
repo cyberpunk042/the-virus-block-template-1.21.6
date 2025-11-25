@@ -23,6 +23,7 @@ public final class VirusCommand {
 						.then(CommandManager.literal("status").executes(ctx -> reportTeleport(ctx.getSource())))));
 
 		VirusDifficultyCommand.register(dispatcher);
+		VirusStatsCommand.register(dispatcher);
 	}
 
 	private static int setTeleportEnabled(ServerCommandSource source, boolean enabled) {

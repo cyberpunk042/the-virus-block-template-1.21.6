@@ -14,6 +14,8 @@ import java.util.UUID;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
@@ -160,12 +162,18 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 	private final EnumMap<VirusEventType, Long> eventHistory = new EnumMap<>(VirusEventType.class);
 	private final Map<BlockPos, Long> shellCooldowns = new HashMap<>();
 	private final Object2LongMap<UUID> guardianBeams = new Object2LongOpenHashMap<>();
+	private final Object2IntMap<UUID> infectiousInventoryTicks = new Object2IntOpenHashMap<>();
+	private final Object2IntMap<UUID> infectiousContactTicks = new Object2IntOpenHashMap<>();
 	private final LongSet pillarChunks = new LongOpenHashSet();
 	private final List<VoidTearInstance> activeVoidTears = new ArrayList<>();
 	private final List<PendingVoidTear> pendingVoidTears = new ArrayList<>();
 	private final Map<Long, ShieldField> activeShields = new HashMap<>();
 	private long nextVoidTearId;
 	private static final double CLEANSE_PURGE_RADIUS = 32.0D;
+	private static final int INFECTIOUS_CONTACT_THRESHOLD = 40;
+	private static final int INFECTIOUS_CONTACT_INTERVAL = 20;
+	private static final int INFECTIOUS_INVENTORY_THRESHOLD = 40;
+	private static final int INFECTIOUS_INVENTORY_INTERVAL = 80;
 
 	private boolean infected;
 	private boolean dormant;
@@ -325,6 +333,8 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 		applyDifficultyRules(world, tier);
 		runEvents(world, tier);
 		boostAmbientSpawns(world, tier);
+		applyInfectiousContactDamage(world);
+		applyInfectiousInventoryEffects(world);
 	}
 
 	private void runEvents(ServerWorld world, InfectionTier tier) {
@@ -369,10 +379,12 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 			return;
 		}
 		int tierIndex = tier.getIndex();
-		int attempts = Math.max(1, tierIndex + 1) * difficultyScale;
+		float tierMultiplier = tier.getMobSpawnMultiplier();
+		float scaledAttempts = difficultyScale * tierMultiplier;
 		if (apocalypseMode) {
-			attempts += 2;
+			scaledAttempts += 2.0F;
 		}
+		int attempts = Math.max(1, Math.round(scaledAttempts));
 		Random random = world.getRandom();
 		List<ServerPlayerEntity> anchors = world.getPlayers(player -> player.isAlive() && !player.isSpectator() && isWithinAura(player.getBlockPos()));
 		if (anchors.isEmpty()) {
@@ -390,6 +402,69 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 			}
 			type.spawn(world, entity -> entity.refreshPositionAndAngles(spawnPos, random.nextFloat() * 360.0F, 0.0F),
 					spawnPos, SpawnReason.EVENT, true, false);
+		}
+	}
+
+	private void applyInfectiousContactDamage(ServerWorld world) {
+		if (!infected) {
+			infectiousContactTicks.clear();
+			return;
+		}
+		Set<UUID> active = new HashSet<>();
+		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
+			if (player.isSpectator() || player.isCreative()) {
+				infectiousContactTicks.removeInt(player.getUuid());
+				continue;
+			}
+			BlockPos feet = player.getBlockPos().down();
+			if (!world.getBlockState(feet).isOf(ModBlocks.INFECTIOUS_CUBE)) {
+				infectiousContactTicks.removeInt(player.getUuid());
+				continue;
+			}
+			UUID uuid = player.getUuid();
+			active.add(uuid);
+			int ticks = infectiousContactTicks.getOrDefault(uuid, 0) + 1;
+			infectiousContactTicks.put(uuid, ticks);
+			if (ticks > INFECTIOUS_CONTACT_THRESHOLD
+					&& (ticks - INFECTIOUS_CONTACT_THRESHOLD) % INFECTIOUS_CONTACT_INTERVAL == 0) {
+				player.damage(world, world.getDamageSources().magic(), 1.0F);
+				world.playSound(null, player.getX(), player.getY(), player.getZ(),
+						SoundEvents.ENTITY_SILVERFISH_HURT, SoundCategory.BLOCKS, 0.6F, 1.2F);
+			}
+		}
+		if (infectiousContactTicks.isEmpty()) {
+			return;
+		}
+		infectiousContactTicks.object2IntEntrySet().removeIf(entry -> !active.contains(entry.getKey()));
+	}
+
+	private void applyInfectiousInventoryEffects(ServerWorld world) {
+		if (!infected) {
+			infectiousInventoryTicks.clear();
+			return;
+		}
+		ItemStack infectiousStack = ModBlocks.INFECTIOUS_CUBE.asItem().getDefaultStack();
+		Set<UUID> retained = new HashSet<>();
+		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
+			UUID uuid = player.getUuid();
+			if (player.isSpectator() || player.isCreative()
+					|| player.getInventory().count(infectiousStack.getItem()) <= 0) {
+				infectiousInventoryTicks.removeInt(uuid);
+				continue;
+			}
+			retained.add(uuid);
+			int ticks = infectiousInventoryTicks.getOrDefault(uuid, 0) + 1;
+			infectiousInventoryTicks.put(uuid, ticks);
+			if (ticks > INFECTIOUS_INVENTORY_THRESHOLD
+					&& (ticks - INFECTIOUS_INVENTORY_THRESHOLD) % INFECTIOUS_INVENTORY_INTERVAL == 0) {
+				player.addStatusEffect(new StatusEffectInstance(StatusEffects.HUNGER, 60, 0));
+				player.addStatusEffect(new StatusEffectInstance(StatusEffects.NAUSEA, 50, 0));
+			}
+		}
+		if (retained.isEmpty()) {
+			infectiousInventoryTicks.clear();
+		} else {
+			infectiousInventoryTicks.object2IntEntrySet().removeIf(entry -> !retained.contains(entry.getKey()));
 		}
 	}
 
@@ -2218,6 +2293,10 @@ private record ShieldField(long id, BlockPos center, double radius, long created
 		return InfectionTier.byIndex(tierIndex);
 	}
 
+	public long getInfectionTicks() {
+		return totalTicks;
+	}
+
 	public long getTicksInTier() {
 		return ticksInTier;
 	}
@@ -2232,6 +2311,13 @@ private record ShieldField(long id, BlockPos center, double radius, long created
 
 	public double getCurrentHealth() {
 		return currentHealth;
+	}
+
+	public float getBoobytrapIntensity() {
+		if (apocalypseMode) {
+			return 1.6F;
+		}
+		return getCurrentTier().getBoobytrapMultiplier();
 	}
 
 	public double getHealthPercent() {

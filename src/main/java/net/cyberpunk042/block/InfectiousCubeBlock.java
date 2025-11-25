@@ -5,8 +5,10 @@ import com.mojang.serialization.MapCodec;
 import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.infection.BoobytrapHelper;
 import net.cyberpunk042.infection.BoobytrapHelper.Type;
+import net.cyberpunk042.util.SilkTouchFallbacks;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
+import net.minecraft.item.ItemStack;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.random.Random;
@@ -28,6 +30,14 @@ public class InfectiousCubeBlock extends Block {
 		int attempts = world.getGameRules().getInt(TheVirusBlock.VIRUS_INFECTIOUS_SPREAD_ATTEMPTS);
 		int radius = world.getGameRules().getInt(TheVirusBlock.VIRUS_INFECTIOUS_SPREAD_RADIUS);
 		BoobytrapHelper.spread(world, pos, Type.INFECTIOUS_CUBE, attempts, radius);
+	}
+
+	@Override
+	public void onStacksDropped(BlockState state, ServerWorld world, BlockPos pos, ItemStack stack, boolean dropExperience) {
+		if (SilkTouchFallbacks.dropSelfIfSilkTouch(this, world, pos, stack)) {
+			return;
+		}
+		super.onStacksDropped(state, world, pos, stack, dropExperience);
 	}
 }
 

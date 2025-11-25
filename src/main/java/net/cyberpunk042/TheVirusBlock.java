@@ -7,6 +7,7 @@ import net.cyberpunk042.command.VirusDebugCommands;
 import net.cyberpunk042.command.VirusDifficultyCommand;
 import net.cyberpunk042.infection.VirusDifficulty;
 import net.cyberpunk042.infection.VirusInfectionSystem;
+import net.cyberpunk042.infection.VirusInventoryAnnouncements;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.item.PurificationOption;
 import net.cyberpunk042.network.DifficultySyncPayload;
@@ -189,6 +190,7 @@ public class TheVirusBlock implements ModInitializer {
 		ModScreenHandlers.bootstrap();
 		VirusDebugCommands.register();
 		VirusInfectionSystem.init();
+		VirusInventoryAnnouncements.init();
 		ServerPlayNetworking.registerGlobalReceiver(PurificationTotemSelectPayload.ID, (payload, context) ->
 				context.player().getServer().execute(() -> handlePurificationSelection(context.player(), payload)));
 		ServerPlayNetworking.registerGlobalReceiver(VirusDifficultySelectPayload.ID, (payload, context) ->

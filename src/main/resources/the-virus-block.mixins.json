@@ -12,7 +12,8 @@
 		"BedBlockMixin",
 		"GuardianEntityAccessor",
 		"ExplosionMixin",
-		"ItemEntityMixin"
+		"ItemEntityMixin",
+		"ItemStackMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

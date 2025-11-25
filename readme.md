@@ -36,43 +36,42 @@ The Virus spreads through **five escalating tiers**:
 
 ### Tier 1 — Mild Corruption
 
-- Adjacent blocks mutate into random variants  
+- Local block mutations around the Virus Block  
 - Single-block flickers / texture glitches  
-- Passive mobs stare or follow players  
-- Loaded chunk: 1 random block mutates every few seconds  
-- Virus Aura: *Poison I* near the block (milk cures)
+- Passive mobs stare, follow, or mirror players  
+- Virus Aura: light poison ticks; stand too long on an Infectious Cube and it starts nibbling half-hearts  
+- Carrying an Infectious Cube in your inventory for a few seconds gives intermittent **Hunger** + **Nausea**
 
 ### Tier 2 — Environmental Decay
 
-- Water turns murky  
-- Random blocks throughout loaded chunks mutate  
-- Small cave-ins during mining  
+- Random mutation pulses across loaded chunks  
+- Fluids begin corrupting (murky water / tainted lava)  
+- Small cave-ins during mining and the first **Collapse Surge** events  
 - Hostile arrows occasionally fall from the sky  
-- Passive mobs become slightly aggressive
+- Boobytraps start appearing, but at a low density
 
 ### Tier 3 — Hostile Ecosystem
 
-- Zombies infect passive mobs  
-- Terrain patches convert to corrupted biomes  
-- TNT meteors fall occasionally  
-- Trees decay or become twisted  
-- Virus Aura upgraded: poison + hunger
+- Passive mobs become corrupted and aggressive  
+- Terrain patches convert to corrupted biomes; surface carpets of corrupted sand/ice/snow spread quickly  
+- TNT meteors / Skyfall begin  
+- Void Tears become possible once Tier 3 extras are enabled  
+- Boobytrap spread and bonus hostile spawns ramp up significantly
 
 ### Tier 4 — Reality Warping
 
-- Random gravity collapses  
-- Blocks fall sideways or upward  
-- Chunks visually “stutter”  
-- Mobs gain random abilities: speed, crits, explosions, venom  
-- Fluids misbehave in corrupted zones
+- Random gravity collapses, sideways block falls, inversion events  
+- Mobs gain random abilities: speed, crits, explosions, venom, knockback  
+- Fluids misbehave in corrupted zones; Collapse Surge becomes lethal  
+- Entity Duplication can trigger if Tier 4 extras stay enabled
 
 ### Tier 5 — The Endgame
 
-- Biomes collapse or invert  
-- Massive TNT/Arrow barrages  
-- Terrain waves rise and fall  
-- Entity duplication events  
-- Virus Block bossbar locks at 100%—once it fills, **Apocalypse Mode** begins.
+- Biomes collapse or invert outright  
+- Massive TNT/Arrow barrages, corruption waves, and entity duplication storms  
+- Corrupted TNT now rolls volatile results (1/3 dud, 1/3 normal, 1/3 1.5× blast) to keep finales unpredictable  
+- Bonus hostile mob spawns spike to their highest density  
+- Once the tier bar fills, **Apocalypse Mode** begins.
 
 ### 🔻 Apocalypse Mode (Post-Tier 5)
 
@@ -142,18 +141,13 @@ Every session becomes a unique apocalypse.
 
 ---
 
-## 👁️ Virus Aura
+## 👁️ Virus Aura & Infectious Hazards
 
-The immediate area around the Virus Block becomes toxic:
+- Standing near the Virus Block applies poison, hunger, slowness, nausea, and armor corrosion. Intensity scales with tier.  
+- Standing directly **on** an Infectious Cube for more than two seconds starts dealing half-hearts of damage every second until you move.  
+- Carrying an Infectious Cube in your inventory for a few seconds applies intermittent Hunger + Nausea pulses—drop it or stash it to recover.
 
-- Poison  
-- Hunger  
-- Slowness  
-- Nausea  
-- Armor corrosion  
-- Hallucination particles  
-
-Aura strength scales with infection tier.
+Pro tip: cure cubes with milk (shapeless recipe) or quarantine them inside obsidian shells.
 
 ---
 
@@ -170,28 +164,25 @@ Apocalypse Mode is the last phase—there is no separate boss arena right now. S
 
 ## 🏛️ Player Tools & Interactions
 
-### Accelerate Corruption
+### Accelerate / Delay Corruption
 
-Feed the Virus Block powerful items to increase its tier faster.
+- Feed the Virus Block powerful items (config) to speed up tier progress.  
+- Wrap a Cured Infectious Cube in an obsidian cocoon to spawn an **Anti-Virus Field**—a beacon-style dome that stops spread, shields players from anomalies, and detonates violently if the virus reaches it.  
+- Build multiple shells to buy time; Tier 4/5 boobytraps can still tunnel through, so watch the new `/virusstats` readout.
 
-### Delay Corruption
+### Temporary Reversion — Purification Totem
 
-Build a containment structure around it (configurable effects).
-
-### Temporary Reversion
-
-Craft a **Purification Totem** (expensive, late-game).  
-Purifies or cancels one mutation event. Choose between:
-
-- **No Boobytraps** – disables trap placement and throttles corrupted worm influx.
-- **No Shell** – collapses every defensive shell wrapped around the Virus Block.
-- **Half HP** – halves the Virus Block’s *maximum* health for the current tier, shortening the remaining timeline without triggering shell collapse.
-- **Bleed HP** – halves the Virus Block’s *current* health, rolling its boss bar backward immediately.
+- **No Boobytraps** – disables trap placement and throttles corrupted worms (virus enters “dormant” mode).  
+- **No Shell** – collapses every defensive shell wrapped around the Virus Block.  
+- **Half HP** – halves the Virus Block’s *maximum* health for the current tier (permanent until tier change).  
+- **Bleed HP** – halves the Virus Block’s *current* health immediately.  
+- The totem now checks for dormant mode and refuses redundant activations, so you get clear feedback.
 
 ### End the Apocalypse
 
-Drain the Virus Block’s health during Apocalypse Mode (or finish mining the exposed block) to wipe the infection.  
-The world remains scarred, but no longer worsens.
+- Once Apocalypse Mode begins, the bossbar flips to red HP.  
+- Hits, TNT, beds, and Purification option 4 drain health instead of rewinding progress.  
+- When HP reaches zero (or you mine the exposed block), the infection is wiped and the world slowly calms down.
 
 ---
 
@@ -210,10 +201,13 @@ This is a “progressive chaos” mod designed for content creation and challeng
 
 ---
 
-## 🧪 Debug Commands
+## 🧪 Debug / Admin Commands
 
-- `/virustiers` – Shows the current infection tier, whether apocalypse mode is active, and every feature that is currently unlocked by the Tier Cookbook. Use this when tuning gamerules or designing new difficulty presets.
-- `/virusboobytraps [radiusChunks]` – Lists every active boobytrap block around you (defaults to 8 chunks) so you can verify trap density or clean up a play area.
+- `/virusstats` – Quick diagnostics (time since mod start, infection uptime, ETA to final wave).  
+- `/virustiers` – Shows the current tier, apocalypse state, and Tier Cookbook flags (great for tuning gamerules).  
+- `/virusboobytraps [radiusChunks]` – Lists nearby boobytraps (defaults to 8 chunks).  
+- `/virusblock waves friendlyfire <enable|disable|status>` – Toggle whether virus-spawned waves hurt one another.  
+- `/virusblock teleport <enable|disable|radius|status>` – Control automatic Virus Block teleports.
 
 ### Tier Feature Defaults
 
@@ -221,11 +215,6 @@ This is a “progressive chaos” mod designed for content creation and challeng
 - **Tier 3:** Void Tear, Inversion.
 - **Tier 4:** Entity Duplication.
 - **Tier 5:** (Reserved – apocalypse add-ons only.)
-
-## 🛡️ Admin Commands
-
-- `/virusblock waves friendlyfire <enable|disable|status>` – Toggles whether virus-spawned waves can hurt each other (requires permission level 2).
-- `/virusblock teleport <enable|disable|radius <0-64>|status>` – Controls the automatic teleport ability of the Virus Block, including maximum radius in chunks.
 
 ## 🍳 Crafting Recipes
 
