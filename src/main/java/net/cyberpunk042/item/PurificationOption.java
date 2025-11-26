@@ -78,7 +78,7 @@ public enum PurificationOption {
 			state.disableBoobytraps(world);
 			player.sendMessage(Text.translatable("message.the-virus-block.purification.no_boobytraps").formatted(Formatting.GREEN), false);
 		} else {
-			player.sendMessage(Text.translatable("message.the-virus-block.purification_totem.dormant").formatted(Formatting.GRAY), true);
+			player.sendMessage(Text.translatable("message.the-virus-block.purification_totem.boobytraps_disabled").formatted(Formatting.GRAY), true);
 		}
 	}
 

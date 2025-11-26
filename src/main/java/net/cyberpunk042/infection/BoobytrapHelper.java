@@ -283,7 +283,8 @@ public final class BoobytrapHelper {
 				|| block == Blocks.END_PORTAL
 				|| block == Blocks.END_PORTAL_FRAME
 				|| block == Blocks.END_GATEWAY
-				|| block == Blocks.RESPAWN_ANCHOR) {
+				|| block == Blocks.RESPAWN_ANCHOR
+				|| block == Blocks.CRAFTING_TABLE) {
 			return false;
 		}
 		return true;

@@ -158,6 +158,8 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 		state.eventHistory.putAll(events);
 		state.lastMatrixCubeTick = lastMatrixCubeTick;
 		shields.forEach(field -> state.activeShields.put(field.id(), field));
+		state.shellRebuildPending = false;
+		state.tierFiveBarrierActive = false;
 		return state;
 	}));
 	public static final PersistentStateType<VirusWorldState> TYPE = new PersistentStateType<>(ID, VirusWorldState::new, CODEC, DataFixTypes.LEVEL);
@@ -167,9 +169,14 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 	private final Map<BlockPos, Long> shellCooldowns = new HashMap<>();
 	private final Object2LongMap<UUID> guardianBeams = new Object2LongOpenHashMap<>();
 	private final Object2IntMap<UUID> infectiousInventoryTicks = new Object2IntOpenHashMap<>();
+	private final Object2LongMap<UUID> infectiousInventoryWarnCooldowns = new Object2LongOpenHashMap<>();
 	private final Object2IntMap<UUID> infectiousContactTicks = new Object2IntOpenHashMap<>();
 	private final Object2IntMap<UUID> helmetPingTimers = new Object2IntOpenHashMap<>();
 	private final Object2DoubleMap<UUID> heavyPantsVoidWear = new Object2DoubleOpenHashMap<>();
+	private boolean shellRebuildPending;
+	private boolean tierFiveBarrierActive;
+	private long nextTierFiveBarrierPushTick;
+	private boolean finalVulnerabilityBlastTriggered;
 	private final LongSet pillarChunks = new LongOpenHashSet();
 	private final List<VoidTearInstance> activeVoidTears = new ArrayList<>();
 	private final List<PendingVoidTear> pendingVoidTears = new ArrayList<>();
@@ -178,14 +185,19 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 	private static final double CLEANSE_PURGE_RADIUS = 32.0D;
 	private static final int INFECTIOUS_CONTACT_THRESHOLD = 40;
 	private static final int INFECTIOUS_CONTACT_INTERVAL = 20;
-	private static final int INFECTIOUS_INVENTORY_THRESHOLD = 40;
-	private static final int INFECTIOUS_INVENTORY_INTERVAL = 80;
+	private static final int INFECTIOUS_INVENTORY_THRESHOLD = 20;
+	private static final int INFECTIOUS_INVENTORY_INTERVAL = 60;
+	private static final int INFECTIOUS_INVENTORY_WARNING_COOLDOWN = 200;
 	private static final int RUBBER_CONTACT_THRESHOLD_BONUS = 60;
 	private static final int RUBBER_CONTACT_INTERVAL_BONUS = 10;
 	private static final float RUBBER_CONTACT_DAMAGE = 0.5F;
 	private static final double HEAVY_PANTS_VOID_TEAR_WEAR = 4.0D / 3.0D;
 	private static final int AUGMENTED_HELMET_PING_INTERVAL = 80;
 	private static final double HELMET_PING_MAX_PARTICLE_DISTANCE = 32.0D;
+	private static final int TIER_FIVE_BARRIER_RADIUS = 6;
+	private static final int TIER_FIVE_BARRIER_INTERVAL = 15;
+	private static final int FINAL_VULNERABILITY_BLAST_RADIUS = 10;
+	private static final double FINAL_VULNERABILITY_BLAST_SCALE = 1.6D;
 	private static final String[] COMPASS_POINTS = new String[]{"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
 
 	private boolean infected;
@@ -317,6 +329,8 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 	public void tick(ServerWorld world) {
 		tickVoidTears(world);
 		tickShieldFields(world);
+		applyInfectiousContactDamage(world);
+		applyInfectiousInventoryEffects(world);
 		if (!infected) {
 			return;
 		}
@@ -344,10 +358,9 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 		maybeSpawnMatrixCube(world, tier);
 
 		applyDifficultyRules(world, tier);
+		maybePushTierFiveBarrier(world, tier);
 		runEvents(world, tier);
 		boostAmbientSpawns(world, tier);
-		applyInfectiousContactDamage(world);
-		applyInfectiousInventoryEffects(world);
 		pulseHelmetTrackers(world);
 	}
 
@@ -420,11 +433,75 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 		}
 	}
 
-	private void applyInfectiousContactDamage(ServerWorld world) {
-		if (!infected) {
-			infectiousContactTicks.clear();
+	private void maybePushTierFiveBarrier(ServerWorld world, InfectionTier tier) {
+		if (tier.getIndex() < InfectionTier.maxIndex() || apocalypseMode) {
+			nextTierFiveBarrierPushTick = 0L;
+			deactivateTierFiveBarrier(world);
 			return;
 		}
+		long tierDuration = getTierDuration(tier);
+		if (tierDuration <= 0 || ticksInTier >= tierDuration / 2) {
+			nextTierFiveBarrierPushTick = 0L;
+			deactivateTierFiveBarrier(world);
+			return;
+		}
+		if (virusSources.isEmpty()) {
+			deactivateTierFiveBarrier(world);
+			return;
+		}
+		long now = world.getTime();
+		if (now < nextTierFiveBarrierPushTick) {
+			return;
+		}
+		nextTierFiveBarrierPushTick = now + TIER_FIVE_BARRIER_INTERVAL;
+		boolean pushed = false;
+		for (BlockPos source : virusSources) {
+			if (!world.isChunkLoaded(ChunkPos.toLong(source))) {
+				continue;
+			}
+			pushPlayersFromBlock(world, source, TIER_FIVE_BARRIER_RADIUS, 0.9D, true);
+			pushed = true;
+		}
+		if (pushed) {
+			tierFiveBarrierActive = true;
+		}
+	}
+
+	private void triggerFinalBarrierBlast(ServerWorld world) {
+		if (finalVulnerabilityBlastTriggered || virusSources.isEmpty()) {
+			return;
+		}
+		finalVulnerabilityBlastTriggered = true;
+		nextTierFiveBarrierPushTick = 0L;
+		for (BlockPos source : virusSources) {
+			if (!world.isChunkLoaded(ChunkPos.toLong(source))) {
+				continue;
+			}
+			pushPlayersFromBlock(world, source, FINAL_VULNERABILITY_BLAST_RADIUS, FINAL_VULNERABILITY_BLAST_SCALE, true);
+			world.spawnParticles(
+					ParticleTypes.SONIC_BOOM,
+					source.getX() + 0.5D,
+					source.getY() + 1.0D,
+					source.getZ() + 0.5D,
+					6,
+					0.25D,
+					0.25D,
+					0.25D,
+					0.0D);
+			world.playSound(null, source, SoundEvents.ENTITY_WARDEN_SONIC_BOOM, SoundCategory.HOSTILE, 2.0F, 0.65F);
+		}
+		deactivateTierFiveBarrier(world);
+	}
+
+	private void deactivateTierFiveBarrier(ServerWorld world) {
+		if (!tierFiveBarrierActive) {
+			return;
+		}
+		tierFiveBarrierActive = false;
+		broadcast(world, Text.translatable("message.the-virus-block.barrier_offline").formatted(Formatting.DARK_PURPLE));
+	}
+
+	private void applyInfectiousContactDamage(ServerWorld world) {
 		Set<UUID> active = new HashSet<>();
 		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
 			if (player.isSpectator() || player.isCreative()) {
@@ -443,6 +520,9 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 			boolean wearingBoots = VirusEquipmentHelper.hasRubberBoots(player);
 			int threshold = INFECTIOUS_CONTACT_THRESHOLD + (wearingBoots ? RUBBER_CONTACT_THRESHOLD_BONUS : 0);
 			int interval = INFECTIOUS_CONTACT_INTERVAL + (wearingBoots ? RUBBER_CONTACT_INTERVAL_BONUS : 0);
+			if (threshold > 0 && ticks == threshold) {
+				player.sendMessage(Text.translatable("message.the-virus-block.infectious_contact_warning"), true);
+			}
 			if (ticks > threshold && (ticks - threshold) % interval == 0) {
 				float damage = wearingBoots ? RUBBER_CONTACT_DAMAGE : 1.0F;
 				player.damage(world, world.getDamageSources().magic(), damage);
@@ -460,32 +540,42 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 	}
 
 	private void applyInfectiousInventoryEffects(ServerWorld world) {
-		if (!infected) {
-			infectiousInventoryTicks.clear();
-			return;
-		}
 		ItemStack infectiousStack = ModBlocks.INFECTIOUS_CUBE.asItem().getDefaultStack();
 		Set<UUID> retained = new HashSet<>();
+		long now = world.getTime();
 		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
 			UUID uuid = player.getUuid();
 			if (player.isSpectator() || player.isCreative()
 					|| player.getInventory().count(infectiousStack.getItem()) <= 0) {
 				infectiousInventoryTicks.removeInt(uuid);
+				infectiousInventoryWarnCooldowns.removeLong(uuid);
 				continue;
 			}
 			retained.add(uuid);
 			int ticks = infectiousInventoryTicks.getOrDefault(uuid, 0) + 1;
 			infectiousInventoryTicks.put(uuid, ticks);
+			if (INFECTIOUS_INVENTORY_THRESHOLD > 0 && ticks == INFECTIOUS_INVENTORY_THRESHOLD) {
+				long nextAllowed = infectiousInventoryWarnCooldowns.getOrDefault(uuid, 0L);
+				if (now >= nextAllowed) {
+					player.sendMessage(Text.translatable("message.the-virus-block.infectious_inventory_warning"), true);
+					infectiousInventoryWarnCooldowns.put(uuid, now + INFECTIOUS_INVENTORY_WARNING_COOLDOWN);
+				}
+			}
 			if (ticks > INFECTIOUS_INVENTORY_THRESHOLD
 					&& (ticks - INFECTIOUS_INVENTORY_THRESHOLD) % INFECTIOUS_INVENTORY_INTERVAL == 0) {
-				player.addStatusEffect(new StatusEffectInstance(StatusEffects.HUNGER, 60, 0));
-				player.addStatusEffect(new StatusEffectInstance(StatusEffects.NAUSEA, 50, 0));
+				player.addStatusEffect(new StatusEffectInstance(StatusEffects.HUNGER, 120, 1));
+				player.addStatusEffect(new StatusEffectInstance(StatusEffects.NAUSEA, 80, 0));
+				player.addStatusEffect(new StatusEffectInstance(StatusEffects.WEAKNESS, 100, 0));
+				player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 80, 0));
+				player.addStatusEffect(new StatusEffectInstance(StatusEffects.POISON, 60, 0));
 			}
 		}
 		if (retained.isEmpty()) {
 			infectiousInventoryTicks.clear();
+			infectiousInventoryWarnCooldowns.clear();
 		} else {
 			infectiousInventoryTicks.object2IntEntrySet().removeIf(entry -> !retained.contains(entry.getKey()));
+			infectiousInventoryWarnCooldowns.object2LongEntrySet().removeIf(entry -> !retained.contains(entry.getKey()));
 		}
 	}
 
@@ -666,6 +756,10 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 				attribute.removeModifier(EXTREME_HEALTH_MODIFIER_ID);
 			}
 		}
+	}
+
+	private void broadcast(ServerWorld world, Text text) {
+		world.getPlayers(PlayerEntity::isAlive).forEach(player -> player.sendMessage(text, false));
 	}
 
 	private void tickGuardianBeams(ServerWorld world) {
@@ -1198,6 +1292,10 @@ private static final int MAX_SHELL_HEIGHT = 2;
 				pushPlayersFromBlock(world, pos, radius);
 			}
 			world.setBlockState(pos, newState, Block.NOTIFY_LISTENERS);
+			if (shellRebuildPending) {
+				shellRebuildPending = false;
+				broadcast(world, Text.translatable("message.the-virus-block.shells_reforming").formatted(Formatting.DARK_AQUA));
+			}
 		});
 	}
 
@@ -1207,6 +1305,10 @@ private static final int MAX_SHELL_HEIGHT = 2;
 	}
 	
 	private void pushPlayersFromBlock(ServerWorld world, BlockPos formingPos, int radius) {
+		pushPlayersFromBlock(world, formingPos, radius, 1.0D, true);
+	}
+
+	private void pushPlayersFromBlock(ServerWorld world, BlockPos formingPos, int radius, double strengthScale, boolean spawnGuardian) {
 		Vec3d origin = Vec3d.ofCenter(formingPos);
 		double pushRadius = Math.max(4.0D, radius + 4.0D);
 		double pushRadiusSq = pushRadius * pushRadius;
@@ -1214,8 +1316,9 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		if (difficultyKnockback <= 0.0D) {
 			return;
 		}
-		double baseStrength = (1.2D + radius * 0.15D) * difficultyKnockback;
-		double verticalBoost = (0.5D + radius * 0.05D) * difficultyKnockback;
+		double scale = Math.max(0.1D, strengthScale);
+		double baseStrength = (1.2D + radius * 0.15D) * difficultyKnockback * scale;
+		double verticalBoost = (0.5D + radius * 0.05D) * difficultyKnockback * scale;
 
 		int affected = 0;
 		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
@@ -1232,7 +1335,9 @@ private static final int MAX_SHELL_HEIGHT = 2;
 			Vec3d pushVec = horizontal.normalize().multiply(baseStrength);
 			player.addVelocity(pushVec.x, verticalBoost, pushVec.z);
 			player.velocityModified = true;
-			spawnGuardianBeam(world, formingPos, player);
+			if (spawnGuardian) {
+				spawnGuardianBeam(world, formingPos, player);
+			}
 			affected++;
 		}
 
@@ -1347,6 +1452,7 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		}
 		shellsCollapsed = true;
 		shellCooldowns.clear();
+		shellRebuildPending = true;
 		guardianBeams.clear();
 		for (BlockPos core : virusSources) {
 			stripShells(world, core);
@@ -1453,6 +1559,13 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		long delay = BASE_SHELL_DELAY + radius * RADIUS_DELAY;
 		int lowTierSteps = Math.max(0, 3 - tierIndex);
 		delay += lowTierSteps * LOW_TIER_DELAY;
+		double highTierScale = 1.0D;
+		if (tierIndex >= 4) {
+			highTierScale = 0.35D;
+		} else if (tierIndex >= 3) {
+			highTierScale = 0.6D;
+		}
+		delay = Math.max(PLAYER_OCCUPANCY_DELAY, Math.round(delay * highTierScale));
 		return delay;
 	}
 
@@ -1596,6 +1709,7 @@ private static final int MAX_SHELL_HEIGHT = 2;
 
 	private void advanceTier(ServerWorld world) {
 		if (tierIndex >= InfectionTier.maxIndex()) {
+			triggerFinalBarrierBlast(world);
 			apocalypseMode = true;
 			markDirty();
 			return;
@@ -1603,6 +1717,12 @@ private static final int MAX_SHELL_HEIGHT = 2;
 
 		tierIndex++;
 		ticksInTier = 0;
+		if (tierIndex >= 3) {
+			shellRebuildPending = true;
+		}
+		shellCooldowns.clear();
+		nextTierFiveBarrierPushTick = 0L;
+		finalVulnerabilityBlastTriggered = false;
 		resetHealthForTier(InfectionTier.byIndex(tierIndex));
 		BlockPos pos = representativePos(world, world.getRandom());
 		if (pos != null) {
@@ -1635,10 +1755,14 @@ private static final int MAX_SHELL_HEIGHT = 2;
 			apocalypseMode = false;
 			terrainCorrupted = false;
 			shellsCollapsed = false;
+			shellRebuildPending = tierIndex >= 3;
+			tierFiveBarrierActive = false;
 			cleansingActive = false;
 			resetHealthForTier(InfectionTier.byIndex(tierIndex));
 			pillarChunks.clear();
 			eventHistory.clear();
+			nextTierFiveBarrierPushTick = 0L;
+			finalVulnerabilityBlastTriggered = false;
 			markDirty();
 			GlobalTerrainCorruption.trigger(world, pos);
 		}
@@ -1739,6 +1863,8 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		apocalypseMode = false;
 		terrainCorrupted = false;
 		shellsCollapsed = false;
+		shellRebuildPending = false;
+		deactivateTierFiveBarrier(world);
 		healthScale = 1.0D;
 		currentHealth = 0.0D;
 		beginCleansing();
@@ -1746,6 +1872,8 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		shellCooldowns.clear();
 		pillarChunks.clear();
 		guardianBeams.clear();
+		nextTierFiveBarrierPushTick = 0L;
+		finalVulnerabilityBlastTriggered = false;
 		for (VoidTearInstance tear : activeVoidTears) {
 			sendVoidTearBurst(world, tear);
 		}

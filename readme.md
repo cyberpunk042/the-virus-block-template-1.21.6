@@ -70,8 +70,9 @@ The Virus spreads through **five escalating tiers**:
 - Biomes collapse or invert outright  
 - Massive TNT/Arrow barrages, corruption waves, and entity duplication storms  
 - Corrupted TNT now rolls volatile results (1/3 dud, 1/3 normal, 1/3 1.5× blast) to keep finales unpredictable  
-- Bonus hostile mob spawns spike to their highest density  
-- Once the tier bar fills, **Apocalypse Mode** begins.
+- Bonus hostile mob spawns spike to their highest density thanks to tier-aware scaling  
+- A guardian-beam shock field forms around every cocoon during the first half of Tier 5, repeatedly shoving intruders backward  
+- Once the tier bar fills, **Apocalypse Mode** begins with a sonic blast that yeets anyone camping the Virus Block.
 
 ### 🔻 Apocalypse Mode (Post-Tier 5)
 
@@ -144,10 +145,23 @@ Every session becomes a unique apocalypse.
 ## 👁️ Virus Aura & Infectious Hazards
 
 - Standing near the Virus Block applies poison, hunger, slowness, nausea, and armor corrosion. Intensity scales with tier.  
-- Standing directly **on** an Infectious Cube for more than two seconds starts dealing half-hearts of damage every second until you move.  
-- Carrying an Infectious Cube in your inventory for a few seconds applies intermittent Hunger + Nausea pulses—drop it or stash it to recover.
+- Standing directly **on** an Infectious Cube now ticks damage continuously; Rubber Shoes extend the safe window slightly but the cube will still chew through your footwear first.  
+- Carrying an Infectious Cube in your inventory rapidly builds viral load—once the threshold hits you’ll be pulsed with Hunger, Nausea, Weakness, Slowness, and Poison until you drop it or stash it.
 
 Pro tip: cure cubes with milk (shapeless recipe) or quarantine them inside obsidian shells.
+
+---
+
+## 🛡️ Prototype Anti-Virus Gear
+
+Four late-game armor pieces help you survive the apocalypse while keeping their vanilla enchant pools and trim compatibility:
+
+- **Composite Elytra (Chest)** – Netherite chestplate defense + Elytra glide in a single item. Firework boosts are throttled for balance, but custom Elytra wings render on the player so you keep your silhouette. Repair with Netherite Ingots or Phantom Membranes.  
+- **Rubber Shoes (Boots)** – Double durability leather boots tuned for boobytrap crawls: extra tolerance while standing on Infectious Cubes, softer explosion knockback, and reduced damage from trap payloads. Repair with Slimeballs.  
+- **Heavy Pants (Leggings)** – Total immunity to Void Tear pull/damage/knockback. The tear eats the leggings’ durability instead of you, so bring spares.  
+- **Augmented Helmet (Helmet)** – Emits periodic compass-style pings that point toward the nearest Virus Block or shield anchor, complete with electric spark particles and HUD chat hints.
+
+These items appear in the custom creative tab alongside the vanilla Elytra for easy testing.
 
 ---
 
@@ -166,23 +180,21 @@ Apocalypse Mode is the last phase—there is no separate boss arena right now. S
 
 ### Accelerate / Delay Corruption
 
-- Feed the Virus Block powerful items (config) to speed up tier progress.  
+- Poke the Virus Block to speed up tier progress.  
 - Wrap a Cured Infectious Cube in an obsidian cocoon to spawn an **Anti-Virus Field**—a beacon-style dome that stops spread, shields players from anomalies, and detonates violently if the virus reaches it.  
-- Build multiple shells to buy time; Tier 4/5 boobytraps can still tunnel through, so watch the new `/virusstats` readout.
 
 ### Temporary Reversion — Purification Totem
 
 - **No Boobytraps** – disables trap placement and throttles corrupted worms (virus enters “dormant” mode).  
-- **No Shell** – collapses every defensive shell wrapped around the Virus Block.  
-- **Half HP** – halves the Virus Block’s *maximum* health for the current tier (permanent until tier change).  
-- **Bleed HP** – halves the Virus Block’s *current* health immediately.  
-- The totem now checks for dormant mode and refuses redundant activations, so you get clear feedback.
+- **No Shell** – collapses every defensive shell wrapped around the Virus Block. (Tier 5)
+- **Half HP** – halves the Virus Block’s *maximum* health.  
+- **Bleed HP** – halves the Virus Block’s *current* health immediately. (EASY Mode Only)
 
 ### End the Apocalypse
 
 - Once Apocalypse Mode begins, the bossbar flips to red HP.  
-- Hits, TNT, beds, and Purification option 4 drain health instead of rewinding progress.  
-- When HP reaches zero (or you mine the exposed block), the infection is wiped and the world slowly calms down.
+- Hits, TNT, beds, and Purification option 4 drain health.  
+- When HP reaches zero (or you mine the exposed block), the infection is wiped and the world calms down.
 
 ---
 
@@ -222,6 +234,10 @@ This is a “progressive chaos” mod designed for content creation and challeng
 | --- | --- | --- |
 | **Cured Infectious Cube** | Shapeless: 1× Infectious Cube + 1× Milk Bucket | Produces 1× Cured Infectious Cube. Combine anywhere in the crafting grid. |
 | **Purification Totem** | Shaped “cross” pattern: Top = Cured Infectious Cube, Left = Corrupted Gold, Center = Totem of Undying, Right = Corrupted Iron, Bottom = Corrupted Diamond | There are four JSON variants covering every rotation; the center slot must always be a Totem of Undying. Consumed on use. |
+| **Composite Elytra** | Elytra + Netherite Chestplate + (2) Crying Obsidian | Combines Elytra glide with netherite-tier armor. Repair using Netherite Ingots or Phantom Membranes. |
+| **Rubber Shoes** | 2× Slime Block + 3× String (shaped “U”) | High-durability anti-boobytrap boots that extend Infectious Cube tolerance and dampen knockback. Repair with Slimeballs. |
+| **Heavy Pants** | Netherite Leggings surrounded by 8× Crying Obsidian | Grants absolute Void Tear immunity while draining legging durability instead of player HP. |
+| **Augmented Helmet** | Netherite Helmet + Compass + Gold Ingot + Leather + Redstone + Stone (shaped) | Adds periodic virus-tracking pings that guide you to the nearest Virus Block or shield anchor. |
 
 *(Drop your PNGs—`cured_infectious_cube.png`, `purification_totem.png`, etc.—into the repo’s `docs/` folder if you want the README to display the crafting layouts directly.)*
 

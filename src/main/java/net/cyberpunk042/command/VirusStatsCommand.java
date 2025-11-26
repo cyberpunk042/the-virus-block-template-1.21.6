@@ -1,6 +1,7 @@
 package net.cyberpunk042.command;
 
 import com.mojang.brigadier.CommandDispatcher;
+import net.cyberpunk042.infection.GlobalTerrainCorruption;
 import net.cyberpunk042.infection.InfectionTier;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.minecraft.server.command.CommandManager;
@@ -46,6 +47,22 @@ public final class VirusStatsCommand {
 					"command.the-virus-block.stats.final_wave_eta",
 					Text.literal(formatDuration(ticksUntilFinalWave))
 			).formatted(Formatting.GOLD), false);
+		}
+
+		int trackedChunks = GlobalTerrainCorruption.getTrackedChunkCount(world);
+		source.sendFeedback(() -> Text.translatable(
+				"command.the-virus-block.stats.chunks_alive",
+				trackedChunks
+		).formatted(Formatting.DARK_GREEN), false);
+
+		long singularityTicks = Math.max(0L, ticksUntilFinalWave - 1_200L);
+		if (singularityTicks <= 0L) {
+			source.sendFeedback(() -> Text.translatable("command.the-virus-block.stats.singularity_now").formatted(Formatting.DARK_PURPLE), false);
+		} else {
+			source.sendFeedback(() -> Text.translatable(
+					"command.the-virus-block.stats.singularity_eta",
+					Text.literal(formatDuration(singularityTicks))
+			).formatted(Formatting.DARK_PURPLE), false);
 		}
 		return 1;
 	}

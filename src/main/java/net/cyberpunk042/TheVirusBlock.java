@@ -218,7 +218,7 @@ public class TheVirusBlock implements ModInitializer {
 			return;
 		}
 		if (state.isDormant() && payload.option() == PurificationOption.NO_BOOBYTRAPS) {
-			player.sendMessage(Text.translatable("message.the-virus-block.purification_totem.dormant"), true);
+			player.sendMessage(Text.translatable("message.the-virus-block.purification_totem.boobytraps_disabled"), true);
 			player.closeHandledScreen();
 			return;
 		}

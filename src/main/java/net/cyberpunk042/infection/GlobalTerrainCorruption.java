@@ -86,6 +86,10 @@ public final class GlobalTerrainCorruption {
 		cleanseActiveChunk(world, tracker, spawn, true);
 	}
 
+	public static int getTrackedChunkCount(ServerWorld world) {
+		return tracker(world).trackedChunkCount();
+	}
+
 	private static BlockState cleanseBlock(BlockState state) {
 		Block block = state.getBlock();
 		if (isPortalCriticalBlock(block)) {
@@ -299,6 +303,7 @@ public final class GlobalTerrainCorruption {
 				|| block == Blocks.END_PORTAL_FRAME
 				|| block == Blocks.END_GATEWAY
 				|| block == Blocks.RESPAWN_ANCHOR
+				|| block == Blocks.CRAFTING_TABLE
 				|| block instanceof BedBlock;
 	}
 
@@ -403,6 +408,10 @@ public final class GlobalTerrainCorruption {
 			cleansingPrimed = false;
 			cleanseSnapshot = new long[0];
 			cleanseCursor = 0;
+		}
+
+		int trackedChunkCount() {
+			return mutatedBlocks.size();
 		}
 	}
 
