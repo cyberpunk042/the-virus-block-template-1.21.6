@@ -38,6 +38,10 @@ public final class ModItemGroups {
 						entries.add(ModBlocks.CURED_INFECTIOUS_CUBE);
 						entries.add(ModBlocks.BACTERIA);
 						entries.add(ModItems.PURIFICATION_TOTEM);
+						entries.add(ModItems.COMPOSITE_ELYTRA);
+						entries.add(ModItems.RUBBER_BOOTS);
+						entries.add(ModItems.HEAVY_PANTS);
+						entries.add(ModItems.AUGMENTED_HELMET);
 					})
 					.build()
 	);
