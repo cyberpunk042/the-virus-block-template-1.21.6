@@ -3,6 +3,7 @@ package net.cyberpunk042.registry;
 import net.cyberpunk042.TheVirusBlock;
 import net.minecraft.item.ItemGroup;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.text.Text;
@@ -38,6 +39,8 @@ public final class ModItemGroups {
 						entries.add(ModBlocks.CURED_INFECTIOUS_CUBE);
 						entries.add(ModBlocks.BACTERIA);
 						entries.add(ModItems.PURIFICATION_TOTEM);
+						entries.add(Items.ELYTRA);
+						entries.add(Items.COMPASS);
 						entries.add(ModItems.COMPOSITE_ELYTRA);
 						entries.add(ModItems.RUBBER_BOOTS);
 						entries.add(ModItems.HEAVY_PANTS);

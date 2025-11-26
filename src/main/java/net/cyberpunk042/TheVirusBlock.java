@@ -159,6 +159,8 @@ public class TheVirusBlock implements ModInitializer {
 			GameRuleRegistry.register("virusEventEntityDuplicationEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_WORMS_ENABLED =
 			GameRuleRegistry.register("virusWormsEnabled", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_MOB_FRIENDLY_FIRE =
+			GameRuleRegistry.register("virusMobFriendlyFire", GameRules.Category.MOBS, GameRuleFactory.createBooleanRule(false));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_WORM_SPAWN_CHANCE =
 			GameRuleRegistry.register("virusWormSpawnChance", GameRules.Category.MOBS, GameRuleFactory.createIntRule(6, 0, 1000));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_WORM_TRAP_SPAWN_CHANCE =

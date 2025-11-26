@@ -14,6 +14,8 @@ import java.util.UUID;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
+import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
@@ -36,6 +38,8 @@ import net.cyberpunk042.network.VoidTearSpawnPayload;
 import net.cyberpunk042.network.ShieldFieldSpawnPayload;
 import net.cyberpunk042.network.ShieldFieldRemovePayload;
 import net.cyberpunk042.registry.ModBlocks;
+import net.cyberpunk042.util.VirusEquipmentHelper;
+import net.cyberpunk042.util.VirusMobAllyHelper;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.BlockState;
@@ -164,6 +168,8 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 	private final Object2LongMap<UUID> guardianBeams = new Object2LongOpenHashMap<>();
 	private final Object2IntMap<UUID> infectiousInventoryTicks = new Object2IntOpenHashMap<>();
 	private final Object2IntMap<UUID> infectiousContactTicks = new Object2IntOpenHashMap<>();
+	private final Object2IntMap<UUID> helmetPingTimers = new Object2IntOpenHashMap<>();
+	private final Object2DoubleMap<UUID> heavyPantsVoidWear = new Object2DoubleOpenHashMap<>();
 	private final LongSet pillarChunks = new LongOpenHashSet();
 	private final List<VoidTearInstance> activeVoidTears = new ArrayList<>();
 	private final List<PendingVoidTear> pendingVoidTears = new ArrayList<>();
@@ -174,6 +180,13 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 	private static final int INFECTIOUS_CONTACT_INTERVAL = 20;
 	private static final int INFECTIOUS_INVENTORY_THRESHOLD = 40;
 	private static final int INFECTIOUS_INVENTORY_INTERVAL = 80;
+	private static final int RUBBER_CONTACT_THRESHOLD_BONUS = 60;
+	private static final int RUBBER_CONTACT_INTERVAL_BONUS = 10;
+	private static final float RUBBER_CONTACT_DAMAGE = 0.5F;
+	private static final double HEAVY_PANTS_VOID_TEAR_WEAR = 4.0D / 3.0D;
+	private static final int AUGMENTED_HELMET_PING_INTERVAL = 80;
+	private static final double HELMET_PING_MAX_PARTICLE_DISTANCE = 32.0D;
+	private static final String[] COMPASS_POINTS = new String[]{"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
 
 	private boolean infected;
 	private boolean dormant;
@@ -335,6 +348,7 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 		boostAmbientSpawns(world, tier);
 		applyInfectiousContactDamage(world);
 		applyInfectiousInventoryEffects(world);
+		pulseHelmetTrackers(world);
 	}
 
 	private void runEvents(ServerWorld world, InfectionTier tier) {
@@ -400,8 +414,9 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 			if (type == null) {
 				continue;
 			}
-			type.spawn(world, entity -> entity.refreshPositionAndAngles(spawnPos, random.nextFloat() * 360.0F, 0.0F),
+			MobEntity spawned = type.spawn(world, entity -> entity.refreshPositionAndAngles(spawnPos, random.nextFloat() * 360.0F, 0.0F),
 					spawnPos, SpawnReason.EVENT, true, false);
+			VirusMobAllyHelper.mark(spawned);
 		}
 	}
 
@@ -425,11 +440,17 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 			active.add(uuid);
 			int ticks = infectiousContactTicks.getOrDefault(uuid, 0) + 1;
 			infectiousContactTicks.put(uuid, ticks);
-			if (ticks > INFECTIOUS_CONTACT_THRESHOLD
-					&& (ticks - INFECTIOUS_CONTACT_THRESHOLD) % INFECTIOUS_CONTACT_INTERVAL == 0) {
-				player.damage(world, world.getDamageSources().magic(), 1.0F);
+			boolean wearingBoots = VirusEquipmentHelper.hasRubberBoots(player);
+			int threshold = INFECTIOUS_CONTACT_THRESHOLD + (wearingBoots ? RUBBER_CONTACT_THRESHOLD_BONUS : 0);
+			int interval = INFECTIOUS_CONTACT_INTERVAL + (wearingBoots ? RUBBER_CONTACT_INTERVAL_BONUS : 0);
+			if (ticks > threshold && (ticks - threshold) % interval == 0) {
+				float damage = wearingBoots ? RUBBER_CONTACT_DAMAGE : 1.0F;
+				player.damage(world, world.getDamageSources().magic(), damage);
 				world.playSound(null, player.getX(), player.getY(), player.getZ(),
 						SoundEvents.ENTITY_SILVERFISH_HURT, SoundCategory.BLOCKS, 0.6F, 1.2F);
+				if (wearingBoots) {
+					VirusEquipmentHelper.damageRubberBoots(player, 1);
+				}
 			}
 		}
 		if (infectiousContactTicks.isEmpty()) {
@@ -466,6 +487,109 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 		} else {
 			infectiousInventoryTicks.object2IntEntrySet().removeIf(entry -> !retained.contains(entry.getKey()));
 		}
+	}
+
+	private void pulseHelmetTrackers(ServerWorld world) {
+		if (!infected || virusSources.isEmpty()) {
+			helmetPingTimers.clear();
+			heavyPantsVoidWear.clear();
+			return;
+		}
+		Set<UUID> tracked = new HashSet<>();
+		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
+			if (player.isSpectator() || player.isCreative() || !VirusEquipmentHelper.hasAugmentedHelmet(player)) {
+				helmetPingTimers.removeInt(player.getUuid());
+				continue;
+			}
+			UUID uuid = player.getUuid();
+			tracked.add(uuid);
+			int ticks = helmetPingTimers.getOrDefault(uuid, 0) + 1;
+			if (ticks >= AUGMENTED_HELMET_PING_INTERVAL) {
+				helmetPingTimers.put(uuid, 0);
+				pingHelmet(world, player);
+			} else {
+				helmetPingTimers.put(uuid, ticks);
+			}
+		}
+		if (tracked.isEmpty()) {
+			helmetPingTimers.clear();
+		} else {
+			helmetPingTimers.object2IntEntrySet().removeIf(entry -> !tracked.contains(entry.getKey()));
+		}
+	}
+
+	private void pingHelmet(ServerWorld world, ServerPlayerEntity player) {
+		BlockPos target = findNearestVirusSource(player.getBlockPos());
+		if (target == null) {
+			player.sendMessage(Text.translatable("message.the-virus-block.helmet_ping_none"), true);
+			return;
+		}
+		Vec3d eye = player.getEyePos();
+		Vec3d delta = Vec3d.ofCenter(target).subtract(eye);
+		double distance = delta.length();
+		if (distance < 0.5D) {
+			player.sendMessage(Text.translatable("message.the-virus-block.helmet_ping_here"), true);
+			return;
+		}
+		double visualDistance = Math.min(distance, HELMET_PING_MAX_PARTICLE_DISTANCE);
+		spawnHelmetTrail(world, eye, delta, visualDistance);
+		player.sendMessage(
+				Text.translatable("message.the-virus-block.helmet_ping", Text.literal(describeDirection(delta)),
+						MathHelper.floor(distance)),
+				true);
+		world.playSound(null, player.getX(), player.getEyeY(), player.getZ(), SoundEvents.BLOCK_NOTE_BLOCK_HARP,
+				SoundCategory.PLAYERS, 0.35F, 1.8F);
+	}
+
+	private void accumulateHeavyPantsWear(ServerPlayerEntity player) {
+		UUID uuid = player.getUuid();
+		double accumulated = heavyPantsVoidWear.getOrDefault(uuid, 0.0D) + HEAVY_PANTS_VOID_TEAR_WEAR;
+		int damage = (int) accumulated;
+		if (damage > 0) {
+			VirusEquipmentHelper.damageHeavyPants(player, damage);
+			accumulated -= damage;
+		}
+		heavyPantsVoidWear.put(uuid, accumulated);
+	}
+
+	@Nullable
+	private BlockPos findNearestVirusSource(BlockPos origin) {
+		if (virusSources.isEmpty()) {
+			return null;
+		}
+		Vec3d originVec = Vec3d.ofCenter(origin);
+		BlockPos closest = null;
+		double best = Double.MAX_VALUE;
+		for (BlockPos source : virusSources) {
+			double distanceSq = source.toCenterPos().squaredDistanceTo(originVec);
+			if (distanceSq < best) {
+				best = distanceSq;
+				closest = source;
+			}
+		}
+		return closest;
+	}
+
+	private void spawnHelmetTrail(ServerWorld world, Vec3d eye, Vec3d delta, double maxDistance) {
+		if (maxDistance <= 0.0D) {
+			return;
+		}
+		Vec3d direction = delta.normalize();
+		int steps = Math.max(4, MathHelper.floor(maxDistance / 2.0D));
+		double step = maxDistance / steps;
+		for (int i = 1; i <= steps; i++) {
+			Vec3d point = eye.add(direction.multiply(step * i));
+			world.spawnParticles(ParticleTypes.ELECTRIC_SPARK, point.x, point.y, point.z, 1, 0.0D, 0.0D, 0.0D, 0.0D);
+		}
+	}
+
+	private static String describeDirection(Vec3d delta) {
+		double angle = Math.toDegrees(Math.atan2(delta.x, delta.z));
+		if (angle < 0.0D) {
+			angle += 360.0D;
+		}
+		int index = MathHelper.floor((angle + 22.5D) / 45.0D) & 7;
+		return COMPASS_POINTS[index];
 	}
 
 	private BlockPos findBoostSpawnPos(ServerWorld world, BlockPos origin, int radius, Random random) {
@@ -684,10 +808,11 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 			BlockPos pos = animal.getBlockPos();
 			animal.discard();
 
-			EntityType.ZOMBIE.spawn(world, entity -> {
+			MobEntity zombie = EntityType.ZOMBIE.spawn(world, entity -> {
 				entity.refreshPositionAndAngles(pos, random.nextFloat() * 360.0F, 0.0F);
 				entity.setCustomName(Text.translatable("entity.the-virus-block.corrupted_passive").formatted(Formatting.DARK_RED));
 			}, pos, SpawnReason.EVENT, true, false);
+			VirusMobAllyHelper.mark(zombie);
 			converted++;
 		}
 		CorruptionProfiler.logTierEvent(world, VirusEventType.PASSIVE_REVOLT, origin, "converted=" + converted);
@@ -873,6 +998,9 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 			}
 		}, spawnPos, SpawnReason.EVENT, false, false);
 		if (spawned != null) {
+			if (spawned instanceof MobEntity mob) {
+				VirusMobAllyHelper.mark(mob);
+			}
 			CorruptionProfiler.logTierEvent(world, VirusEventType.ENTITY_DUPLICATION, spawnPos,
 					"type=" + spawned.getType().toString());
 		}
@@ -1355,14 +1483,17 @@ private static final int MAX_SHELL_HEIGHT = 2;
 				}
 
 				EntityType<?> type = pickGuardianType(random, i == 0);
-				type.spawn(world, entity -> {
-					if (entity instanceof HostileEntity hostile) {
+				Entity entity = type.spawn(world, spawned -> {
+					if (spawned instanceof HostileEntity hostile) {
 						hostile.setPersistent();
 					}
-					if (entity instanceof IronGolemEntity golem) {
+					if (spawned instanceof IronGolemEntity golem) {
 						golem.setPlayerCreated(false);
 					}
 				}, spawnPos, SpawnReason.EVENT, true, false);
+				if (entity instanceof MobEntity mob) {
+					VirusMobAllyHelper.mark(mob);
+				}
 			}
 		}
 	}
@@ -1778,6 +1909,10 @@ private static final int MAX_SHELL_HEIGHT = 2;
 			}
 			double distance = Math.sqrt(distanceSq);
 			if (distance > effectRadius) {
+				continue;
+			}
+			if (living instanceof ServerPlayerEntity player && VirusEquipmentHelper.hasHeavyPants(player)) {
+				accumulateHeavyPantsWear(player);
 				continue;
 			}
 			double proximity = 1.0D - Math.min(1.0D, distance / effectRadius);

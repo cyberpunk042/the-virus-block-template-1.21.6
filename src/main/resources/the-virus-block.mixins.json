@@ -13,7 +13,9 @@
 		"GuardianEntityAccessor",
 		"ExplosionMixin",
 		"ItemEntityMixin",
-		"ItemStackMixin"
+		"ItemStackMixin",
+		"FireworkRocketEntityMixin",
+		"MobEntityMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

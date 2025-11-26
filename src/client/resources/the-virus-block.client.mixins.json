@@ -7,7 +7,9 @@
     "RainSplashParticleFactoryMixin",
     "SnowflakeParticleFactoryMixin",
     "SpriteContentsAccessor",
-    "WeatherRenderingMixin"
+    "WeatherRenderingMixin",
+    "PlayerEntityRendererMixin",
+    "access.LivingEntityRendererAccessor"
   ],
 	"injectors": {
 		"defaultRequire": 1

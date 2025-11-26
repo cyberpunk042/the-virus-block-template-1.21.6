@@ -6,6 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.registry.ModBlocks;
+import net.cyberpunk042.util.VirusEquipmentHelper;
 import net.cyberpunk042.item.PurificationTotemUtil;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
@@ -22,6 +23,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.world.Heightmap;
 import net.minecraft.world.World;
@@ -123,7 +125,14 @@ public final class BoobytrapHelper {
 				if (PurificationTotemUtil.isHolding(player)) {
 					continue;
 				}
-				player.damage(world, world.getDamageSources().explosion(null, null), damage);
+				float appliedDamage = damage;
+				if (VirusEquipmentHelper.hasRubberBoots(player)) {
+					appliedDamage *= 0.6F;
+					VirusEquipmentHelper.damageRubberBoots(player, 1);
+				}
+				if (appliedDamage > 0.0F) {
+					player.damage(world, world.getDamageSources().explosion(null, null), appliedDamage);
+				}
 				applyMalus(world, player);
 			}
 			affectedPlayers = players.size();
@@ -132,6 +141,7 @@ public final class BoobytrapHelper {
 
 		if (!playersOnly && damageBlocks) {
 			world.createExplosion(null, pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D, power, World.ExplosionSourceType.BLOCK);
+			softenKnockbackForBoots(world, pos, power);
 		}
 
 		CorruptionProfiler.logBoobytrapTrigger(world, pos, type.name(), reason, affectedPlayers);
@@ -166,6 +176,20 @@ public final class BoobytrapHelper {
 			default -> new StatusEffectInstance(StatusEffects.SLOWNESS, 140, 1);
 		};
 		player.addStatusEffect(effect);
+	}
+
+	private static void softenKnockbackForBoots(ServerWorld world, BlockPos origin, float power) {
+		double radius = power * 2.5D + 2.0D;
+		Box area = new Box(origin).expand(radius);
+		List<ServerPlayerEntity> players = world.getEntitiesByClass(ServerPlayerEntity.class, area, ServerPlayerEntity::isAlive);
+		for (ServerPlayerEntity player : players) {
+			if (!VirusEquipmentHelper.hasRubberBoots(player)) {
+				continue;
+			}
+			Vec3d velocity = player.getVelocity();
+			player.setVelocity(velocity.multiply(0.65D, 1.0D, 0.65D));
+			player.velocityDirty = true;
+		}
 	}
 
 	@Nullable

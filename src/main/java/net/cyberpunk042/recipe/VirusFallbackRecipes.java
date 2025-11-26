@@ -34,6 +34,14 @@ public final class VirusFallbackRecipes {
 			RegistryKey.of(RegistryKeys.RECIPE, Identifier.of(TheVirusBlock.MOD_ID, "purification_totem_south"));
 	private static final RegistryKey<net.minecraft.recipe.Recipe<?>> PURIFICATION_TOTEM_WEST_ID =
 			RegistryKey.of(RegistryKeys.RECIPE, Identifier.of(TheVirusBlock.MOD_ID, "purification_totem_west"));
+	private static final RegistryKey<net.minecraft.recipe.Recipe<?>> COMPOSITE_ELYTRA_ID =
+			RegistryKey.of(RegistryKeys.RECIPE, Identifier.of(TheVirusBlock.MOD_ID, "composite_elytra"));
+	private static final RegistryKey<net.minecraft.recipe.Recipe<?>> RUBBER_BOOTS_ID =
+			RegistryKey.of(RegistryKeys.RECIPE, Identifier.of(TheVirusBlock.MOD_ID, "rubber_boots"));
+	private static final RegistryKey<net.minecraft.recipe.Recipe<?>> HEAVY_PANTS_ID =
+			RegistryKey.of(RegistryKeys.RECIPE, Identifier.of(TheVirusBlock.MOD_ID, "heavy_pants"));
+	private static final RegistryKey<net.minecraft.recipe.Recipe<?>> AUGMENTED_HELMET_ID =
+			RegistryKey.of(RegistryKeys.RECIPE, Identifier.of(TheVirusBlock.MOD_ID, "augmented_helmet"));
 
 	private VirusFallbackRecipes() {
 	}
@@ -59,6 +67,22 @@ public final class VirusFallbackRecipes {
 		}
 		if (current.get(PURIFICATION_TOTEM_WEST_ID) == null) {
 			entries.add(createTotemRecipe(PURIFICATION_TOTEM_WEST_ID, " I ", "CTD", " G "));
+			changed = true;
+		}
+		if (current.get(COMPOSITE_ELYTRA_ID) == null) {
+			entries.add(createCompositeElytraRecipe());
+			changed = true;
+		}
+		if (current.get(RUBBER_BOOTS_ID) == null) {
+			entries.add(createRubberBootsRecipe());
+			changed = true;
+		}
+		if (current.get(HEAVY_PANTS_ID) == null) {
+			entries.add(createHeavyPantsRecipe());
+			changed = true;
+		}
+		if (current.get(AUGMENTED_HELMET_ID) == null) {
+			entries.add(createAugmentedHelmetRecipe());
 			changed = true;
 		}
 		if (changed) {
@@ -92,6 +116,58 @@ public final class VirusFallbackRecipes {
 				raw,
 				new ItemStack(ModItems.PURIFICATION_TOTEM));
 		return new RecipeEntry<>(id, recipe);
+	}
+
+	private static RecipeEntry<ShapelessRecipe> createCompositeElytraRecipe() {
+		ShapelessRecipe recipe = new ShapelessRecipe(
+				"",
+				CraftingRecipeCategory.MISC,
+				new ItemStack(ModItems.COMPOSITE_ELYTRA),
+				List.of(Ingredient.ofItems(Items.ELYTRA), Ingredient.ofItems(Items.NETHERITE_CHESTPLATE)));
+		return new RecipeEntry<>(COMPOSITE_ELYTRA_ID, recipe);
+	}
+
+	private static RecipeEntry<ShapedRecipe> createRubberBootsRecipe() {
+		Map<Character, Ingredient> key = Map.of(
+				'S', Ingredient.ofItems(Items.SLIME_BALL),
+				'T', Ingredient.ofItems(Items.STRING));
+		RawShapedRecipe raw = RawShapedRecipe.create(key, Arrays.asList("S S", "S S", "TTT"));
+		ShapedRecipe recipe = new ShapedRecipe(
+				"",
+				CraftingRecipeCategory.MISC,
+				raw,
+				new ItemStack(ModItems.RUBBER_BOOTS));
+		return new RecipeEntry<>(RUBBER_BOOTS_ID, recipe);
+	}
+
+	private static RecipeEntry<ShapedRecipe> createHeavyPantsRecipe() {
+		Map<Character, Ingredient> key = Map.of(
+				'C', Ingredient.ofItems(Items.CRYING_OBSIDIAN),
+				'N', Ingredient.ofItems(Items.NETHERITE_LEGGINGS));
+		RawShapedRecipe raw = RawShapedRecipe.create(key, Arrays.asList("CCC", "CNC", "CCC"));
+		ShapedRecipe recipe = new ShapedRecipe(
+				"",
+				CraftingRecipeCategory.MISC,
+				raw,
+				new ItemStack(ModItems.HEAVY_PANTS));
+		return new RecipeEntry<>(HEAVY_PANTS_ID, recipe);
+	}
+
+	private static RecipeEntry<ShapedRecipe> createAugmentedHelmetRecipe() {
+		Map<Character, Ingredient> key = Map.of(
+				'G', Ingredient.ofItems(Items.GOLD_INGOT),
+				'L', Ingredient.ofItems(Items.LEATHER),
+				'R', Ingredient.ofItems(Items.REDSTONE),
+				'H', Ingredient.ofItems(Items.NETHERITE_HELMET),
+				'S', Ingredient.ofItems(Items.STONE),
+				'C', Ingredient.ofItems(Items.COMPASS));
+		RawShapedRecipe raw = RawShapedRecipe.create(key, Arrays.asList("GLG", "RHR", "SCS"));
+		ShapedRecipe recipe = new ShapedRecipe(
+				"",
+				CraftingRecipeCategory.MISC,
+				raw,
+				new ItemStack(ModItems.AUGMENTED_HELMET));
+		return new RecipeEntry<>(AUGMENTED_HELMET_ID, recipe);
 	}
 }
 

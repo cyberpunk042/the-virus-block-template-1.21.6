@@ -1,6 +1,8 @@
 package net.cyberpunk042.mixin;
 
+import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.infection.VirusWorldState;
+import net.cyberpunk042.util.VirusMobAllyHelper;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
@@ -8,6 +10,7 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
+import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
@@ -52,7 +55,13 @@ public abstract class LivingEntityMixin extends Entity {
 		if (attacker.getWorld() != self.getWorld()) {
 			return;
 		}
-
+		if (!world.getGameRules().getBoolean(TheVirusBlock.VIRUS_MOB_FRIENDLY_FIRE)
+				&& self instanceof MobEntity && attacker instanceof MobEntity
+				&& VirusMobAllyHelper.isAlly(self) && VirusMobAllyHelper.isAlly(attacker)) {
+			((MobEntity) attacker).setTarget(null);
+			cir.setReturnValue(false);
+			return;
+		}
 	}
 
 	@Inject(method = "baseTick", at = @At("TAIL"))
