@@ -5,6 +5,7 @@ import java.util.Objects;
 import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.block.entity.MatrixCubeBlockEntity;
 import net.cyberpunk042.infection.VirusWorldState;
+import net.cyberpunk042.registry.ModStatusEffects;
 import net.cyberpunk042.mixin.FallingBlockEntityAccessor;
 import net.cyberpunk042.registry.ModBlocks;
 import net.cyberpunk042.registry.ModEntities;
@@ -68,7 +69,7 @@ public class FallingMatrixCubeEntity extends FallingBlockEntity {
 			world.setBlockState(below, Blocks.AIR.getDefaultState(), Block.NOTIFY_LISTENERS);
 			return true;
 		}
-		if (hitsCoreOrShell(stateBelow)) {
+		if (hitsCoreOrShell(world, below, stateBelow)) {
 			despawn(world);
 			return false;
 		}
@@ -97,7 +98,7 @@ public class FallingMatrixCubeEntity extends FallingBlockEntity {
 		}
 		BlockState carried = this.getBlockState();
 		BlockState current = world.getBlockState(landing);
-		if (hitsCoreOrShell(current)) {
+		if (hitsCoreOrShell(world, landing, current)) {
 			despawn(world);
 			return;
 		}
@@ -128,9 +129,13 @@ public class FallingMatrixCubeEntity extends FallingBlockEntity {
 		return isUnbreakable(world, pos, state);
 	}
 
-	private static boolean hitsCoreOrShell(BlockState state) {
+	private static boolean hitsCoreOrShell(ServerWorld world, BlockPos pos, BlockState state) {
+		if (state.isAir() && VirusWorldState.get(world).isFuseClearedBlock(pos)) {
+			return true;
+		}
 		Block block = state.getBlock();
 		return block == ModBlocks.VIRUS_BLOCK
+				|| block == ModBlocks.SINGULARITY_BLOCK
 				|| block == ModBlocks.CORRUPTED_STONE
 				|| block == ModBlocks.CORRUPTED_CRYING_OBSIDIAN
 				|| block == ModBlocks.CORRUPTED_DIAMOND
@@ -161,6 +166,9 @@ public class FallingMatrixCubeEntity extends FallingBlockEntity {
 			return;
 		}
 		for (LivingEntity living : world.getEntitiesByClass(LivingEntity.class, new Box(pos).expand(0.5), LivingEntity::isAlive)) {
+			if (living.hasStatusEffect(ModStatusEffects.PERSONAL_SHIELD)) {
+				continue;
+			}
 			living.damage(world, world.getDamageSources().fallingBlock(this), damage);
 		}
 	}

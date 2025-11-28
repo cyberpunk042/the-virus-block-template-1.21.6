@@ -9,6 +9,7 @@
     "SpriteContentsAccessor",
     "WeatherRenderingMixin",
     "PlayerEntityRendererMixin",
+    "WorldBorderRenderingMixin",
     "access.LivingEntityRendererAccessor"
   ],
 	"injectors": {

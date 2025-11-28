@@ -15,7 +15,10 @@
 		"ItemEntityMixin",
 		"ItemStackMixin",
 		"FireworkRocketEntityMixin",
-		"MobEntityMixin"
+		"MobEntityMixin",
+		"ServerChunkManagerMixin",
+		"ServerWorldChunkGuardMixin",
+		"WorldBorderMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

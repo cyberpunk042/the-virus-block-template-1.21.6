@@ -5,6 +5,8 @@ import org.slf4j.LoggerFactory;
 
 import net.cyberpunk042.command.VirusDebugCommands;
 import net.cyberpunk042.command.VirusDifficultyCommand;
+import net.cyberpunk042.config.InfectionConfigRegistry;
+import net.cyberpunk042.config.ModConfigBootstrap;
 import net.cyberpunk042.infection.VirusDifficulty;
 import net.cyberpunk042.infection.VirusInfectionSystem;
 import net.cyberpunk042.infection.VirusInventoryAnnouncements;
@@ -14,6 +16,10 @@ import net.cyberpunk042.network.DifficultySyncPayload;
 import net.cyberpunk042.network.PurificationTotemSelectPayload;
 import net.cyberpunk042.network.ShieldFieldRemovePayload;
 import net.cyberpunk042.network.ShieldFieldSpawnPayload;
+import net.cyberpunk042.network.SingularityBorderPayload;
+import net.cyberpunk042.network.SingularityVisualStartPayload;
+import net.cyberpunk042.network.SingularityVisualStopPayload;
+import net.cyberpunk042.network.SingularitySchedulePayload;
 import net.cyberpunk042.network.SkyTintPayload;
 import net.cyberpunk042.network.VirusDifficultySelectPayload;
 import net.cyberpunk042.network.VoidTearBurstPayload;
@@ -23,6 +29,7 @@ import net.cyberpunk042.registry.ModBlocks;
 import net.cyberpunk042.registry.ModEntities;
 import net.cyberpunk042.registry.ModItemGroups;
 import net.cyberpunk042.registry.ModItems;
+import net.cyberpunk042.registry.ModStatusEffects;
 import net.cyberpunk042.screen.ModScreenHandlers;
 import net.cyberpunk042.screen.handler.PurificationTotemScreenHandler;
 import net.cyberpunk042.screen.handler.VirusDifficultyScreenHandler;
@@ -50,6 +57,7 @@ public class TheVirusBlock implements ModInitializer {
 	public static final Identifier SKY_TINT_PACKET = Identifier.of(MOD_ID, "sky_tint");
 	public static final String CORRUPTION_PROJECTILE_TAG = MOD_ID + ".corruption_projectile";
 	public static final String CORRUPTION_EXPLOSIVE_TAG = MOD_ID + ".corruption_explosive";
+	public static final String VIRUS_DEFENSE_BEAM_TAG = MOD_ID + ".virus_defense_beam";
 	private static final String STARTER_TAG = MOD_ID + ".starter_kit";
 	private static final String STARTER_TOTEM_TAG = MOD_ID + ".starter_totem";
 	public static final Identifier DIFFICULTY_SYNC_PACKET = Identifier.of(MOD_ID, "difficulty_sync");
@@ -58,6 +66,10 @@ public class TheVirusBlock implements ModInitializer {
 	public static final Identifier VOID_TEAR_BURST_PACKET = Identifier.of(MOD_ID, "void_tear_burst");
 	public static final Identifier SHIELD_FIELD_SPAWN_PACKET = Identifier.of(MOD_ID, "shield_field_spawn");
 	public static final Identifier SHIELD_FIELD_REMOVE_PACKET = Identifier.of(MOD_ID, "shield_field_remove");
+	public static final Identifier SINGULARITY_VISUAL_START_PACKET = Identifier.of(MOD_ID, "singularity_visual_start");
+	public static final Identifier SINGULARITY_VISUAL_STOP_PACKET = Identifier.of(MOD_ID, "singularity_visual_stop");
+	public static final Identifier SINGULARITY_BORDER_PACKET = Identifier.of(MOD_ID, "singularity_border");
+	public static final Identifier SINGULARITY_SCHEDULE_PACKET = Identifier.of(MOD_ID, "singularity_schedule");
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_BLOCK_TELEPORT_ENABLED =
 			GameRuleRegistry.register("virusBlockTeleportEnabled", GameRules.Category.MISC, GameRuleFactory.createBooleanRule(true));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_BLOCK_TELEPORT_RADIUS =
@@ -173,21 +185,34 @@ public class TheVirusBlock implements ModInitializer {
 			GameRuleRegistry.register("virusAllowFastFlight", GameRules.Category.PLAYER, GameRuleFactory.createBooleanRule(true));
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_VERBOSE_INVENTORY_ALERTS =
 			GameRuleRegistry.register("virusVerboseInventoryAlerts", GameRules.Category.CHAT, GameRuleFactory.createBooleanRule(true));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_SINGULARITY_ALLOW_CHUNK_GENERATION =
+			GameRuleRegistry.register("virusSingularityAllowChunkGeneration", GameRules.Category.MISC, GameRuleFactory.createBooleanRule(false));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_SINGULARITY_ALLOW_OUTSIDE_BORDER_LOAD =
+			GameRuleRegistry.register("virusSingularityAllowOutsideBorderLoad", GameRules.Category.MISC, GameRuleFactory.createBooleanRule(false));
+	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_SINGULARITY_COLLAPSE_ENABLED =
+			GameRuleRegistry.register("virusSingularityCollapseEnabled", GameRules.Category.MISC, GameRuleFactory.createBooleanRule(true));
 
 	@Override
 	public void onInitialize() {
+		ModConfigBootstrap.prepareCommon();
+		InfectionConfigRegistry.loadCommon();
 		PayloadTypeRegistry.playS2C().register(SkyTintPayload.ID, SkyTintPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(DifficultySyncPayload.ID, DifficultySyncPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(VoidTearSpawnPayload.ID, VoidTearSpawnPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(VoidTearBurstPayload.ID, VoidTearBurstPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(ShieldFieldSpawnPayload.ID, ShieldFieldSpawnPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(ShieldFieldRemovePayload.ID, ShieldFieldRemovePayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(SingularityVisualStartPayload.ID, SingularityVisualStartPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(SingularityVisualStopPayload.ID, SingularityVisualStopPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(SingularityBorderPayload.ID, SingularityBorderPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(SingularitySchedulePayload.ID, SingularitySchedulePayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(PurificationTotemSelectPayload.ID, PurificationTotemSelectPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(VirusDifficultySelectPayload.ID, VirusDifficultySelectPayload.CODEC);
 		ModBlocks.bootstrap();
 		ModItems.bootstrap();
 		ModBlockEntities.bootstrap();
 		ModEntities.bootstrap();
+		ModStatusEffects.bootstrap();
 		ModItemGroups.bootstrap();
 		ModScreenHandlers.bootstrap();
 		VirusDebugCommands.register();
@@ -262,6 +287,7 @@ public class TheVirusBlock implements ModInitializer {
 		VirusWorldState state = VirusWorldState.get(world);
 		warnIfInfected(player, state);
 		state.sendShieldSnapshots(player);
+		state.syncProfileOnJoin(player);
 		grantStarterKit(player);
 		ensureFastFlight(player);
 		maybePromptDifficulty(player);

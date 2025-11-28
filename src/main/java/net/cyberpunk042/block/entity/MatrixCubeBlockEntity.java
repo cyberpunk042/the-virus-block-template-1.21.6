@@ -103,6 +103,10 @@ public class MatrixCubeBlockEntity extends BlockEntity {
 		ActiveTracker.unregister(world, id);
 	}
 
+	public static void trimActive(ServerWorld world, int limit) {
+		ActiveTracker.trim(world, limit);
+	}
+
 	public static final class ActiveTracker {
 		private ActiveTracker() {
 		}
@@ -132,6 +136,33 @@ public class MatrixCubeBlockEntity extends BlockEntity {
 			}
 			prune(world, ids);
 			return ids.size();
+		}
+
+		public static void trim(ServerWorld world, int limit) {
+			if (limit < 0) {
+				limit = 0;
+			}
+			Set<UUID> ids = ACTIVE.get(world);
+			if (ids == null) {
+				return;
+			}
+			prune(world, ids);
+			if (ids.size() <= limit) {
+				return;
+			}
+			Iterator<UUID> iterator = ids.iterator();
+			while (ids.size() > limit && iterator.hasNext()) {
+				UUID id = iterator.next();
+				iterator.remove();
+				ConcurrentHashMap<UUID, BlockPos> positions = ACTIVE_POSITIONS.get(world);
+				if (positions != null) {
+					positions.remove(id);
+				}
+				Entity entity = world.getEntity(id);
+				if (entity != null) {
+					entity.discard();
+				}
+			}
 		}
 
 		private static void prune(ServerWorld world, Set<UUID> ids) {

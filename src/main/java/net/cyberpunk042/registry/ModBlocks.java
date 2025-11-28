@@ -9,6 +9,7 @@ import net.cyberpunk042.block.InfectedGrassBlock;
 import net.cyberpunk042.block.InfectiousCubeBlock;
 import net.cyberpunk042.block.CuredInfectiousCubeBlock;
 import net.cyberpunk042.block.MatrixCubeBlock;
+import net.cyberpunk042.block.SingularityBlock;
 import net.cyberpunk042.block.VirusBlock;
 import net.cyberpunk042.block.corrupted.CorruptedCryingObsidianBlock;
 import net.cyberpunk042.block.corrupted.CorruptedDiamondBlock;
@@ -43,6 +44,16 @@ public final class ModBlocks {
 					.requiresTool()
 					.luminance(state -> 6)
 					.strength(5.0F, 2000.0F));
+
+	public static final SingularityBlock SINGULARITY_BLOCK = register("singularity_block", SingularityBlock::new,
+			AbstractBlock.Settings.create()
+					.mapColor(MapColor.DARK_RED)
+					.requiresTool()
+					.nonOpaque()
+					.luminance(state -> 15)
+					.sounds(BlockSoundGroup.AMETHYST_BLOCK)
+					.dropsNothing()
+					.strength(1200.0F, 3600000.0F));
 
 	public static final CorruptedStoneBlock CORRUPTED_STONE = register("corrupted_stone", CorruptedStoneBlock::new,
 			AbstractBlock.Settings.create()

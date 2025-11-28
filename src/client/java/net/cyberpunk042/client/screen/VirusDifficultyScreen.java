@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import net.cyberpunk042.client.state.VirusDifficultyClientState;
+import net.cyberpunk042.config.ColorConfig;
+import net.cyberpunk042.config.ColorConfig.ColorSlot;
 import net.cyberpunk042.infection.VirusDifficulty;
 import net.cyberpunk042.network.VirusDifficultySelectPayload;
 import net.cyberpunk042.screen.handler.VirusDifficultyScreenHandler;
@@ -55,8 +57,8 @@ public class VirusDifficultyScreen extends HandledScreen<VirusDifficultyScreenHa
 
 	@Override
 	protected void drawBackground(DrawContext context, float delta, int mouseX, int mouseY) {
-		context.fill(x, y, x + backgroundWidth, y + backgroundHeight, 0xAA000000);
-		context.drawBorder(x, y, backgroundWidth, backgroundHeight, 0xFF552266);
+		context.fill(x, y, x + backgroundWidth, y + backgroundHeight, ColorConfig.argb(ColorSlot.UI_DIFFICULTY_BACKGROUND));
+		context.drawBorder(x, y, backgroundWidth, backgroundHeight, ColorConfig.argb(ColorSlot.UI_DIFFICULTY_BORDER));
 	}
 
 	@Override
@@ -76,8 +78,9 @@ public class VirusDifficultyScreen extends HandledScreen<VirusDifficultyScreenHa
 		super.drawForeground(context, mouseX, mouseY);
 		int centerX = backgroundWidth / 2;
 		int warningY = backgroundHeight - 32;
-		context.drawCenteredTextWithShadow(textRenderer, warningLine1, centerX, warningY, 0xFFCC5555);
-		context.drawCenteredTextWithShadow(textRenderer, warningLine2, centerX, warningY + 12, 0xFFCC5555);
+		int warningColor = ColorConfig.argb(ColorSlot.UI_WARNING_TEXT);
+		context.drawCenteredTextWithShadow(textRenderer, warningLine1, centerX, warningY, warningColor);
+		context.drawCenteredTextWithShadow(textRenderer, warningLine2, centerX, warningY + 12, warningColor);
 	}
 
 	private class DifficultyButton extends PressableWidget {
@@ -92,8 +95,14 @@ public class VirusDifficultyScreen extends HandledScreen<VirusDifficultyScreenHa
 		protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
 			boolean selected = VirusDifficultyClientState.get() == difficulty;
 			boolean hovered = isHovered();
-			int borderColor = selected ? 0xFF66FFAA : (hovered ? 0xFF8888EE : 0xFF444444);
-			int fillColor = hovered ? 0x88333366 : 0x66000000;
+			int borderColor = selected
+					? ColorConfig.argb(ColorSlot.UI_DIFFICULTY_BUTTON_BORDER_SELECTED)
+					: (hovered
+							? ColorConfig.argb(ColorSlot.UI_DIFFICULTY_BUTTON_BORDER_HOVER)
+							: ColorConfig.argb(ColorSlot.UI_DIFFICULTY_BUTTON_BORDER_IDLE));
+			int fillColor = hovered
+					? ColorConfig.argb(ColorSlot.UI_DIFFICULTY_BUTTON_FILL_HOVER)
+					: ColorConfig.argb(ColorSlot.UI_DIFFICULTY_BUTTON_FILL_IDLE);
 			context.fill(getX(), getY(), getX() + width, getY() + height, fillColor);
 			context.drawBorder(getX(), getY(), width, height, borderColor);
 			int iconSize = 32;

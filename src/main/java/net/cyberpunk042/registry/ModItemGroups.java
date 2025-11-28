@@ -18,6 +18,7 @@ public final class ModItemGroups {
 					.displayName(Text.translatable("itemGroup.the-virus-block"))
 					.entries((displayContext, entries) -> {
 						entries.add(ModBlocks.VIRUS_BLOCK);
+						entries.add(ModBlocks.SINGULARITY_BLOCK);
 						entries.add(ModBlocks.CORRUPTED_STONE);
 						entries.add(ModBlocks.CORRUPTED_GLASS);
 						entries.add(ModBlocks.CORRUPTED_DIRT);

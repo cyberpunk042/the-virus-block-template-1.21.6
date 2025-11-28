@@ -1,5 +1,6 @@
 {
   "block.the-virus-block.virus_block": "Virus Block",
+  "block.the-virus-block.singularity_block": "Singularity Block",
   "block.the-virus-block.corrupted_stone": "Corrupted Stone",
   "block.the-virus-block.corrupted_glass": "Corrupted Glass",
   "block.the-virus-block.corrupted_dirt": "Corrupted Dirt",
@@ -21,6 +22,7 @@
   "block.the-virus-block.bacteria": "Corrupted Bacteria",
   "block.the-virus-block.infected_grass": "Infected Grass",
   "item.the-virus-block.virus_block": "Virus Block",
+  "item.the-virus-block.singularity_block": "Singularity Block",
   "item.the-virus-block.corrupted_stone": "Corrupted Stone",
   "item.the-virus-block.corrupted_glass": "Corrupted Glass",
   "item.the-virus-block.corrupted_dirt": "Corrupted Dirt",
@@ -70,6 +72,13 @@
   "message.the-virus-block.teleport": "The Virus Block shifts to a new location!",
   "message.the-virus-block.shells_collapsed": "The Virus Block shells collapse and cannot reform!",
   "message.the-virus-block.shells_reforming": "[Virus Alert] Cocoon shells are reforming!",
+  "message.the-virus-block.singularity_warning": "[Virus Alert] Total Collapse in 60 seconds!",
+  "message.the-virus-block.singularity_collapse": "[Virus Alert] Total Collapse has begun!",
+  "message.the-virus-block.singularity_core": "[Virus Alert] Singularity core is igniting!",
+  "message.the-virus-block.singularity_dissipated": "[Virus Alert] Singularity has dissipated. World resetting...",
+	"message.the-virus-block.singularity_detonated": "[Virus Alert] Singularity detonated; collapse disabled by operators.",
+  "message.the-virus-block.singularity_forced": "[Debug] Singularity sequence forced by operator.",
+  "message.the-virus-block.singularity_aborted": "[Debug] Singularity sequence aborted by operator.",
   "message.the-virus-block.purification.no_boobytraps": "Trap placements disabled. Worm activity will plummet.",
   "message.the-virus-block.purification.no_shell": "Shell defenses collapse around the Virus Block!",
   "message.the-virus-block.purification.max_hp": "Containment clamps down, slashing the Virus Block's max health.",
@@ -115,12 +124,16 @@
   "command.the-virus-block.stats.final_wave_eta": "Final wave ETA: %s",
   "command.the-virus-block.stats.final_wave_now": "The final wave is underway!",
   "command.the-virus-block.stats.chunks_alive": "Tracked corrupted chunks: %s",
-  "command.the-virus-block.stats.singularity_eta": "Singularity warning in %s",
-  "command.the-virus-block.stats.singularity_now": "Singularity warning active!",
+  "command.the-virus-block.stats.singularity_dormant": "Singularity state: Dormant",
+  "command.the-virus-block.stats.singularity_fusing": "Singularity fusing: %s remaining",
+  "command.the-virus-block.stats.singularity_collapse": "Singularity state: Collapse in progress",
   "bossbar.the-virus-block.tier": "Tier %s \u2013 %s",
   "bossbar.the-virus-block.state.calm": "Dormant",
   "bossbar.the-virus-block.state.active": "Active",
   "bossbar.the-virus-block.vulnerable": "Virus Block Vulnerable",
+  "bossbar.the-virus-block.singularity.fuse": "Singularity Fuse",
+  "bossbar.the-virus-block.singularity.collapse": "Singularity Collapse",
+  "bossbar.the-virus-block.singularity.collapse_priming": "Singularity Collapse (Priming)",
 
   "difficulty.the-virus-block.easy.name": "Easy",
   "difficulty.the-virus-block.easy.desc": "The infection crawls. Shells stay gentle and the Bleed option is available.",
@@ -132,6 +145,7 @@
   "difficulty.the-virus-block.extreme.desc": "Aggressive spread and max-health drained each tier.",
 
   "entity.the-virus-block.corrupted_passive": "Corrupted Husk",
-  "entity.the-virus-block.corrupted_worm": "Bitey Worm"
+  "entity.the-virus-block.corrupted_worm": "Bitey Worm",
+  "effect.the-virus-block.personal_shield": "Personal Shield"
 }
 

@@ -1,0 +1,100 @@
+{
+  "radius": 13.5,
+  "mesh": {
+    "lat_steps": 120,
+    "lon_steps": 220,
+    "swirl_strength": 0.0,
+    "layers": {
+      "wedge": {
+        "mesh_type": "solid",
+        "lat_steps": 120,
+        "lon_steps": 220,
+        "lat_start": 0.05,
+        "lat_end": 0.95,
+        "lon_start": 0.0,
+        "lon_end": 0.125,
+        "radius_multiplier": 1.02,
+        "alpha": {
+          "min": 0.4,
+          "max": 0.85
+        },
+        "colors": {
+          "primary": "#FFFFFFFF",
+          "secondary": "#FF67E9FF"
+        }
+      },
+      "mirror": {
+        "mesh_type": "solid",
+        "lat_steps": 120,
+        "lon_steps": 220,
+        "lat_start": 0.05,
+        "lat_end": 0.95,
+        "lon_start": 0.5,
+        "lon_end": 0.625,
+        "radius_multiplier": 1.02,
+        "alpha": {
+          "min": 0.4,
+          "max": 0.85
+        },
+        "colors": {
+          "primary": "#FFFFFFFF",
+          "secondary": "#FF67E9FF"
+        }
+      },
+      "edge": {
+        "mesh_type": "wireframe",
+        "lat_steps": 32,
+        "lon_steps": 64,
+        "lon_start": 0.0,
+        "lon_end": 0.125,
+        "radius_multiplier": 1.08,
+        "wire_thickness": 0.08,
+        "alpha": {
+          "min": 0.3,
+          "max": 0.6
+        },
+        "colors": {
+          "primary": "#FF16202D",
+          "secondary": "#FF5CF0FF"
+        }
+      },
+      "mirror_edge": {
+        "mesh_type": "wireframe",
+        "lat_steps": 32,
+        "lon_steps": 64,
+        "lon_start": 0.5,
+        "lon_end": 0.625,
+        "radius_multiplier": 1.08,
+        "wire_thickness": 0.08,
+        "alpha": {
+          "min": 0.3,
+          "max": 0.6
+        },
+        "colors": {
+          "primary": "#FF16202D",
+          "secondary": "#FF5CF0FF"
+        }
+      }
+    }
+  },
+  "animation": {
+    "scale": 0.26,
+    "spin_speed": 0.008,
+    "tilt": 0.0
+  },
+  "color": {
+    "primary": "#FFFFFFFF",
+    "secondary": "#FF67E9FF"
+  },
+  "alpha": {
+    "min": 0.4,
+    "max": 0.9
+  },
+  "beam": {
+    "enabled": false,
+    "inner_radius": 0.04,
+    "outer_radius": 0.07,
+    "color": "#FFFFFFFF"
+  }
+}
+

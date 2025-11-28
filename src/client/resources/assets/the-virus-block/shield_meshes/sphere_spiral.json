@@ -1,0 +1,24 @@
+{
+  "mesh_type": "solid",
+  "lat_steps": 88,
+  "lon_steps": 300,
+  "lat_start": 0.0,
+  "lat_end": 1.0,
+  "lon_start": 0.0,
+  "lon_end": 1.0,
+  "radius_multiplier": 1.08,
+  "swirl_strength": 1.2,
+  "phase_offset": 0.25,
+  "alpha": {
+    "min": 0.55,
+    "max": 0.96
+  },
+  "colors": {
+    "primary": "#FFF0F7FF",
+    "secondary": "#FFBA74FF"
+  },
+  "band_count": 0,
+  "band_thickness": 0.2,
+  "wire_thickness": 0.05
+}
+

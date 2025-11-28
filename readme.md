@@ -72,17 +72,33 @@ The Virus spreads through **five escalating tiers**:
 - Corrupted TNT now rolls volatile results (1/3 dud, 1/3 normal, 1/3 1.5× blast) to keep finales unpredictable  
 - Bonus hostile mob spawns spike to their highest density thanks to tier-aware scaling  
 - A guardian-beam shock field forms around every cocoon during the first half of Tier 5, repeatedly shoving intruders backward  
-- Once the tier bar fills, **Apocalypse Mode** begins with a sonic blast that yeets anyone camping the Virus Block.
+- Once the tier bar fills, the Virus enters **Apocalypse Mode** and begins charging the Singularity.
 
-### 🔻 Apocalypse Mode (Post-Tier 5)
+### 🔻 Apocalypse Mode & Singularity
 
-Once the Tier 5 progress bar finishes, every Virus Block sheds its shells, the bossbar switches to a red health readout, and the corruption enters its terminal phase:
+After the last Tier 5 assault, the finale unfolds as a choreographed disaster:
 
-- The Virus Block becomes fully vulnerable; melee hits, arrows, TNT, and Purification option 4 all drain its health.
+1. **Fusing Countdown (30 seconds)**  
+   - Bossbar switches to a purple “Total Collapse” warning.  
+   - Virus Blocks crackle and flash white with the actual TNT fuse effect (we spawn a non-exploding primed TNT entity for the fuse animation), guardian beams intensify, and at T−15 s any remaining cocoon shell forcibly collapses.
+2. **Singularity Beam + Reverse Collapse**  
+   - A dark red (rainbow-tinted) beam punches from bedrock to build height.  
+   - Chunk shells are queued from the horizon inward; every few ticks another batch implodes (alternating bottom→top vs top→bottom) while a sculk/portal veil and Warden booms sweep across the skyline.
+3. **Core Ignition (“Big Bang”)**  
+   - Once only the Virus chunk remains, the block transforms into a Singularity core, unleashes the largest explosion in the mod, and launches debris outward.
+4. **Orbital Ring Formation**  
+   - Debris coalesces into a luminous ring circling the blast site; multiple columns are shredded every tick and a gravitational wind (`pullEntitiesTowardRing`) drags players/items toward the luminous halo so the spectacle never pauses.
+5. **Dissipation & World Reset**  
+   - Reverse-portal surges draw the ring inward, swallow lingering debris, and the infection forcibly resets (virus sources removed, starter Virus Block returned to players).
+
+> **References:**  
+> 1. `VirusWorldState.tickSingularity()` – drives the countdown, shell collapse, collapse sweep, core ignition, ring, and cleanup.  
+> 2. `docs/singularity-plan.md` – design document outlining every phase.  
+> 3. `VirusStatsCommand` – exposes remaining time and current Singularity state via `/virusstats`.  
+> 4. `VirusCommand` – provides `/virusblock singularity start|abort|status` for admin/debug playback.
+
 - Purification option 3 still halves the block’s max health, shortening the fight without rewinding progress.
-- The calm/progress bossbar is hidden; only the red health bar remains while vulnerable.
-- When Virus HP reaches zero *or* you finish mining the exposed block, the infection is cleansed and the world begins to recover.
-- (Future roadmap: a Singularity-style fail-safe may return later if players ignore Apocalypse Mode for too long, but it is currently disabled.)
+- When the Singularity finishes dissipating, you spawn with the Virus Block again (starter kit) and the world has been cleansed.
 
 ---
 
@@ -213,6 +229,15 @@ This is a “progressive chaos” mod designed for content creation and challeng
 
 ---
 
+## 🛠️ Development & Testing Roadmap
+
+- The ongoing `VirusWorldState` refactor, architecture diagrams, and milestone breakdowns live in `docs/architecture_readme.md`. Check it whenever you need to understand which systems are being extracted next (Scenario Registry, controllers, planners, effect bus, etc.).
+- `docs/virusworld_state_refactor.md` captures the Strategy/Builder/Observer patterns behind that roadmap and is the canonical blueprint referenced by engineering discussions.
+- Automated tests will land later in the roadmap; for now, **Jean runs manual QA playtests at each milestone** (controller extraction, planner service, engine integration, etc.) and records the results alongside release notes.
+- If you are contributing code, add your scenario/feature notes to the architecture doc so the manual testing checklist stays accurate.
+
+---
+
 ## 🧪 Debug / Admin Commands
 
 - `/virusstats` – Quick diagnostics (time since mod start, infection uptime, ETA to final wave).  
@@ -272,6 +297,80 @@ Most tuning happens through gamerules. Here are the high-impact ones (defaults i
 | `virusMatrixCubeMaxActive` | `200` | Cap on simultaneous Matrix Cubes raining from the sky. |
 | `virusBoobytrapsEnabled` | `true` | Controls spontaneous boobytrap placement/explosions. |
 | `virusWormsEnabled` | `true` | Allows corrupted dirt/boobytraps to spawn corrupted worms. |
+| `virusSingularityAllowChunkGeneration` | `false` | Runtime switch; actual default comes from `config/the-virus-block/singularity.json`. Only when both the config and this gamerule are `true` will the collapse generate/load missing chunks. |
+| `virusSingularityAllowOutsideBorderLoad` | `false` | Runtime switch; combined with the config, it determines whether chunks outside the active border can be touched. |
+| `virusSingularityCollapseEnabled` | `true` | Live override for the collapse itself; both this gamerule and the config flag must remain `true` for the singularity collapse to progress. |
+
+> **Server Config:** `config/the-virus-block/singularity.json` defines the hard defaults for chunk generation/outside-border loading, telemetry, and fluid draining so servers can lock behaviour before the world even starts. The gamerules above simply mirror those values at runtime.
+
+### Singularity Config (`config/the-virus-block/singularity.json`)
+
+```jsonc
+{
+  "allowChunkGeneration": false,
+  "allowOutsideBorderLoad": false,
+  "debugLogging": true,
+  "drainWaterAhead": true,
+  "waterDrainOffset": 5,
+  "multithreadCollapse": false,
+  "respectProtectedBlocks": true,
+  "collapseMode": "ring_slice",
+  "collapseParticles": false,
+  "fillMode": "air",
+  "collapseWorkerCount": 4,
+  "collapseTickDelay": 1,
+  "collapseEnabled": true,
+  "fuseExplosionDelayTicks": 400,
+  "fuseAnimationDelayTicks": 20,
+  "fusePulseInterval": 8,
+  "collapseViewDistance": 0,
+  "collapseSimulationDistance": 0,
+  "collapseBroadcastMode": "immediate",
+  "collapseBroadcastRadius": 96,
+  "chunkPreGenEnabled": true,
+  "chunkPreGenRadiusBlocks": 0,
+  "chunkPreGenChunksPerTick": 128,
+  "chunkPreloadEnabled": true,
+  "chunkPreloadChunksPerTick": 64,
+  "radiusDelays": [
+    { "side": 1, "ticks": 1 },
+    { "side": 3, "ticks": 1 },
+    { "side": 5, "ticks": 2 },
+    { "side": 9, "ticks": 4 },
+    { "side": 21, "ticks": 8 }
+  ],
+  "barrierStartRadius": 192.0,
+  "barrierEndRadius": 0.5,
+  "barrierInterpolationTicks": 600
+}
+```
+
+- `allowChunkGeneration` / `allowOutsideBorderLoad` guard the chunk manager mixins; if either is `false`, the collapse skips new terrain regardless of gamerules.
+- `debugLogging` enables per-tick collapse summaries (columns processed, skips, water cells cleared) to make troubleshooting easy.
+- `drainWaterAhead` / `waterDrainOffset` control the proactive fluid pass that clears water/lava a few blocks ahead of the erosion front so oceans don’t explode into waterfalls mid-collapse.
+- `multithreadCollapse` toggles the collapse worker scheduler. When enabled, slices are processed on background threads sized according to `collapseWorkerCount` (rounded to multiples of four so you can request 4/8/12 on a 12-core machine).
+- `respectProtectedBlocks` keeps bedrock/negative-hardness blocks intact even during chunk wipes; turn it off for pure obliteration.
+- `collapseMode` selects between the two modern destruction paths: `"ring_slice"` (outer shell in 16 passes) and `"ring_slice_chunk"` (full chunk vaporization).
+- `collapseParticles` gates the ash/sound spam for each cleared block; leave it `false` when profiling.
+- `fillMode` picks the `/fill` behavior used by the collapse: `"air"` replaces blocks directly, `"destroy"` mimics `/fill … destroy` (breaks blocks, spawns drops).
+- `fillShape` decides how each chunk is iterated while it is being hollowed out. `"matrix"` (default) sweeps in XYZ order, while `"column"`, `"row"`, `"vector"`, and `"outline"` bias the carve for specific visuals or performance profiles.
+- `useNativeFill` lets you toggle between the high-speed direct block replacement path (`false`) and a vanilla-style fill (`true`) that fires block updates and respects drops at the cost of extra TPS.
+- `collapseWorkerCount` is ignored until `multithreadCollapse` is `true`, but once threading is on we reduce the value to the nearest multiple of four and clamp it to `availableCores - 1`.
+- `collapseTickDelay` is the per-batch cooldown in ticks; raising it slows the collapse cadence without touching throughput math.
+- `collapseEnabled` is the master kill-switch: when `false`, fusing still detonates after its timer but no singularity block is spawned and no terrain is chewed away. The gamerule `virusSingularityCollapseEnabled` can override this live without reopening the config.
+- `fuseExplosionDelayTicks` controls how long (in ticks) the fuse counts down once Tier 5 ends. `fuseAnimationDelayTicks` determines how long into the fuse the shell collapse animation triggers. `fusePulseInterval` is the base time between fuse pulses (smaller numbers = more frequent).
+- `collapseViewDistance` / `collapseSimulationDistance` optionally override the vanilla player-manager distances during the collapse (set each to `0` to leave vanilla behaviour). The overrides are logged on the `singularity` channel and automatically restored once the event finishes.
+- `collapseBroadcastMode` / `collapseBroadcastRadius` control how aggressively we stream collapse block updates to clients. `immediate` mirrors vanilla; `delayed`/`summary` skip packets for chunks farther than the configured radius (in blocks) and replay them later when a player gets close (`summary` also logs a short digest).
+- `radiusDelays` now define the tick cooldown for rings at or below the listed side length so you can slow the final rings without editing code.
+- `chunkPreGenRadiusBlocks` accepts `0` to inherit `barrierStartRadius`. Use the other chunk fields to tune (or disable) the pre-generation/preload cadence.
+- `barrierStartRadius` determines how far out the protective border spawns (and therefore how far we preload/pregenerate).
+- `barrierEndRadius` clamps how tight the border shrinks by the finale.
+- `barrierInterpolationTicks` feeds directly into the border interpolation so you can speed up or slow down the shrink animation.
+
+#### Collapse Sync Commands
+
+Use `/virusblock singularity viewdistance <chunks>` or `/virusblock singularity simulationdistance <chunks>` to update the overrides at runtime (set `0` to disable). The commands simply persist the values back into `singularity.json`; the overrides are applied the moment a collapse arms and are restored automatically afterward.  
+Use `/virusblock singularity broadcast mode <immediate|delayed|summary>` and `/virusblock singularity broadcast radius <blocks>` to switch the collapse broadcast profile without editing the config.
 
 ### Example Preset (`configs/virus_contained.mcfunction`)
 

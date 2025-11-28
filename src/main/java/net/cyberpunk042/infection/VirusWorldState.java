@@ -1,6 +1,9 @@
 package net.cyberpunk042.infection;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Deque;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -10,44 +13,68 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Locale;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.longs.LongIterator;
 import net.cyberpunk042.TheVirusBlock;
+import net.cyberpunk042.config.InfectionLogConfig.LogChannel;
+import net.cyberpunk042.config.SingularityConfig;
+import net.cyberpunk042.infection.singularity.ColumnWorkResult;
+import net.cyberpunk042.infection.singularity.SingularityChunkContext;
+import net.cyberpunk042.infection.singularity.BulkFillHelper;
+import net.cyberpunk042.infection.singularity.SingularityRingSlices;
+import net.cyberpunk042.infection.singularity.SingularityCollapseScheduler;
 import net.cyberpunk042.block.corrupted.CorruptedGlassBlock;
 import net.cyberpunk042.block.corrupted.CorruptedStoneBlock;
 import net.cyberpunk042.block.corrupted.CorruptionStage;
 import net.cyberpunk042.block.entity.MatrixCubeBlockEntity;
+import net.cyberpunk042.block.entity.SingularityBlockEntity;
+import net.cyberpunk042.entity.BlackholePearlEntity;
 import net.cyberpunk042.entity.CorruptedTntEntity;
 import net.cyberpunk042.entity.FallingMatrixCubeEntity;
+import net.cyberpunk042.entity.VirusFuseEntity;
 import net.cyberpunk042.infection.mutation.BlockMutationHelper;
+import net.cyberpunk042.infection.singularity.SingularityDestructionEngine;
 import net.cyberpunk042.mixin.GuardianEntityAccessor;
 import net.cyberpunk042.network.DifficultySyncPayload;
 import net.cyberpunk042.network.VoidTearBurstPayload;
+import net.minecraft.block.LightBlock;
 import net.cyberpunk042.network.VoidTearSpawnPayload;
 import net.cyberpunk042.network.ShieldFieldSpawnPayload;
 import net.cyberpunk042.network.ShieldFieldRemovePayload;
+import net.cyberpunk042.network.SingularityBorderPayload;
+import net.cyberpunk042.network.SingularitySchedulePayload;
 import net.cyberpunk042.registry.ModBlocks;
+import net.cyberpunk042.util.InfectionLog;
 import net.cyberpunk042.util.VirusEquipmentHelper;
 import net.cyberpunk042.util.VirusMobAllyHelper;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.datafixer.DataFixTypes;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityStatuses;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.FallingBlockEntity;
+import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.SpawnReason;
 import net.minecraft.entity.attribute.EntityAttributeInstance;
@@ -66,15 +93,21 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.ArrowEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.particle.BlockStateParticleEffect;
+import net.minecraft.particle.DustColorTransitionParticleEffect;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.particle.ParticleTypes;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.PlayerManager;
+import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.server.world.ServerChunkManager;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.math.BlockBox;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.ChunkPos;
@@ -88,6 +121,9 @@ import net.minecraft.world.PersistentState;
 import net.minecraft.world.PersistentStateType;
 import net.minecraft.world.World.ExplosionSourceType;
 import net.minecraft.world.WorldEvents;
+import net.minecraft.world.chunk.Chunk;
+import net.minecraft.world.chunk.ChunkStatus;
+import net.minecraft.world.border.WorldBorder;
 import org.jetbrains.annotations.Nullable;
 
 public class VirusWorldState extends PersistentState {
@@ -112,7 +148,7 @@ private static final Codec<SpreadSnapshot> SPREAD_CODEC = RecordCodecBuilder.cre
 			Codec.LONG.listOf().fieldOf("pillarChunks").forGetter(SpreadSnapshot::pillars),
 			BlockPos.CODEC.listOf().fieldOf("virusSources").forGetter(SpreadSnapshot::sources)
 	).apply(instance, SpreadSnapshot::new));
-private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+	private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(instance -> instance.group(
 			Codec.BOOL.optionalFieldOf("infected", false).forGetter(state -> state.infected),
 			Codec.BOOL.optionalFieldOf("dormant", false).forGetter(state -> state.dormant),
 			Codec.INT.optionalFieldOf("tierIndex", 0).forGetter(state -> state.tierIndex),
@@ -120,16 +156,21 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 			Codec.LONG.optionalFieldOf("ticksInTier", 0L).forGetter(state -> state.ticksInTier),
 			Codec.INT.optionalFieldOf("containmentLevel", 0).forGetter(state -> state.containmentLevel),
 			Codec.INT.optionalFieldOf("stateFlags", 0).forGetter(VirusWorldState::encodeFlags),
-			Codec.DOUBLE.optionalFieldOf("healthScale", 1.0D).forGetter(state -> state.healthScale),
-			Codec.DOUBLE.optionalFieldOf("currentHealth", 0.0D).forGetter(state -> state.currentHealth),
+			HealthSnapshot.CODEC.optionalFieldOf("health", HealthSnapshot.DEFAULT).forGetter(HealthSnapshot::of),
 			Codec.STRING.optionalFieldOf("difficulty", VirusDifficulty.HARD.getId()).forGetter(state -> state.difficulty.getId()),
 			Codec.BOOL.optionalFieldOf("difficultyPromptShown", false).forGetter(state -> state.difficultyPromptShown),
 			BOOBYTRAP_CODEC.optionalFieldOf("boobytrapDefaults").forGetter(VirusWorldState::getBoobytrapDefaultsRecord),
 			SPREAD_CODEC.optionalFieldOf("spreadData").forGetter(state -> state.getSpreadSnapshot()),
 			Codec.unboundedMap(VirusEventType.CODEC, Codec.LONG).optionalFieldOf("eventHistory", Map.of()).forGetter(VirusWorldState::getEventHistorySnapshot),
 			Codec.LONG.optionalFieldOf("lastMatrixCubeTick", 0L).forGetter(state -> state.lastMatrixCubeTick),
-			SHIELD_FIELD_CODEC.listOf().optionalFieldOf("shieldFields", List.of()).forGetter(VirusWorldState::getShieldFieldsSnapshot)
-	).apply(instance, (infected, dormant, tierIndex, totalTicks, ticksInTier, containmentLevel, stateFlags, healthScale, currentHealth, difficultyId, difficultyPromptShown, boobytrapDefaults, spreadData, events, lastMatrixCubeTick, shields) -> {
+			Codec.unboundedMap(Codec.STRING, Codec.STRING).optionalFieldOf("singularityProfiles", Map.of()).forGetter(VirusWorldState::getProfileSnapshot),
+			instance.group(
+					SHIELD_FIELD_CODEC.listOf().optionalFieldOf("shieldFields", List.of()).forGetter(VirusWorldState::getShieldFieldsSnapshot),
+					SingularitySnapshot.CODEC.optionalFieldOf("singularity").forGetter(VirusWorldState::getSingularitySnapshot),
+					Codec.BOOL.optionalFieldOf("singularityPreGenComplete", false).forGetter(state -> state.singularityPreGenComplete),
+					Codec.INT.optionalFieldOf("singularityPreGenMissing", 0).forGetter(state -> state.singularityPreGenMissingChunks)
+			).apply(instance, SingularityPersistenceTail::new)
+	).apply(instance, (infected, dormant, tierIndex, totalTicks, ticksInTier, containmentLevel, stateFlags, healthSnapshot, difficultyId, difficultyPromptShown, boobytrapDefaults, spreadData, events, lastMatrixCubeTick, profileMap, persistenceTail) -> {
 		VirusWorldState state = new VirusWorldState();
 		state.infected = infected;
 		state.dormant = dormant;
@@ -141,8 +182,8 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 		state.terrainCorrupted = (stateFlags & FLAG_TERRAIN) != 0;
 		state.shellsCollapsed = (stateFlags & FLAG_SHELLS) != 0;
 		state.cleansingActive = (stateFlags & FLAG_CLEANSING) != 0;
-		state.healthScale = healthScale;
-		state.currentHealth = currentHealth;
+		state.healthScale = healthSnapshot.scale();
+		state.currentHealth = healthSnapshot.current();
 		state.difficulty = VirusDifficulty.fromId(difficultyId);
 		state.difficultyPromptShown = difficultyPromptShown;
 		boobytrapDefaults.ifPresent(def -> {
@@ -157,9 +198,13 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 		});
 		state.eventHistory.putAll(events);
 		state.lastMatrixCubeTick = lastMatrixCubeTick;
-		shields.forEach(field -> state.activeShields.put(field.id(), field));
+		state.applyProfileSnapshot(profileMap);
+		persistenceTail.shields().forEach(field -> state.activeShields.put(field.id(), field));
 		state.shellRebuildPending = false;
 		state.tierFiveBarrierActive = false;
+		persistenceTail.snapshot().ifPresentOrElse(state::applySingularitySnapshot, state::clearSingularityState);
+		state.singularityPreGenComplete = persistenceTail.preGenComplete();
+		state.singularityPreGenMissingChunks = persistenceTail.preGenMissing();
 		return state;
 	}));
 	public static final PersistentStateType<VirusWorldState> TYPE = new PersistentStateType<>(ID, VirusWorldState::new, CODEC, DataFixTypes.LEVEL);
@@ -177,7 +222,94 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 	private boolean tierFiveBarrierActive;
 	private long nextTierFiveBarrierPushTick;
 	private boolean finalVulnerabilityBlastTriggered;
-	private final LongSet pillarChunks = new LongOpenHashSet();
+	private SingularityState singularityState = SingularityState.DORMANT;
+	private long singularityTicks;
+	@Nullable
+	private BlockPos singularityCenter;
+	private boolean singularityShellCollapsed;
+	private int singularityCollapseRadius;
+	private boolean singularityCollapseDescending;
+	private int singularityCollapseTotalChunks;
+	private int singularityCollapseCompletedChunks;
+	private int singularityCollapseBarDelay;
+	private int singularityCollapseCompleteHold;
+	private int singularityCollapseTickCooldown;
+	private int singularityRingTicks;
+	private long singularityFuseElapsed;
+	private int singularityPhaseDelay;
+	private int singularityFusePulseTicker;
+private boolean singularityBorderActive;
+	private boolean singularityDistanceOverrideActive;
+	private int singularityViewDistanceSnapshot = -1;
+	private int singularitySimulationDistanceSnapshot = -1;
+	private boolean singularityBorderPendingDeployment;
+	private boolean singularityBorderHasSnapshot;
+	private double singularityBorderCenterX;
+	private double singularityBorderCenterZ;
+	private double singularityBorderInitialDiameter;
+	private double singularityBorderTargetDiameter;
+	private double singularityBorderLastDiameter;
+	private int singularityBorderResetCountdown = -1;
+	private int singularityCollapseStallTicks;
+	private int singularityFuseWatchdogTicks;
+	private SingularityState singularityLastLoggedState = SingularityState.DORMANT;
+	private long singularityBorderDuration;
+	private long singularityBorderElapsed;
+	private double singularityBorderOriginalCenterX;
+	private double singularityBorderOriginalCenterZ;
+	private double singularityBorderOriginalDiameter;
+	private double singularityBorderOriginalSafeZone;
+	private double singularityBorderOriginalDamagePerBlock;
+	private int singularityBorderOriginalWarningBlocks;
+	private int singularityBorderOriginalWarningTime;
+	private final DoubleArrayList singularityRingThresholds = new DoubleArrayList();
+	private final IntArrayList singularityRingChunkCounts = new IntArrayList();
+	private final IntArrayList singularityRingRadii = new IntArrayList();
+	private List<List<ChunkPos>> singularityRingChunks = new ArrayList<>();
+	private int singularityRingIndex;
+	private int singularityRingPendingChunks;
+	private double singularityInitialBorderDiameter;
+	private double singularityFinalBorderDiameter;
+	private long singularityTotalRingTicks;
+	private long singularityRingTickAccumulator;
+	private double singularityBorderOuterRadius;
+	private double singularityBorderInnerRadius;
+	private int singularityRingActualCount;
+	private final Deque<Long> singularityChunkQueue = new ArrayDeque<>();
+	private final Deque<Long> singularityResetQueue = new ArrayDeque<>();
+	private final LongSet singularityResetProcessed = new LongOpenHashSet();
+	private int singularityResetDelay;
+	private SingularityDestructionEngine singularityDestructionEngine = SingularityDestructionEngine.create();
+	private boolean singularityDestructionDirty = true;
+	private int singularityLayersPerSlice = SINGULARITY_COLLAPSE_MIN_LAYERS_PER_SLICE;
+	private int singularityLastColumnsPerTick = -1;
+	private int singularityLastLayersPerSlice = -1;
+private Deque<Long> singularityPreloadQueue = new ArrayDeque<>();
+private boolean singularityPreloadComplete;
+private int singularityPreloadMissingChunks;
+private int singularityDebugLogCooldown = SINGULARITY_DEBUG_LOG_INTERVAL;
+	private final LongSet singularityPinnedChunks = new LongOpenHashSet();
+	private final LongSet collapseBufferedChunks = new LongOpenHashSet();
+	private final Object2ObjectOpenHashMap<UUID, SingularityConfig.CollapseSyncProfile> singularityPlayerProfiles = new Object2ObjectOpenHashMap<>();
+private final Deque<Long> singularityPreGenQueue = new ArrayDeque<>();
+private boolean singularityPreGenComplete;
+private int singularityPreGenMissingChunks;
+private int singularityPreGenTotalChunks;
+@Nullable
+private ChunkPos singularityPreGenCenter;
+private int singularityPreGenLogCooldown = SINGULARITY_PREGEN_LOG_INTERVAL;
+private int singularityPreloadLogCooldown = SINGULARITY_PRELOAD_LOG_INTERVAL;
+private int singularityRemovalLogCooldown = 20;
+	private final Map<BlockPos, UUID> activeFuseEntities = new HashMap<>();
+	@Nullable
+	private SingularityCollapseScheduler collapseScheduler;
+	@Nullable
+	private UUID blackholePearlId;
+	private static final boolean ENABLE_BLACKHOLE_PEARL = false;
+	private final Set<BlockPos> singularityGlowNodes = new HashSet<>();
+	private final Map<BlockPos, BlockState> fuseClearedBlocks = new HashMap<>();
+	private final Set<BlockPos> suppressedUnregisters = new HashSet<>();
+private final LongSet pillarChunks = new LongOpenHashSet();
 	private final List<VoidTearInstance> activeVoidTears = new ArrayList<>();
 	private final List<PendingVoidTear> pendingVoidTears = new ArrayList<>();
 	private final Map<Long, ShieldField> activeShields = new HashMap<>();
@@ -196,10 +328,395 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 	private static final double HELMET_PING_MAX_PARTICLE_DISTANCE = 32.0D;
 	private static final int TIER_FIVE_BARRIER_RADIUS = 6;
 	private static final int TIER_FIVE_BARRIER_INTERVAL = 15;
-	private static final int FINAL_VULNERABILITY_BLAST_RADIUS = 10;
-	private static final double FINAL_VULNERABILITY_BLAST_SCALE = 1.6D;
+	private static final int FINAL_VULNERABILITY_BLAST_RADIUS = 3;
+	private static final double FINAL_VULNERABILITY_BLAST_SCALE = 0.6D;
+	private static final int SINGULARITY_COLLAPSE_PARTICLE_DENSITY = 6;
+	private static final int SINGULARITY_RING_DURATION = 200;
+	private static final int SINGULARITY_CORE_CHARGE_TICKS = 80;
+	private static final int SINGULARITY_RING_START_DELAY = 40;
+	private static final int SINGULARITY_RESET_DELAY_TICKS = 160;
+private static final int SINGULARITY_COLLAPSE_MIN_COLUMNS_PER_TICK = 16;
+private static final int SINGULARITY_COLLAPSE_MAX_COLUMNS_PER_TICK = 256;
+private static final int SINGULARITY_COLLAPSE_MIN_LAYERS_PER_SLICE = 1;
+private static final double SINGULARITY_BORDER_MIN_DIAMETER = 24.0D;
+private static final double SINGULARITY_BORDER_FINAL_DIAMETER = 1.0D;
+	private static final int SINGULARITY_COLLAPSE_CHUNKS_PER_STEP = 1;
+private static final int SINGULARITY_RING_COLUMNS_PER_TICK = 64;
+private static final int SINGULARITY_PREGEN_LOG_INTERVAL = 40;
+private static final int SINGULARITY_PRELOAD_LOG_INTERVAL = 20;
+private static final int SINGULARITY_COLLAPSE_BAR_DELAY_TICKS = 60;
+private static final int SINGULARITY_COLLAPSE_COMPLETE_HOLD_TICKS = 40;
+private static final int SINGULARITY_DEBUG_LOG_INTERVAL = 40;
+	private static final BlockPos[] SINGULARITY_GLOW_OFFSETS = new BlockPos[]{
+			new BlockPos(0, 1, 0),
+			new BlockPos(0, -1, 0),
+			new BlockPos(1, 0, 0),
+			new BlockPos(-1, 0, 0),
+			new BlockPos(0, 0, 1),
+			new BlockPos(0, 0, -1)
+	};
+	private static final float BLACKHOLE_PRIMARY_SCALE = 1.2F;
+	private static final float BLACKHOLE_CORE_SCALE = 1.8F;
+	private static final double SINGULARITY_RING_PULL_RADIUS = 24.0D;
+	private static final double SINGULARITY_RING_PULL_STRENGTH = 0.35D;
+	private static final DustColorTransitionParticleEffect SINGULARITY_FUSE_GLOW =
+			new DustColorTransitionParticleEffect(0xFFFFFF, 0xFF3333, 1.1F);
 	private static final String[] COMPASS_POINTS = new String[]{"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
 
+	private static int configuredCollapseMaxRadius() {
+		return Math.max(16, (int) Math.round(SingularityConfig.barrierStartRadius()));
+	}
+
+	private static double configuredBarrierStartRadius() {
+		return SingularityConfig.barrierStartRadius();
+	}
+
+	private static double configuredBarrierEndRadius() {
+		return MathHelper.clamp(SingularityConfig.barrierEndRadius(), 0.5D, configuredBarrierStartRadius());
+	}
+
+	private static long configuredBorderDurationTicks() {
+		return Math.max(20L, SingularityConfig.barrierInterpolationTicks());
+	}
+
+	private static int configuredPregenRadiusChunks() {
+		return Math.max(0, MathHelper.ceil(configuredPreGenRadiusBlocks() / 16.0D));
+	}
+
+	private static long configuredFuseExplosionDelayTicks() {
+		return Math.max(20L, SingularityConfig.fuseExplosionDelayTicks());
+	}
+
+	private static int configuredFuseShellCollapseTicks() {
+		return Math.max(0, SingularityConfig.fuseAnimationDelayTicks());
+	}
+
+	private static int configuredFusePulseInterval() {
+		return Math.max(1, SingularityConfig.fusePulseInterval());
+	}
+
+	private static double configuredPreGenRadiusBlocks() {
+		int configured = SingularityConfig.chunkPreGenRadiusBlocks();
+		return configured > 0 ? configured : configuredBarrierStartRadius();
+	}
+
+	private static boolean configuredPreGenEnabled() {
+		return SingularityConfig.chunkPreGenEnabled();
+	}
+
+	private static boolean configuredPreloadEnabled() {
+		return SingularityConfig.chunkPreloadEnabled();
+	}
+
+	private static int configuredPreGenChunksPerTick() {
+		return Math.max(1, SingularityConfig.chunkPreGenChunksPerTick());
+	}
+
+	private static int configuredPreloadChunksPerTick() {
+		return Math.max(1, SingularityConfig.chunkPreloadChunksPerTick());
+	}
+
+	private static int configuredCollapseTickInterval() {
+		return Math.max(1, SingularityConfig.collapseTickDelay());
+	}
+
+	private void applyCollapseDistanceOverrides(ServerWorld world) {
+		int targetView = SingularityConfig.collapseViewDistance();
+		int targetSim = SingularityConfig.collapseSimulationDistance();
+		if (targetView <= 0 && targetSim <= 0) {
+			return;
+		}
+		MinecraftServer server = world.getServer();
+		PlayerManager manager = server.getPlayerManager();
+		boolean changed = false;
+		if (!singularityDistanceOverrideActive) {
+			singularityViewDistanceSnapshot = manager.getViewDistance();
+			singularitySimulationDistanceSnapshot = manager.getSimulationDistance();
+		}
+		if (targetView > 0 && manager.getViewDistance() != targetView) {
+			manager.setViewDistance(targetView);
+			changed = true;
+		}
+		if (targetSim > 0 && manager.getSimulationDistance() != targetSim) {
+			manager.setSimulationDistance(targetSim);
+			changed = true;
+		}
+		if (changed) {
+			singularityDistanceOverrideActive = true;
+			if (SingularityConfig.debugLogging()) {
+				InfectionLog.info(LogChannel.SINGULARITY,
+						"[vanillaSync] viewDistance={} (orig={}) simulationDistance={} (orig={})",
+						manager.getViewDistance(),
+						singularityViewDistanceSnapshot,
+						manager.getSimulationDistance(),
+						singularitySimulationDistanceSnapshot);
+			}
+		} else if (!singularityDistanceOverrideActive) {
+			singularityViewDistanceSnapshot = -1;
+			singularitySimulationDistanceSnapshot = -1;
+		}
+	}
+
+	private void restoreCollapseDistanceOverrides(MinecraftServer server) {
+		if (!singularityDistanceOverrideActive) {
+			return;
+		}
+		PlayerManager manager = server.getPlayerManager();
+		if (singularityViewDistanceSnapshot >= 0 && manager.getViewDistance() != singularityViewDistanceSnapshot) {
+			manager.setViewDistance(singularityViewDistanceSnapshot);
+		}
+		if (singularitySimulationDistanceSnapshot >= 0
+				&& manager.getSimulationDistance() != singularitySimulationDistanceSnapshot) {
+			manager.setSimulationDistance(singularitySimulationDistanceSnapshot);
+		}
+		if (SingularityConfig.debugLogging()) {
+			InfectionLog.info(LogChannel.SINGULARITY,
+					"[vanillaSync] restored viewDistance={} simulationDistance={}",
+					manager.getViewDistance(),
+					manager.getSimulationDistance());
+		}
+		singularityDistanceOverrideActive = false;
+		singularityViewDistanceSnapshot = -1;
+		singularitySimulationDistanceSnapshot = -1;
+	}
+
+	private Map<String, String> getProfileSnapshot() {
+		if (singularityPlayerProfiles.isEmpty()) {
+			return Map.of();
+		}
+		Map<String, String> snapshot = new HashMap<>();
+		ObjectIterator<Object2ObjectMap.Entry<UUID, SingularityConfig.CollapseSyncProfile>> iterator = singularityPlayerProfiles.object2ObjectEntrySet().iterator();
+		while (iterator.hasNext()) {
+			Object2ObjectMap.Entry<UUID, SingularityConfig.CollapseSyncProfile> entry = iterator.next();
+			snapshot.put(entry.getKey().toString(), entry.getValue().id());
+		}
+		return snapshot;
+	}
+
+	private void applyProfileSnapshot(Map<String, String> entries) {
+		singularityPlayerProfiles.clear();
+		if (entries == null || entries.isEmpty()) {
+			return;
+		}
+		entries.forEach(this::applyProfileSnapshotEntry);
+	}
+
+	private void applyProfileSnapshotEntry(String uuidString, String profileId) {
+		try {
+			UUID uuid = UUID.fromString(uuidString);
+			SingularityConfig.CollapseSyncProfile profile = SingularityConfig.CollapseSyncProfile.fromId(profileId);
+			if (profile != null && profile != SingularityConfig.collapseDefaultSyncProfile()) {
+				singularityPlayerProfiles.put(uuid, profile);
+			}
+		} catch (IllegalArgumentException ignored) {
+		}
+	}
+
+	public SingularityConfig.CollapseSyncProfile getCollapseProfile(ServerPlayerEntity player) {
+		return getCollapseProfile(player.getUuid());
+	}
+
+	private SingularityConfig.CollapseSyncProfile getCollapseProfile(UUID uuid) {
+		SingularityConfig.CollapseSyncProfile profile = singularityPlayerProfiles.get(uuid);
+		return profile != null ? profile : SingularityConfig.collapseDefaultSyncProfile();
+	}
+
+	public void setCollapseProfile(ServerPlayerEntity player, SingularityConfig.CollapseSyncProfile profile) {
+		if (profile == null) {
+			profile = SingularityConfig.collapseDefaultSyncProfile();
+		}
+		UUID uuid = player.getUuid();
+		SingularityConfig.CollapseSyncProfile defaultProfile = SingularityConfig.collapseDefaultSyncProfile();
+		SingularityConfig.CollapseSyncProfile previous = singularityPlayerProfiles.get(uuid);
+		if (profile == defaultProfile) {
+			if (previous != null) {
+				singularityPlayerProfiles.remove(uuid);
+				markDirty();
+			}
+		} else if (previous != profile) {
+			singularityPlayerProfiles.put(uuid, profile);
+			markDirty();
+		}
+		if (profile == SingularityConfig.CollapseSyncProfile.CINEMATIC && isCollapseActive()) {
+			sendCollapseSchedule(player);
+		}
+	}
+
+	public void syncProfileOnJoin(ServerPlayerEntity player) {
+		if (player == null) {
+			return;
+		}
+		if (getCollapseProfile(player) == SingularityConfig.CollapseSyncProfile.CINEMATIC && isCollapseActive()) {
+			sendCollapseSchedule(player);
+		}
+	}
+
+	private boolean shouldPlayerTriggerBroadcast(ServerPlayerEntity player) {
+		return getCollapseProfile(player) != SingularityConfig.CollapseSyncProfile.MINIMAL;
+	}
+
+	private boolean isCollapseActive() {
+		return singularityState == SingularityState.FUSING
+				|| singularityState == SingularityState.COLLAPSE
+				|| singularityState == SingularityState.CORE
+				|| singularityState == SingularityState.RING
+				|| singularityState == SingularityState.DISSIPATION;
+	}
+
+	private CollapseBroadcastDecision evaluateBroadcastDecision(ServerWorld world, ChunkPos chunk) {
+		SingularityConfig.CollapseBroadcastMode mode = SingularityConfig.collapseBroadcastMode();
+		int radius = Math.max(0, SingularityConfig.collapseBroadcastRadius());
+		if (mode == SingularityConfig.CollapseBroadcastMode.IMMEDIATE || radius <= 0) {
+			return CollapseBroadcastDecision.immediate(mode);
+		}
+		boolean notifyNow = isChunkWithinBroadcastRadius(world, chunk, radius);
+		return notifyNow ? CollapseBroadcastDecision.immediate(mode) : CollapseBroadcastDecision.buffered(mode);
+	}
+
+	private boolean isChunkWithinBroadcastRadius(ServerWorld world, ChunkPos chunk, int radius) {
+		double thresholdSq = radius * (double) radius;
+		double centerX = chunk.getCenterX();
+		double centerZ = chunk.getCenterZ();
+		for (ServerPlayerEntity player : world.getPlayers(player -> player.isAlive() && !player.isSpectator())) {
+			if (!shouldPlayerTriggerBroadcast(player)) {
+				continue;
+			}
+			double dx = player.getX() - centerX;
+			double dz = player.getZ() - centerZ;
+			if (dx * dx + dz * dz <= thresholdSq) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private void markChunkBroadcastBuffered(ChunkPos chunk, CollapseBroadcastDecision decision) {
+		if (collapseBufferedChunks.add(chunk.toLong())) {
+			SingularityChunkContext.recordBroadcastBuffered(chunk, decision.mode());
+		}
+	}
+
+	private void flushBufferedChunks(ServerWorld world) {
+		flushBufferedChunks(world, false);
+	}
+
+	private void flushBufferedChunks(ServerWorld world, boolean force) {
+		if (collapseBufferedChunks.isEmpty()) {
+			return;
+		}
+		SingularityConfig.CollapseBroadcastMode mode = SingularityConfig.collapseBroadcastMode();
+		int radius = Math.max(0, SingularityConfig.collapseBroadcastRadius());
+		LongIterator iterator = collapseBufferedChunks.iterator();
+		while (iterator.hasNext()) {
+			long packed = iterator.nextLong();
+			ChunkPos chunk = new ChunkPos(packed);
+			boolean shouldFlush = force
+					|| mode == SingularityConfig.CollapseBroadcastMode.IMMEDIATE
+					|| radius <= 0
+					|| isChunkWithinBroadcastRadius(world, chunk, radius);
+			if (!shouldFlush) {
+				continue;
+			}
+			BlockPos pos = new BlockPos(chunk.getCenterX(), world.getBottomY(), chunk.getCenterZ());
+			world.getChunkManager().markForUpdate(pos);
+			SingularityChunkContext.recordBroadcastFlushed(chunk);
+			iterator.remove();
+		}
+	}
+
+	private static final class CollapseBroadcastDecision {
+		private final boolean notifyPlayers;
+		private final SingularityConfig.CollapseBroadcastMode mode;
+		private final int updateFlags;
+
+		private CollapseBroadcastDecision(boolean notifyPlayers, SingularityConfig.CollapseBroadcastMode mode) {
+			this.notifyPlayers = notifyPlayers;
+			this.mode = mode;
+			this.updateFlags = notifyPlayers ? Block.NOTIFY_LISTENERS : Block.NOTIFY_NEIGHBORS;
+		}
+
+		static CollapseBroadcastDecision immediate(SingularityConfig.CollapseBroadcastMode mode) {
+			return new CollapseBroadcastDecision(true, mode);
+		}
+
+		static CollapseBroadcastDecision buffered(SingularityConfig.CollapseBroadcastMode mode) {
+			return new CollapseBroadcastDecision(false, mode);
+		}
+
+		boolean notifyPlayers() {
+			return notifyPlayers;
+		}
+
+		int updateFlags() {
+			return updateFlags;
+		}
+
+		SingularityConfig.CollapseBroadcastMode mode() {
+			return mode;
+		}
+	}
+
+	private void broadcastCollapseSchedule(ServerWorld world) {
+		if (!isCollapseActive()) {
+			return;
+		}
+		SingularitySchedulePayload payload = buildSchedulePayload();
+		if (payload == null) {
+			return;
+		}
+		for (ServerPlayerEntity player : world.getPlayers(player -> player.isAlive() && !player.isSpectator())) {
+			if (getCollapseProfile(player) == SingularityConfig.CollapseSyncProfile.CINEMATIC) {
+				ServerPlayNetworking.send(player, payload);
+			}
+		}
+	}
+
+	private void sendCollapseSchedule(ServerPlayerEntity player) {
+		if (player == null || !isCollapseActive()) {
+			return;
+		}
+		SingularitySchedulePayload payload = buildSchedulePayload();
+		if (payload == null) {
+			return;
+		}
+		ServerPlayNetworking.send(player, payload);
+	}
+
+	private SingularitySchedulePayload buildSchedulePayload() {
+		if (singularityRingChunkCounts.isEmpty() || singularityRingThresholds.isEmpty()) {
+			return null;
+		}
+		List<SingularitySchedulePayload.RingEntry> rings = new ArrayList<>();
+		int ringCount = Math.min(singularityRingChunkCounts.size(), singularityRingThresholds.size());
+		for (int i = 0; i < ringCount; i++) {
+			int chunks = singularityRingChunkCounts.getInt(i);
+			if (chunks <= 0) {
+				continue;
+			}
+			int side = i < singularityRingRadii.size() ? Math.max(1, singularityRingRadii.getInt(i)) : 1;
+			double threshold = singularityRingThresholds.getDouble(i);
+			int tickInterval = resolveTickIntervalForSide(side);
+			rings.add(new SingularitySchedulePayload.RingEntry(i, chunks, side, threshold, tickInterval));
+		}
+		if (rings.isEmpty()) {
+			return null;
+		}
+		return new SingularitySchedulePayload(rings);
+	}
+
+	private int resolveTickIntervalForSide(int sideLength) {
+		for (SingularityConfig.RadiusDelay delay : SingularityConfig.radiusDelays()) {
+			if (sideLength <= delay.side) {
+				return Math.max(1, delay.ticks);
+			}
+		}
+		return configuredCollapseTickInterval();
+	}
+
+	private boolean isSingularityCollapseEnabled(ServerWorld world) {
+		return SingularityConfig.collapseEnabled()
+				&& world.getGameRules().getBoolean(TheVirusBlock.VIRUS_SINGULARITY_COLLAPSE_ENABLED);
+	}
 	private boolean infected;
 	private boolean dormant;
 	private int tierIndex;
@@ -344,7 +861,7 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 		ensureHealthInitialized(tier);
 		int tierDuration = getTierDuration(tier);
 
-		if (!apocalypseMode && tierDuration > 0 && ticksInTier >= tierDuration) {
+		if (!apocalypseMode && tierDuration > 0 && ticksInTier >= tierDuration && singularityState == SingularityState.DORMANT) {
 			advanceTier(world);
 		}
 
@@ -353,18 +870,24 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 			markDirty();
 		}
 
-		BlockMutationHelper.mutateAroundSources(world, virusSources, tier, apocalypseMode);
+		if (!isSingularityActive() && !shouldSkipSpreadThisTick(world)) {
+			BlockMutationHelper.mutateAroundSources(world, virusSources, tier, apocalypseMode);
+		}
 		reinforceCores(world, tier);
 		maybeSpawnMatrixCube(world, tier);
 
 		applyDifficultyRules(world, tier);
 		maybePushTierFiveBarrier(world, tier);
+		tickSingularity(world);
 		runEvents(world, tier);
 		boostAmbientSpawns(world, tier);
 		pulseHelmetTrackers(world);
 	}
 
 	private void runEvents(ServerWorld world, InfectionTier tier) {
+		if (singularityState != SingularityState.DORMANT) {
+			return;
+		}
 		boolean tier2Active = TierCookbook.anyEnabled(world, tier, apocalypseMode, TierFeatureGroup.TIER2_EVENT);
 		boolean tier3Active = TierCookbook.anyEnabled(world, tier, apocalypseMode, TierFeatureGroup.TIER3_EXTRA);
 		if (!tier2Active && !tier3Active) {
@@ -393,6 +916,9 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 	}
 
 	private void boostAmbientSpawns(ServerWorld world, InfectionTier tier) {
+		if (singularityState != SingularityState.DORMANT) {
+			return;
+		}
 		if (!world.getGameRules().getBoolean(GameRules.DO_MOB_SPAWNING)) {
 			return;
 		}
@@ -459,12 +985,2640 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 			if (!world.isChunkLoaded(ChunkPos.toLong(source))) {
 				continue;
 			}
-			pushPlayersFromBlock(world, source, TIER_FIVE_BARRIER_RADIUS, 0.9D, true);
+			pushPlayersFromBlock(world, source, TIER_FIVE_BARRIER_RADIUS, 0.9D, false);
 			pushed = true;
 		}
 		if (pushed) {
 			tierFiveBarrierActive = true;
 		}
+	}
+
+	private void tickSingularity(ServerWorld world) {
+		ensureSingularityGamerules(world);
+		tickSingularityBorder(world);
+		if (!infected) {
+			if (singularityState != SingularityState.DORMANT) {
+				clearFuseEntities(world);
+				revertSingularityBlock(world, false);
+				resetSingularityState(world);
+				markDirty();
+			}
+			return;
+		}
+		if (singularityState == SingularityState.DORMANT) {
+			tickSingularityPreGeneration(world);
+		}
+		switch (singularityState) {
+			case DORMANT -> {
+				if (apocalypseMode) {
+					return;
+				}
+				long remaining = getTicksUntilFinalWave();
+				long fuseDelay = configuredFuseExplosionDelayTicks();
+				if (remaining > 0 && remaining <= fuseDelay && currentHealth <= 0.0D) {
+					logSingularityStateChange(SingularityState.FUSING,
+							"finalWaveWarning remaining=" + remaining + " fuseDelay=" + fuseDelay);
+					singularityState = SingularityState.FUSING;
+					singularityTicks = fuseDelay;
+					singularityShellCollapsed = false;
+					singularityFusePulseTicker = 0;
+					singularityFuseElapsed = 0;
+					singularityCollapseTotalChunks = 0;
+					singularityCollapseCompletedChunks = 0;
+					singularityCollapseBarDelay = 0;
+					singularityCollapseCompleteHold = 0;
+					singularityCenter = representativePos(world, world.getRandom());
+					applyCollapseDistanceOverrides(world);
+					if (isSingularityCollapseEnabled(world)) {
+						prepareSingularityChunkQueue(world);
+					} else {
+						singularityChunkQueue.clear();
+					}
+					broadcast(world, Text.translatable("message.the-virus-block.singularity_warning").formatted(Formatting.LIGHT_PURPLE));
+					markDirty();
+				}
+				clearFuseEntities(world);
+			}
+			case FUSING -> {
+				tickSingularityPreGeneration(world);
+				tickSingularityChunkPreload(world);
+				tickFuseWatchdog(world);
+				if (singularityTicks > 0) {
+					singularityTicks--;
+					singularityFuseElapsed++;
+					emitFuseEffects(world);
+					maintainFuseEntities(world);
+					if (!singularityShellCollapsed && singularityFuseElapsed >= configuredFuseShellCollapseTicks()) {
+						singularityShellCollapsed = true;
+						if (!shellsCollapsed) {
+							collapseShells(world);
+						}
+					}
+					if (singularityTicks <= 0) {
+						detonateFuseCore(world);
+						if (isSingularityCollapseEnabled(world)) {
+							logSingularityStateChange(SingularityState.COLLAPSE,
+									"fuseComplete elapsed=" + singularityFuseElapsed + " allowCollapse="
+											+ isSingularityCollapseEnabled(world));
+							singularityState = SingularityState.COLLAPSE;
+							singularityDebugLogCooldown = 0;
+							singularityCollapseRadius = computeInitialCollapseRadius(world);
+							singularityCollapseDescending = true;
+							prepareSingularityChunkQueue(world);
+							singularityCollapseBarDelay = SINGULARITY_COLLAPSE_BAR_DELAY_TICKS;
+							singularityCollapseCompleteHold = SINGULARITY_COLLAPSE_COMPLETE_HOLD_TICKS;
+							singularityCollapseTickCooldown = 0;
+							singularityBorderElapsed = 0L;
+							singularityBorderPendingDeployment = true;
+							if (singularityCenter == null) {
+								singularityCenter = representativePos(world, world.getRandom());
+								if (singularityCenter == null && !virusSources.isEmpty()) {
+									singularityCenter = virusSources.iterator().next();
+								}
+							}
+							activateSingularityBlock(world);
+							broadcast(world, Text.translatable("message.the-virus-block.singularity_collapse").formatted(Formatting.DARK_PURPLE));
+							markDirty();
+						} else {
+							skipSingularityCollapse(world, "disabled before activation");
+						}
+					}
+				}
+			}
+			case COLLAPSE -> processSingularityCollapse(world);
+			case CORE -> processSingularityCore(world);
+			case RING -> processSingularityRing(world);
+			case DISSIPATION -> processSingularityDissipation(world);
+			case RESET -> processSingularityReset(world);
+		}
+		maintainBlackholePearl(world);
+	}
+
+	private void emitFuseEffects(ServerWorld world) {
+		if (virusSources.isEmpty()) {
+			return;
+		}
+		float intensity = 1.0F - (float) singularityTicks / Math.max(1.0F, (float) configuredFuseExplosionDelayTicks());
+		int particleCount = MathHelper.clamp(2 + (int) (intensity * 6), 2, 10);
+		int pulseInterval = Math.max(4, configuredFusePulseInterval() - MathHelper.floor(intensity * 4));
+		singularityFusePulseTicker++;
+		boolean pulse = singularityFusePulseTicker >= pulseInterval;
+		if (pulse) {
+			singularityFusePulseTicker = 0;
+		}
+		for (BlockPos source : virusSources) {
+			if (!world.isChunkLoaded(ChunkPos.toLong(source))) {
+				continue;
+			}
+			Vec3d fusePos = resolveFusePosition(world, source);
+			double baseX = fusePos.x;
+			double baseY = fusePos.y;
+			double baseZ = fusePos.z;
+			for (int i = 0; i < particleCount; i++) {
+				double x = baseX + world.random.nextGaussian() * 0.3D;
+				double y = baseY + world.random.nextGaussian() * 0.3D;
+				double z = baseZ + world.random.nextGaussian() * 0.3D;
+				world.spawnParticles(ParticleTypes.ELECTRIC_SPARK, x, y, z, 1, 0.0D, 0.02D, 0.0D, 0.01D);
+			}
+			if (pulse) {
+				world.spawnParticles(ParticleTypes.FLASH,
+						baseX,
+						baseY,
+						baseZ,
+						1,
+						0.0D,
+						0.0D,
+						0.0D,
+						0.0D);
+				world.spawnParticles(SINGULARITY_FUSE_GLOW,
+						baseX,
+						baseY + 0.1D,
+						baseZ,
+						6,
+						0.25D,
+						0.2D,
+						0.25D,
+						0.0D);
+				world.spawnParticles(ParticleTypes.GLOW,
+						baseX,
+						baseY + 0.2D,
+						baseZ,
+						4,
+						0.2D,
+						0.2D,
+						0.2D,
+						0.0D);
+				world.playSound(null,
+						baseX,
+						baseY,
+						baseZ,
+						SoundEvents.ENTITY_TNT_PRIMED,
+						SoundCategory.BLOCKS,
+						0.8F + intensity * 0.4F,
+						0.8F + world.random.nextFloat() * 0.2F);
+			}
+		}
+	}
+
+	private void maintainFuseEntities(ServerWorld world) {
+		activeFuseEntities.entrySet().removeIf(entry -> {
+			Entity entity = world.getEntity(entry.getValue());
+			if (entity instanceof VirusFuseEntity fuse && fuse.isAlive()) {
+				return false;
+			}
+			InfectionLog.info(LogChannel.SINGULARITY_FUSE, "Removing dead fuse entity at {}", entry.getKey());
+			return true;
+		});
+		for (BlockPos source : virusSources) {
+			if (!world.isChunkLoaded(ChunkPos.toLong(source))) {
+				continue;
+			}
+			clearBlockForFuse(world, source);
+			if (activeFuseEntities.containsKey(source)) {
+				continue;
+			}
+			VirusFuseEntity fuse = new VirusFuseEntity(world, source);
+			if (world.spawnEntity(fuse)) {
+				activeFuseEntities.put(source.toImmutable(), fuse.getUuid());
+				InfectionLog.info(LogChannel.SINGULARITY_FUSE, "Spawned fuse entity at {}", source);
+			} else {
+				TheVirusBlock.LOGGER.warn("[Fuse] Failed to spawn fuse entity at {}", source);
+			}
+		}
+	}
+
+	private void maintainBlackholePearl(ServerWorld world) {
+		if (!ENABLE_BLACKHOLE_PEARL) {
+			clearBlackholePearl(world);
+			return;
+		}
+		if (singularityState == SingularityState.DORMANT || singularityCenter == null) {
+			clearBlackholePearl(world);
+			return;
+		}
+		if (!world.isChunkLoaded(ChunkPos.toLong(singularityCenter))) {
+			return;
+		}
+		BlackholePearlEntity pearl = getBlackholePearl(world);
+		if (pearl == null) {
+			pearl = BlackholePearlEntity.create(world, singularityCenter);
+			pearl.setTargetScale(getBlackholeTargetScale());
+			if (world.spawnEntity(pearl)) {
+				blackholePearlId = pearl.getUuid();
+			}
+		} else {
+			pearl.setAnchor(singularityCenter);
+			pearl.setTargetScale(getBlackholeTargetScale());
+		}
+	}
+
+	private float getBlackholeTargetScale() {
+		return switch (singularityState) {
+			case CORE, RING, DISSIPATION -> BLACKHOLE_CORE_SCALE;
+			default -> BLACKHOLE_PRIMARY_SCALE;
+		};
+	}
+
+	private void clearBlackholePearl(ServerWorld world) {
+		if (blackholePearlId == null) {
+			return;
+		}
+		Entity entity = world.getEntity(blackholePearlId);
+		if (entity instanceof BlackholePearlEntity pearl) {
+			pearl.discard();
+		}
+		blackholePearlId = null;
+	}
+
+	@Nullable
+	private BlackholePearlEntity getBlackholePearl(ServerWorld world) {
+		if (blackholePearlId == null) {
+			return null;
+		}
+		Entity entity = world.getEntity(blackholePearlId);
+		if (entity instanceof BlackholePearlEntity pearl) {
+			return pearl;
+		}
+		blackholePearlId = null;
+		return null;
+	}
+
+	private void installSingularityGlow(ServerWorld world) {
+		if (singularityCenter == null) {
+			return;
+		}
+		removeSingularityGlow(world);
+		for (BlockPos offset : SINGULARITY_GLOW_OFFSETS) {
+			BlockPos target = singularityCenter.add(offset);
+			if (!world.isChunkLoaded(ChunkPos.toLong(target))) {
+				continue;
+			}
+			BlockState state = world.getBlockState(target);
+			if (!state.isAir() && !state.isOf(Blocks.LIGHT)) {
+				continue;
+			}
+			BlockState light = Blocks.LIGHT.getDefaultState().with(LightBlock.LEVEL_15, 15);
+			world.setBlockState(target, light, Block.NOTIFY_LISTENERS);
+			singularityGlowNodes.add(target.toImmutable());
+		}
+	}
+
+	private void removeSingularityGlow(ServerWorld world) {
+		if (singularityGlowNodes.isEmpty()) {
+			if (singularityCenter == null) {
+				return;
+			}
+		}
+		for (BlockPos pos : singularityGlowNodes) {
+			if (world.getBlockState(pos).isOf(Blocks.LIGHT)) {
+				world.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_LISTENERS);
+			}
+		}
+		singularityGlowNodes.clear();
+		if (singularityCenter != null) {
+			for (BlockPos offset : SINGULARITY_GLOW_OFFSETS) {
+				BlockPos target = singularityCenter.add(offset);
+				if (world.getBlockState(target).isOf(Blocks.LIGHT)) {
+					world.setBlockState(target, Blocks.AIR.getDefaultState(), Block.NOTIFY_LISTENERS);
+				}
+			}
+		}
+	}
+
+	private void clearBlockForFuse(ServerWorld world, BlockPos pos) {
+		if (fuseClearedBlocks.containsKey(pos)) {
+			return;
+		}
+		BlockState state = world.getBlockState(pos);
+		if (!state.isOf(ModBlocks.VIRUS_BLOCK)) {
+			return;
+		}
+		suppressSourceUnregister(pos);
+		fuseClearedBlocks.put(pos.toImmutable(), state);
+		world.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
+	}
+
+	private void restoreClearedFuseBlocks(ServerWorld world) {
+		if (fuseClearedBlocks.isEmpty()) {
+			return;
+		}
+		Iterator<Map.Entry<BlockPos, BlockState>> iterator = fuseClearedBlocks.entrySet().iterator();
+		while (iterator.hasNext()) {
+			Map.Entry<BlockPos, BlockState> entry = iterator.next();
+			BlockPos pos = entry.getKey();
+			if (!world.isChunkLoaded(ChunkPos.toLong(pos))) {
+				continue;
+			}
+			BlockState current = world.getBlockState(pos);
+			if (current.isAir()) {
+				world.setBlockState(pos, entry.getValue(), Block.NOTIFY_LISTENERS);
+			}
+			iterator.remove();
+		}
+	}
+
+	public void onWorldLoad(ServerWorld world) {
+		ensureSingularityGamerules(world);
+		if (singularityBorderActive || singularityBorderHasSnapshot) {
+			restoreSingularityBorder(world);
+		}
+		if (singularityState == SingularityState.DORMANT) {
+			resetSingularityPreparation("worldLoad");
+		}
+	}
+
+	private void ensureSingularityGamerules(ServerWorld world) {
+		if (world == null || world.getServer() == null) {
+			return;
+		}
+		applySingularityGamerule(world, TheVirusBlock.VIRUS_SINGULARITY_ALLOW_CHUNK_GENERATION, SingularityConfig.allowChunkGeneration());
+		applySingularityGamerule(world, TheVirusBlock.VIRUS_SINGULARITY_ALLOW_OUTSIDE_BORDER_LOAD, SingularityConfig.allowOutsideBorderLoad());
+	}
+
+	private void applySingularityGamerule(ServerWorld world,
+			GameRules.Key<GameRules.BooleanRule> rule,
+			boolean desired) {
+		GameRules.BooleanRule gamerule = world.getGameRules().get(rule);
+		if (gamerule.get() != desired) {
+			gamerule.set(desired, world.getServer());
+		}
+	}
+
+	private void resetSingularityPreparation(String reason) {
+		singularityChunkQueue.clear();
+		singularityPreGenQueue.clear();
+		singularityPreloadQueue.clear();
+		singularityPinnedChunks.clear();
+		singularityPreGenMissingChunks = 0;
+		singularityPreloadMissingChunks = 0;
+		singularityPreGenComplete = false;
+		singularityPreloadComplete = false;
+		singularityPreGenLogCooldown = 0;
+		singularityPreloadLogCooldown = 0;
+		singularityResetQueue.clear();
+		singularityResetProcessed.clear();
+		singularityResetDelay = 0;
+		singularityDestructionEngine = SingularityDestructionEngine.create();
+		singularityDestructionDirty = true;
+		if (SingularityConfig.debugLogging()) {
+			InfectionLog.info(LogChannel.SINGULARITY, "[prep] reset collapse staging reason={}", reason);
+		}
+	}
+
+	public boolean isFuseClearedBlock(BlockPos pos) {
+		return fuseClearedBlocks.containsKey(pos);
+	}
+
+	private boolean isVirusCoreBlock(BlockPos pos, BlockState state) {
+		return state.isOf(ModBlocks.VIRUS_BLOCK) || fuseClearedBlocks.containsKey(pos);
+	}
+
+	private void suppressSourceUnregister(BlockPos pos) {
+		suppressedUnregisters.add(pos.toImmutable());
+	}
+
+	public boolean shouldSkipUnregister(BlockPos pos) {
+		return suppressedUnregisters.remove(pos);
+	}
+
+	private void clearFuseEntities(ServerWorld world) {
+		clearFuseEntities(world, true);
+	}
+
+	private void clearFuseEntities(ServerWorld world, boolean restoreBlocks) {
+		if (activeFuseEntities.isEmpty()) {
+			if (restoreBlocks) {
+				restoreClearedFuseBlocks(world);
+			}
+			return;
+		}
+		for (UUID uuid : activeFuseEntities.values()) {
+			Entity entity = world.getEntity(uuid);
+			if (entity != null) {
+				entity.discard();
+			}
+		}
+		activeFuseEntities.clear();
+		if (restoreBlocks) {
+			restoreClearedFuseBlocks(world);
+		}
+	}
+
+	private boolean isSingularitySuppressionActive() {
+		return singularityState == SingularityState.FUSING;
+	}
+
+	private boolean isSingularityActive() {
+		return singularityState != SingularityState.DORMANT;
+	}
+
+	private float getSingularitySuppressionProgress() {
+		if (!isSingularitySuppressionActive()) {
+			return 0.0F;
+		}
+		return MathHelper.clamp(1.0F - (float) singularityTicks / (float) configuredFuseExplosionDelayTicks(), 0.0F, 1.0F);
+	}
+
+	private double getSingularityActivityMultiplier() {
+		if (!isSingularitySuppressionActive()) {
+			return 1.0D;
+		}
+		return MathHelper.clamp(1.0D - getSingularitySuppressionProgress(), 0.0D, 1.0D);
+	}
+
+	private float getMatrixCubeSingularityFactor() {
+		return switch (singularityState) {
+			case DORMANT -> 1.0F;
+			case FUSING -> 0.35F;
+			default -> 0.0F;
+		};
+	}
+
+	private boolean shouldSkipSpreadThisTick(ServerWorld world) {
+		float progress = getSingularitySuppressionProgress();
+		if (progress <= 0.0F) {
+			return false;
+		}
+		if (progress >= 0.999F) {
+			return true;
+		}
+		return world.random.nextFloat() < progress;
+	}
+
+	private int computeInitialCollapseRadius(ServerWorld world) {
+		int radius = configuredCollapseMaxRadius();
+		List<ServerPlayerEntity> players = world.getPlayers(PlayerEntity::isAlive);
+		if (!players.isEmpty()) {
+			double maxDistance = 0.0D;
+			BlockPos center = singularityCenter != null ? singularityCenter : players.get(0).getBlockPos();
+			for (ServerPlayerEntity player : players) {
+				double distance = Math.max(player.squaredDistanceTo(Vec3d.ofCenter(center)), 0.0D);
+				maxDistance = Math.max(maxDistance, Math.sqrt(distance));
+			}
+			radius = (int) Math.min(configuredCollapseMaxRadius(), Math.max(32.0D, maxDistance + 32.0D));
+		}
+		return Math.max(16, radius);
+	}
+
+	private void tickSingularityBorder(ServerWorld world) {
+		if (!singularityBorderActive) {
+			SingularityChunkContext.disableBorderGuard(world);
+			singularityBorderResetCountdown = -1;
+			return;
+		}
+		SingularityChunkContext.enableBorderGuard(world);
+		singularityBorderLastDiameter = world.getWorldBorder().getSize();
+		if (singularityBorderDuration > 0L) {
+			singularityBorderElapsed = Math.min(singularityBorderDuration, singularityBorderElapsed + 1);
+		}
+		maybeAutoResetBorder(world);
+	}
+
+	private void deploySingularityBorder(ServerWorld world) {
+		if (singularityCenter == null || singularityRingThresholds.isEmpty()) {
+			return;
+		}
+		WorldBorder border = world.getWorldBorder();
+		captureOriginalBorder(border);
+		double centerX = singularityCenter.getX() + 0.5D;
+		double centerZ = singularityCenter.getZ() + 0.5D;
+		double outerRadius = configuredBarrierStartRadius();
+		double finalRadius = configuredBarrierEndRadius();
+		double initialDiameter = Math.max(SINGULARITY_BORDER_MIN_DIAMETER, outerRadius * 2.0D);
+		double finalDiameter = Math.max(SINGULARITY_BORDER_FINAL_DIAMETER, finalRadius * 2.0D);
+		border.setCenter(centerX, centerZ);
+		border.setSize(initialDiameter);
+		singularityBorderActive = true;
+		singularityBorderPendingDeployment = false;
+		singularityBorderCenterX = centerX;
+		singularityBorderCenterZ = centerZ;
+		singularityBorderInitialDiameter = initialDiameter;
+		singularityBorderTargetDiameter = finalDiameter;
+		singularityBorderLastDiameter = initialDiameter;
+		singularityBorderResetCountdown = -1;
+		singularityInitialBorderDiameter = initialDiameter;
+		singularityFinalBorderDiameter = finalDiameter;
+		int ringStages = Math.max(1, singularityRingActualCount);
+		singularityTotalRingTicks = (long) ringStages * configuredCollapseTickInterval();
+		long durationTicks = configuredBorderDurationTicks();
+		long durationMillis = Math.max(50L, durationTicks * 50L);
+		InfectionLog.info(LogChannel.SINGULARITY,
+				"Deploying border center=({},{}) outerRadius={} finalRadius={} initialDiameter={} finalDiameter={} durationTicks={}",
+				String.format("%.2f", centerX),
+				String.format("%.2f", centerZ),
+				String.format("%.2f", outerRadius),
+				String.format("%.2f", finalRadius),
+				String.format("%.2f", initialDiameter),
+				String.format("%.2f", finalDiameter),
+				durationTicks);
+		singularityBorderDuration = durationTicks;
+		singularityBorderElapsed = 0L;
+		singularityRingTickAccumulator = 0L;
+		singularityRingIndex = -1;
+		singularityRingPendingChunks = 0;
+		markDirty();
+		InfectionLog.info(LogChannel.SINGULARITY,
+				"Border initialized size={} (should equal initialDiameter)",
+				String.format("%.2f", border.getSize()));
+		syncSingularityBorder(world, initialDiameter, 0L, finalDiameter);
+		world.getWorldBorder().interpolateSize(initialDiameter, finalDiameter, durationMillis);
+		SingularityChunkContext.enableBorderGuard(world);
+	}
+
+	private void restoreSingularityBorder(ServerWorld world) {
+		if (!singularityBorderActive && !singularityBorderHasSnapshot) {
+			return;
+		}
+		WorldBorder border = world.getWorldBorder();
+		if (singularityBorderHasSnapshot) {
+			border.setCenter(singularityBorderOriginalCenterX, singularityBorderOriginalCenterZ);
+			border.setSize(singularityBorderOriginalDiameter);
+			border.setSafeZone(singularityBorderOriginalSafeZone);
+			border.setDamagePerBlock(singularityBorderOriginalDamagePerBlock);
+			border.setWarningBlocks(singularityBorderOriginalWarningBlocks);
+			border.setWarningTime(singularityBorderOriginalWarningTime);
+		}
+		clearSingularityBorderState();
+		SingularityChunkContext.disableBorderGuard(world);
+		markDirty();
+		syncSingularityBorder(world);
+	}
+
+	private void maybeAutoResetBorder(ServerWorld world) {
+		if (!SingularityConfig.barrierAutoReset() || world == null) {
+			return;
+		}
+		if (!singularityBorderActive) {
+			singularityBorderResetCountdown = -1;
+			return;
+		}
+		boolean shrinkFinished = singularityBorderDuration <= 0L || singularityBorderElapsed >= singularityBorderDuration;
+		boolean collapseFinished = (singularityState != SingularityState.COLLAPSE && singularityState != SingularityState.RESET)
+				|| singularityChunkQueue.isEmpty();
+		if (!shrinkFinished || !collapseFinished) {
+			return;
+		}
+		if (singularityBorderResetCountdown < 0) {
+			long delay = Math.max(0L, SingularityConfig.barrierResetDelayTicks());
+			singularityBorderResetCountdown = delay > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) delay;
+			return;
+		}
+		if (singularityBorderResetCountdown-- > 0) {
+			return;
+		}
+		restoreSingularityBorder(world);
+	}
+
+	private void syncSingularityBorder(ServerWorld world) {
+		syncSingularityBorder(world, world != null ? world.getWorldBorder().getSize() : singularityBorderLastDiameter, singularityBorderElapsed, singularityBorderTargetDiameter);
+	}
+
+	private void syncSingularityBorder(ServerWorld world, double reportedDiameter, long reportedElapsed, double reportedTargetDiameter) {
+		if (world == null) {
+			return;
+		}
+		double diameter = reportedDiameter;
+		double centerX = singularityBorderCenterX;
+		double centerZ = singularityBorderCenterZ;
+		if (centerX == 0.0D && singularityCenter != null) {
+			centerX = singularityCenter.getX() + 0.5D;
+		}
+		if (centerZ == 0.0D && singularityCenter != null) {
+			centerZ = singularityCenter.getZ() + 0.5D;
+		}
+		SingularityBorderPayload payload = new SingularityBorderPayload(
+				singularityBorderActive,
+				centerX,
+				centerZ,
+				singularityBorderInitialDiameter,
+				diameter,
+				reportedTargetDiameter,
+				singularityBorderDuration,
+				reportedElapsed,
+				singularityState.name()
+		);
+		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
+			ServerPlayNetworking.send(player, payload);
+		}
+	}
+
+	private void captureOriginalBorder(WorldBorder border) {
+		if (singularityBorderHasSnapshot) {
+			return;
+		}
+		singularityBorderOriginalCenterX = border.getCenterX();
+		singularityBorderOriginalCenterZ = border.getCenterZ();
+		singularityBorderOriginalDiameter = border.getSize();
+		singularityBorderOriginalSafeZone = border.getSafeZone();
+		singularityBorderOriginalDamagePerBlock = border.getDamagePerBlock();
+		singularityBorderOriginalWarningBlocks = border.getWarningBlocks();
+		singularityBorderOriginalWarningTime = border.getWarningTime();
+		singularityBorderHasSnapshot = true;
+	}
+
+	private void clearSingularityBorderState() {
+		singularityBorderActive = false;
+		singularityBorderPendingDeployment = false;
+		singularityBorderHasSnapshot = false;
+		singularityBorderCenterX = 0.0D;
+		singularityBorderCenterZ = 0.0D;
+		singularityBorderInitialDiameter = 0.0D;
+		singularityBorderTargetDiameter = 0.0D;
+		singularityBorderDuration = 0L;
+		singularityBorderElapsed = 0L;
+		singularityBorderLastDiameter = 0.0D;
+		singularityBorderOriginalCenterX = 0.0D;
+		singularityBorderOriginalCenterZ = 0.0D;
+		singularityBorderOriginalDiameter = 0.0D;
+		singularityBorderOriginalSafeZone = 0.0D;
+		singularityBorderOriginalDamagePerBlock = 0.0D;
+		singularityBorderOriginalWarningBlocks = 0;
+		singularityBorderOriginalWarningTime = 0;
+		singularityRingThresholds.clear();
+		singularityRingChunkCounts.clear();
+		singularityRingChunks.clear();
+		singularityRingIndex = -1;
+		singularityRingPendingChunks = 0;
+		singularityInitialBorderDiameter = 0.0D;
+		singularityFinalBorderDiameter = 0.0D;
+		singularityTotalRingTicks = 0L;
+		singularityRingTickAccumulator = 0L;
+		singularityBorderOuterRadius = 0.0D;
+		singularityBorderInnerRadius = 0.0D;
+		singularityRingActualCount = 0;
+		singularityBorderResetCountdown = -1;
+	}
+
+	private void activateSingularityBlock(ServerWorld world) {
+		if (singularityCenter == null || !world.isChunkLoaded(ChunkPos.toLong(singularityCenter))) {
+			return;
+		}
+		BlockState state = world.getBlockState(singularityCenter);
+		if (!state.isOf(ModBlocks.SINGULARITY_BLOCK)) {
+			world.setBlockState(singularityCenter, ModBlocks.SINGULARITY_BLOCK.getDefaultState(), Block.NOTIFY_ALL);
+		}
+		installSingularityGlow(world);
+		fuseClearedBlocks.remove(singularityCenter);
+		BlockEntity blockEntity = world.getBlockEntity(singularityCenter);
+		if (blockEntity instanceof SingularityBlockEntity singularityBlock) {
+			singularityBlock.startSequence(world);
+		}
+	}
+
+	private void detonateFuseCore(ServerWorld world) {
+		if (singularityCenter == null) {
+			return;
+		}
+		Vec3d fusePos = resolveFusePosition(world, singularityCenter);
+		BlockPos elevatedCenter = BlockPos.ofFloored(fusePos);
+		if (!elevatedCenter.equals(singularityCenter)) {
+			singularityCenter = elevatedCenter;
+		}
+		world.playSound(null,
+				fusePos.x,
+				fusePos.y,
+				fusePos.z,
+				SoundEvents.ENTITY_GENERIC_EXPLODE,
+				SoundCategory.BLOCKS,
+				4.0F,
+				0.6F);
+		world.spawnParticles(ParticleTypes.EXPLOSION_EMITTER,
+				fusePos.x,
+				fusePos.y,
+				fusePos.z,
+				2,
+				0.2D,
+				0.2D,
+				0.2D,
+				0.01D);
+		pushPlayersFromBlock(world, singularityCenter, FINAL_VULNERABILITY_BLAST_RADIUS, FINAL_VULNERABILITY_BLAST_SCALE, false);
+		world.syncWorldEvent(WorldEvents.BLOCK_BROKEN, singularityCenter, Block.getRawIdFromState(ModBlocks.VIRUS_BLOCK.getDefaultState()));
+		clearFuseEntities(world, false);
+	}
+
+	private Vec3d resolveFusePosition(ServerWorld world, BlockPos source) {
+		UUID fuseId = activeFuseEntities.get(source);
+		if (fuseId != null) {
+			Entity entity = world.getEntity(fuseId);
+			if (entity instanceof VirusFuseEntity fuse) {
+				return fuse.getPos();
+			}
+		}
+		return Vec3d.ofCenter(source);
+	}
+
+	private void ensureSingularityCenter(ServerWorld world) {
+		if (singularityCenter != null) {
+			return;
+		}
+		BlockPos candidate = representativePos(world, world.getRandom());
+		if (candidate == null && !virusSources.isEmpty()) {
+			candidate = virusSources.iterator().next();
+		}
+		if (candidate == null) {
+			candidate = world.getSpawnPos();
+		}
+		if (candidate != null) {
+			singularityCenter = candidate.toImmutable();
+		}
+	}
+
+	private void revertSingularityBlock(ServerWorld world, boolean remove) {
+		if (singularityCenter == null || !world.isChunkLoaded(ChunkPos.toLong(singularityCenter))) {
+			return;
+		}
+		BlockState state = world.getBlockState(singularityCenter);
+		if (!state.isOf(ModBlocks.SINGULARITY_BLOCK)) {
+			return;
+		}
+		BlockState replacement = remove ? Blocks.AIR.getDefaultState() : ModBlocks.VIRUS_BLOCK.getDefaultState();
+		world.setBlockState(singularityCenter, replacement, Block.NOTIFY_LISTENERS);
+		SingularityBlockEntity.notifyStop(world, singularityCenter);
+		world.getChunkManager().markForUpdate(singularityCenter);
+		removeSingularityGlow(world);
+		fuseClearedBlocks.remove(singularityCenter);
+	}
+
+	private void prepareSingularityChunkQueue(ServerWorld world) {
+		singularityChunkQueue.clear();
+		singularityCollapseTotalChunks = 0;
+		singularityCollapseCompletedChunks = 0;
+		singularityRingThresholds.clear();
+		singularityRingChunkCounts.clear();
+		singularityRingRadii.clear();
+		singularityRingIndex = -1;
+		singularityRingPendingChunks = 0;
+		singularityInitialBorderDiameter = 0.0D;
+		singularityFinalBorderDiameter = 0.0D;
+		singularityTotalRingTicks = 0L;
+		singularityRingTickAccumulator = 0L;
+		ensureSingularityCenter(world);
+		if (singularityCenter == null) {
+			TheVirusBlock.LOGGER.warn("[Singularity] Unable to prepare collapse queue because center is null");
+			return;
+		}
+		ChunkPos centerChunk = new ChunkPos(singularityCenter);
+		int maxRadiusInChunks = Math.max(1, MathHelper.ceil(configuredCollapseMaxRadius() / 16.0F));
+		boolean capturedOuterRadius = false;
+		double outerRadius = 0.0D;
+		double innerRadius = 0.0D;
+		int actualRingCount = 0;
+		LongSet seen = new LongOpenHashSet();
+		for (int radius = maxRadiusInChunks; radius >= 0; radius--) {
+			int before = singularityChunkQueue.size();
+			appendChunkRing(centerChunk, radius, seen);
+			int added = singularityChunkQueue.size() - before;
+			if (added > 0) {
+				double threshold = computeRingThreshold(radius);
+				singularityRingThresholds.add(threshold);
+				singularityRingChunkCounts.add(added);
+				singularityRingRadii.add(radius);
+				if (!capturedOuterRadius) {
+					outerRadius = threshold;
+					capturedOuterRadius = true;
+				}
+				innerRadius = threshold;
+				actualRingCount++;
+			}
+		}
+		if (singularityChunkQueue.isEmpty()) {
+			long packed = centerChunk.toLong();
+			singularityChunkQueue.addLast(packed);
+			double threshold = computeRingThreshold(0);
+			singularityRingThresholds.add(threshold);
+			singularityRingChunkCounts.add(1);
+			singularityRingRadii.add(0);
+			if (!capturedOuterRadius) {
+				outerRadius = threshold;
+				capturedOuterRadius = true;
+			}
+			innerRadius = threshold;
+			actualRingCount = Math.max(1, actualRingCount);
+		}
+
+		if (!singularityRingThresholds.isEmpty() && outerRadius > 0.0D) {
+			double scale = configuredBarrierStartRadius() / outerRadius;
+			for (int i = 0; i < singularityRingThresholds.size(); i++) {
+				double scaled = singularityRingThresholds.getDouble(i) * scale;
+				singularityRingThresholds.set(i, scaled);
+			}
+			outerRadius *= scale;
+			innerRadius *= scale;
+		}
+
+		double finalThreshold = Math.max(SINGULARITY_BORDER_FINAL_DIAMETER * 0.5D, 0.0D);
+		singularityRingThresholds.add(finalThreshold);
+		singularityRingChunkCounts.add(0);
+		singularityRingRadii.add(0);
+		singularityCollapseTotalChunks = Math.max(1, singularityChunkQueue.size());
+		singularityCollapseCompletedChunks = 0;
+		singularityBorderOuterRadius = capturedOuterRadius ? outerRadius : configuredBarrierStartRadius();
+		singularityBorderInnerRadius = innerRadius > 0.0D ? innerRadius : singularityBorderOuterRadius;
+		singularityRingActualCount = Math.max(1, actualRingCount);
+		rebuildSingularityDestruction(world);
+		broadcastCollapseSchedule(world);
+	}
+
+	private void appendChunkRing(ChunkPos center, int radius, LongSet seen) {
+		appendChunkRing(center, radius, seen, singularityChunkQueue);
+	}
+
+	private void appendChunkRing(ChunkPos center, int radius, LongSet seen, Deque<Long> target) {
+		if (radius == 0) {
+			addChunkToQueue(center.x, center.z, seen, target);
+			return;
+		}
+		int minX = center.x - radius;
+		int maxX = center.x + radius;
+		int minZ = center.z - radius;
+		int maxZ = center.z + radius;
+		for (int x = minX; x <= maxX; x++) {
+			addChunkToQueue(x, minZ, seen, target);
+			addChunkToQueue(x, maxZ, seen, target);
+		}
+		for (int z = minZ + 1; z <= maxZ - 1; z++) {
+			addChunkToQueue(minX, z, seen, target);
+			addChunkToQueue(maxX, z, seen, target);
+		}
+	}
+
+	private void addChunkToQueue(int chunkX, int chunkZ, LongSet seen, Deque<Long> target) {
+		ChunkPos pos = new ChunkPos(chunkX, chunkZ);
+		long packed = pos.toLong();
+		if (seen.add(packed)) {
+			target.addLast(packed);
+		}
+	}
+
+	private void rebuildSingularityDestruction(ServerWorld world) {
+		singularityDestructionEngine = SingularityDestructionEngine.create();
+		singularityDestructionEngine.setActiveColumnsPerTick(Math.max(16, SINGULARITY_COLLAPSE_CHUNKS_PER_STEP * 64));
+		int minY = world.getBottomY();
+		int maxY = world.getBottomY() + world.getDimension().height() - 1;
+		singularityDestructionEngine.setColumnBounds(minY, maxY);
+		List<Long> queueSnapshot = new ArrayList<>(singularityChunkQueue);
+		singularityResetQueue.clear();
+		singularityResetQueue.addAll(queueSnapshot);
+		singularityResetProcessed.clear();
+		singularityResetDelay = 0;
+		int offset = 0;
+		boolean reusePinnedChunks = singularityPreloadComplete && areAllCollapseChunksPinned(queueSnapshot);
+		if (reusePinnedChunks) {
+			if (!singularityPreloadQueue.isEmpty()) {
+				singularityPreloadQueue.clear();
+			}
+			if (SingularityConfig.debugLogging()) {
+				InfectionLog.info(LogChannel.SINGULARITY,
+						"[preload] reuse pinned chunks={} (skipping reload)",
+						singularityPinnedChunks.size());
+			}
+		} else {
+			singularityPreloadQueue = new ArrayDeque<>(queueSnapshot);
+			singularityPreloadComplete = singularityPreloadQueue.isEmpty();
+			singularityPreloadMissingChunks = 0;
+		}
+		singularityRingChunks = new ArrayList<>(singularityRingChunkCounts.size());
+		for (int i = 0; i < singularityRingChunkCounts.size(); i++) {
+			int count = singularityRingChunkCounts.getInt(i);
+			List<ChunkPos> ringChunks;
+			if (count <= 0) {
+				ringChunks = Collections.emptyList();
+			} else {
+				ringChunks = new ArrayList<>(count);
+				for (int j = 0; j < count && offset < queueSnapshot.size(); j++, offset++) {
+					ringChunks.add(new ChunkPos(queueSnapshot.get(offset)));
+				}
+				double threshold = singularityRingThresholds.getDouble(i);
+				singularityDestructionEngine.enqueueRing(i, threshold, ringChunks);
+				if (SingularityConfig.debugLogging()) {
+					InfectionLog.info(LogChannel.SINGULARITY, "ring {}: threshold={} chunks={}",
+							i,
+							roundDistance(threshold),
+							count);
+				}
+			}
+			singularityRingChunks.add(ringChunks);
+		}
+		singularityDestructionDirty = false;
+		if (SingularityConfig.debugLogging()) {
+			InfectionLog.info(LogChannel.SINGULARITY, "planner built {} rings ({} chunks queued)", singularityRingChunkCounts.size(), singularityChunkQueue.size());
+		}
+	}
+
+	private void ensureDestructionEngine(ServerWorld world) {
+		if (singularityDestructionEngine == null || singularityDestructionDirty) {
+			rebuildSingularityDestruction(world);
+		}
+	}
+
+	private double computeRingThreshold(int chunkRadius) {
+		double diagonal = Math.max(1.0D, (chunkRadius + 1) * 16.0D * MathHelper.SQUARE_ROOT_OF_TWO);
+		return diagonal;
+	}
+
+	private List<Double> copyRingThresholds() {
+		List<Double> list = new ArrayList<>(singularityRingThresholds.size());
+		for (double value : singularityRingThresholds) {
+			list.add(value);
+		}
+		return list;
+	}
+
+	private List<Integer> copyRingCounts() {
+		List<Integer> list = new ArrayList<>(singularityRingChunkCounts.size());
+		for (int value : singularityRingChunkCounts) {
+			list.add(value);
+		}
+		return list;
+	}
+
+	private List<Integer> copyRingRadii() {
+		List<Integer> list = new ArrayList<>(singularityRingRadii.size());
+		for (int value : singularityRingRadii) {
+			list.add(value);
+		}
+		return list;
+	}
+
+	private void tickCollapseBarDelay() {
+		if (singularityCollapseBarDelay >= 0) {
+			singularityCollapseBarDelay--;
+		}
+	}
+
+	private void tickSingularityChunkPreload(ServerWorld world) {
+		if (!configuredPreloadEnabled()) {
+			if (!singularityPreloadComplete) {
+				singularityPreloadQueue.clear();
+				singularityPreloadMissingChunks = 0;
+				singularityPreloadComplete = true;
+				InfectionLog.info(LogChannel.SINGULARITY, "[preload] skipped (disabled via config)");
+			}
+			return;
+		}
+		if (singularityPreloadComplete) {
+			return;
+		}
+		if (singularityPreloadQueue.isEmpty()) {
+			finishSingularityChunkPreload(world);
+			return;
+		}
+		ServerChunkManager chunkManager = world.getChunkManager();
+		boolean allowGeneration = SingularityConfig.allowChunkGeneration()
+				&& world.getGameRules().getBoolean(TheVirusBlock.VIRUS_SINGULARITY_ALLOW_CHUNK_GENERATION);
+		int budget = configuredPreloadChunksPerTick();
+		int before = singularityPreloadQueue.size();
+		while (budget-- > 0 && !singularityPreloadQueue.isEmpty()) {
+			long packed = singularityPreloadQueue.pollFirst();
+			ChunkPos pos = new ChunkPos(packed);
+			SingularityChunkContext.pushChunkBypass(pos);
+			try {
+				if (world.isChunkLoaded(packed)) {
+					pinSingularityChunk(world, pos);
+					if (SingularityConfig.debugLogging()) {
+						InfectionLog.info(LogChannel.SINGULARITY, "preload chunk ready {} (already loaded)", pos);
+					}
+					continue;
+				}
+				boolean outsideBorder = !world.getWorldBorder().contains(pos.getCenterX(), pos.getCenterZ());
+				try {
+					Chunk chunk = chunkManager.getChunk(pos.x, pos.z, ChunkStatus.FULL, true);
+					if (chunk == null) {
+						String reason = outsideBorder ? "outsideBorder" : (allowGeneration ? "missingChunk" : "generationDisabled");
+						handlePreloadFailure(pos, allowGeneration, reason);
+					} else {
+						pinSingularityChunk(world, pos);
+						if (SingularityConfig.debugLogging()) {
+							if (allowGeneration) {
+								InfectionLog.info(LogChannel.SINGULARITY, "preload chunk loaded {}", pos);
+							} else {
+								InfectionLog.info(LogChannel.SINGULARITY,
+										"preload chunk loaded {} (generation disabled, disk fetch only)",
+										pos);
+							}
+						}
+					}
+				} catch (IllegalStateException ex) {
+					logChunkLoadException(world, "preload", pos, allowGeneration, ex);
+					handlePreloadFailure(pos, allowGeneration, ex.getMessage());
+				}
+			} finally {
+				SingularityChunkContext.popChunkBypass(pos);
+			}
+		}
+		logPreloadProgress(before - singularityPreloadQueue.size(), singularityPreloadQueue.size());
+		if (singularityPreloadQueue.isEmpty()) {
+			finishSingularityChunkPreload(world);
+		}
+	}
+
+	private void tickSingularityPreGeneration(ServerWorld world) {
+		if (!configuredPreGenEnabled()) {
+			if (!singularityPreGenComplete) {
+				singularityPreGenQueue.clear();
+				singularityPreGenMissingChunks = 0;
+				singularityPreGenComplete = true;
+				InfectionLog.info(LogChannel.SINGULARITY, "[preGen] skipped (disabled via config)");
+			}
+			return;
+		}
+		if (singularityPreGenComplete) {
+			return;
+		}
+		if (singularityState != SingularityState.DORMANT && singularityState != SingularityState.FUSING) {
+			return;
+		}
+		ensureSingularityCenter(world);
+		if (singularityCenter == null) {
+			return;
+		}
+		if (singularityPreGenQueue.isEmpty()) {
+			rebuildSingularityPreGenQueue(world);
+		}
+		if (singularityPreGenQueue.isEmpty()) {
+			return;
+		}
+		ServerChunkManager chunkManager = world.getChunkManager();
+		int budget = configuredPreGenChunksPerTick();
+		int before = singularityPreGenQueue.size();
+		while (budget-- > 0 && !singularityPreGenQueue.isEmpty()) {
+			long packed = singularityPreGenQueue.pollFirst();
+			ChunkPos pos = new ChunkPos(packed);
+			try {
+				chunkManager.getChunk(pos.x, pos.z, ChunkStatus.FULL, true);
+			} catch (IllegalStateException ex) {
+				logChunkLoadException(world, "pregen", pos, true, ex);
+				singularityPreGenMissingChunks++;
+			}
+		}
+		logPreGenProgress(before - singularityPreGenQueue.size(), singularityPreGenQueue.size());
+		if (singularityPreGenQueue.isEmpty()) {
+			singularityPreGenComplete = true;
+			InfectionLog.info(LogChannel.SINGULARITY,
+					"[preGen] complete center={} total={} missing={}",
+					singularityPreGenCenter,
+					singularityPreGenTotalChunks,
+					singularityPreGenMissingChunks);
+			singularityPreGenQueue.clear();
+			singularityPreGenLogCooldown = SINGULARITY_PREGEN_LOG_INTERVAL;
+			markDirty();
+		}
+	}
+
+	private void rebuildSingularityPreGenQueue(ServerWorld world) {
+		if (singularityCenter == null) {
+			return;
+		}
+		ChunkPos centerChunk = new ChunkPos(singularityCenter);
+		singularityPreGenCenter = centerChunk;
+		singularityPreGenQueue.clear();
+		singularityPreGenMissingChunks = 0;
+		singularityPreGenComplete = false;
+		LongSet seen = new LongOpenHashSet();
+		for (int radius = configuredPregenRadiusChunks(); radius >= 0; radius--) {
+			appendChunkRing(centerChunk, radius, seen, singularityPreGenQueue);
+		}
+		singularityPreGenTotalChunks = singularityPreGenQueue.size();
+		InfectionLog.info(LogChannel.SINGULARITY,
+				"[preGen] queued {} chunks within {} blocks (center={})",
+				singularityPreGenTotalChunks,
+				String.format("%.2f", configuredPreGenRadiusBlocks()),
+				singularityPreGenCenter);
+		markDirty();
+	}
+
+	private void logPreGenProgress(int processed, int remaining) {
+		if (remaining > 0 && processed <= 0 && singularityPreGenLogCooldown > 0) {
+			singularityPreGenLogCooldown--;
+			return;
+		}
+		singularityPreGenLogCooldown = SINGULARITY_PREGEN_LOG_INTERVAL;
+		InfectionLog.info(LogChannel.SINGULARITY,
+				"[preGen] processed={} remaining={} missing={} center={}",
+				processed,
+				remaining,
+				singularityPreGenMissingChunks,
+				singularityPreGenCenter);
+	}
+
+	private void handlePreloadFailure(ChunkPos pos, boolean generationAttempted, String reason) {
+		singularityPreloadMissingChunks++;
+		if (SingularityConfig.debugLogging()) {
+			TheVirusBlock.LOGGER.warn("[Singularity] chunk preload failed for {} (generationAllowed={} reason={})",
+					pos,
+					generationAttempted,
+					reason == null ? "<unknown>" : reason);
+		}
+	}
+
+	private void finishSingularityChunkPreload(ServerWorld world) {
+		if (singularityPreloadComplete) {
+			return;
+		}
+		singularityPreloadComplete = true;
+		InfectionLog.info(LogChannel.SINGULARITY,
+				"[preload] complete missing={} pinned={}",
+				singularityPreloadMissingChunks,
+				singularityPinnedChunks.size());
+		singularityPreloadLogCooldown = SINGULARITY_PRELOAD_LOG_INTERVAL;
+		if (singularityPreloadMissingChunks > 0) {
+			TheVirusBlock.LOGGER.warn("[Singularity] {} collapse chunks were not prepared before the event. Enable chunk generation or pre-load the area to avoid skips.", singularityPreloadMissingChunks);
+		}
+	}
+
+	private void logPreloadProgress(int processed, int remaining) {
+		if (remaining > 0 && processed <= 0 && singularityPreloadLogCooldown > 0) {
+			singularityPreloadLogCooldown--;
+			return;
+		}
+		singularityPreloadLogCooldown = SINGULARITY_PRELOAD_LOG_INTERVAL;
+		InfectionLog.info(LogChannel.SINGULARITY,
+				"[preload] processed={} remaining={} missing={} pinned={}",
+				processed,
+				remaining,
+				singularityPreloadMissingChunks,
+				singularityPinnedChunks.size());
+	}
+
+	private void logChunkLoadException(ServerWorld world,
+			String phase,
+			ChunkPos chunk,
+			boolean generationAllowed,
+			IllegalStateException error) {
+		if (!SingularityConfig.debugLogging()) {
+			return;
+		}
+		boolean bypassing = SingularityChunkContext.isBypassingChunk(chunk.x, chunk.z);
+		boolean outsideBorder = !world.getWorldBorder().contains(chunk.getCenterX(), chunk.getCenterZ());
+		double distance = chunkDistanceFromCenter(chunk.toLong());
+		TheVirusBlock.LOGGER.warn("[Singularity] chunk load failed phase={} chunk={} allowGen={} bypass={} outsideBorder={} distance={} thread={}",
+				phase,
+				chunk,
+				generationAllowed,
+				bypassing,
+				outsideBorder,
+				String.format("%.2f", distance),
+				Thread.currentThread().getName(),
+				error);
+	}
+
+	private void processSingularityCollapse(ServerWorld world) {
+		if (!isSingularityCollapseEnabled(world)) {
+			skipSingularityCollapse(world, "disabled mid-collapse");
+			return;
+		}
+		tickCollapseBarDelay();
+		tickSingularityChunkPreload(world);
+		flushBufferedChunks(world);
+		if (singularityCollapseBarDelay <= 0 && singularityBorderPendingDeployment) {
+			deploySingularityBorder(world);
+		}
+		ensureSingularityCenter(world);
+		if (singularityCenter == null) {
+			return;
+		}
+		ensureDestructionEngine(world);
+		if (singularityChunkQueue.isEmpty() && singularityRingPendingChunks <= 0 && singularityRingIndex >= singularityRingThresholds.size() - 1) {
+			if (singularityCollapseBarDelay <= 0) {
+				if (singularityCollapseCompleteHold > 0) {
+					singularityCollapseCompleteHold--;
+					return;
+				}
+				if (singularityCollapseCompletedChunks >= singularityCollapseTotalChunks) {
+					logSingularityStateChange(SingularityState.CORE, "collapse complete");
+					singularityState = SingularityState.CORE;
+					singularityRingTicks = SINGULARITY_RING_DURATION;
+					singularityPhaseDelay = SINGULARITY_CORE_CHARGE_TICKS;
+					broadcast(world, Text.translatable("message.the-virus-block.singularity_core").formatted(Formatting.RED));
+					syncSingularityBorder(world);
+					markDirty();
+				}
+			}
+			return;
+		}
+		advanceRingIndexIfNeeded(world);
+		if (singularityRingPendingChunks <= 0) {
+			return;
+		}
+		if (!SingularityConfig.useMultithreadedCollapse()) {
+			shutdownCollapseScheduler();
+		}
+		if (singularityCollapseTickCooldown > 0) {
+			singularityCollapseTickCooldown--;
+			return;
+		}
+		updateCollapseThroughput(world);
+		logSingularityDebugInfo(world);
+		boolean progressed;
+		SingularityChunkContext.push(world);
+		try {
+			if (SingularityConfig.useMultithreadedCollapse()) {
+				progressed = processCollapseWithScheduler(world);
+			} else {
+				progressed = singularityDestructionEngine.consumeColumns(this::processCollapseColumn, world);
+			}
+		} finally {
+			SingularityChunkContext.pop(world);
+		}
+		if (progressed) {
+			singularityCollapseStallTicks = 0;
+			singularityCollapseTickCooldown = resolveTickIntervalForCurrentRing();
+			singularityCollapseRadius = (int) Math.round(singularityDestructionEngine.getCurrentRadius());
+		} else {
+			logSingularityStall(world);
+			singularityCollapseTickCooldown = 0;
+		}
+		if (singularityChunkQueue.isEmpty()) {
+			singularityCollapseRadius = 0;
+			singularityCollapseCompletedChunks = Math.min(singularityCollapseCompletedChunks, singularityCollapseTotalChunks);
+		}
+		flushBufferedChunks(world);
+		markDirty();
+	}
+
+	private void skipSingularityCollapse(ServerWorld world, String reason) {
+		logSingularityStateChange(SingularityState.DISSIPATION, reason);
+		singularityState = SingularityState.DISSIPATION;
+		singularityRingTicks = 0;
+		singularityRingPendingChunks = 0;
+		singularityRingIndex = -1;
+		singularityCollapseTickCooldown = 0;
+		singularityCollapseBarDelay = 0;
+		singularityCollapseCompleteHold = 0;
+		singularityCollapseRadius = 0;
+		singularityChunkQueue.clear();
+		singularityBorderPendingDeployment = false;
+		singularityBorderDuration = 0L;
+		singularityBorderElapsed = 0L;
+		releaseSingularityChunkTickets(world);
+		restoreSingularityBorder(world);
+		singularityPhaseDelay = SINGULARITY_RESET_DELAY_TICKS;
+		singularityRingTickAccumulator = 0L;
+		singularityRingActualCount = 0;
+		singularityRingThresholds.clear();
+		singularityRingChunkCounts.clear();
+		singularityRingChunks.clear();
+		singularityRingRadii.clear();
+		singularityDestructionDirty = true;
+		shutdownCollapseScheduler();
+		syncSingularityBorder(world);
+		if (SingularityConfig.debugLogging()) {
+			InfectionLog.info(LogChannel.SINGULARITY, "[skipCollapse] {}", reason);
+		}
+		flushBufferedChunks(world, true);
+		collapseBufferedChunks.clear();
+		broadcast(world, Text.translatable("message.the-virus-block.singularity_detonated").formatted(Formatting.DARK_PURPLE));
+		markDirty();
+	}
+
+	private SingularityDestructionEngine.ColumnTask processCollapseColumn(SingularityDestructionEngine.ColumnTask task, ServerWorld world) {
+		SingularityChunkContext.pushChunkBypass(task.chunk());
+		try {
+			ServerChunkManager chunkManager = world.getChunkManager();
+			long chunkLong = task.chunk().toLong();
+			boolean outsideAllowed = SingularityConfig.allowOutsideBorderLoad()
+					&& world.getGameRules().getBoolean(TheVirusBlock.VIRUS_SINGULARITY_ALLOW_OUTSIDE_BORDER_LOAD);
+			boolean bypassingChunk = SingularityChunkContext.isBypassingChunk(task.chunk().x, task.chunk().z);
+			if (!outsideAllowed && !bypassingChunk) {
+				WorldBorder border = world.getWorldBorder();
+				double chunkCenterX = task.chunk().getCenterX();
+				double chunkCenterZ = task.chunk().getCenterZ();
+				if (!border.contains(chunkCenterX, chunkCenterZ)) {
+					double borderRadius = border.getSize() * 0.5D;
+					double chunkDistance = chunkDistanceFromCenter(chunkLong);
+					SingularityChunkContext.sampleBorderRejectedChunk(task.chunk(), chunkDistance, borderRadius);
+					SingularityChunkContext.recordSkippedBorder();
+					SingularityChunkContext.recordChunkBlocked(task.chunk(), "outside border");
+					markCollapseChunkComplete(world, task.chunk());
+					return null;
+				}
+			}
+
+			boolean chunkLoaded = world.isChunkLoaded(chunkLong);
+			boolean generationAllowed = SingularityConfig.allowChunkGeneration()
+					&& world.getGameRules().getBoolean(TheVirusBlock.VIRUS_SINGULARITY_ALLOW_CHUNK_GENERATION);
+			if (!chunkLoaded && generationAllowed) {
+				try {
+					Chunk chunk = chunkManager.getChunk(task.chunk().x, task.chunk().z, ChunkStatus.FULL, true);
+					if (chunk != null) {
+						if (shouldPinCollapseChunks()) {
+							pinSingularityChunk(world, task.chunk());
+						}
+						if (SingularityConfig.debugLogging()) {
+							InfectionLog.info(LogChannel.SINGULARITY, "chunk loaded on demand {}", task.chunk());
+						}
+						return task;
+					}
+				} catch (IllegalStateException ex) {
+					logChunkLoadException(world, "collapse", task.chunk(), generationAllowed, ex);
+					// Chunk manager refused generation; treat as missing.
+					SingularityChunkContext.recordSkippedMissing();
+					SingularityChunkContext.recordChunkBlocked(task.chunk(), ex.getMessage());
+				}
+			}
+			if (!chunkLoaded) {
+				if (shouldAwaitMissingChunks()) {
+					return task;
+				}
+				double chunkDistance = chunkDistanceFromCenter(chunkLong);
+				SingularityChunkContext.sampleMissingChunk(task.chunk(), chunkDistance, generationAllowed);
+				SingularityChunkContext.recordSkippedMissing();
+				markCollapseChunkComplete(world, task.chunk());
+				return null;
+			}
+
+			if (shouldPinCollapseChunks()) {
+				pinSingularityChunk(world, task.chunk());
+			}
+
+			if (SingularityConfig.drainWaterAhead()) {
+				drainFluidsAhead(world, task, layerBaseY(task));
+			}
+
+			if (SingularityConfig.useRingSliceMode()) {
+				RingSliceStatus status = processRingSliceSingleThread(world, task);
+				if (status == RingSliceStatus.RETRY) {
+					return task.withSticky(true);
+				}
+				if (status == RingSliceStatus.COMPLETE) {
+					markCollapseChunkComplete(world, task.chunk());
+				}
+				return null;
+			}
+
+			if (SingularityConfig.useRingSliceChunkMode()) {
+				boolean chunkComplete = processChunkFillSingleThread(world, task);
+				if (chunkComplete) {
+					markCollapseChunkComplete(world, task.chunk());
+				}
+				return null;
+			}
+
+			return null;
+		} finally {
+			SingularityChunkContext.popChunkBypass(task.chunk());
+		}
+	}
+
+	private void markCollapseChunkComplete(ServerWorld world, ChunkPos chunk) {
+		SingularityChunkContext.recordColumnCompleted();
+		long packed = chunk.toLong();
+		singularityChunkQueue.remove(packed);
+		if (singularityRingPendingChunks > 0) {
+			singularityRingPendingChunks--;
+		}
+		if (singularityCollapseCompletedChunks < singularityCollapseTotalChunks) {
+			singularityCollapseCompletedChunks++;
+		}
+		updateCollapseRadiusFromChunk(packed);
+		singularityCollapseDescending = !singularityCollapseDescending;
+		spawnChunkVeil(world, chunk);
+		if (SingularityConfig.debugLogging()) {
+			InfectionLog.info(LogChannel.SINGULARITY, "chunk processed {} pending={}", chunk, singularityRingPendingChunks);
+		}
+		singularityDestructionEngine.removeChunkTasks(chunk);
+	}
+
+	private void drainFluidsAhead(ServerWorld world, SingularityDestructionEngine.ColumnTask task, int baseY) {
+		int offset = SingularityConfig.waterDrainOffset();
+		if (offset <= 0) {
+			return;
+		}
+		ChunkPos chunk = task.chunk();
+		int minY = baseY + 1;
+		int maxY = Math.min(task.maxY(), baseY + offset);
+		if (maxY <= baseY) {
+			return;
+		}
+		BlockBox slice = new BlockBox(chunk.getStartX(),
+				minY,
+				chunk.getStartZ(),
+				chunk.getEndX(),
+				maxY,
+				chunk.getEndZ());
+		SingularityConfig.FillShape shape = SingularityConfig.bulkFillShape();
+		boolean canUseNativeFill = shape == SingularityConfig.FillShape.MATRIX;
+		if (canUseNativeFill && BulkFillHelper.clearFluidRange(world, slice, "minecraft:water")) {
+			return;
+		}
+		BlockPos.Mutable mutable = new BlockPos.Mutable();
+		for (int y = minY; y <= maxY; y++) {
+			for (int x = chunk.getStartX(); x <= chunk.getEndX(); x++) {
+				for (int z = chunk.getStartZ(); z <= chunk.getEndZ(); z++) {
+					if (!BulkFillHelper.shouldFillShape(x,
+							y,
+							z,
+							slice.getMinX(),
+							slice.getMinY(),
+							slice.getMinZ(),
+							slice.getMaxX(),
+							slice.getMaxY(),
+							slice.getMaxZ(),
+							shape)) {
+						continue;
+					}
+					mutable.set(x, y, z);
+					BlockState state;
+					try {
+						state = world.getBlockState(mutable);
+					} catch (IllegalStateException ex) {
+						SingularityChunkContext.recordSkippedMissing();
+						return;
+					}
+					if (state.isAir()
+							|| state.isOf(ModBlocks.VIRUS_BLOCK)
+							|| state.isOf(ModBlocks.SINGULARITY_BLOCK)
+							|| state.getFluidState().isEmpty()) {
+						continue;
+					}
+					try {
+						world.setBlockState(mutable, Blocks.AIR.getDefaultState(), Block.NOTIFY_LISTENERS);
+						SingularityChunkContext.recordWaterCleared();
+					} catch (IllegalStateException ex) {
+						SingularityChunkContext.recordSkippedMissing();
+						return;
+					}
+				}
+			}
+		}
+	}
+
+	private int layerBaseY(SingularityDestructionEngine.ColumnTask task) {
+		return MathHelper.clamp(task.currentY(), task.minY(), task.maxY());
+	}
+
+	private void spawnChunkVeil(ServerWorld world, ChunkPos chunk) {
+		if (singularityCenter == null) {
+			return;
+		}
+		double centerX = chunk.getCenterX();
+		double centerZ = chunk.getCenterZ();
+		double centerY = singularityCenter.getY() + world.random.nextGaussian() * 2.0D;
+		for (int i = 0; i < 8; i++) {
+			double angle = (Math.PI * 2 * i) / 8.0D + world.random.nextDouble() * 0.15D;
+			double radius = 8.0D + world.random.nextDouble() * 4.0D;
+			double x = centerX + Math.cos(angle) * radius;
+			double z = centerZ + Math.sin(angle) * radius;
+			double y = centerY + world.random.nextGaussian() * 1.5D;
+			world.spawnParticles(ParticleTypes.SCULK_SOUL, x, y, z, 3, 0.2D, 0.2D, 0.2D, 0.01D);
+			world.spawnParticles(ParticleTypes.REVERSE_PORTAL, x, y + 0.8D, z, 2, 0.05D, 0.1D, 0.05D, 0.05D);
+		}
+		world.playSound(null,
+				centerX,
+				centerY,
+				centerZ,
+				SoundEvents.ENTITY_WARDEN_SONIC_BOOM,
+				SoundCategory.HOSTILE,
+				1.2F,
+				0.6F + world.random.nextFloat() * 0.3F);
+	}
+
+	private void updateCollapseRadiusFromChunk(long chunkLong) {
+		singularityCollapseRadius = (int) Math.max(0.0D, Math.round(chunkDistanceFromCenter(chunkLong)));
+	}
+
+	private double chunkDistanceFromCenter(long chunkLong) {
+		if (singularityCenter == null) {
+			return 0.0D;
+		}
+		ChunkPos center = new ChunkPos(singularityCenter);
+		ChunkPos current = new ChunkPos(chunkLong);
+		double dx = (current.x - center.x) * 16.0D;
+		double dz = (current.z - center.z) * 16.0D;
+		return Math.sqrt(dx * dx + dz * dz);
+	}
+
+	private double getCurrentCollapseRadius(ServerWorld world) {
+		return Math.max(0.0D, world.getWorldBorder().getSize() * 0.5D);
+	}
+
+	private static double roundDistance(double value) {
+		return Math.round(value * 100.0D) / 100.0D;
+	}
+
+	private void spawnCollapseParticles(ServerWorld world, BlockPos pos) {
+		if (!SingularityConfig.collapseParticles()) {
+			return;
+		}
+		world.spawnParticles(
+				ParticleTypes.ASH,
+				pos.getX() + 0.5D,
+				pos.getY() + 0.5D,
+				pos.getZ() + 0.5D,
+				SINGULARITY_COLLAPSE_PARTICLE_DENSITY,
+				0.25D,
+				0.25D,
+				0.25D,
+				0.01D);
+		if (world.random.nextInt(20) == 0) {
+			world.playSound(null, pos, SoundEvents.BLOCK_SCULK_SPREAD, SoundCategory.HOSTILE, 0.8F, 0.4F + world.random.nextFloat() * 0.2F);
+		}
+	}
+
+	private void carveColumn(ServerWorld world, BlockPos target, int startY, int endY, int step) {
+		long chunkLong = ChunkPos.toLong(target);
+		if (!world.isChunkLoaded(chunkLong)) {
+			return;
+		}
+		BlockPos.Mutable pos = new BlockPos.Mutable(target.getX(), startY, target.getZ());
+		for (int y = startY; step > 0 ? y <= endY : y >= endY; y += step) {
+			pos.setY(y);
+			BlockState state = world.getBlockState(pos);
+			if (state.isAir()
+					|| state.isOf(ModBlocks.VIRUS_BLOCK)
+					|| state.isOf(ModBlocks.SINGULARITY_BLOCK)
+					|| state.getHardness(world, pos) < 0.0F) {
+				continue;
+			}
+			world.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_LISTENERS);
+			spawnCollapseParticles(world, pos);
+		}
+	}
+
+	private void advanceRingIndexIfNeeded(ServerWorld world) {
+		if (!singularityBorderActive || singularityRingThresholds.isEmpty()) {
+			return;
+		}
+		double currentRadius = getCurrentCollapseRadius(world);
+		if (singularityRingIndex < 0) {
+			if (currentRadius > singularityRingThresholds.getDouble(0)) {
+				return;
+			}
+			singularityRingIndex = 0;
+			if (!singularityRingChunkCounts.isEmpty()) {
+				int chunks = singularityRingChunkCounts.getInt(0);
+				singularityRingPendingChunks += chunks;
+				singularityDestructionEngine.activateRing(0,
+						singularityCollapseDescending,
+						SingularityConfig.useRingSliceMode());
+				logRingActivation(world, 0, currentRadius);
+				updateCollapseThroughput(world);
+			}
+			return;
+		}
+		while (singularityRingIndex + 1 < singularityRingThresholds.size()
+				&& currentRadius <= singularityRingThresholds.getDouble(singularityRingIndex + 1)) {
+			singularityRingIndex++;
+			if (singularityRingIndex < singularityRingChunkCounts.size()) {
+				int chunks = singularityRingChunkCounts.getInt(singularityRingIndex);
+				singularityRingPendingChunks += chunks;
+				singularityDestructionEngine.activateRing(singularityRingIndex,
+						singularityCollapseDescending,
+						SingularityConfig.useRingSliceMode());
+				logRingActivation(world, singularityRingIndex, currentRadius);
+				updateCollapseThroughput(world);
+			}
+		}
+	}
+
+	private boolean processCollapseWithScheduler(ServerWorld world) {
+		SingularityCollapseScheduler scheduler = ensureCollapseScheduler();
+		int budget = singularityDestructionEngine.getActiveColumnsPerTick();
+		boolean submitted = false;
+		for (int i = 0; i < budget; i++) {
+			SingularityDestructionEngine.ColumnTask task = singularityDestructionEngine.pollColumn();
+			if (task == null) {
+				break;
+			}
+			SingularityChunkContext.recordColumnProcessed();
+			if (submitColumnTask(world, scheduler, task)) {
+				submitted = true;
+			}
+		}
+		boolean applied = scheduler.flush(this, world, singularityDestructionEngine);
+		return submitted || applied || scheduler.hasPendingResults();
+	}
+
+	private boolean submitColumnTask(ServerWorld world, SingularityCollapseScheduler scheduler, SingularityDestructionEngine.ColumnTask task) {
+		long chunkLong = task.chunk().toLong();
+		boolean outsideAllowed = SingularityConfig.allowOutsideBorderLoad()
+				&& world.getGameRules().getBoolean(TheVirusBlock.VIRUS_SINGULARITY_ALLOW_OUTSIDE_BORDER_LOAD);
+		if (!outsideAllowed) {
+			WorldBorder border = world.getWorldBorder();
+			double chunkCenterX = task.chunk().getCenterX();
+			double chunkCenterZ = task.chunk().getCenterZ();
+			if (!border.contains(chunkCenterX, chunkCenterZ)) {
+				double borderRadius = border.getSize() * 0.5D;
+				double chunkDistance = chunkDistanceFromCenter(chunkLong);
+				SingularityChunkContext.sampleBorderRejectedChunk(task.chunk(), chunkDistance, borderRadius);
+				SingularityChunkContext.recordSkippedBorder();
+				markCollapseChunkComplete(world, task.chunk());
+				return true;
+			}
+		}
+
+		boolean chunkLoaded = world.isChunkLoaded(chunkLong);
+		boolean generationAllowed = SingularityConfig.allowChunkGeneration()
+				&& world.getGameRules().getBoolean(TheVirusBlock.VIRUS_SINGULARITY_ALLOW_CHUNK_GENERATION);
+		ServerChunkManager chunkManager = world.getChunkManager();
+		if (!chunkLoaded && generationAllowed) {
+			SingularityChunkContext.pushChunkBypass(task.chunk());
+			try {
+				Chunk chunk = chunkManager.getChunk(task.chunk().x, task.chunk().z, ChunkStatus.FULL, true);
+				if (chunk != null) {
+					pinSingularityChunk(world, task.chunk());
+					singularityDestructionEngine.requeueColumn(task.withSticky(true));
+					return true;
+				}
+			} catch (IllegalStateException ex) {
+				logChunkLoadException(world, "scheduler", task.chunk(), generationAllowed, ex);
+				SingularityChunkContext.recordSkippedMissing();
+			} finally {
+				SingularityChunkContext.popChunkBypass(task.chunk());
+			}
+		}
+		if (!chunkLoaded) {
+			if (shouldAwaitMissingChunks()) {
+				singularityDestructionEngine.requeueColumn(task.withSticky(true));
+				return false;
+			}
+			SingularityChunkContext.sampleMissingChunk(task.chunk(), chunkDistanceFromCenter(chunkLong), generationAllowed);
+			SingularityChunkContext.recordSkippedMissing();
+			markCollapseChunkComplete(world, task.chunk());
+			return true;
+		}
+
+		scheduler.submit(world, task);
+		return true;
+	}
+
+	public void applyWorkerResult(ServerWorld world,
+			SingularityDestructionEngine engine,
+			ColumnWorkResult result) {
+		ColumnWorkResult.FailureReason failure = result.failureReason();
+		if (failure != null) {
+			if (failure == ColumnWorkResult.FailureReason.MISSING_CHUNK) {
+				if (shouldAwaitMissingChunks()) {
+					singularityDestructionEngine.requeueColumn(result.task().withSticky(false));
+					return;
+				}
+				SingularityChunkContext.recordSkippedMissing();
+				markCollapseChunkComplete(world, result.task().chunk());
+			} else if (failure == ColumnWorkResult.FailureReason.OUTSIDE_BORDER) {
+				SingularityChunkContext.sampleBorderRejectedChunk(result.task().chunk(),
+						chunkDistanceFromCenter(result.task().chunk().toLong()),
+						result.borderRadius());
+				SingularityChunkContext.recordSkippedBorder();
+				markCollapseChunkComplete(world, result.task().chunk());
+			}
+			return;
+		}
+
+		int drainedApplied = 0;
+		for (BlockPos drained : result.drainedBlocks()) {
+			if (trySetAir(world, drained, false)) {
+				drainedApplied++;
+				SingularityChunkContext.recordWaterCleared();
+			}
+		}
+		int clearedApplied = 0;
+		for (BlockPos cleared : result.clearedBlocks()) {
+			if (tryClearCollapseBlock(world, cleared, true)) {
+				spawnCollapseParticles(world, cleared);
+				clearedApplied++;
+			}
+		}
+		if (clearedApplied > 0) {
+			SingularityChunkContext.recordBlocksCleared(clearedApplied);
+		}
+		if (SingularityConfig.debugLogging() && (clearedApplied > 0 || drainedApplied > 0 || result.columnComplete())) {
+			InfectionLog.info(LogChannel.SINGULARITY,
+					"[workerResult] chunk={} cleared={} drained={} nextY={} complete={} chunkMode={}",
+					result.task().chunk(),
+					clearedApplied,
+					drainedApplied,
+					result.nextY(),
+					result.columnComplete(),
+					result.chunkMode());
+		}
+
+		if (result.columnComplete()) {
+			markCollapseChunkComplete(world, result.task().chunk());
+			singularityDestructionEngine.onColumnComplete(result.task());
+			return;
+		}
+
+		// No requeue on ring slice modes; next depth tasks are already present.
+	}
+
+	private boolean trySetAir(ServerWorld world, BlockPos pos, boolean respectImmunity) {
+		BlockState state;
+		try {
+			state = world.getBlockState(pos);
+		} catch (IllegalStateException ex) {
+			return false;
+		}
+		if (state.isAir()) {
+			return false;
+		}
+		if (respectImmunity) {
+			if (state.isOf(ModBlocks.VIRUS_BLOCK)
+					|| state.isOf(ModBlocks.SINGULARITY_BLOCK)
+					|| state.getHardness(world, pos) < 0.0F) {
+				return false;
+			}
+		}
+		try {
+			world.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_LISTENERS);
+			return true;
+		} catch (IllegalStateException ex) {
+			return false;
+		}
+	}
+
+	private boolean tryClearCollapseBlock(ServerWorld world, BlockPos pos, boolean respectImmunity) {
+		if (SingularityConfig.bulkFillMode() == SingularityConfig.CollapseFillMode.DESTROY) {
+			BlockState state;
+			try {
+				state = world.getBlockState(pos);
+			} catch (IllegalStateException ex) {
+				return false;
+			}
+			if (state.isAir()) {
+				return false;
+			}
+			if (respectImmunity) {
+				if (state.isOf(ModBlocks.VIRUS_BLOCK)
+						|| state.isOf(ModBlocks.SINGULARITY_BLOCK)
+						|| state.getHardness(world, pos) < 0.0F) {
+					return false;
+				}
+			}
+			try {
+				world.breakBlock(pos, false);
+				return true;
+			} catch (IllegalStateException ex) {
+				return false;
+			}
+		}
+		return trySetAir(world, pos, respectImmunity);
+	}
+
+	private boolean shouldAwaitMissingChunks() {
+		return !singularityPreloadComplete;
+	}
+
+	private SingularityCollapseScheduler ensureCollapseScheduler() {
+		if (collapseScheduler == null) {
+			collapseScheduler = new SingularityCollapseScheduler(() -> singularityCenter);
+		}
+		return collapseScheduler;
+	}
+
+	private void shutdownCollapseScheduler() {
+		if (collapseScheduler != null) {
+			collapseScheduler.close();
+			collapseScheduler = null;
+		}
+	}
+
+	private void pinSingularityChunk(ServerWorld world, ChunkPos pos) {
+		long packed = pos.toLong();
+		if (singularityPinnedChunks.add(packed)) {
+			try {
+				world.setChunkForced(pos.x, pos.z, true);
+				if (SingularityConfig.debugLogging()) {
+					InfectionLog.info(LogChannel.SINGULARITY, "pinned chunk {}", pos);
+				}
+			} catch (IllegalStateException ex) {
+				singularityPinnedChunks.remove(packed);
+				if (SingularityConfig.debugLogging()) {
+					TheVirusBlock.LOGGER.warn("[Singularity] failed to pin chunk {} ({})", pos, ex.getMessage());
+				}
+			}
+		}
+	}
+
+	private void releaseSingularityChunkTickets(ServerWorld world) {
+		if (singularityPinnedChunks.isEmpty()) {
+			return;
+		}
+		int released = singularityPinnedChunks.size();
+		for (long packed : singularityPinnedChunks.toLongArray()) {
+			ChunkPos pos = new ChunkPos(packed);
+			try {
+				world.setChunkForced(pos.x, pos.z, false);
+			} catch (IllegalStateException ex) {
+				if (SingularityConfig.debugLogging()) {
+					TheVirusBlock.LOGGER.warn("[Singularity] failed to unpin chunk {} ({})", pos, ex.getMessage());
+				}
+			}
+		}
+		singularityPinnedChunks.clear();
+		InfectionLog.info(LogChannel.SINGULARITY, "[unload] released {} forced chunks", released);
+	}
+
+	private boolean areAllCollapseChunksPinned(List<Long> queueSnapshot) {
+		if (queueSnapshot.isEmpty()) {
+			return true;
+		}
+		if (singularityPinnedChunks.isEmpty() || singularityPinnedChunks.size() < queueSnapshot.size()) {
+			return false;
+		}
+		for (Long packed : queueSnapshot) {
+			if (packed == null) {
+				continue;
+			}
+			if (!singularityPinnedChunks.contains(packed.longValue())) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private RingSliceStatus processRingSliceSingleThread(ServerWorld world, SingularityDestructionEngine.ColumnTask task) {
+		if (singularityCenter == null) {
+			return RingSliceStatus.COMPLETE;
+		}
+		int depth = task.ringSliceDepth();
+		if (depth < 0) {
+			return RingSliceStatus.COMPLETE;
+		}
+		ChunkPos chunkPos = task.chunk();
+		ServerChunkManager chunkManager = world.getChunkManager();
+		boolean chunkAvailable;
+		try {
+			chunkAvailable = chunkManager.getChunk(chunkPos.x, chunkPos.z, ChunkStatus.FULL, false) != null;
+		} catch (IllegalStateException ex) {
+			chunkAvailable = false;
+		}
+		if (!chunkAvailable) {
+			SingularityChunkContext.recordSkippedMissing();
+			if (SingularityConfig.debugLogging()) {
+				InfectionLog.info(LogChannel.SINGULARITY,
+						"[ringSlice] chunk={} depth={} deferred reason=missingChunk",
+						chunkPos,
+						depth);
+			}
+			return RingSliceStatus.RETRY;
+		}
+		SingularityRingSlices.SliceFacing facing = SingularityRingSlices.resolve(chunkPos, singularityCenter);
+		BlockBox sliceBox = SingularityRingSlices.boundsForSlice(chunkPos,
+				facing,
+				depth,
+				task.minY(),
+				task.maxY());
+		if (sliceBox != null
+				&& SingularityConfig.bulkFillShape() == SingularityConfig.FillShape.OUTLINE
+				&& SingularityConfig.outlineThickness() > 1) {
+			sliceBox = SingularityRingSlices.expandForOutline(sliceBox, chunkPos, facing, SingularityConfig.outlineThickness());
+		}
+		if (sliceBox == null) {
+			return depth >= SingularityRingSlices.SLICE_COUNT - 1 ? RingSliceStatus.COMPLETE : RingSliceStatus.CONTINUE;
+		}
+		boolean respectProtected = SingularityConfig.respectProtectedBlocks();
+		CollapseBroadcastDecision broadcastDecision = evaluateBroadcastDecision(world, chunkPos);
+		int clearedBlocks;
+		try {
+			clearedBlocks = BulkFillHelper.clearVolume(world,
+					sliceBox,
+					SingularityConfig.bulkFillMode(),
+					SingularityConfig.bulkFillShape(),
+					respectProtected,
+					broadcastDecision.updateFlags());
+		} catch (IllegalStateException ex) {
+			SingularityChunkContext.recordSkippedMissing();
+			SingularityChunkContext.recordChunkBlocked(chunkPos, ex.getMessage());
+			return RingSliceStatus.RETRY;
+		}
+		if (clearedBlocks > 0) {
+			SingularityChunkContext.recordBlocksCleared(clearedBlocks);
+			if (SingularityConfig.debugLogging() && shouldSampleRemovalLog()) {
+				InfectionLog.info(LogChannel.SINGULARITY,
+						"[ringSlice] chunk={} depth={} clearedBlocks={} facing={}",
+						chunkPos,
+						depth,
+						clearedBlocks,
+						facing);
+			}
+		}
+		if (!broadcastDecision.notifyPlayers()) {
+			markChunkBroadcastBuffered(task.chunk(), broadcastDecision);
+		}
+		return depth >= SingularityRingSlices.SLICE_COUNT - 1 ? RingSliceStatus.COMPLETE : RingSliceStatus.CONTINUE;
+	}
+
+	private boolean processChunkFillSingleThread(ServerWorld world, SingularityDestructionEngine.ColumnTask task) {
+		ChunkPos chunkPos = task.chunk();
+		BlockBox chunkBox = new BlockBox(chunkPos.getStartX(),
+				task.minY(),
+				chunkPos.getStartZ(),
+				chunkPos.getEndX(),
+				task.maxY(),
+				chunkPos.getEndZ());
+		boolean respectProtected = SingularityConfig.respectProtectedBlocks();
+		CollapseBroadcastDecision broadcastDecision = evaluateBroadcastDecision(world, chunkPos);
+		int clearedBlocks;
+		try {
+			clearedBlocks = BulkFillHelper.clearVolume(world,
+					chunkBox,
+					SingularityConfig.bulkFillMode(),
+					SingularityConfig.bulkFillShape(),
+					respectProtected,
+					broadcastDecision.updateFlags());
+		} catch (IllegalStateException ex) {
+			SingularityChunkContext.recordSkippedMissing();
+			SingularityChunkContext.recordChunkBlocked(chunkPos, ex.getMessage());
+			return false;
+		}
+		if (clearedBlocks > 0) {
+			SingularityChunkContext.recordBlocksCleared(clearedBlocks);
+			if (SingularityConfig.debugLogging() && shouldSampleRemovalLog()) {
+				InfectionLog.info(LogChannel.SINGULARITY,
+						"[ringChunk] chunk={} clearedBlocks={}",
+						chunkPos,
+						clearedBlocks);
+			}
+		}
+		if (!broadcastDecision.notifyPlayers()) {
+			markChunkBroadcastBuffered(task.chunk(), broadcastDecision);
+		}
+		return true;
+	}
+
+	private void logSingularityDebugInfo(ServerWorld world) {
+		if (!SingularityConfig.debugLogging() || singularityCenter == null || singularityState != SingularityState.COLLAPSE) {
+			return;
+		}
+		if (--singularityDebugLogCooldown > 0) {
+			return;
+		}
+		singularityDebugLogCooldown = SINGULARITY_DEBUG_LOG_INTERVAL;
+
+		double borderRadius = getCurrentCollapseRadius(world);
+		double centerX = singularityCenter.getX() + 0.5D;
+		double centerZ = singularityCenter.getZ() + 0.5D;
+		double minX = centerX - borderRadius;
+		double maxX = centerX + borderRadius;
+		double minZ = centerZ - borderRadius;
+		double maxZ = centerZ + borderRadius;
+
+		List<ServerPlayerEntity> players = world.getPlayers(player -> player.isAlive() && !player.isSpectator());
+		StringBuilder playerInfo = new StringBuilder();
+		for (ServerPlayerEntity player : players) {
+			if (playerInfo.length() > 0) {
+				playerInfo.append("; ");
+			}
+			Vec3d pos = player.getPos();
+			playerInfo.append(player.getName().getString())
+					.append("=")
+					.append(roundDistance(pos.x))
+					.append(",")
+					.append(roundDistance(pos.y))
+					.append(",")
+					.append(roundDistance(pos.z));
+		}
+		if (playerInfo.length() == 0) {
+			playerInfo.append("<none>");
+		}
+
+		int activeColumns = singularityDestructionEngine != null ? singularityDestructionEngine.getActiveColumnsPerTick() : 0;
+
+		InfectionLog.info(LogChannel.SINGULARITY, "players {}", playerInfo);
+		InfectionLog.info(LogChannel.SINGULARITY, "border center=({}, {}) radius={} box=[{}..{}]x[{}..{}] ring={} pending={} columns={} layers={}",
+				roundDistance(centerX),
+				roundDistance(centerZ),
+				roundDistance(borderRadius),
+				roundDistance(minX),
+				roundDistance(maxX),
+				roundDistance(minZ),
+				roundDistance(maxZ),
+				singularityRingIndex,
+				singularityRingPendingChunks,
+				activeColumns,
+				singularityLayersPerSlice);
+	}
+
+	private void logSingularityStall(ServerWorld world) {
+		if (!SingularityConfig.debugLogging()
+				|| singularityState != SingularityState.COLLAPSE
+				|| singularityRingPendingChunks <= 0) {
+			return;
+		}
+		singularityCollapseStallTicks++;
+		handleCollapseWatchdog(world);
+		if (singularityCollapseStallTicks % 20 != 0) {
+			return;
+		}
+		int enginePending = singularityDestructionEngine != null ? singularityDestructionEngine.getPendingColumns() : 0;
+		boolean schedulerPending = collapseScheduler != null && collapseScheduler.hasPendingResults();
+		InfectionLog.info(LogChannel.SINGULARITY,
+				"[collapse] stalled ticks={} ringPending={} enginePending={} schedulerPending={} preloadComplete={} chunkQueue={} cooldown={}",
+				singularityCollapseStallTicks,
+				singularityRingPendingChunks,
+				enginePending,
+				schedulerPending,
+				singularityPreloadComplete,
+				singularityChunkQueue.size(),
+				singularityCollapseTickCooldown);
+	}
+
+	private void logSingularityStateChange(SingularityState next, String reason) {
+		if (!SingularityConfig.debugLogging()) {
+			singularityLastLoggedState = next;
+			if (next != SingularityState.FUSING) {
+				singularityFuseWatchdogTicks = 0;
+			}
+			if (next != SingularityState.COLLAPSE) {
+				singularityCollapseStallTicks = 0;
+			}
+			return;
+		}
+		if (singularityLastLoggedState == next && singularityState == next) {
+			return;
+		}
+		InfectionLog.info(LogChannel.SINGULARITY,
+				"[state] {} -> {} reason={}",
+				singularityState,
+				next,
+				reason == null ? "<none>" : reason);
+		singularityLastLoggedState = next;
+		if (next != SingularityState.FUSING) {
+			singularityFuseWatchdogTicks = 0;
+		}
+		if (next != SingularityState.COLLAPSE) {
+			singularityCollapseStallTicks = 0;
+		}
+	}
+
+	private void tickFuseWatchdog(ServerWorld world) {
+		if (!SingularityConfig.collapseWatchdogEnabled()) {
+			singularityFuseWatchdogTicks = 0;
+			return;
+		}
+		if (singularityState != SingularityState.FUSING || !singularityPreloadComplete) {
+			singularityFuseWatchdogTicks = 0;
+			return;
+		}
+		singularityFuseWatchdogTicks++;
+		int limit = SingularityConfig.watchdogFuseMaxExtraTicks();
+		if (limit > 0 && singularityFuseWatchdogTicks >= limit) {
+			InfectionLog.info(LogChannel.SINGULARITY,
+					"[watchdog] fuse stalled ticks={} preloadComplete={} collapseDelay={} autoSkip={}",
+					singularityFuseWatchdogTicks,
+					singularityPreloadComplete,
+					singularityCollapseBarDelay,
+					SingularityConfig.watchdogAutoSkipFuse());
+			singularityFuseWatchdogTicks = 0;
+			if (SingularityConfig.watchdogAutoSkipFuse()) {
+				skipSingularityCollapse(world, "fuse watchdog exceeded " + limit + " ticks");
+			}
+		}
+	}
+
+	private void handleCollapseWatchdog(ServerWorld world) {
+		if (!SingularityConfig.collapseWatchdogEnabled()) {
+			return;
+		}
+		int warn = SingularityConfig.watchdogCollapseWarnTicks();
+		int abort = SingularityConfig.watchdogCollapseAbortTicks();
+		if (warn > 0 && singularityCollapseStallTicks == warn) {
+			InfectionLog.info(LogChannel.SINGULARITY,
+					"[watchdog] collapse stalled warn ringPending={} queue={} schedulerPending={}",
+					singularityRingPendingChunks,
+					singularityChunkQueue.size(),
+					collapseScheduler != null && collapseScheduler.hasPendingResults());
+		}
+		if (abort > 0 && singularityCollapseStallTicks >= abort) {
+			InfectionLog.info(LogChannel.SINGULARITY,
+					"[watchdog] collapse abort ringPending={} queue={} autoSkip={}",
+					singularityRingPendingChunks,
+					singularityChunkQueue.size(),
+					SingularityConfig.watchdogAutoSkipCollapse());
+			singularityCollapseStallTicks = 0;
+			if (SingularityConfig.watchdogAutoSkipCollapse()) {
+				skipSingularityCollapse(world, "collapse watchdog exceeded " + abort + " ticks");
+			}
+		}
+	}
+
+	private enum RingSliceStatus {
+		RETRY,
+		CONTINUE,
+		COMPLETE
+	}
+
+	private boolean shouldSampleRemovalLog() {
+		if (--singularityRemovalLogCooldown > 0) {
+			return false;
+		}
+		singularityRemovalLogCooldown = 20;
+		return true;
+	}
+
+	private boolean shouldPinCollapseChunks() {
+		SingularityConfig.CollapseMode mode = SingularityConfig.collapseMode();
+		return mode != SingularityConfig.CollapseMode.RING_SLICE
+				&& mode != SingularityConfig.CollapseMode.RING_SLICE_CHUNK;
+	}
+
+	private int currentRingSideLength() {
+		if (singularityRingRadii.isEmpty()) {
+			return Integer.MAX_VALUE;
+		}
+		int index = singularityRingIndex;
+		if (index < 0) {
+			index = 0;
+		}
+		if (index >= singularityRingRadii.size()) {
+			index = singularityRingRadii.size() - 1;
+		}
+		int radius = Math.max(0, singularityRingRadii.getInt(index));
+		return radius * 2 + 1;
+	}
+
+	private int currentRingChunkCount() {
+		if (singularityRingChunkCounts.isEmpty()) {
+			return Math.max(1, singularityRingPendingChunks);
+		}
+		int index = singularityRingIndex;
+		if (index < 0) {
+			index = 0;
+		}
+		if (index >= singularityRingChunkCounts.size()) {
+			index = singularityRingChunkCounts.size() - 1;
+		}
+		int count = singularityRingChunkCounts.getInt(index);
+		if (count <= 0) {
+			count = Math.max(1, singularityRingPendingChunks);
+		}
+		return Math.max(1, count);
+	}
+
+	private int maxSlicesPerTickForCurrentRing() {
+		return SingularityRingSlices.SLICE_COUNT;
+	}
+
+	private int applyRingSliceSlowdown(int columns) {
+		if (!SingularityConfig.useRingSliceMode()) {
+			return columns;
+		}
+		int chunkCount = currentRingChunkCount();
+		int sliceCap = maxSlicesPerTickForCurrentRing();
+		long cap = (long) chunkCount * sliceCap;
+		if (cap > Integer.MAX_VALUE) {
+			cap = Integer.MAX_VALUE;
+		}
+		int capped = (int) cap;
+		return Math.max(chunkCount, Math.min(columns, capped));
+	}
+
+	private int resolveTickIntervalForCurrentRing() {
+		int side = currentRingSideLength();
+		for (SingularityConfig.RadiusDelay delay : SingularityConfig.radiusDelays()) {
+			if (side <= delay.side) {
+				return Math.max(1, delay.ticks);
+			}
+		}
+		return configuredCollapseTickInterval();
+	}
+
+	private void updateCollapseThroughput(ServerWorld world) {
+		if (singularityDestructionEngine == null) {
+			return;
+		}
+		singularityLayersPerSlice = 1;
+		if (singularityRingPendingChunks <= 0 || singularityBorderDuration <= 0) {
+			singularityDestructionEngine.setActiveColumnsPerTick(SINGULARITY_COLLAPSE_MIN_COLUMNS_PER_TICK);
+			return;
+		}
+		int pendingColumns = Math.max(1, singularityDestructionEngine.getPendingColumns());
+		int columns = Math.max(SINGULARITY_COLLAPSE_MIN_COLUMNS_PER_TICK,
+				Math.min(SINGULARITY_COLLAPSE_MAX_COLUMNS_PER_TICK, pendingColumns));
+		columns = applyRingSliceSlowdown(columns);
+		singularityDestructionEngine.setActiveColumnsPerTick(columns);
+
+		if (SingularityConfig.debugLogging()
+				&& (columns != singularityLastColumnsPerTick || singularityLayersPerSlice != singularityLastLayersPerSlice)) {
+			InfectionLog.info(LogChannel.SINGULARITY,
+					"throughput columns={} layers={} pending={}",
+					columns,
+					singularityLayersPerSlice,
+					singularityRingPendingChunks);
+		}
+		singularityLastColumnsPerTick = columns;
+		singularityLastLayersPerSlice = singularityLayersPerSlice;
+	}
+
+	private void logRingActivation(ServerWorld world, int ringIndex, double borderRadius) {
+		if (!SingularityConfig.debugLogging()) {
+			return;
+		}
+		if (ringIndex < 0 || ringIndex >= singularityRingThresholds.size()) {
+			return;
+		}
+		double threshold = singularityRingThresholds.getDouble(ringIndex);
+		int chunkCount = ringIndex < singularityRingChunkCounts.size() ? singularityRingChunkCounts.getInt(ringIndex) : 0;
+		List<ChunkPos> chunks = ringIndex < singularityRingChunks.size() ? singularityRingChunks.get(ringIndex) : Collections.emptyList();
+		double minDist = Double.POSITIVE_INFINITY;
+		double maxDist = 0.0D;
+		for (ChunkPos chunk : chunks) {
+			double distance = chunkDistanceFromCenter(chunk.toLong());
+			minDist = Math.min(minDist, distance);
+			maxDist = Math.max(maxDist, distance);
+		}
+		if (chunks.isEmpty()) {
+			minDist = 0.0D;
+			maxDist = 0.0D;
+		}
+		InfectionLog.info(LogChannel.SINGULARITY,
+				"activating ring {} chunks={} threshold={} borderRadius={} chunkDist={}..{}",
+				ringIndex,
+				chunkCount,
+				roundDistance(threshold),
+				roundDistance(borderRadius),
+				roundDistance(minDist),
+				roundDistance(maxDist));
+	}
+
+	private void processSingularityCore(ServerWorld world) {
+		if (singularityCenter == null) {
+			return;
+		}
+		if (singularityPhaseDelay > 0) {
+			singularityPhaseDelay--;
+			world.spawnParticles(ParticleTypes.ENCHANT,
+					singularityCenter.getX() + 0.5D,
+					singularityCenter.getY() + 0.5D,
+					singularityCenter.getZ() + 0.5D,
+					6,
+					0.3D,
+					0.3D,
+					0.3D,
+					0.02D);
+			if (singularityPhaseDelay % 10 == 0) {
+				world.playSound(null,
+						singularityCenter.getX() + 0.5D,
+						singularityCenter.getY() + 0.5D,
+						singularityCenter.getZ() + 0.5D,
+						SoundEvents.BLOCK_BEACON_AMBIENT,
+						SoundCategory.HOSTILE,
+						1.5F,
+						0.6F);
+			}
+			markDirty();
+			return;
+		}
+		world.playSound(null, singularityCenter, SoundEvents.ENTITY_WITHER_SPAWN, SoundCategory.HOSTILE, 4.0F, 0.5F);
+		world.spawnParticles(ParticleTypes.EXPLOSION_EMITTER,
+				singularityCenter.getX() + 0.5D,
+				singularityCenter.getY() + 0.5D,
+				singularityCenter.getZ() + 0.5D,
+				2,
+				0.2D,
+				0.2D,
+				0.2D,
+				0.01D);
+		pushPlayersFromBlock(world, singularityCenter, 12, 2.0D, false);
+		world.createExplosion(null, null, null, singularityCenter.getX() + 0.5D, singularityCenter.getY() + 0.5D, singularityCenter.getZ() + 0.5D, 10.0F, false, ExplosionSourceType.TNT);
+		logSingularityStateChange(SingularityState.RING, "core detonation");
+		singularityState = SingularityState.RING;
+		singularityPhaseDelay = SINGULARITY_RING_START_DELAY;
+		syncSingularityBorder(world);
+		markDirty();
+	}
+
+	private void processSingularityRing(ServerWorld world) {
+		if (singularityCenter == null) {
+			logSingularityStateChange(SingularityState.DISSIPATION, "ring center missing");
+			singularityState = SingularityState.DISSIPATION;
+			syncSingularityBorder(world);
+			markDirty();
+			return;
+		}
+		if (singularityPhaseDelay > 0) {
+			singularityPhaseDelay--;
+			world.spawnParticles(ParticleTypes.SMALL_FLAME,
+					singularityCenter.getX() + 0.5D,
+					singularityCenter.getY() + 0.5D,
+					singularityCenter.getZ() + 0.5D,
+					4,
+					0.2D,
+					0.2D,
+					0.2D,
+					0.01D);
+			markDirty();
+			return;
+		}
+		if (singularityRingTicks <= 0) {
+			logSingularityStateChange(SingularityState.DISSIPATION, "ring finished");
+			singularityState = SingularityState.DISSIPATION;
+			singularityPhaseDelay = SINGULARITY_RESET_DELAY_TICKS;
+			syncSingularityBorder(world);
+			markDirty();
+			return;
+		}
+		singularityRingTicks--;
+		double radius = 8.0D + (SINGULARITY_RING_DURATION - singularityRingTicks) * 0.25D;
+		int segments = 48;
+		for (int i = 0; i < segments; i++) {
+			double angle = (Math.PI * 2 * i) / segments;
+			double x = singularityCenter.getX() + 0.5D + Math.cos(angle) * radius;
+			double z = singularityCenter.getZ() + 0.5D + Math.sin(angle) * radius;
+			double y = singularityCenter.getY() + Math.sin(world.random.nextDouble() * Math.PI) * 2.0D;
+			world.spawnParticles(ParticleTypes.PORTAL, x, y, z, 1, 0.0D, 0.0D, 0.0D, 0.0D);
+			BlockStateParticleEffect debris = new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.DEEPSLATE.getDefaultState());
+			world.spawnParticles(debris, x, y + 1.5D, z, 1, 0.0D, 0.1D, 0.0D, 0.02D);
+		}
+		for (int i = 0; i < SINGULARITY_RING_COLUMNS_PER_TICK; i++) {
+			double angle = world.random.nextDouble() * Math.PI * 2;
+			double columnRadius = radius + world.random.nextBetween(-2, 2);
+			double x = singularityCenter.getX() + 0.5D + Math.cos(angle) * columnRadius;
+			double z = singularityCenter.getZ() + 0.5D + Math.sin(angle) * columnRadius;
+			BlockPos destroy = BlockPos.ofFloored(x, singularityCenter.getY(), z);
+			int minY = world.getBottomY();
+			int maxY = world.getBottomY() + world.getDimension().height() - 1;
+			boolean fromBottom = world.random.nextBoolean();
+			carveColumn(world, destroy, fromBottom ? minY : maxY, fromBottom ? maxY : minY, fromBottom ? 1 : -1);
+		}
+		if (singularityRingTicks % 20 == 0) {
+			world.playSound(null,
+					singularityCenter.getX() + 0.5D,
+					singularityCenter.getY() + 0.5D,
+					singularityCenter.getZ() + 0.5D,
+					SoundEvents.AMBIENT_NETHER_WASTES_MOOD.value(),
+					SoundCategory.AMBIENT);
+		}
+		if (singularityRingTicks % 10 == 0) {
+			world.playSound(null,
+					singularityCenter.getX() + 0.5D,
+					singularityCenter.getY() + 0.5D,
+					singularityCenter.getZ() + 0.5D,
+					SoundEvents.BLOCK_END_PORTAL_SPAWN,
+					SoundCategory.HOSTILE,
+					1.1F,
+					0.5F + world.random.nextFloat() * 0.2F);
+		}
+		pullEntitiesTowardRing(world, radius + SINGULARITY_RING_PULL_RADIUS);
+	}
+
+	private void processSingularityDissipation(ServerWorld world) {
+		if (singularityCenter == null) {
+			clearFuseEntities(world);
+			resetSingularityState(world);
+			markDirty();
+			return;
+		}
+		world.spawnParticles(ParticleTypes.REVERSE_PORTAL,
+				singularityCenter.getX() + 0.5D,
+				singularityCenter.getY() + 0.5D,
+				singularityCenter.getZ() + 0.5D,
+				16,
+				2.0D,
+				2.0D,
+				2.0D,
+				0.05D);
+		if (world.random.nextInt(5) == 0) {
+			world.playSound(null,
+					singularityCenter.getX() + 0.5D,
+					singularityCenter.getY() + 0.5D,
+					singularityCenter.getZ() + 0.5D,
+					SoundEvents.BLOCK_RESPAWN_ANCHOR_DEPLETE.value(),
+					SoundCategory.HOSTILE);
+		}
+		if (singularityPhaseDelay > 0) {
+			singularityPhaseDelay--;
+			markDirty();
+			return;
+		}
+		if (shouldStartPostReset()) {
+			startPostCollapseReset(world);
+			return;
+		}
+		finishSingularity(world);
+	}
+
+	private boolean shouldStartPostReset() {
+		return SingularityConfig.postResetEnabled()
+				&& !singularityResetQueue.isEmpty();
+	}
+
+	private void startPostCollapseReset(ServerWorld world) {
+		if (singularityResetQueue.isEmpty() || !SingularityConfig.postResetEnabled()) {
+			InfectionLog.info(LogChannel.SINGULARITY,
+					"[reset] skipped enabled={} queue={}",
+					SingularityConfig.postResetEnabled(),
+					singularityResetQueue.size());
+			finishSingularity(world);
+			return;
+		}
+		singularityState = SingularityState.RESET;
+		singularityResetDelay = (int) Math.max(0L, SingularityConfig.postResetDelayTicks());
+		singularityResetProcessed.clear();
+		InfectionLog.info(LogChannel.SINGULARITY,
+				"[reset] init queue={} delay={} chunksPerTick={} batchRadius={} tickDelay={}",
+				singularityResetQueue.size(),
+				singularityResetDelay,
+				SingularityConfig.postResetChunksPerTick(),
+				SingularityConfig.postResetBatchRadius(),
+				SingularityConfig.postResetTickDelay());
+		broadcast(world, Text.literal("Singularity remnant reset initializing...").formatted(Formatting.LIGHT_PURPLE));
+		markDirty();
+	}
+
+	private void processSingularityReset(ServerWorld world) {
+		if (!SingularityConfig.postResetEnabled()) {
+			finishSingularity(world);
+			return;
+		}
+		if (singularityResetDelay > 0) {
+			singularityResetDelay--;
+			markDirty();
+			return;
+		}
+		singularityResetDelay = Math.max(1, SingularityConfig.postResetTickDelay());
+		int perTick = Math.max(1, SingularityConfig.postResetChunksPerTick());
+		int processed = 0;
+		while (processed < perTick && !singularityResetQueue.isEmpty()) {
+			Long chunkKey = singularityResetQueue.pollFirst();
+			if (chunkKey == null) {
+				continue;
+			}
+			if (singularityResetProcessed.contains(chunkKey.longValue())) {
+				continue;
+			}
+			resetChunkBatch(world, new ChunkPos(chunkKey));
+			processed++;
+		}
+		if (singularityResetQueue.isEmpty()) {
+			InfectionLog.info(LogChannel.SINGULARITY,
+					"[reset] complete processed={} queue=0",
+					singularityResetProcessed.size());
+			finishSingularity(world);
+		} else if (processed > 0) {
+			if (SingularityConfig.debugLogging()) {
+				InfectionLog.info(LogChannel.SINGULARITY,
+						"[reset] processed={} remaining={}",
+						processed,
+						singularityResetQueue.size());
+			}
+			markDirty();
+		} else {
+			int tickBudget = Math.max(1, SingularityConfig.postResetTickDelay());
+			singularityResetDelay = tickBudget;
+		}
+	}
+
+	private void resetChunkBatch(ServerWorld world, ChunkPos base) {
+		int radius = Math.max(0, SingularityConfig.postResetBatchRadius());
+		for (int dx = -radius; dx <= radius; dx++) {
+			for (int dz = -radius; dz <= radius; dz++) {
+				ChunkPos target = new ChunkPos(base.x + dx, base.z + dz);
+				resetSingleChunk(world, target);
+			}
+		}
+	}
+
+	private void resetSingleChunk(ServerWorld world, ChunkPos pos) {
+		long key = pos.toLong();
+		if (!singularityResetProcessed.add(key)) {
+			return;
+		}
+		MinecraftServer server = world.getServer();
+		if (server == null) {
+			return;
+		}
+		try {
+			BlockPos origin = new BlockPos(pos.getStartX(), world.getBottomY(), pos.getStartZ());
+			ServerCommandSource source = server.getCommandSource()
+					.withWorld(world)
+					.withPosition(Vec3d.ofCenter(origin))
+					.withLevel(4)
+					.withSilent();
+			String command = String.format(Locale.ROOT, "chunk reset %d %d", pos.x, pos.z);
+			server.getCommandManager().executeWithPrefix(source, command);
+			if (SingularityConfig.debugLogging()) {
+				InfectionLog.info(LogChannel.SINGULARITY, "[reset] chunk {}", pos);
+			}
+		} catch (Exception ex) {
+			TheVirusBlock.LOGGER.warn("[Singularity] chunk reset failed chunk={} reason={}", pos, ex.toString());
+		}
+	}
+
+	private void pullEntitiesTowardRing(ServerWorld world, double radius) {
+		if (singularityCenter == null) {
+			return;
+		}
+		Vec3d center = Vec3d.ofCenter(singularityCenter);
+		Box range = new Box(singularityCenter).expand(radius);
+		for (LivingEntity living : world.getEntitiesByClass(LivingEntity.class, range, Entity::isAlive)) {
+			Vec3d delta = center.subtract(living.getPos());
+			double distance = delta.length();
+			if (distance < 0.1D) {
+				continue;
+			}
+			double modifier = MathHelper.clamp(1.0D - (distance / (radius + 4.0D)), 0.0D, 1.0D);
+			if (modifier <= 0.0D) {
+				continue;
+			}
+			Vec3d impulse = delta.normalize().multiply(SINGULARITY_RING_PULL_STRENGTH * modifier);
+			living.addVelocity(impulse.x, impulse.y * 0.2D, impulse.z);
+			living.velocityDirty = true;
+			living.velocityModified = true;
+		}
+		for (ItemEntity item : world.getEntitiesByClass(ItemEntity.class, range, entity -> !entity.isRemoved())) {
+			Vec3d delta = center.subtract(item.getPos());
+			double distance = delta.length();
+			if (distance < 0.1D) {
+				continue;
+			}
+			double modifier = MathHelper.clamp(1.0D - (distance / (radius + 4.0D)), 0.0D, 1.0D);
+			if (modifier <= 0.0D) {
+				continue;
+			}
+			Vec3d impulse = delta.normalize().multiply(SINGULARITY_RING_PULL_STRENGTH * 0.5D * modifier);
+			item.addVelocity(impulse.x, impulse.y * 0.1D, impulse.z);
+			item.velocityDirty = true;
+		}
+	}
+
+	private void finishSingularity(ServerWorld world) {
+		clearFuseEntities(world, false);
+		revertSingularityBlock(world, true);
+		flushBufferedChunks(world, true);
+		collapseBufferedChunks.clear();
+		resetSingularityState(world);
+		broadcast(world, Text.translatable("message.the-virus-block.singularity_dissipated").formatted(Formatting.BLUE));
+		forceContainmentReset(world);
+		world.getPlayers(PlayerEntity::isAlive).forEach(player -> {
+			player.sendMessage(Text.translatable("message.the-virus-block.cleansed").formatted(Formatting.AQUA), false);
+		});
+		markDirty();
+	}
+
+	public boolean forceStartSingularity(ServerWorld world, int seconds, BlockPos fallbackCenter) {
+		ensureSingularityGamerules(world);
+		restoreSingularityBorder(world);
+		if (!infected) {
+			ensureDebugInfection(world, fallbackCenter);
+		}
+		if (virusSources.isEmpty()) {
+			virusSources.add(fallbackCenter.toImmutable());
+		}
+		int clampedSeconds = MathHelper.clamp(seconds, 5, 120);
+		InfectionTier tier = InfectionTier.byIndex(InfectionTier.maxIndex());
+		tierIndex = tier.getIndex();
+		ticksInTier = getTierDuration(tier);
+		apocalypseMode = false;
+		finalVulnerabilityBlastTriggered = false;
+		logSingularityStateChange(SingularityState.FUSING, "force command seconds=" + clampedSeconds);
+		singularityState = SingularityState.FUSING;
+		singularityTicks = Math.min(configuredFuseExplosionDelayTicks(), clampedSeconds * 20L);
+		singularityShellCollapsed = false;
+		singularityCollapseRadius = 0;
+		singularityCollapseDescending = true;
+		singularityCollapseTotalChunks = 0;
+		singularityCollapseCompletedChunks = 0;
+		singularityCollapseBarDelay = 0;
+		singularityRingTicks = 0;
+		singularityPhaseDelay = 0;
+		singularityFusePulseTicker = 0;
+		singularityFuseElapsed = 0;
+		resetSingularityPreparation("forceStart");
+		if (isSingularityCollapseEnabled(world)) {
+			prepareSingularityChunkQueue(world);
+		} else {
+			singularityChunkQueue.clear();
+		}
+		if (singularityCenter == null || !world.isChunkLoaded(ChunkPos.toLong(singularityCenter))) {
+			singularityCenter = representativePos(world, world.getRandom());
+		}
+		if (singularityCenter == null) {
+			singularityCenter = fallbackCenter.toImmutable();
+		}
+		maintainFuseEntities(world);
+		applyCollapseDistanceOverrides(world);
+		markDirty();
+		broadcast(world, Text.translatable("message.the-virus-block.singularity_forced").formatted(Formatting.LIGHT_PURPLE));
+		return true;
+	}
+
+	public boolean abortSingularity(ServerWorld world) {
+		if (singularityState == SingularityState.DORMANT) {
+			return false;
+		}
+		clearFuseEntities(world);
+		revertSingularityBlock(world, false);
+		resetSingularityState(world);
+		markDirty();
+		broadcast(world, Text.translatable("message.the-virus-block.singularity_aborted").formatted(Formatting.GRAY));
+		return true;
+	}
+
+	private void ensureDebugInfection(ServerWorld world, BlockPos center) {
+		infected = true;
+		dormant = false;
+		apocalypseMode = false;
+		captureBoobytrapDefaults(world);
+		restoreBoobytrapRules(world);
+		virusSources.clear();
+		virusSources.add(center.toImmutable());
+		if (world.isChunkLoaded(ChunkPos.toLong(center)) && world.getBlockState(center).isAir()) {
+			world.setBlockState(center, ModBlocks.VIRUS_BLOCK.getDefaultState(), Block.NOTIFY_LISTENERS);
+		}
+		fuseClearedBlocks.clear();
+		suppressedUnregisters.clear();
+		markDirty();
 	}
 
 	private void triggerFinalBarrierBlast(ServerWorld world) {
@@ -477,7 +3631,7 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 			if (!world.isChunkLoaded(ChunkPos.toLong(source))) {
 				continue;
 			}
-			pushPlayersFromBlock(world, source, FINAL_VULNERABILITY_BLAST_RADIUS, FINAL_VULNERABILITY_BLAST_SCALE, true);
+			pushPlayersFromBlock(world, source, FINAL_VULNERABILITY_BLAST_RADIUS, FINAL_VULNERABILITY_BLAST_SCALE, false);
 			world.spawnParticles(
 					ParticleTypes.SONIC_BOOM,
 					source.getX() + 0.5D,
@@ -762,6 +3916,233 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 		world.getPlayers(PlayerEntity::isAlive).forEach(player -> player.sendMessage(text, false));
 	}
 
+	private Optional<SingularitySnapshot> getSingularitySnapshot() {
+		return Optional.of(new SingularitySnapshot(
+				singularityState.name(),
+				singularityTicks,
+				singularityCenter,
+				singularityShellCollapsed,
+				singularityCollapseRadius,
+				singularityCollapseDescending,
+				singularityRingTicks,
+				singularityPhaseDelay,
+				singularityFusePulseTicker,
+				singularityFuseElapsed,
+				new ArrayList<>(singularityChunkQueue),
+				singularityCollapseTotalChunks,
+				singularityCollapseCompletedChunks,
+				new CollapseTimingSnapshot(singularityCollapseBarDelay, singularityCollapseCompleteHold),
+				new ResetSnapshot(new ArrayList<>(singularityResetQueue), singularityResetDelay),
+				getSingularityBorderSnapshot().orElse(null)));
+	}
+
+	private Optional<SingularityBorderSnapshot> getSingularityBorderSnapshot() {
+		if (!singularityBorderActive && !singularityBorderHasSnapshot) {
+			return Optional.empty();
+		}
+		SingularityBorderOriginalSnapshot original = null;
+		if (singularityBorderHasSnapshot) {
+			original = new SingularityBorderOriginalSnapshot(
+					singularityBorderOriginalCenterX,
+					singularityBorderOriginalCenterZ,
+					singularityBorderOriginalDiameter,
+					singularityBorderOriginalSafeZone,
+					singularityBorderOriginalDamagePerBlock,
+					singularityBorderOriginalWarningBlocks,
+					singularityBorderOriginalWarningTime);
+		}
+		SingularityBorderTimelineSnapshot timeline = new SingularityBorderTimelineSnapshot(
+				copyRingThresholds(),
+				copyRingCounts(),
+				copyRingRadii(),
+				singularityInitialBorderDiameter,
+				singularityFinalBorderDiameter,
+				singularityTotalRingTicks,
+				singularityRingTickAccumulator,
+				singularityRingIndex,
+				singularityRingPendingChunks,
+				singularityBorderOuterRadius,
+				singularityBorderInnerRadius,
+				singularityRingActualCount);
+		return Optional.of(new SingularityBorderSnapshot(
+				singularityBorderActive,
+				singularityBorderCenterX,
+				singularityBorderCenterZ,
+				singularityBorderInitialDiameter,
+				singularityBorderTargetDiameter,
+				singularityBorderDuration,
+				singularityBorderElapsed,
+				singularityBorderLastDiameter,
+				original,
+				timeline));
+	}
+
+	private void applySingularitySnapshot(SingularitySnapshot snapshot) {
+		try {
+			singularityState = SingularityState.valueOf(snapshot.state());
+		} catch (IllegalArgumentException ex) {
+			singularityState = SingularityState.DORMANT;
+		}
+		singularityLastLoggedState = singularityState;
+		singularityTicks = Math.max(0L, snapshot.ticks());
+		singularityCenter = snapshot.centerPos();
+		singularityShellCollapsed = snapshot.shellCollapsed();
+		singularityCollapseRadius = Math.max(0, snapshot.collapseRadius());
+		singularityCollapseDescending = snapshot.collapseDescending();
+		singularityRingTicks = snapshot.ringTicks();
+		singularityPhaseDelay = snapshot.phaseDelay();
+		singularityFusePulseTicker = MathHelper.clamp(snapshot.fuseTicker(), 0, configuredFusePulseInterval());
+		singularityFuseElapsed = Math.max(0L, snapshot.fuseElapsed());
+		singularityChunkQueue.clear();
+		snapshot.chunkQueue().forEach(chunk -> singularityChunkQueue.addLast(chunk.longValue()));
+		singularityCollapseTotalChunks = Math.max(0, snapshot.collapseTotal());
+		singularityCollapseCompletedChunks = MathHelper.clamp(snapshot.collapseCompleted(), 0, singularityCollapseTotalChunks);
+		CollapseTimingSnapshot timings = snapshot.timings();
+		if (timings != null) {
+			singularityCollapseBarDelay = timings.delay();
+			singularityCollapseCompleteHold = Math.max(0, timings.hold());
+		} else {
+			singularityCollapseBarDelay = 0;
+			singularityCollapseCompleteHold = 0;
+		}
+		ResetSnapshot reset = snapshot.reset();
+		singularityResetQueue.clear();
+		if (reset != null) {
+			reset.queue().forEach(chunk -> singularityResetQueue.addLast(chunk.longValue()));
+			singularityResetDelay = Math.max(0, reset.delay());
+		} else {
+			singularityResetDelay = 0;
+		}
+		singularityResetProcessed.clear();
+		applySingularityBorderSnapshot(snapshot.border());
+		singularityDestructionEngine = SingularityDestructionEngine.create();
+		singularityDestructionDirty = true;
+	}
+
+	private void applySingularityBorderSnapshot(@Nullable SingularityBorderSnapshot snapshot) {
+		if (snapshot == null) {
+			clearSingularityBorderState();
+			return;
+		}
+		singularityBorderActive = snapshot.active();
+		singularityBorderCenterX = snapshot.centerX();
+		singularityBorderCenterZ = snapshot.centerZ();
+		singularityBorderInitialDiameter = snapshot.initialDiameter();
+		singularityBorderTargetDiameter = snapshot.targetDiameter();
+		singularityBorderDuration = snapshot.duration();
+		singularityBorderElapsed = snapshot.elapsed();
+		singularityBorderLastDiameter = snapshot.lastDiameter();
+		SingularityBorderOriginalSnapshot original = snapshot.original();
+		singularityBorderHasSnapshot = original != null;
+		if (original != null) {
+			singularityBorderOriginalCenterX = original.centerX();
+			singularityBorderOriginalCenterZ = original.centerZ();
+			singularityBorderOriginalDiameter = original.diameter();
+			singularityBorderOriginalSafeZone = original.safeZone();
+			singularityBorderOriginalDamagePerBlock = original.damagePerBlock();
+			singularityBorderOriginalWarningBlocks = original.warningBlocks();
+			singularityBorderOriginalWarningTime = original.warningTime();
+		} else {
+			singularityBorderOriginalCenterX = 0.0D;
+			singularityBorderOriginalCenterZ = 0.0D;
+			singularityBorderOriginalDiameter = 0.0D;
+			singularityBorderOriginalSafeZone = 0.0D;
+			singularityBorderOriginalDamagePerBlock = 0.0D;
+			singularityBorderOriginalWarningBlocks = 0;
+			singularityBorderOriginalWarningTime = 0;
+		}
+		SingularityBorderTimelineSnapshot timeline = snapshot.timeline();
+		singularityRingThresholds.clear();
+		singularityRingChunkCounts.clear();
+		singularityRingRadii.clear();
+		if (timeline != null) {
+			for (Double threshold : timeline.thresholds()) {
+				if (threshold != null) {
+					singularityRingThresholds.add(threshold.doubleValue());
+				}
+			}
+			for (Integer count : timeline.ringCounts()) {
+				if (count != null) {
+					singularityRingChunkCounts.add(Math.max(0, count.intValue()));
+				}
+			}
+			for (Integer radius : timeline.ringRadii()) {
+				if (radius != null) {
+					singularityRingRadii.add(Math.max(0, radius.intValue()));
+				}
+			}
+			singularityInitialBorderDiameter = timeline.initialDiameter();
+			singularityFinalBorderDiameter = timeline.finalDiameter();
+			singularityTotalRingTicks = Math.max(0L, timeline.totalTicks());
+			singularityRingTickAccumulator = MathHelper.clamp(timeline.elapsedTicks(), 0L, singularityTotalRingTicks);
+			singularityRingIndex = timeline.ringIndex();
+			singularityRingPendingChunks = Math.max(0, timeline.pendingChunks());
+			singularityBorderOuterRadius = Math.max(0.0D, timeline.outerRadius());
+			singularityBorderInnerRadius = Math.max(0.0D, timeline.innerRadius());
+			singularityRingActualCount = Math.max(1, timeline.ringCount());
+			singularityBorderPendingDeployment = false;
+		} else {
+			singularityInitialBorderDiameter = singularityBorderInitialDiameter;
+			singularityFinalBorderDiameter = singularityBorderTargetDiameter;
+			singularityTotalRingTicks = 0L;
+			singularityRingTickAccumulator = 0L;
+			singularityRingIndex = -1;
+			singularityRingPendingChunks = 0;
+			singularityBorderOuterRadius = 0.0D;
+			singularityBorderInnerRadius = 0.0D;
+			singularityRingActualCount = 0;
+			singularityBorderPendingDeployment = false;
+		}
+	}
+
+	private void resetSingularityState(ServerWorld world) {
+		releaseSingularityChunkTickets(world);
+		restoreCollapseDistanceOverrides(world.getServer());
+		clearBlackholePearl(world);
+		removeSingularityGlow(world);
+		restoreSingularityBorder(world);
+		clearSingularityState();
+	}
+
+	private void clearSingularityState() {
+		singularityState = SingularityState.DORMANT;
+		singularityLastLoggedState = SingularityState.DORMANT;
+		singularityCollapseStallTicks = 0;
+		singularityFuseWatchdogTicks = 0;
+		singularityTicks = 0L;
+		singularityCenter = null;
+		singularityShellCollapsed = false;
+		singularityCollapseRadius = 0;
+		singularityCollapseDescending = true;
+		singularityRingTicks = 0;
+		singularityPhaseDelay = 0;
+		singularityFusePulseTicker = 0;
+		singularityFuseElapsed = 0;
+		singularityChunkQueue.clear();
+		singularityResetQueue.clear();
+		singularityResetProcessed.clear();
+		singularityResetDelay = 0;
+		singularityCollapseTickCooldown = 0;
+		singularityCollapseTotalChunks = 0;
+		singularityCollapseCompletedChunks = 0;
+		singularityCollapseBarDelay = 0;
+		singularityCollapseCompleteHold = 0;
+		singularityDestructionEngine = SingularityDestructionEngine.create();
+		singularityDestructionDirty = true;
+		shutdownCollapseScheduler();
+		singularityPreloadQueue.clear();
+		singularityPreloadComplete = false;
+		singularityPreloadMissingChunks = 0;
+		singularityDebugLogCooldown = SINGULARITY_DEBUG_LOG_INTERVAL;
+		fuseClearedBlocks.clear();
+		collapseBufferedChunks.clear();
+		suppressedUnregisters.clear();
+		blackholePearlId = null;
+		singularityGlowNodes.clear();
+		clearSingularityBorderState();
+		singularityRingRadii.clear();
+	}
+
 	private void tickGuardianBeams(ServerWorld world) {
 		if (guardianBeams.isEmpty()) {
 			return;
@@ -796,6 +4177,9 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 
 		int pulses = 2 + tier.getIndex();
 		for (int i = 0; i < pulses; i++) {
+			if (shouldSkipSpreadThisTick(world)) {
+				break;
+			}
 			BlockMutationHelper.mutateAroundSources(world, virusSources, tier, apocalypseMode);
 		}
 
@@ -1109,10 +4493,15 @@ private static final Codec<VirusWorldState> CODEC = RecordCodecBuilder.create(in
 				continue;
 			}
 
-			if (!world.getBlockState(pos).isOf(ModBlocks.VIRUS_BLOCK)) {
-				iterator.remove();
-				markDirty();
-				removed = true;
+			BlockState state = world.getBlockState(pos);
+			boolean isCore = isVirusCoreBlock(pos, state);
+			if (!isCore) {
+				boolean singularityActive = singularityState != SingularityState.DORMANT && state.isOf(ModBlocks.SINGULARITY_BLOCK);
+				if (!singularityActive) {
+					iterator.remove();
+					markDirty();
+					removed = true;
+				}
 			}
 		}
 
@@ -1262,7 +4651,7 @@ private static final int MAX_SHELL_HEIGHT = 2;
 
 			BlockState current = world.getBlockState(pos);
 			BlockPos key = pos.toImmutable();
-			if (current.isOf(ModBlocks.VIRUS_BLOCK) || current.isOf(block)) {
+			if (isVirusCoreBlock(pos, current) || current.isOf(ModBlocks.SINGULARITY_BLOCK) || current.isOf(block)) {
 				shellCooldowns.remove(key);
 				return;
 			}
@@ -1370,6 +4759,7 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		guardian.setNoGravity(true);
 		guardian.setInvulnerable(true);
 		guardian.setTarget(target);
+		guardian.addCommandTag(TheVirusBlock.VIRUS_DEFENSE_BEAM_TAG);
 		if (!world.spawnEntity(guardian)) {
 			return;
 		}
@@ -1517,7 +4907,7 @@ private static final int MAX_SHELL_HEIGHT = 2;
 	}
 
 	private boolean teleportSource(ServerWorld world, BlockPos from, BlockPos to) {
-		if (!world.getBlockState(from).isOf(ModBlocks.VIRUS_BLOCK)) {
+		if (!isVirusCoreBlock(from, world.getBlockState(from))) {
 			return false;
 		}
 		world.setBlockState(from, Blocks.AIR.getDefaultState(), Block.NOTIFY_LISTENERS);
@@ -1547,7 +4937,8 @@ private static final int MAX_SHELL_HEIGHT = 2;
 			if (!world.getBlockState(below).isSolidBlock(world, below)) {
 				continue;
 			}
-			if (world.getBlockState(target).isOf(ModBlocks.VIRUS_BLOCK)) {
+			if (isVirusCoreBlock(target, world.getBlockState(target))
+					|| world.getBlockState(target).isOf(ModBlocks.SINGULARITY_BLOCK)) {
 				continue;
 			}
 			return target;
@@ -1647,6 +5038,14 @@ private static final int MAX_SHELL_HEIGHT = 2;
 
 	private void maybeSpawnMatrixCube(ServerWorld world, InfectionTier tier) {
 		int maxActive = Math.max(1, world.getGameRules().getInt(TheVirusBlock.VIRUS_MATRIX_CUBE_MAX_ACTIVE));
+		float singularityFactor = getMatrixCubeSingularityFactor();
+		if (singularityFactor <= 0.0F) {
+			MatrixCubeBlockEntity.trimActive(world, 0);
+			CorruptionProfiler.logMatrixCubeSkip(world, "singularity_halt", null, MatrixCubeBlockEntity.getActiveCount(world), 0);
+			return;
+		}
+		maxActive = Math.max(1, MathHelper.floor(maxActive * singularityFactor));
+		MatrixCubeBlockEntity.trimActive(world, maxActive);
 		int active = MatrixCubeBlockEntity.getActiveCount(world);
 		if (active >= maxActive) {
 			CorruptionProfiler.logMatrixCubeSkip(world, "active_limit", null, active, maxActive);
@@ -1660,7 +5059,17 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		}
 
 		Random random = world.getRandom();
+		double activityMultiplier = getSingularityActivityMultiplier();
+		if (activityMultiplier <= 0.0D) {
+			CorruptionProfiler.logMatrixCubeSkip(world, "singularity_freeze", null, active, maxActive);
+			return;
+		}
 		int attempts = Math.max(1, world.getGameRules().getInt(TheVirusBlock.VIRUS_MATRIX_CUBE_SPAWN_ATTEMPTS));
+		attempts = Math.max(0, MathHelper.floor(attempts * activityMultiplier * singularityFactor));
+		if (attempts <= 0) {
+			CorruptionProfiler.logMatrixCubeSkip(world, "singularity_freeze", null, active, maxActive);
+			return;
+		}
 		int placements = 0;
 		for (int attempt = 0; attempt < attempts && active < maxActive; attempt++) {
 			ServerPlayerEntity anchor = players.get(random.nextInt(players.size()));
@@ -1761,6 +5170,8 @@ private static final int MAX_SHELL_HEIGHT = 2;
 			resetHealthForTier(InfectionTier.byIndex(tierIndex));
 			pillarChunks.clear();
 			eventHistory.clear();
+			resetSingularityState(world);
+			tierFiveBarrierActive = false;
 			nextTierFiveBarrierPushTick = 0L;
 			finalVulnerabilityBlastTriggered = false;
 			markDirty();
@@ -1841,6 +5252,8 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		MatrixCubeBlockEntity.destroyAll(world);
 		shellCooldowns.clear();
 		pillarChunks.clear();
+		fuseClearedBlocks.clear();
+		suppressedUnregisters.clear();
 		apocalypseMode = false;
 		terrainCorrupted = false;
 		shellsCollapsed = false;
@@ -1864,6 +5277,7 @@ private static final int MAX_SHELL_HEIGHT = 2;
 		terrainCorrupted = false;
 		shellsCollapsed = false;
 		shellRebuildPending = false;
+		resetSingularityState(world);
 		deactivateTierFiveBarrier(world);
 		healthScale = 1.0D;
 		currentHealth = 0.0D;
@@ -2075,7 +5489,10 @@ private static final int MAX_SHELL_HEIGHT = 2;
 				continue;
 			}
 			BlockState state = world.getBlockState(target);
-			if (state.isAir() || state.getHardness(world, target) < 0.0F || state.isOf(ModBlocks.VIRUS_BLOCK)) {
+			if (state.isAir()
+					|| state.getHardness(world, target) < 0.0F
+					|| isVirusCoreBlock(target, state)
+					|| state.isOf(ModBlocks.SINGULARITY_BLOCK)) {
 				continue;
 			}
 			if (state.isIn(BlockTags.BASE_STONE_OVERWORLD)) {
@@ -2576,6 +5993,53 @@ private record ShieldField(long id, BlockPos center, double radius, long created
 		return currentHealth;
 	}
 
+	public long getTicksUntilFinalWave() {
+		if (!infected || apocalypseMode) {
+			return 0L;
+		}
+		InfectionTier current = getCurrentTier();
+		long remaining = Math.max(0L, getTierDuration(current) - ticksInTier);
+		for (int tier = current.getIndex() + 1; tier <= InfectionTier.maxIndex(); tier++) {
+			remaining += getTierDuration(InfectionTier.byIndex(tier));
+		}
+		return remaining;
+	}
+
+	public SingularityState getSingularityState() {
+		return singularityState;
+	}
+
+	public long getSingularityTicks() {
+		return singularityTicks;
+	}
+
+	public float getSingularityFuseProgress() {
+		return getSingularitySuppressionProgress();
+	}
+
+	public float getSingularityCollapseProgress() {
+		if (singularityState != SingularityState.COLLAPSE) {
+			return 0.0F;
+		}
+		if (singularityCollapseBarDelay > 0) {
+			return 1.0F;
+		}
+		if (singularityBorderDuration > 0L) {
+			float elapsed = MathHelper.clamp((float) singularityBorderElapsed / (float) singularityBorderDuration, 0.0F, 1.0F);
+			float progress = 1.0F - elapsed;
+			return MathHelper.clamp(progress, 0.0F, 1.0F);
+		}
+		if (singularityCollapseTotalChunks <= 0) {
+			return 0.0F;
+		}
+		float completed = MathHelper.clamp((float) singularityCollapseCompletedChunks / (float) singularityCollapseTotalChunks, 0.0F, 1.0F);
+		return MathHelper.clamp(1.0F - completed, 0.0F, 1.0F);
+	}
+
+	public int getSingularityCollapseDelayTicks() {
+		return Math.max(0, singularityCollapseBarDelay);
+	}
+
 	public float getBoobytrapIntensity() {
 		if (apocalypseMode) {
 			return 1.6F;
@@ -2789,6 +6253,190 @@ private record ShieldField(long id, BlockPos center, double radius, long created
 			flags |= FLAG_CLEANSING;
 		}
 		return flags;
+	}
+
+	public enum SingularityState {
+		DORMANT,
+		FUSING,
+		COLLAPSE,
+		CORE,
+		RING,
+		DISSIPATION,
+		RESET
+	}
+
+	private record HealthSnapshot(double scale, double current) {
+		private static final HealthSnapshot DEFAULT = new HealthSnapshot(1.0D, 0.0D);
+		private static final Codec<HealthSnapshot> CODEC = RecordCodecBuilder.create(inst -> inst.group(
+				Codec.DOUBLE.optionalFieldOf("scale", 1.0D).forGetter(HealthSnapshot::scale),
+				Codec.DOUBLE.optionalFieldOf("current", 0.0D).forGetter(HealthSnapshot::current)
+		).apply(inst, HealthSnapshot::new));
+
+		private static HealthSnapshot of(VirusWorldState state) {
+			return new HealthSnapshot(state.healthScale, state.currentHealth);
+		}
+	}
+
+	private record SingularityPersistenceTail(
+			List<ShieldField> shields,
+			Optional<SingularitySnapshot> snapshot,
+			boolean preGenComplete,
+			int preGenMissing) {
+	}
+
+	private record SingularitySnapshot(
+			String state,
+			long ticks,
+			@Nullable BlockPos centerPos,
+			boolean shellCollapsed,
+			int collapseRadius,
+			boolean collapseDescending,
+			int ringTicks,
+			int phaseDelay,
+			int fuseTicker,
+			long fuseElapsed,
+			List<Long> chunkQueue,
+			int collapseTotal,
+			int collapseCompleted,
+			@Nullable CollapseTimingSnapshot timings,
+			@Nullable ResetSnapshot reset,
+			@Nullable SingularityBorderSnapshot border) {
+		private static final Codec<SingularitySnapshot> CODEC = RecordCodecBuilder.create(inst -> inst.group(
+				Codec.STRING.optionalFieldOf("state", SingularityState.DORMANT.name()).forGetter(SingularitySnapshot::state),
+				Codec.LONG.optionalFieldOf("ticks", 0L).forGetter(SingularitySnapshot::ticks),
+				BlockPos.CODEC.optionalFieldOf("center").forGetter(snapshot -> Optional.ofNullable(snapshot.centerPos())),
+				Codec.BOOL.optionalFieldOf("shellCollapsed", false).forGetter(SingularitySnapshot::shellCollapsed),
+				Codec.INT.optionalFieldOf("collapseRadius", 0).forGetter(SingularitySnapshot::collapseRadius),
+				Codec.BOOL.optionalFieldOf("collapseDescending", true).forGetter(SingularitySnapshot::collapseDescending),
+				Codec.INT.optionalFieldOf("ringTicks", 0).forGetter(SingularitySnapshot::ringTicks),
+				Codec.INT.optionalFieldOf("phaseDelay", 0).forGetter(SingularitySnapshot::phaseDelay),
+				Codec.INT.optionalFieldOf("fuseTicker", 0).forGetter(SingularitySnapshot::fuseTicker),
+				Codec.LONG.optionalFieldOf("fuseElapsed", 0L).forGetter(SingularitySnapshot::fuseElapsed),
+				Codec.LONG.listOf().optionalFieldOf("chunkQueue", List.of()).forGetter(SingularitySnapshot::chunkQueue),
+				Codec.INT.optionalFieldOf("collapseTotal", 0).forGetter(SingularitySnapshot::collapseTotal),
+				Codec.INT.optionalFieldOf("collapseCompleted", 0).forGetter(SingularitySnapshot::collapseCompleted),
+				CollapseTimingSnapshot.CODEC.optionalFieldOf("timings").forGetter(snapshot -> Optional.ofNullable(snapshot.timings())),
+				ResetSnapshot.CODEC.optionalFieldOf("reset").forGetter(snapshot -> Optional.ofNullable(snapshot.reset())),
+				SingularityBorderSnapshot.CODEC.optionalFieldOf("border").forGetter(snapshot -> Optional.ofNullable(snapshot.border()))
+		).apply(inst, (state,
+				ticks,
+				center,
+				shellCollapsed,
+				collapseRadius,
+				collapseDescending,
+				ringTicks,
+				phaseDelay,
+				fuseTicker,
+				fuseElapsed,
+				queue,
+				total,
+				completed,
+				timings,
+				reset,
+				border) -> new SingularitySnapshot(state,
+						ticks,
+						center.orElse(null),
+						shellCollapsed,
+						collapseRadius,
+						collapseDescending,
+						ringTicks,
+						phaseDelay,
+						fuseTicker,
+						fuseElapsed,
+						queue,
+						total,
+						completed,
+						timings.orElse(null),
+						reset.orElse(null),
+						border.orElse(null))));
+	}
+
+	private record CollapseTimingSnapshot(int delay, int hold) {
+		private static final Codec<CollapseTimingSnapshot> CODEC = RecordCodecBuilder.create(inst -> inst.group(
+				Codec.INT.optionalFieldOf("delay", 0).forGetter(CollapseTimingSnapshot::delay),
+				Codec.INT.optionalFieldOf("hold", 0).forGetter(CollapseTimingSnapshot::hold)
+		).apply(inst, CollapseTimingSnapshot::new));
+	}
+
+	private record ResetSnapshot(List<Long> queue, int delay) {
+		private static final Codec<ResetSnapshot> CODEC = RecordCodecBuilder.create(inst -> inst.group(
+				Codec.LONG.listOf().optionalFieldOf("queue", List.of()).forGetter(ResetSnapshot::queue),
+				Codec.INT.optionalFieldOf("delay", 0).forGetter(ResetSnapshot::delay)
+		).apply(inst, ResetSnapshot::new));
+	}
+
+	private record SingularityBorderSnapshot(
+			boolean active,
+			double centerX,
+			double centerZ,
+			double initialDiameter,
+			double targetDiameter,
+			long duration,
+			long elapsed,
+			double lastDiameter,
+			@Nullable SingularityBorderOriginalSnapshot original,
+			@Nullable SingularityBorderTimelineSnapshot timeline) {
+		private static final Codec<SingularityBorderSnapshot> CODEC = RecordCodecBuilder.create(inst -> inst.group(
+				Codec.BOOL.optionalFieldOf("active", false).forGetter(SingularityBorderSnapshot::active),
+				Codec.DOUBLE.optionalFieldOf("centerX", 0.0D).forGetter(SingularityBorderSnapshot::centerX),
+				Codec.DOUBLE.optionalFieldOf("centerZ", 0.0D).forGetter(SingularityBorderSnapshot::centerZ),
+				Codec.DOUBLE.optionalFieldOf("initialDiameter", 0.0D).forGetter(SingularityBorderSnapshot::initialDiameter),
+				Codec.DOUBLE.optionalFieldOf("targetDiameter", 0.0D).forGetter(SingularityBorderSnapshot::targetDiameter),
+				Codec.LONG.optionalFieldOf("duration", 0L).forGetter(SingularityBorderSnapshot::duration),
+				Codec.LONG.optionalFieldOf("elapsed", 0L).forGetter(SingularityBorderSnapshot::elapsed),
+				Codec.DOUBLE.optionalFieldOf("lastDiameter", 0.0D).forGetter(SingularityBorderSnapshot::lastDiameter),
+				SingularityBorderOriginalSnapshot.CODEC.optionalFieldOf("original").forGetter(snapshot -> Optional.ofNullable(snapshot.original())),
+				SingularityBorderTimelineSnapshot.CODEC.optionalFieldOf("timeline").forGetter(snapshot -> Optional.ofNullable(snapshot.timeline()))
+		).apply(inst, (active, centerX, centerZ, initialDiameter, targetDiameter, duration, elapsed, lastDiameter, original, timeline) ->
+				new SingularityBorderSnapshot(active, centerX, centerZ, initialDiameter, targetDiameter, duration, elapsed, lastDiameter, original.orElse(null), timeline.orElse(null))));
+	}
+
+	private record SingularityBorderOriginalSnapshot(
+			double centerX,
+			double centerZ,
+			double diameter,
+			double safeZone,
+			double damagePerBlock,
+			int warningBlocks,
+			int warningTime) {
+		private static final Codec<SingularityBorderOriginalSnapshot> CODEC = RecordCodecBuilder.create(inst -> inst.group(
+				Codec.DOUBLE.optionalFieldOf("centerX", 0.0D).forGetter(SingularityBorderOriginalSnapshot::centerX),
+				Codec.DOUBLE.optionalFieldOf("centerZ", 0.0D).forGetter(SingularityBorderOriginalSnapshot::centerZ),
+				Codec.DOUBLE.optionalFieldOf("diameter", 0.0D).forGetter(SingularityBorderOriginalSnapshot::diameter),
+				Codec.DOUBLE.optionalFieldOf("safeZone", 0.0D).forGetter(SingularityBorderOriginalSnapshot::safeZone),
+				Codec.DOUBLE.optionalFieldOf("damagePerBlock", 0.0D).forGetter(SingularityBorderOriginalSnapshot::damagePerBlock),
+				Codec.INT.optionalFieldOf("warningBlocks", 0).forGetter(SingularityBorderOriginalSnapshot::warningBlocks),
+				Codec.INT.optionalFieldOf("warningTime", 0).forGetter(SingularityBorderOriginalSnapshot::warningTime)
+		).apply(inst, SingularityBorderOriginalSnapshot::new));
+	}
+
+	private record SingularityBorderTimelineSnapshot(
+			List<Double> thresholds,
+			List<Integer> ringCounts,
+			List<Integer> ringRadii,
+			double initialDiameter,
+			double finalDiameter,
+			long totalTicks,
+			long elapsedTicks,
+			int ringIndex,
+			int pendingChunks,
+			double outerRadius,
+			double innerRadius,
+			int ringCount) {
+		private static final Codec<SingularityBorderTimelineSnapshot> CODEC = RecordCodecBuilder.create(inst -> inst.group(
+				Codec.DOUBLE.listOf().optionalFieldOf("thresholds", List.of()).forGetter(SingularityBorderTimelineSnapshot::thresholds),
+				Codec.INT.listOf().optionalFieldOf("ringCounts", List.of()).forGetter(SingularityBorderTimelineSnapshot::ringCounts),
+				Codec.INT.listOf().optionalFieldOf("ringRadii", List.of()).forGetter(SingularityBorderTimelineSnapshot::ringRadii),
+				Codec.DOUBLE.optionalFieldOf("initialDiameter", 0.0D).forGetter(SingularityBorderTimelineSnapshot::initialDiameter),
+				Codec.DOUBLE.optionalFieldOf("finalDiameter", 0.0D).forGetter(SingularityBorderTimelineSnapshot::finalDiameter),
+				Codec.LONG.optionalFieldOf("totalTicks", 0L).forGetter(SingularityBorderTimelineSnapshot::totalTicks),
+				Codec.LONG.optionalFieldOf("elapsedTicks", 0L).forGetter(SingularityBorderTimelineSnapshot::elapsedTicks),
+				Codec.INT.optionalFieldOf("ringIndex", -1).forGetter(SingularityBorderTimelineSnapshot::ringIndex),
+				Codec.INT.optionalFieldOf("pendingChunks", 0).forGetter(SingularityBorderTimelineSnapshot::pendingChunks),
+				Codec.DOUBLE.optionalFieldOf("outerRadius", 0.0D).forGetter(SingularityBorderTimelineSnapshot::outerRadius),
+				Codec.DOUBLE.optionalFieldOf("innerRadius", 0.0D).forGetter(SingularityBorderTimelineSnapshot::innerRadius),
+				Codec.INT.optionalFieldOf("ringCount", 0).forGetter(SingularityBorderTimelineSnapshot::ringCount)
+		).apply(inst, SingularityBorderTimelineSnapshot::new));
 	}
 
 }

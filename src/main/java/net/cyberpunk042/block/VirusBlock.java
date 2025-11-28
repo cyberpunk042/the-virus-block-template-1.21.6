@@ -69,7 +69,10 @@ public class VirusBlock extends BlockWithEntity {
 	@Override
 	protected void onStateReplaced(BlockState state, ServerWorld world, BlockPos pos, boolean moved) {
 		if (!world.getBlockState(pos).isOf(state.getBlock())) {
-			VirusWorldState.get(world).unregisterSource(world, pos);
+			VirusWorldState infection = VirusWorldState.get(world);
+			if (!infection.shouldSkipUnregister(pos)) {
+				infection.unregisterSource(world, pos);
+			}
 		}
 
 		super.onStateReplaced(state, world, pos, moved);

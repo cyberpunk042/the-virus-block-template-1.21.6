@@ -1,5 +1,7 @@
 package net.cyberpunk042.client.render;
 
+import net.cyberpunk042.config.ColorConfig;
+import net.cyberpunk042.config.ColorConfig.ColorSlot;
 import net.fabricmc.fabric.api.client.render.fluid.v1.FluidRenderHandler;
 import net.fabricmc.fabric.api.client.render.fluid.v1.FluidRenderHandlerRegistry;
 import net.minecraft.client.texture.Sprite;
@@ -28,7 +30,7 @@ public final class VirusFluidRenderers {
 			@Override
 			public int getFluidColor(BlockRenderView view, BlockPos pos, FluidState state) {
 				if (VirusSkyClientState.areFluidsCorrupted()) {
-					return 0xFF8A1818; // deep red accent while keeping the fluid fully opaque
+					return ColorConfig.argb(ColorSlot.CORRUPTED_LAVA);
 				}
 				return vanillaLava.getFluidColor(view, pos, state);
 			}
@@ -43,7 +45,7 @@ public final class VirusFluidRenderers {
 			@Override
 			public int getFluidColor(BlockRenderView view, BlockPos pos, FluidState state) {
 				if (VirusSkyClientState.areFluidsCorrupted()) {
-					return 0xFF2F7A2F; // swampy green tint with full alpha
+					return ColorConfig.argb(ColorSlot.CORRUPTED_WATER);
 				}
 				return vanillaWater.getFluidColor(view, pos, state);
 			}

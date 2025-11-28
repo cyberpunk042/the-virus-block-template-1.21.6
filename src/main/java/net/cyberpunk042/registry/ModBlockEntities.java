@@ -2,6 +2,7 @@ package net.cyberpunk042.registry;
 
 import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.block.entity.MatrixCubeBlockEntity;
+import net.cyberpunk042.block.entity.SingularityBlockEntity;
 import net.cyberpunk042.block.entity.VirusBlockEntity;
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
 import net.minecraft.block.entity.BlockEntityType;
@@ -14,6 +15,12 @@ public final class ModBlockEntities {
 			Registries.BLOCK_ENTITY_TYPE,
 			Identifier.of(TheVirusBlock.MOD_ID, "virus_block"),
 			FabricBlockEntityTypeBuilder.create(VirusBlockEntity::new, ModBlocks.VIRUS_BLOCK).build()
+	);
+
+	public static final BlockEntityType<SingularityBlockEntity> SINGULARITY_BLOCK = Registry.register(
+			Registries.BLOCK_ENTITY_TYPE,
+			Identifier.of(TheVirusBlock.MOD_ID, "singularity_block"),
+			FabricBlockEntityTypeBuilder.create(SingularityBlockEntity::new, ModBlocks.SINGULARITY_BLOCK).build()
 	);
 
 	public static final BlockEntityType<MatrixCubeBlockEntity> MATRIX_CUBE = Registry.register(

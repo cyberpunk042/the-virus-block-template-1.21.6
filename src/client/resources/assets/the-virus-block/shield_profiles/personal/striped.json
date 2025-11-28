@@ -1,0 +1,61 @@
+{
+  "radius": 14.0,
+  "mesh": {
+    "lat_steps": 200,
+    "lon_steps": 160,
+    "swirl_strength": 0.05,
+    "layers": {
+      "bands": {
+        "mesh_type": "bands",
+        "lat_steps": 220,
+        "lon_steps": 180,
+        "radius_multiplier": 1.03,
+        "band_count": 14,
+        "band_thickness": 0.35,
+        "alpha": {
+          "min": 0.35,
+          "max": 0.82
+        },
+        "colors": {
+          "primary": "#FFF9F6FF",
+          "secondary": "#FF6EEDFF"
+        }
+      },
+      "rim": {
+        "mesh_type": "wireframe",
+        "lat_steps": 48,
+        "lon_steps": 96,
+        "radius_multiplier": 1.1,
+        "wire_thickness": 0.08,
+        "alpha": {
+          "min": 0.4,
+          "max": 0.75
+        },
+        "colors": {
+          "primary": "#FF120C30",
+          "secondary": "#FF67FFE3"
+        }
+      }
+    }
+  },
+  "animation": {
+    "scale": 0.28,
+    "spin_speed": 0.03,
+    "tilt": 0.12
+  },
+  "color": {
+    "primary": "#FFF9F6FF",
+    "secondary": "#FF6EEDFF"
+  },
+  "alpha": {
+    "min": 0.4,
+    "max": 0.9
+  },
+  "beam": {
+    "enabled": false,
+    "inner_radius": 0.04,
+    "outer_radius": 0.08,
+    "color": "#FFFFFFFF"
+  }
+}
+

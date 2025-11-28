@@ -1,0 +1,68 @@
+{
+  "radius": 18.0,
+  "mesh": {
+    "lat_steps": 64,
+    "lon_steps": 192,
+    "swirl_strength": 0.0,
+    "layers": {
+      "checker": {
+        "style": "sphere_square",
+        "shape": "sphere_square",
+        "radius_multiplier": 1.1,
+        "alpha": {
+          "min": 0.4,
+          "max": 0.85
+        },
+        "colors": {
+          "primary": "#FFFFFFFF",
+          "secondary": "#FF4CC8FF"
+        }
+      },
+      "frame": {
+        "mesh_type": "wireframe",
+        "style": "sphere_plain",
+        "shape": "sphere_wireframe",
+        "lat_steps": 48,
+        "lon_steps": 120,
+        "lat_start": 0.0,
+        "lat_end": 1.0,
+        "lon_start": 0.125,
+        "lon_end": 0.875,
+        "radius_multiplier": 1.2,
+        "swirl_strength": 0.0,
+        "phase_offset": 0.25,
+        "alpha": {
+          "min": 0.25,
+          "max": 0.6
+        },
+        "colors": {
+          "primary": "#FF0C1724",
+          "secondary": "#FF75F7FF"
+        },
+        "band_count": 0,
+        "band_thickness": 0.1,
+        "wire_thickness": 0.08
+      }
+    }
+  },
+  "animation": {
+    "scale": 0.3,
+    "spin_speed": 0.018,
+    "tilt": 0.08
+  },
+  "color": {
+    "primary": "#FFFFFFFF",
+    "secondary": "#FF4CC8FF"
+  },
+  "alpha": {
+    "min": 0.4,
+    "max": 0.9
+  },
+  "beam": {
+    "enabled": false,
+    "inner_radius": 0.04,
+    "outer_radius": 0.08,
+    "color": "#FFFFFFFF"
+  }
+}
+

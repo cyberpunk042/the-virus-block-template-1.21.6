@@ -2,8 +2,8 @@ package net.cyberpunk042.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import net.cyberpunk042.infection.GlobalTerrainCorruption;
-import net.cyberpunk042.infection.InfectionTier;
 import net.cyberpunk042.infection.VirusWorldState;
+import net.cyberpunk042.infection.VirusWorldState.SingularityState;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.world.ServerWorld;
@@ -39,7 +39,7 @@ public final class VirusStatsCommand {
 				Text.literal(formatDuration(state.getInfectionTicks()))
 		).formatted(Formatting.GRAY), false);
 
-		long ticksUntilFinalWave = ticksUntilFinalWave(state);
+		long ticksUntilFinalWave = state.getTicksUntilFinalWave();
 		if (ticksUntilFinalWave <= 0L) {
 			source.sendFeedback(() -> Text.translatable("command.the-virus-block.stats.final_wave_now").formatted(Formatting.DARK_RED), false);
 		} else {
@@ -55,28 +55,16 @@ public final class VirusStatsCommand {
 				trackedChunks
 		).formatted(Formatting.DARK_GREEN), false);
 
-		long singularityTicks = Math.max(0L, ticksUntilFinalWave - 1_200L);
-		if (singularityTicks <= 0L) {
-			source.sendFeedback(() -> Text.translatable("command.the-virus-block.stats.singularity_now").formatted(Formatting.DARK_PURPLE), false);
-		} else {
-			source.sendFeedback(() -> Text.translatable(
-					"command.the-virus-block.stats.singularity_eta",
-					Text.literal(formatDuration(singularityTicks))
+		SingularityState singularityState = state.getSingularityState();
+		switch (singularityState) {
+			case DORMANT -> source.sendFeedback(() -> Text.translatable("command.the-virus-block.stats.singularity_dormant").formatted(Formatting.DARK_PURPLE), false);
+			case FUSING -> source.sendFeedback(() -> Text.translatable(
+					"command.the-virus-block.stats.singularity_fusing",
+					Text.literal(formatDuration(state.getSingularityTicks()))
 			).formatted(Formatting.DARK_PURPLE), false);
+			case COLLAPSE -> source.sendFeedback(() -> Text.translatable("command.the-virus-block.stats.singularity_collapse").formatted(Formatting.DARK_PURPLE), false);
 		}
 		return 1;
-	}
-
-	private static long ticksUntilFinalWave(VirusWorldState state) {
-		if (!state.isInfected() || state.isApocalypseMode()) {
-			return 0L;
-		}
-		InfectionTier current = state.getCurrentTier();
-		long remaining = Math.max(0L, current.getDurationTicks() - state.getTicksInTier());
-		for (int tier = current.getIndex() + 1; tier <= InfectionTier.maxIndex(); tier++) {
-			remaining += InfectionTier.byIndex(tier).getDurationTicks();
-		}
-		return remaining;
 	}
 
 	private static String formatDuration(long ticks) {

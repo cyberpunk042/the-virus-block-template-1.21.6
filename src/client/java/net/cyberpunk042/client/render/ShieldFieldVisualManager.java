@@ -1,6 +1,11 @@
 package net.cyberpunk042.client.render;
 
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -12,8 +17,10 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.cyberpunk042.TheVirusBlock;
+import net.cyberpunk042.client.render.util.BeaconBeamRenderer;
 import net.cyberpunk042.network.ShieldFieldRemovePayload;
 import net.cyberpunk042.network.ShieldFieldSpawnPayload;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -32,6 +39,7 @@ import net.minecraft.client.render.block.entity.BeaconBlockEntityRenderer;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.util.math.MatrixStack.Entry;
 import net.minecraft.command.CommandSource;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.RotationAxis;
@@ -40,25 +48,118 @@ import net.minecraft.util.math.Vec3d;
 public final class ShieldFieldVisualManager {
 	private static final Identifier TEXTURE = Identifier.of(TheVirusBlock.MOD_ID, "textures/misc/anti-virus-shield.png");
 	private static final Identifier BEAM_TEXTURE = BeaconBlockEntityRenderer.BEAM_TEXTURE;
-	private static final float INNER_BEAM_RADIUS = 0.045F;
-	private static final float OUTER_BEAM_RADIUS = 0.06F;
-	private static final Map<Long, ShieldVisual> ACTIVE = new Long2ObjectOpenHashMap<>();
-	private static float visualScale = 0.3F;
-	private static float spinSpeed = 0.03F;
-	private static float tiltMultiplier = 0F;
-	private static final ShieldVisualPreset[] PRESETS = new ShieldVisualPreset[]{
-			new ShieldVisualPreset("default", 640, 80, 0.0F),
-			new ShieldVisualPreset("smooth", 64, 96, 0.0F),
-			new ShieldVisualPreset("swirl", 48, 96, 2.4F),
-			new ShieldVisualPreset("rings", 54, 80, 0.6F)
-	};
-	private static int currentPresetIndex = 0;
-	private static String activePresetName = PRESETS[0].name();
-	private static int latSteps = PRESETS[0].latSteps();
-	private static int lonSteps = PRESETS[0].lonSteps();
-	private static float swirlStrength = PRESETS[0].swirlStrength();
+	private static final float PERSONAL_RADIUS_SCALE = 0.5F;
+	private static final double PERSONAL_CENTER_SHIFT = -0.1D;
+	private static final Long2ObjectOpenHashMap<ShieldVisual> ACTIVE = new Long2ObjectOpenHashMap<>();
+	private static final Map<String, ShieldProfileConfig> BUILTIN_PROFILES = new LinkedHashMap<>();
+	private static final List<String> BUILTIN_ORDER = new ArrayList<>();
+	private static final Map<String, ShieldProfileConfig> PERSONAL_BUILTINS = PersonalShieldProfileStore.getBuiltinProfiles();
+	private static final List<String> PERSONAL_BUILTIN_ORDER = PersonalShieldProfileStore.getBuiltinOrder();
+	private static long localVisualId = Long.MIN_VALUE;
+	private static String activeProfileName;
+	private static ShieldProfileConfig currentProfile;
+	private static String personalProfileName;
+	private static ShieldProfileConfig personalProfile;
+	private static ShieldVisual personalVisual;
+	private static boolean personalShieldEnabled;
+	private static boolean personalShieldVisible = true;
+	private static boolean personalUsesAutoScale;
+	private static float personalOverrideRadius;
+	private static int personalProfileRevision;
+	private static PersonalFollowMode personalFollowMode = PersonalFollowMode.SMOOTH;
+	private static EditTarget editTarget = EditTarget.WORLD;
+
+	public enum EditTarget {
+		WORLD,
+		PERSONAL
+	}
+
+	static {
+		BUILTIN_PROFILES.putAll(ShieldProfileStore.getBuiltinProfiles());
+		BUILTIN_ORDER.addAll(ShieldProfileStore.getBuiltinOrder());
+		if (BUILTIN_ORDER.isEmpty()) {
+			String fallback = "default";
+			BUILTIN_ORDER.add(fallback);
+			BUILTIN_PROFILES.put(fallback, ShieldProfileConfig.defaults());
+		}
+		String first = BUILTIN_ORDER.get(0);
+		activeProfileName = first;
+		currentProfile = BUILTIN_PROFILES.getOrDefault(first, ShieldProfileConfig.defaults()).copy();
+		if (PERSONAL_BUILTIN_ORDER.isEmpty()) {
+			personalProfileName = "personal-default";
+			personalProfile = ShieldProfileConfig.defaults();
+		} else {
+			String personalFirst = PERSONAL_BUILTIN_ORDER.get(0);
+			personalProfileName = personalFirst;
+			personalProfile = PERSONAL_BUILTINS.getOrDefault(personalFirst, ShieldProfileConfig.defaults()).copy();
+		}
+		disablePersonalBeam(personalProfile);
+		applyPersonalPredictionDefaults(personalProfile);
+		personalProfileRevision = 0;
+		personalUsesAutoScale = true;
+		personalOverrideRadius = 0.0F;
+	}
 
 	private ShieldFieldVisualManager() {
+	}
+
+	public static EditTarget getEditTarget() {
+		return editTarget;
+	}
+
+	public static void setEditTarget(EditTarget target) {
+		editTarget = target == null ? EditTarget.WORLD : target;
+	}
+
+	public static boolean isEditingPersonal() {
+		return editTarget == EditTarget.PERSONAL;
+	}
+
+	public static boolean isPersonalShieldVisible() {
+		return personalShieldVisible;
+	}
+
+	public static void setPersonalShieldVisible(boolean visible) {
+		personalShieldVisible = visible;
+	}
+
+	public static PersonalFollowMode getPersonalFollowMode() {
+		return personalFollowMode;
+	}
+
+	public static void setPersonalFollowMode(PersonalFollowMode mode) {
+		if (mode != null) {
+			personalFollowMode = mode;
+		}
+	}
+
+	public static boolean setPersonalFollowMode(String name) {
+		PersonalFollowMode mode = PersonalFollowMode.fromName(name);
+		if (mode == null) {
+			return false;
+		}
+		personalFollowMode = mode;
+		return true;
+	}
+
+	public static List<String> getPersonalFollowModeNames() {
+		List<String> names = new ArrayList<>();
+		for (PersonalFollowMode mode : PersonalFollowMode.values()) {
+			names.add(mode.id());
+		}
+		return names;
+	}
+
+	public static ShieldProfileConfig getEditableProfile() {
+		return isEditingPersonal() ? personalProfile : currentProfile;
+	}
+
+	public static Iterable<String> getEditableLayerIds() {
+		return getEditableProfile().meshLayers().keySet();
+	}
+
+	public static Iterable<String> getEditableConfigKeys() {
+		return getEditableProfile().knownKeys();
 	}
 
 	public static void init() {
@@ -70,11 +171,22 @@ public final class ShieldFieldVisualManager {
 			if (client.isPaused()) {
 				return;
 			}
-			ACTIVE.values().forEach(ShieldVisual::tick);
+			Iterator<Long2ObjectMap.Entry<ShieldVisual>> iterator = ACTIVE.long2ObjectEntrySet().iterator();
+			while (iterator.hasNext()) {
+				ShieldVisual visual = iterator.next().getValue();
+				if (visual.tick()) {
+					iterator.remove();
+				}
+			}
+			updatePersonalShield(client);
 		});
 		WorldRenderEvents.AFTER_ENTITIES.register(ShieldFieldVisualManager::render);
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) ->
-				client.execute(ACTIVE::clear));
+				client.execute(() -> {
+					ACTIVE.clear();
+					personalVisual = null;
+					personalShieldEnabled = false;
+				}));
 	}
 
 	private static void handleSpawn(ShieldFieldSpawnPayload payload) {
@@ -82,10 +194,16 @@ public final class ShieldFieldVisualManager {
 		if (client.world == null) {
 			return;
 		}
-		ACTIVE.put(payload.id(), new ShieldVisual(
+		ShieldProfileConfig config = currentProfile.copy();
+		config.setRadius(payload.radius());
+		long id = payload.id();
+		ShieldVisual visual = new ShieldVisual(
 				new Vec3d(payload.x(), payload.y(), payload.z()),
-				payload.radius(),
-				client.world.random.nextFloat() * MathHelper.TAU));
+				config,
+				false,
+				-1,
+				client.world.random.nextFloat() * MathHelper.TAU);
+		ACTIVE.put(id, visual);
 	}
 
 	private static void handleRemove(ShieldFieldRemovePayload payload) {
@@ -93,7 +211,7 @@ public final class ShieldFieldVisualManager {
 	}
 
 	private static void render(WorldRenderContext context) {
-		if (ACTIVE.isEmpty()) {
+		if (ACTIVE.isEmpty() && (!personalShieldEnabled || personalVisual == null)) {
 			return;
 		}
 		VertexConsumerProvider consumers = context.consumers();
@@ -109,25 +227,45 @@ public final class ShieldFieldVisualManager {
 			if (alpha <= 0.02F) {
 				continue;
 			}
-			float scale = Math.max(0.5F, visual.radius * visualScale);
-			float phase = spinSpeed == 0.0F ? 0.0F : visual.phase;
+			ShieldProfileConfig config = visual.config;
+			float scale = Math.max(0.5F, visual.radius() * config.visualScale());
+			float rotation = (visual.age * config.spinSpeed()) + visual.phase;
 
 			matrices.push();
 			matrices.translate(visual.position.x - camPos.x, visual.position.y - camPos.y, visual.position.z - camPos.z);
-			float rotation = (visual.age * spinSpeed) + phase;
 			matrices.multiply(RotationAxis.POSITIVE_Y.rotation(rotation));
-			matrices.multiply(RotationAxis.POSITIVE_X.rotation(rotation * tiltMultiplier));
+			matrices.multiply(RotationAxis.POSITIVE_X.rotation(rotation * config.tiltMultiplier()));
 			matrices.scale(scale, scale, scale);
 			VertexConsumer consumer = consumers.getBuffer(layer);
-			renderSphere(matrices.peek(), consumer, visual, alpha * 0.92F, phase);
+			renderSphere(matrices.peek(), consumer, visual, config, alpha * 0.92F);
 			matrices.pop();
 
-			renderBeam(context, visual);
+			renderBeam(context, visual, config);
+		}
+
+		if (personalShieldEnabled && personalShieldVisible && personalVisual != null) {
+			float alpha = personalVisual.alpha();
+			if (alpha > 0.02F) {
+				ShieldProfileConfig config = personalVisual.config;
+				float scale = Math.max(0.5F, personalVisual.radius() * config.visualScale());
+				float rotation = (personalVisual.age * config.spinSpeed()) + personalVisual.phase;
+
+				matrices.push();
+				matrices.translate(personalVisual.position.x - camPos.x, personalVisual.position.y - camPos.y, personalVisual.position.z - camPos.z);
+				matrices.multiply(RotationAxis.POSITIVE_Y.rotation(rotation));
+				matrices.multiply(RotationAxis.POSITIVE_X.rotation(rotation * config.tiltMultiplier()));
+				matrices.scale(scale, scale, scale);
+				VertexConsumer consumer = consumers.getBuffer(layer);
+				renderSphere(matrices.peek(), consumer, personalVisual, config, alpha * 0.92F);
+				matrices.pop();
+
+				renderBeam(context, personalVisual, config);
+			}
 		}
 	}
 
-	private static void renderBeam(WorldRenderContext context, ShieldVisual visual) {
-		if (context.world() == null) {
+	private static void renderBeam(WorldRenderContext context, ShieldVisual visual, ShieldProfileConfig config) {
+		if (context.world() == null || !config.beamEnabled()) {
 			return;
 		}
 		VertexConsumerProvider consumers = context.consumers();
@@ -144,105 +282,329 @@ public final class ShieldFieldVisualManager {
 		float tickDelta = MinecraftClient.getInstance().getRenderTickCounter().getTickProgress(false);
 		int topY = context.world().getBottomY() + context.world().getDimension().height();
 		int remaining = Math.max(4, topY - MathHelper.floor(beamStartY));
-		renderCustomBeam(matrices, consumers, remaining, worldTime, tickDelta);
+		int color = config.beamColor();
+		int innerColor = (0x64000000 | (color & 0x00FFFFFF));
+		BeaconBeamRenderer.render(
+				matrices,
+				consumers,
+				BEAM_TEXTURE,
+				config.beamInnerRadius(),
+				config.beamOuterRadius(),
+				remaining,
+				worldTime,
+				tickDelta,
+				color,
+				innerColor);
 		matrices.pop();
 	}
 
-	private static void renderSphere(Entry entry, VertexConsumer consumer, ShieldVisual visual, float alpha, float phaseOffset) {
+	private static void renderSphere(Entry entry, VertexConsumer consumer, ShieldVisual visual, ShieldProfileConfig config, float alpha) {
 		Matrix4f matrix = entry.getPositionMatrix();
 		Matrix3f normalMatrix = entry.getNormalMatrix();
-		int latCount = MathHelper.clamp(latSteps, 8, 640);
-		int lonCount = MathHelper.clamp(lonSteps, 16, 960);
-		for (int lat = 0; lat < latCount; lat++) {
-			float v0 = lat / (float) latCount;
-			float v1 = (lat + 1) / (float) latCount;
-			float theta0 = v0 * MathHelper.PI;
-			float theta1 = v1 * MathHelper.PI;
-			for (int lon = 0; lon <= lonCount; lon++) {
-				float u = lon / (float) lonCount;
-				float phi = (u * MathHelper.TAU) + phaseOffset + swirlStrength * (v0 - 0.5F);
-				addVertex(matrix, normalMatrix, consumer, theta1, phi, u, v1, alpha);
-				addVertex(matrix, normalMatrix, consumer, theta0, phi, u, v0, alpha);
+		config.meshLayers().forEach((id, layer) ->
+				renderLayer(matrix, normalMatrix, consumer, visual, config, id, layer, alpha * 0.92F));
+	}
+
+	private static void renderLayer(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer,
+	                                ShieldVisual visual, ShieldProfileConfig profile, String layerId,
+	                                ShieldMeshLayerConfig layer, float baseAlpha) {
+		int latSteps = MathHelper.clamp(layer.latSteps(), 2, 512);
+		int lonSteps = MathHelper.clamp(layer.lonSteps(), 4, 1024);
+		float latStart = layer.latStart();
+		float latRange = Math.max(0.001F, layer.latEnd() - latStart);
+		float lonStart = layer.lonStart();
+		float lonRange = Math.max(0.001F, layer.lonEnd() - layer.lonStart());
+		float radiusScale = Math.max(0.01F, layer.radiusMultiplier());
+		float basePhase = visual.phase + layer.phaseOffset();
+		ShieldTriangleTypeConfig triangleType = ShieldTriangleTypeStore.getOrDefault(
+				profile.layerTriangles().getOrDefault(layerId, "default"));
+
+		for (int lat = 0; lat < latSteps; lat++) {
+			float lat0Norm = latStart + (lat / (float) latSteps) * latRange;
+			float lat1Norm = latStart + ((lat + 1) / (float) latSteps) * latRange;
+			float relLat0 = (lat0Norm - latStart) / latRange;
+			float relLat1 = (lat1Norm - latStart) / latRange;
+			float relLatMid = (relLat0 + relLat1) * 0.5F;
+			float theta0 = lat0Norm * MathHelper.PI;
+			float theta1 = lat1Norm * MathHelper.PI;
+			float layerAlpha = MathHelper.lerp(relLatMid, layer.alphaMin(), layer.alphaMax());
+			float finalAlpha = MathHelper.clamp(baseAlpha * layerAlpha, 0.0F, 1.0F);
+			if (finalAlpha <= 0.01F) {
+				continue;
+			}
+			int color = withAlpha(lerpColor(layer.primaryColor(), layer.secondaryColor(), relLatMid), finalAlpha);
+			for (int lon = 0; lon < lonSteps; lon++) {
+				float lon0Norm = lonStart + (lon / (float) lonSteps) * lonRange;
+				float lon1Norm = lonStart + ((lon + 1) / (float) lonSteps) * lonRange;
+				float relLonMid = ((lon0Norm + lon1Norm) * 0.5F - lonStart) / lonRange;
+				if (!layer.shouldRenderCell(lat, latSteps, lon, lonSteps, relLatMid, relLonMid)) {
+					continue;
+				}
+				float swirl = layer.swirlStrength();
+				float swirlOffset = swirl * (relLatMid - 0.5F);
+				float phi0 = (lon0Norm * MathHelper.TAU) + basePhase + swirlOffset;
+				float phi1 = (lon1Norm * MathHelper.TAU) + basePhase + swirlOffset;
+				float u0 = lon0Norm;
+				float u1 = lon1Norm;
+				float v0 = lat0Norm;
+				float v1 = lat1Norm;
+
+				for (ShieldTriangleTypeConfig.Corner[] tri : triangleType.triangles()) {
+					addCornerVertex(matrix, normalMatrix, consumer, tri[0], theta0, theta1, phi0, phi1, u0, u1, v0, v1, radiusScale, color);
+					addCornerVertex(matrix, normalMatrix, consumer, tri[1], theta0, theta1, phi0, phi1, u0, u1, v0, v1, radiusScale, color);
+					addCornerVertex(matrix, normalMatrix, consumer, tri[2], theta0, theta1, phi0, phi1, u0, u1, v0, v1, radiusScale, color);
+				}
 			}
 		}
 	}
 
-	private static void addVertex(Matrix4f matrix, Matrix3f normalMatrix,
-	                              VertexConsumer consumer, float theta, float phi, float u, float v, float alpha) {
+	private static void addCornerVertex(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer,
+	                                    ShieldTriangleTypeConfig.Corner corner,
+	                                    float theta0, float theta1, float phi0, float phi1,
+	                                    float u0, float u1, float v0, float v1,
+	                                    float radiusScale, int color) {
+		float theta = switch (corner) {
+			case TOP_LEFT, TOP_RIGHT -> theta0;
+			case BOTTOM_LEFT, BOTTOM_RIGHT -> theta1;
+		};
+		float phi = switch (corner) {
+			case TOP_LEFT, BOTTOM_LEFT -> phi0;
+			case TOP_RIGHT, BOTTOM_RIGHT -> phi1;
+		};
+		float u = switch (corner) {
+			case TOP_LEFT, BOTTOM_LEFT -> u0;
+			case TOP_RIGHT, BOTTOM_RIGHT -> u1;
+		};
+		float v = switch (corner) {
+			case TOP_LEFT, TOP_RIGHT -> v0;
+			case BOTTOM_LEFT, BOTTOM_RIGHT -> v1;
+		};
+		addVertex(matrix, normalMatrix, consumer, theta, phi, u, v, radiusScale, color);
+	}
+
+	private static void addVertex(Matrix4f matrix, Matrix3f normalMatrix, VertexConsumer consumer,
+	                              float theta, float phi, float u, float v, float radiusScale, int color) {
 		float sinTheta = MathHelper.sin(theta);
 		float x = sinTheta * MathHelper.cos(phi);
 		float y = MathHelper.cos(theta);
 		float z = sinTheta * MathHelper.sin(phi);
-		Vector4f position = new Vector4f(x, y, z, 1.0F);
+		Vector4f position = new Vector4f(x * radiusScale, y * radiusScale, z * radiusScale, 1.0F);
 		position.mul(matrix);
 		Vector3f normal = new Vector3f(x, y, z);
 		normal.mul(normalMatrix);
-		float base = 0.95F;
-		float pulse = 0.02F * MathHelper.sin(phi);
-		float r = MathHelper.clamp(base + pulse, 0.0F, 1.0F);
-		float g = MathHelper.clamp(base + pulse, 0.0F, 1.0F);
-		float b = MathHelper.clamp(base + 0.01F, 0.0F, 1.0F);
-		int ai = MathHelper.floor(alpha * 255.0F) & 0xFF;
-		int ri = MathHelper.floor(r * 255.0F) & 0xFF;
-		int gi = MathHelper.floor(g * 255.0F) & 0xFF;
-		int bi = MathHelper.floor(b * 255.0F) & 0xFF;
-		int color = (ai << 24) | (ri << 16) | (gi << 8) | bi;
 		consumer.vertex(position.x(), position.y(), position.z(), color, u, v,
 				OverlayTexture.DEFAULT_UV, LightmapTextureManager.MAX_LIGHT_COORDINATE,
 				normal.x(), normal.y(), normal.z());
 	}
 
-	private static final class ShieldVisual {
-		final Vec3d position;
-		final float radius;
-		final float phase;
-		private float age;
+	private static int lerpColor(int start, int end, float progress) {
+		float clamped = MathHelper.clamp(progress, 0.0F, 1.0F);
+		int sa = (start >>> 24) & 0xFF;
+		int sr = (start >>> 16) & 0xFF;
+		int sg = (start >>> 8) & 0xFF;
+		int sb = start & 0xFF;
+		int ea = (end >>> 24) & 0xFF;
+		int er = (end >>> 16) & 0xFF;
+		int eg = (end >>> 8) & 0xFF;
+		int eb = end & 0xFF;
+		int a = MathHelper.floor(MathHelper.lerp(clamped, sa, ea));
+		int r = MathHelper.floor(MathHelper.lerp(clamped, sr, er));
+		int g = MathHelper.floor(MathHelper.lerp(clamped, sg, eg));
+		int b = MathHelper.floor(MathHelper.lerp(clamped, sb, eb));
+		return (a << 24) | (r << 16) | (g << 8) | b;
+	}
 
-		ShieldVisual(Vec3d position, float radius, float phase) {
-			this.position = position;
-			this.radius = radius;
-			this.phase = phase;
+	private static int withAlpha(int color, float alpha) {
+		int a = MathHelper.floor(MathHelper.clamp(alpha, 0.0F, 1.0F) * 255.0F) & 0xFF;
+		return (color & 0x00FFFFFF) | (a << 24);
+	}
+
+	private static void updatePersonalShield(MinecraftClient client) {
+		if (!personalShieldEnabled) {
+			return;
+		}
+		if (client.player == null || client.world == null) {
+			personalVisual = null;
+			return;
+		}
+		Vec3d targetPos = resolvePersonalAnchor(client.player);
+		boolean autoScale = personalUsesAutoScale;
+		float baseRadius = autoScale ? personalProfile.radius()
+				: (personalOverrideRadius > 0.0F ? personalOverrideRadius : personalProfile.radius());
+		if (personalVisual == null) {
+			float phase = client.world.random.nextFloat() * MathHelper.TAU;
+			ShieldProfileConfig config = createPersonalProfile(baseRadius, autoScale);
+			personalVisual = new ShieldVisual(targetPos, config, true, -1, phase, personalProfileRevision);
+			return;
+		}
+		if (personalVisual.profileRevision != personalProfileRevision) {
+			float phase = personalVisual.phase;
+			ShieldProfileConfig config = createPersonalProfile(baseRadius, autoScale);
+			personalVisual = new ShieldVisual(targetPos, config, true, -1, phase, personalProfileRevision);
+		}
+		Vec3d currentPos = personalVisual.position;
+		Vec3d nextPos = personalFollowMode.interpolate(currentPos, targetPos);
+		personalVisual.setPosition(nextPos);
+		personalVisual.tick();
+	}
+
+	private static Vec3d resolvePersonalAnchor(PlayerEntity player) {
+		Vec3d center = player.getBoundingBox().getCenter().add(0.0D, PERSONAL_CENTER_SHIFT, 0.0D);
+		if (!personalProfile.predictionEnabled()) {
+			return center;
+		}
+		return applyPersonalPrediction(player, center);
+	}
+
+	private static Vec3d applyPersonalPrediction(PlayerEntity player, Vec3d base) {
+		double lead = MathHelper.clamp(personalProfile.predictionLeadTicks(), 0, 60);
+		if (lead <= 0.0D) {
+			return base;
+		}
+		Vec3d predicted = base.add(player.getVelocity().multiply(lead));
+		float lookAhead = personalProfile.predictionLookAhead();
+		if (lookAhead != 0.0F) {
+			Vec3d look = player.getRotationVec(1.0F).normalize();
+			predicted = predicted.add(look.multiply(lookAhead));
+		}
+		float vertical = personalProfile.predictionVerticalBoost();
+		if (vertical != 0.0F) {
+			predicted = predicted.add(0.0D, vertical, 0.0D);
+		}
+		float maxDistance = personalProfile.predictionMaxDistance();
+		if (maxDistance > 0.01F) {
+			Vec3d delta = predicted.subtract(base);
+			double maxSq = maxDistance * maxDistance;
+			if (delta.lengthSquared() > maxSq) {
+				predicted = base.add(delta.normalize().multiply(maxDistance));
+			}
+		}
+		return predicted;
+	}
+
+	public enum PersonalFollowMode {
+		SNAP("snap", 1.0F),
+		SMOOTH("smooth", 0.35F),
+		GLIDE("glide", 0.2F);
+
+		private final String id;
+		private final float lerpFactor;
+
+		PersonalFollowMode(String id, float lerpFactor) {
+			this.id = id;
+			this.lerpFactor = lerpFactor;
 		}
 
-		void tick() {
-			age += 1.0F;
+		public String id() {
+			return id;
+		}
+
+		public float lerpFactor() {
+			return lerpFactor;
+		}
+
+		public Vec3d interpolate(Vec3d current, Vec3d target) {
+			if (current == null || lerpFactor >= 0.999F) {
+				return target;
+			}
+			return current.lerp(target, lerpFactor);
+		}
+
+		public static PersonalFollowMode fromName(String name) {
+			if (name == null) {
+				return null;
+			}
+			String key = name.toLowerCase(Locale.ROOT);
+			for (PersonalFollowMode mode : values()) {
+				if (mode.id.equals(key)) {
+					return mode;
+				}
+			}
+			return null;
+		}
+	}
+
+	private static final class ShieldVisual {
+		Vec3d position;
+		final ShieldProfileConfig config;
+		final boolean local;
+		final int maxLifeTicks;
+		final float phase;
+		final int profileRevision;
+		private int age;
+
+		ShieldVisual(Vec3d position, ShieldProfileConfig config, boolean local, int maxLifeTicks, float phase) {
+			this(position, config, local, maxLifeTicks, phase, 0);
+		}
+
+		ShieldVisual(Vec3d position, ShieldProfileConfig config, boolean local, int maxLifeTicks, float phase, int profileRevision) {
+			this.position = position;
+			this.config = config;
+			this.local = local;
+			this.maxLifeTicks = maxLifeTicks;
+			this.phase = phase;
+			this.profileRevision = profileRevision;
+		}
+
+		boolean tick() {
+			age++;
+			return local && maxLifeTicks > 0 && age >= maxLifeTicks;
+		}
+
+		float radius() {
+			return Math.max(0.5F, config.radius());
 		}
 
 		float alpha() {
-			float pulse = 0.88F + 0.1F * MathHelper.sin((age * 0.04F) + phase);
-			return MathHelper.clamp(pulse, 0.6F, 0.98F);
+			float sine = 0.5F + 0.5F * MathHelper.sin((age * 0.04F) + phase);
+			return MathHelper.lerp(sine, config.minAlpha(), config.maxAlpha());
+		}
+
+		void setPosition(Vec3d position) {
+			this.position = position;
 		}
 	}
 
-	private static void applyPreset(ShieldVisualPreset preset, int index) {
-		latSteps = preset.latSteps();
-		lonSteps = preset.lonSteps();
-		swirlStrength = preset.swirlStrength();
-		activePresetName = preset.name();
-		currentPresetIndex = index;
+	private static void applyProfile(String name, ShieldProfileConfig profile) {
+		currentProfile = profile.copy();
+		activeProfileName = normalizeName(name);
+	}
+
+	private static ShieldProfileConfig createPersonalProfile(float radius, boolean applyScale) {
+		float scaled = applyScale ? Math.max(0.5F, radius * PERSONAL_RADIUS_SCALE) : Math.max(0.5F, radius);
+		ShieldProfileConfig config = personalProfile.copy();
+		config.setBeamEnabled(false);
+		config.setBeamRadii(0.0F, 0.0F);
+		config.setRadius(scaled);
+		return config;
 	}
 
 	public static boolean applyPreset(String name) {
-		for (int i = 0; i < PRESETS.length; i++) {
-			if (PRESETS[i].name().equalsIgnoreCase(name)) {
-				applyPreset(PRESETS[i], i);
-				return true;
-			}
+		String key = normalizeName(name);
+		ShieldProfileConfig preset = BUILTIN_PROFILES.get(key);
+		if (preset == null) {
+			return false;
 		}
-		return false;
+		applyProfile(key, preset);
+		return true;
 	}
 
 	public static String cyclePreset() {
-		int next = (currentPresetIndex + 1) % PRESETS.length;
-		applyPreset(PRESETS[next], next);
-		return activePresetName;
+		int index = BUILTIN_ORDER.indexOf(activeProfileName);
+		if (index < 0) {
+			index = 0;
+		}
+		int next = (index + 1) % BUILTIN_ORDER.size();
+		String name = BUILTIN_ORDER.get(next);
+		applyProfile(name, BUILTIN_PROFILES.get(name));
+		return activeProfileName;
 	}
 
 	public static boolean setLatSteps(int value) {
 		if (value < 8 || value > 640) {
 			return false;
 		}
-		latSteps = value;
+		currentProfile.setLatSteps(value);
 		markCustom();
 		return true;
 	}
@@ -251,7 +613,7 @@ public final class ShieldFieldVisualManager {
 		if (value < 16 || value > 960) {
 			return false;
 		}
-		lonSteps = value;
+		currentProfile.setLonSteps(value);
 		markCustom();
 		return true;
 	}
@@ -260,57 +622,385 @@ public final class ShieldFieldVisualManager {
 		if (value < -8.0F || value > 8.0F) {
 			return false;
 		}
-		swirlStrength = value;
+		currentProfile.setSwirlStrength(value);
 		markCustom();
 		return true;
 	}
 
+	public static Iterable<String> getPersonalLayerIds() {
+		return personalProfile.meshLayers().keySet();
+	}
+
+	public static Iterable<String> getPersonalConfigKeys() {
+		return personalProfile.knownKeys();
+	}
+
+	public static List<String> describePersonalLayers() {
+		return describeLayersFor(personalProfile);
+	}
+
+	public static boolean addPersonalMeshLayer(String id) {
+		boolean added = personalProfile.addLayer(id);
+		if (added) {
+			markPersonalCustom();
+		}
+		return added;
+	}
+
+	public static boolean removePersonalMeshLayer(String id) {
+		boolean removed = personalProfile.removeLayer(id);
+		if (removed) {
+			markPersonalCustom();
+		}
+		return removed;
+	}
+
+	public static boolean setPersonalLayerValue(String id, String key, String value) {
+		try {
+			boolean updated = personalProfile.setLayerValue(id, key, value);
+			if (updated) {
+				markPersonalCustom();
+				return true;
+			}
+			return false;
+		} catch (IllegalArgumentException ex) {
+			return false;
+		}
+	}
+
+	public static boolean setPersonalLatSteps(int value) {
+		if (value < 8 || value > 640) {
+			return false;
+		}
+		personalProfile.setLatSteps(value);
+		markPersonalCustom();
+		return true;
+	}
+
+	public static boolean setPersonalLonSteps(int value) {
+		if (value < 16 || value > 960) {
+			return false;
+		}
+		personalProfile.setLonSteps(value);
+		markPersonalCustom();
+		return true;
+	}
+
+	public static boolean setPersonalSwirlStrength(float value) {
+		if (value < -8.0F || value > 8.0F) {
+			return false;
+		}
+		personalProfile.setSwirlStrength(value);
+		markPersonalCustom();
+		return true;
+	}
+
+	public static boolean setPersonalScale(float value) {
+		if (value < 0.05F || value > 2.0F) {
+			return false;
+		}
+		personalProfile.setVisualScale(value);
+		markPersonalCustom();
+		return true;
+	}
+
+	public static boolean setPersonalSpinSpeed(float value) {
+		if (value < -0.2F || value > 0.2F) {
+			return false;
+		}
+		personalProfile.setSpinSpeed(value);
+		markPersonalCustom();
+		return true;
+	}
+
+	public static boolean setPersonalTiltMultiplier(float value) {
+		if (value < -1.0F || value > 1.0F) {
+			return false;
+		}
+		personalProfile.setTiltMultiplier(value);
+		markPersonalCustom();
+		return true;
+	}
+
+	public static boolean setPersonalConfigValue(String key, String rawValue) {
+		boolean updated = personalProfile.setValue(key, rawValue);
+		if (updated) {
+			markPersonalCustom();
+		}
+		return updated;
+	}
+
+	public static void setPersonalPrimaryColor(int color) {
+		personalProfile.setPrimaryColor(color);
+		markPersonalCustom();
+	}
+
+	public static void setPersonalSecondaryColor(int color) {
+		personalProfile.setSecondaryColor(color);
+		markPersonalCustom();
+	}
+
+	public static void setPersonalBeamColor(int color) {
+		personalProfile.setBeamColor(color);
+		markPersonalCustom();
+	}
+
+	public static boolean setPersonalPredictionEnabled(boolean enabled) {
+		personalProfile.setPredictionEnabled(enabled);
+		markPersonalCustom();
+		return true;
+	}
+
+	public static boolean setPersonalPredictionLeadTicks(int ticks) {
+		personalProfile.setPredictionLeadTicks(ticks);
+		markPersonalCustom();
+		return true;
+	}
+
+	public static boolean setPersonalPredictionMaxDistance(float distance) {
+		personalProfile.setPredictionMaxDistance(distance);
+		markPersonalCustom();
+		return true;
+	}
+
+	public static boolean setPersonalPredictionLookAhead(float offset) {
+		personalProfile.setPredictionLookAhead(offset);
+		markPersonalCustom();
+		return true;
+	}
+
+	public static boolean setPersonalPredictionVerticalBoost(float boost) {
+		personalProfile.setPredictionVerticalBoost(boost);
+		markPersonalCustom();
+		return true;
+	}
+
+	public static boolean isPersonalPredictionEnabled() {
+		return personalProfile.predictionEnabled();
+	}
+
+	public static int getPersonalPredictionLeadTicks() {
+		return personalProfile.predictionLeadTicks();
+	}
+
+	public static float getPersonalPredictionMaxDistance() {
+		return personalProfile.predictionMaxDistance();
+	}
+
+	public static float getPersonalPredictionLookAhead() {
+		return personalProfile.predictionLookAhead();
+	}
+
+	public static float getPersonalPredictionVerticalBoost() {
+		return personalProfile.predictionVerticalBoost();
+	}
+
+	public static String describePersonalPrediction() {
+		return String.format(Locale.ROOT,
+				"enabled=%s lead=%dt max=%.2f look=%.2f vertical=%.2f",
+				personalProfile.predictionEnabled(),
+				personalProfile.predictionLeadTicks(),
+				personalProfile.predictionMaxDistance(),
+				personalProfile.predictionLookAhead(),
+				personalProfile.predictionVerticalBoost());
+	}
+
+	public static boolean savePersonalProfile(String name) {
+		return PersonalShieldProfileStore.save(name, personalProfile);
+	}
+
+	public static boolean loadPersonalProfile(String name) {
+		String key = normalizeName(name);
+		return PersonalShieldProfileStore.load(name).map(config -> {
+			personalProfile = config.copy();
+			disablePersonalBeam(personalProfile);
+			personalProfileName = key.isEmpty() ? "personal" : key;
+			bumpPersonalRevision();
+			return true;
+		}).orElseGet(() -> applyPersonalPreset(key));
+	}
+
+	public static boolean applyPersonalPreset(String name) {
+		String key = normalizeName(name);
+		ShieldProfileConfig preset = PERSONAL_BUILTINS.get(key);
+		if (preset == null) {
+			return false;
+		}
+		personalProfile = preset.copy();
+		disablePersonalBeam(personalProfile);
+		personalProfileName = key;
+		bumpPersonalRevision();
+		return true;
+	}
+
+	public static void copyWorldProfileToPersonal() {
+		personalProfile = currentProfile.copy();
+		disablePersonalBeam(personalProfile);
+		personalProfileName = normalizeName(activeProfileName + "-personal");
+		bumpPersonalRevision();
+	}
+
+	private static void disablePersonalBeam(ShieldProfileConfig profile) {
+		profile.setBeamEnabled(false);
+		profile.setBeamRadii(0.0F, 0.0F);
+	}
+
+	private static void applyPersonalPredictionDefaults(ShieldProfileConfig profile) {
+		profile.setPredictionEnabled(true);
+		profile.setPredictionLeadTicks(2);
+	}
+
+	public static void enablePersonalShield(float radius) {
+		personalShieldEnabled = true;
+		personalUsesAutoScale = radius <= 0.0F;
+		personalOverrideRadius = personalUsesAutoScale ? 0.0F : Math.max(0.5F, radius);
+		float baseRadius = personalUsesAutoScale ? personalProfile.radius() : personalOverrideRadius;
+		ShieldProfileConfig config = createPersonalProfile(baseRadius, personalUsesAutoScale);
+		personalVisual = new ShieldVisual(Vec3d.ZERO, config, true, -1, 0.0F, personalProfileRevision);
+	}
+
+	public static void disablePersonalShield() {
+		personalShieldEnabled = false;
+		personalVisual = null;
+		personalUsesAutoScale = false;
+		personalOverrideRadius = 0.0F;
+	}
+
 	private static void markCustom() {
-		activePresetName = "custom";
-		currentPresetIndex = -1;
+		activeProfileName = "custom";
+	}
+
+	private static void markPersonalCustom() {
+		personalProfileName = "personal-custom";
+		bumpPersonalRevision();
+	}
+
+	private static void bumpPersonalRevision() {
+		personalProfileRevision++;
 	}
 
 	public static String getActivePresetName() {
-		return activePresetName;
+		return activeProfileName;
+	}
+
+	public static Iterable<String> getLayerIds() {
+		return currentProfile.meshLayers().keySet();
+	}
+
+	public static Iterable<String> getPersonalPresetNames() {
+		return Collections.unmodifiableList(PERSONAL_BUILTIN_ORDER);
+	}
+
+	public static List<String> getSavedPersonalProfileNames() {
+		return PersonalShieldProfileStore.listProfiles();
+	}
+
+	public static Iterable<String> getLayerKeySuggestions() {
+		return ShieldMeshLayerConfig.knownKeys();
+	}
+
+	public static Map<String, ShieldMeshLayerConfig> getLayers() {
+		return currentProfile.meshLayers();
+	}
+
+	public static boolean addMeshLayer(String id) {
+		boolean added = currentProfile.addLayer(id);
+		if (added) {
+			markCustom();
+		}
+		return added;
+	}
+
+	public static boolean removeMeshLayer(String id) {
+		boolean removed = currentProfile.removeLayer(id);
+		if (removed) {
+			markCustom();
+		}
+		return removed;
+	}
+
+	public static boolean setLayerConfigValue(String id, String key, String value) {
+		boolean updated = currentProfile.setLayerValue(id, key, value);
+		if (updated) {
+			markCustom();
+		}
+		return updated;
+	}
+
+	public static List<String> describeLayers() {
+		return describeLayersFor(currentProfile);
+	}
+
+	private static List<String> describeLayersFor(ShieldProfileConfig profile) {
+		List<String> lines = new ArrayList<>();
+		Map<String, String> styles = profile.layerStyles();
+		Map<String, String> shapes = profile.layerShapes();
+		Map<String, String> triangles = profile.layerTriangles();
+		profile.meshLayers().forEach((id, layer) -> {
+			String entry = String.format(Locale.ROOT,
+					"%s -> style=%s shape=%s triangle=%s type=%s lat=%d lon=%d radius=%.2f",
+					id,
+					styles.getOrDefault(id, "custom"),
+					shapes.getOrDefault(id, "custom"),
+					triangles.getOrDefault(id, "default"),
+					layer.meshType().name().toLowerCase(Locale.ROOT),
+					layer.latSteps(),
+					layer.lonSteps(),
+					layer.radiusMultiplier());
+			lines.add(entry);
+		});
+		return lines;
 	}
 
 	public static int getLatSteps() {
-		return latSteps;
+		return currentProfile.latSteps();
 	}
 
 	public static int getLonSteps() {
-		return lonSteps;
+		return currentProfile.lonSteps();
 	}
 
 	public static float getSwirlStrength() {
-		return swirlStrength;
+		return currentProfile.swirlStrength();
 	}
 
 	public static float getVisualScale() {
-		return visualScale;
+		return currentProfile.visualScale();
 	}
 
 	public static float getSpinSpeed() {
-		return spinSpeed;
+		return currentProfile.spinSpeed();
 	}
 
 	public static float getTiltMultiplier() {
-		return tiltMultiplier;
+		return currentProfile.tiltMultiplier();
+	}
+
+	public static ShieldProfileConfig getCurrentProfile() {
+		return currentProfile;
+	}
+
+	public static ShieldProfileConfig getPersonalProfile() {
+		return personalProfile;
+	}
+
+	public static String getPersonalProfileName() {
+		return personalProfileName;
 	}
 
 	public static Iterable<String> getPresetNames() {
-		return Arrays.stream(PRESETS).map(ShieldVisualPreset::name).toList();
+		return Collections.unmodifiableList(BUILTIN_ORDER);
 	}
 
 	public static CompletableFuture<Suggestions> suggestPresetNames(SuggestionsBuilder builder) {
-		return CommandSource.suggestMatching(Arrays.stream(PRESETS).map(ShieldVisualPreset::name), builder);
+		return CommandSource.suggestMatching(BUILTIN_ORDER.stream(), builder);
 	}
 
 	public static boolean setScale(float value) {
 		if (value < 0.05F || value > 2.0F) {
 			return false;
 		}
-		visualScale = value;
+		currentProfile.setVisualScale(value);
 		markCustom();
 		return true;
 	}
@@ -319,7 +1009,7 @@ public final class ShieldFieldVisualManager {
 		if (value < -0.2F || value > 0.2F) {
 			return false;
 		}
-		spinSpeed = value;
+		currentProfile.setSpinSpeed(value);
 		markCustom();
 		return true;
 	}
@@ -328,62 +1018,59 @@ public final class ShieldFieldVisualManager {
 		if (value < -1.0F || value > 1.0F) {
 			return false;
 		}
-		tiltMultiplier = value;
+		currentProfile.setTiltMultiplier(value);
 		markCustom();
 		return true;
 	}
 
-	private record ShieldVisualPreset(String name, int latSteps, int lonSteps, float swirlStrength) {
+	public static boolean setConfigValue(String key, String rawValue) {
+		boolean updated = currentProfile.setValue(key, rawValue);
+		if (updated) {
+			markCustom();
+		}
+		return updated;
 	}
 
-	private static void renderCustomBeam(MatrixStack matrices, VertexConsumerProvider consumers, int height, long worldTime, float tickDelta) {
-		float cycle = Math.floorMod(worldTime, 40L) + tickDelta;
-		float phase = MathHelper.fractionalPart(cycle * 0.2F - MathHelper.floor(cycle * 0.1F));
-		float vStart = -1.0F + phase;
-		VertexConsumer inner = consumers.getBuffer(RenderLayer.getBeaconBeam(BEAM_TEXTURE, false));
-		VertexConsumer outer = consumers.getBuffer(RenderLayer.getBeaconBeam(BEAM_TEXTURE, true));
-		renderBeamPrism(matrices.peek(), inner, INNER_BEAM_RADIUS, height, vStart, vStart + height * (0.5F / INNER_BEAM_RADIUS), 0xFFFFFFFF);
-		renderBeamPrism(matrices.peek(), outer, OUTER_BEAM_RADIUS, height, vStart, vStart + height, 0x40FFFFFF);
+	public static Iterable<String> getConfigKeys() {
+		return currentProfile.knownKeys();
 	}
 
-	private static void renderBeamPrism(MatrixStack.Entry entry, VertexConsumer consumer, float radius, int height, float vStart, float vEnd, int argb) {
-		renderFacePair(entry, consumer, -radius, -radius, radius, -radius, height, vStart, vEnd, argb, 0.0F, 0.0F, -1.0F); // north
-		renderFacePair(entry, consumer, radius, -radius, radius, radius, height, vStart, vEnd, argb, 1.0F, 0.0F, 0.0F);     // east
-		renderFacePair(entry, consumer, -radius, radius, radius, radius, height, vStart, vEnd, argb, 0.0F, 0.0F, 1.0F);     // south
-		renderFacePair(entry, consumer, -radius, -radius, -radius, radius, height, vStart, vEnd, argb, -1.0F, 0.0F, 0.0F);  // west
+	public static boolean saveCurrentProfile(String name) {
+		return ShieldProfileStore.save(name, currentProfile);
 	}
 
-	private static void renderFacePair(MatrixStack.Entry entry, VertexConsumer consumer,
-	                                   float x1, float z1, float x2, float z2,
-	                                   int height, float vStart, float vEnd,
-	                                   int argb, float normalX, float normalY, float normalZ) {
-		renderFace(entry, consumer, x1, z1, x2, z2, height, vStart, vEnd, argb, normalX, normalY, normalZ);
-		renderFace(entry, consumer, x2, z2, x1, z1, height, vStart, vEnd, argb, -normalX, -normalY, -normalZ);
+	public static boolean loadProfile(String name) {
+		String key = normalizeName(name);
+		return ShieldProfileStore.load(name).map(config -> {
+			applyProfile(key, config);
+			return true;
+		}).orElseGet(() -> applyPreset(key));
 	}
 
-	private static void renderFace(MatrixStack.Entry entry, VertexConsumer consumer,
-	                               float x1, float z1, float x2, float z2,
-	                               int height, float vStart, float vEnd,
-	                               int argb, float normalX, float normalY, float normalZ) {
-		addBeamVertex(entry, consumer, x1, 0.0F, z1, 0.0F, vStart, argb, normalX, normalY, normalZ);
-		addBeamVertex(entry, consumer, x1, height, z1, 0.0F, vEnd, argb, normalX, normalY, normalZ);
-		addBeamVertex(entry, consumer, x2, height, z2, 1.0F, vEnd, argb, normalX, normalY, normalZ);
-		addBeamVertex(entry, consumer, x2, 0.0F, z2, 1.0F, vStart, argb, normalX, normalY, normalZ);
+	public static Iterable<String> getSavedProfileNames() {
+		return ShieldProfileStore.listProfiles();
 	}
 
-	private static void addBeamVertex(MatrixStack.Entry entry, VertexConsumer consumer,
-	                                  float x, float y, float z, float u, float v,
-	                                  int argb, float normalX, float normalY, float normalZ) {
-		int a = (argb >>> 24) & 0xFF;
-		int r = (argb >>> 16) & 0xFF;
-		int g = (argb >>> 8) & 0xFF;
-		int b = argb & 0xFF;
-		consumer.vertex(entry.getPositionMatrix(), x, y, z)
-				.color(r, g, b, a)
-				.texture(u, v)
-				.overlay(OverlayTexture.DEFAULT_UV)
-				.light(LightmapTextureManager.MAX_LIGHT_COORDINATE)
-				.normal(entry, normalX, normalY, normalZ);
+	public static void spawnLocal(Vec3d center, float radius, int durationTicks) {
+		ShieldProfileConfig config = currentProfile.copy().setRadius(radius);
+		long id = localVisualId++;
+		float phase = MinecraftClient.getInstance().world == null ? 0.0F : MinecraftClient.getInstance().world.random.nextFloat() * MathHelper.TAU;
+		ShieldVisual visual = new ShieldVisual(center, config, true, durationTicks, phase);
+		ACTIVE.put(id, visual);
+	}
+
+	private static String normalizeName(String name) {
+		return name == null ? "" : name.trim().toLowerCase(Locale.ROOT);
+	}
+
+	public static void reloadActiveProfile() {
+		if (activeProfileName == null || "custom".equals(activeProfileName)) {
+			return;
+		}
+		String name = activeProfileName;
+		if (!loadProfile(name)) {
+			applyPreset(name);
+		}
 	}
 }
 

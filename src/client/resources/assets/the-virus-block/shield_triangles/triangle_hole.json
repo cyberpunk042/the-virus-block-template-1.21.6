@@ -1,0 +1,14 @@
+{
+  "triangles": [
+    [
+      "bottom_left",
+      "top_right",
+      "top_left"
+    ],
+    [
+      "bottom_left",
+      "bottom_right",
+      "top_right"
+    ]
+  ]
+}

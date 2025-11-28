@@ -2,6 +2,7 @@ package net.cyberpunk042.mixin;
 
 import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.infection.VirusWorldState;
+import net.cyberpunk042.registry.ModStatusEffects;
 import net.cyberpunk042.util.VirusMobAllyHelper;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.Entity;
@@ -10,6 +11,7 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
+import net.minecraft.entity.mob.GuardianEntity;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
@@ -21,6 +23,7 @@ import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
@@ -62,6 +65,21 @@ public abstract class LivingEntityMixin extends Entity {
 			cir.setReturnValue(false);
 			return;
 		}
+	}
+
+	@ModifyVariable(method = "damage(Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/entity/damage/DamageSource;F)Z",
+			at = @At("HEAD"), argsOnly = true, index = 3)
+	private float theVirusBlock$personalShieldBeamResistance(float amount, ServerWorld world, DamageSource source) {
+		LivingEntity self = (LivingEntity) (Object) this;
+		if (amount <= 0.0F) {
+			return amount;
+		}
+		if (self.hasStatusEffect(ModStatusEffects.PERSONAL_SHIELD)
+				&& source.getAttacker() instanceof GuardianEntity guardian
+				&& guardian.getCommandTags().contains(TheVirusBlock.VIRUS_DEFENSE_BEAM_TAG)) {
+			return amount * 0.25F;
+		}
+		return amount;
 	}
 
 	@Inject(method = "baseTick", at = @At("TAIL"))

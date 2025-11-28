@@ -26,7 +26,7 @@ public final class VirusBlockProtection {
 		PlayerBlockBreakEvents.BEFORE.register((world, player, pos, state, blockEntity) -> {
 			if (!(world instanceof ServerWorld serverWorld)
 					|| !(player instanceof ServerPlayerEntity serverPlayer)
-					|| !state.isOf(ModBlocks.VIRUS_BLOCK)) {
+					|| !(state.isOf(ModBlocks.VIRUS_BLOCK) || state.isOf(ModBlocks.SINGULARITY_BLOCK))) {
 				return true;
 			}
 

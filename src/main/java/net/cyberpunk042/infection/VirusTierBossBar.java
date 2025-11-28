@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import it.unimi.dsi.fastutil.objects.Object2ByteMap;
 import it.unimi.dsi.fastutil.objects.Object2ByteOpenHashMap;
+import net.cyberpunk042.infection.VirusWorldState.SingularityState;
 import net.cyberpunk042.network.DifficultySyncPayload;
 import net.cyberpunk042.network.SkyTintPayload;
 import net.minecraft.entity.boss.BossBar;
@@ -23,7 +24,12 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 
 public final class VirusTierBossBar {
-	private static final Map<RegistryKey<World>, ServerBossBar> BARS = new HashMap<>();
+	private static final class BossBars {
+		ServerBossBar tierBar;
+		ServerBossBar singularityBar;
+	}
+
+	private static final Map<RegistryKey<World>, BossBars> BARS = new HashMap<>();
 	private static final Object2ByteMap<UUID> SKY_TINT = new Object2ByteOpenHashMap<>();
 
 	private VirusTierBossBar() {
@@ -43,23 +49,67 @@ public final class VirusTierBossBar {
 	public static void update(ServerWorld world, VirusWorldState state) {
 		syncSkyTint(world, state);
 		RegistryKey<World> key = world.getRegistryKey();
-		ServerBossBar bar = BARS.get(key);
+		BossBars bars = BARS.get(key);
 		if (!state.isInfected()) {
-			if (bar != null) {
-				clearBar(bar);
+			if (bars != null) {
+				if (bars.tierBar != null) {
+					clearBar(bars.tierBar);
+				}
+				if (bars.singularityBar != null) {
+					clearBar(bars.singularityBar);
+				}
 				BARS.remove(key);
 			}
 			return;
 		}
 
-		if (bar == null) {
-			bar = createBar();
-			BARS.put(key, bar);
+		if (bars == null) {
+			bars = new BossBars();
+			BARS.put(key, bars);
 		}
 
+		updateTierBar(world, state, bars);
+		updateSingularityBar(world, state, bars);
+	}
+
+	private static void updateTierBar(ServerWorld world, VirusWorldState state, BossBars bars) {
+		if (state.getSingularityState() != SingularityState.DORMANT) {
+			if (bars.tierBar != null) {
+				clearBar(bars.tierBar);
+			}
+			return;
+		}
+		ServerBossBar bar = bars.tierBar;
+		if (bar == null) {
+			bar = createBar();
+			bars.tierBar = bar;
+		}
 		syncPlayers(world, bar);
 		bar.setVisible(true);
 		updateBarSegments(bar, state);
+	}
+
+	private static void updateSingularityBar(ServerWorld world, VirusWorldState state, BossBars bars) {
+		SingularityState singularityState = state.getSingularityState();
+		boolean active = singularityState == SingularityState.FUSING || singularityState == SingularityState.COLLAPSE;
+		ServerBossBar bar = bars.singularityBar;
+		if (!active) {
+			if (bar != null) {
+				clearBar(bar);
+			}
+			return;
+		}
+		if (bar == null) {
+			bar = createSingularityBar();
+			bars.singularityBar = bar;
+		}
+		syncPlayers(world, bar);
+		bar.setVisible(true);
+		if (singularityState == SingularityState.FUSING) {
+			updateSingularityFuseBar(bar, state);
+		} else {
+			updateSingularityCollapseBar(bar, state);
+		}
 	}
 
 	private static ServerBossBar createBar() {
@@ -67,6 +117,15 @@ public final class VirusTierBossBar {
 				Text.literal("Virus Tier"),
 				BossBar.Color.PURPLE,
 				BossBar.Style.NOTCHED_10);
+		bar.setVisible(false);
+		return bar;
+	}
+
+	private static ServerBossBar createSingularityBar() {
+		ServerBossBar bar = new ServerBossBar(
+				Text.translatable("bossbar.the-virus-block.singularity.fuse"),
+				BossBar.Color.YELLOW,
+				BossBar.Style.PROGRESS);
 		bar.setVisible(false);
 		return bar;
 	}
@@ -103,6 +162,32 @@ public final class VirusTierBossBar {
 
 		bar.setPercent(progressRatio);
 		bar.setColor(progressRatio >= 1.0F ? BossBar.Color.RED : BossBar.Color.PURPLE);
+	}
+
+	private static void updateSingularityFuseBar(ServerBossBar bar, VirusWorldState state) {
+		float progress = MathHelper.clamp(state.getSingularityFuseProgress(), 0.0F, 1.0F);
+		int percent = Math.round(progress * 100.0F);
+		MutableText title = Text.translatable("bossbar.the-virus-block.singularity.fuse")
+				.formatted(Formatting.GOLD)
+				.append(Text.literal(String.format(" [%d%%]", percent)).formatted(Formatting.YELLOW));
+		bar.setName(title);
+		bar.setColor(BossBar.Color.YELLOW);
+		bar.setPercent(progress);
+	}
+
+	private static void updateSingularityCollapseBar(ServerBossBar bar, VirusWorldState state) {
+		float remaining = MathHelper.clamp(state.getSingularityCollapseProgress(), 0.0F, 1.0F);
+		int percent = Math.round(remaining * 100.0F);
+		boolean priming = state.getSingularityCollapseDelayTicks() > 0;
+		String key = priming
+				? "bossbar.the-virus-block.singularity.collapse_priming"
+				: "bossbar.the-virus-block.singularity.collapse";
+		MutableText title = Text.translatable(key)
+				.formatted(Formatting.DARK_RED)
+				.append(Text.literal(String.format(" [%d%%]", percent)).formatted(Formatting.RED));
+		bar.setName(title);
+		bar.setColor(BossBar.Color.RED);
+		bar.setPercent(remaining);
 	}
 
 	private static float getProgressRatio(VirusWorldState state) {

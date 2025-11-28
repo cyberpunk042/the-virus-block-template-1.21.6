@@ -140,6 +140,7 @@ public final class BlockMutationHelper {
 		}
 
 		if (original.isOf(ModBlocks.VIRUS_BLOCK)
+				|| original.isOf(ModBlocks.SINGULARITY_BLOCK)
 				|| original.isOf(ModBlocks.INFECTED_BLOCK)
 				|| original.isOf(ModBlocks.INFECTIOUS_CUBE)
 				|| original.isOf(ModBlocks.CURED_INFECTIOUS_CUBE)

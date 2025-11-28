@@ -95,7 +95,7 @@ public final class GlobalTerrainCorruption {
 		if (isPortalCriticalBlock(block)) {
 			return null;
 		}
-		if (block == ModBlocks.VIRUS_BLOCK || block == ModBlocks.MATRIX_CUBE) {
+		if (block == ModBlocks.VIRUS_BLOCK || block == ModBlocks.SINGULARITY_BLOCK || block == ModBlocks.MATRIX_CUBE) {
 			return Blocks.AIR.getDefaultState();
 		}
 		if (block == ModBlocks.CORRUPTED_DIRT || block == ModBlocks.INFECTED_BLOCK) {

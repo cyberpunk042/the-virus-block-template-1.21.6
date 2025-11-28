@@ -1,0 +1,42 @@
+{
+  "radius": 18.0,
+  "mesh": {
+    "lat_steps": 64,
+    "lon_steps": 160,
+    "swirl_strength": 0.2,
+    "layers": {
+      "shell": {
+        "style": "sphere_square",
+        "shape": "sphere_square",
+        "colors": {
+          "primary": "#FFF9FFFF",
+          "secondary": "#FFCCE2FF"
+        },
+        "alpha": {
+          "min": 0.55,
+          "max": 0.9
+        }
+      }
+    }
+  },
+  "animation": {
+    "scale": 0.28,
+    "spin_speed": 0.02,
+    "tilt": 0.0
+  },
+  "color": {
+    "primary": "#FFF9FFFF",
+    "secondary": "#FFCCE2FF"
+  },
+  "alpha": {
+    "min": 0.55,
+    "max": 0.9
+  },
+  "beam": {
+    "enabled": false,
+    "inner_radius": 0.04,
+    "outer_radius": 0.08,
+    "color": "#FFFFFFFF"
+  }
+}
+

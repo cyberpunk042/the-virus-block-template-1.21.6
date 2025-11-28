@@ -6,6 +6,8 @@ import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
 import net.cyberpunk042.client.state.VirusDifficultyClientState;
+import net.cyberpunk042.config.ColorConfig;
+import net.cyberpunk042.config.ColorConfig.ColorSlot;
 import net.cyberpunk042.item.PurificationOption;
 import net.cyberpunk042.network.PurificationTotemSelectPayload;
 import net.cyberpunk042.screen.handler.PurificationTotemScreenHandler;
@@ -69,8 +71,8 @@ public class PurificationTotemScreen extends HandledScreen<PurificationTotemScre
 		int top = y;
 		int right = left + backgroundWidth;
 		int bottom = top + backgroundHeight;
-		context.fill(left, top, right, bottom, 0xCC060606);
-		context.drawBorder(left, top, backgroundWidth, backgroundHeight, 0xFF6E3FDB);
+		context.fill(left, top, right, bottom, ColorConfig.argb(ColorSlot.UI_PURIFICATION_BACKGROUND));
+		context.drawBorder(left, top, backgroundWidth, backgroundHeight, ColorConfig.argb(ColorSlot.UI_PURIFICATION_BORDER));
 	}
 
 	@Override
@@ -85,7 +87,7 @@ public class PurificationTotemScreen extends HandledScreen<PurificationTotemScre
 
 	@Override
 	protected void drawForeground(DrawContext context, int mouseX, int mouseY) {
-		context.drawText(textRenderer, title, 8, 6, 0x404040, false);
+		context.drawText(textRenderer, title, 8, 6, ColorConfig.argb(ColorSlot.UI_PURIFICATION_TITLE), false);
 	}
 
 	private void selectOption(PurificationOption option) {
@@ -117,8 +119,12 @@ public class PurificationTotemScreen extends HandledScreen<PurificationTotemScre
 		@Override
 		protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
 			boolean hovered = isHovered();
-			int borderColor = hovered ? 0xFFE6A90F : 0xFF6E3FDB;
-			int fillColor = hovered ? 0x66FFD088 : 0x66202020;
+			int borderColor = hovered
+					? ColorConfig.argb(ColorSlot.UI_PURIFICATION_OPTION_BORDER_HOVER)
+					: ColorConfig.argb(ColorSlot.UI_PURIFICATION_OPTION_BORDER_IDLE);
+			int fillColor = hovered
+					? ColorConfig.argb(ColorSlot.UI_PURIFICATION_OPTION_FILL_HOVER)
+					: ColorConfig.argb(ColorSlot.UI_PURIFICATION_OPTION_FILL_IDLE);
 			context.fill(getX(), getY(), getX() + width, getY() + height, fillColor);
 			context.drawBorder(getX(), getY(), width, height, borderColor);
 			context.drawCenteredTextWithShadow(PurificationTotemScreen.this.textRenderer, option.title(), getX() + width / 2, getY() - 12, 0xFFFFFF);

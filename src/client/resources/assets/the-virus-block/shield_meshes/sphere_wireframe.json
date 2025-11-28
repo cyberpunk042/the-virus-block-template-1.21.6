@@ -1,0 +1,24 @@
+{
+  "mesh_type": "wireframe",
+  "lat_steps": 64,
+  "lon_steps": 240,
+  "lat_start": 0.0,
+  "lat_end": 1.0,
+  "lon_start": 0.0,
+  "lon_end": 1.0,
+  "radius_multiplier": 1.1,
+  "swirl_strength": 0.0,
+  "phase_offset": 0.0,
+  "alpha": {
+    "min": 0.35,
+    "max": 0.8
+  },
+  "colors": {
+    "primary": "#FFE8F4FF",
+    "secondary": "#FF7AC0FF"
+  },
+  "band_count": 0,
+  "band_thickness": 0.2,
+  "wire_thickness": 0.07
+}
+

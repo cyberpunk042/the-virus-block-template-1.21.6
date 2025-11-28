@@ -275,7 +275,7 @@ public final class BoobytrapHelper {
 			return false;
 		}
 		Block block = state.getBlock();
-		if (block == ModBlocks.VIRUS_BLOCK || block == ModBlocks.MATRIX_CUBE || isTrap(block)
+		if (block == ModBlocks.VIRUS_BLOCK || block == ModBlocks.SINGULARITY_BLOCK || block == ModBlocks.MATRIX_CUBE || isTrap(block)
 				|| block instanceof BedBlock
 				|| block == Blocks.OBSIDIAN
 				|| block == Blocks.CRYING_OBSIDIAN

@@ -1,0 +1,24 @@
+{
+  "mesh_type": "bands",
+  "lat_steps": 80,
+  "lon_steps": 260,
+  "lat_start": 0.0,
+  "lat_end": 1.0,
+  "lon_start": 0.0,
+  "lon_end": 1.0,
+  "radius_multiplier": 1.12,
+  "swirl_strength": 0.15,
+  "phase_offset": 0.0,
+  "alpha": {
+    "min": 0.4,
+    "max": 0.88
+  },
+  "colors": {
+    "primary": "#FFF5FFFF",
+    "secondary": "#FF6CB7FF"
+  },
+  "band_count": 12,
+  "band_thickness": 0.35,
+  "wire_thickness": 0.05
+}
+
