@@ -58,7 +58,7 @@ public final class VirusInventoryAnnouncements {
 		if (world.getRegistryKey() != World.OVERWORLD) {
 			return;
 		}
-		if (VirusWorldState.get(world).isInfected()) {
+		if (VirusWorldState.get(world).infectionState().infected()) {
 			return;
 		}
 		long time = world.getTime();

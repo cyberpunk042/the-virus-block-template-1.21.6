@@ -56,8 +56,8 @@ public final class VirusDebugCommands {
 	private static int showTierPlan(ServerCommandSource source) {
 		ServerWorld world = source.getWorld();
 		VirusWorldState state = VirusWorldState.get(world);
-		InfectionTier tier = state.getCurrentTier();
-		boolean apocalypse = state.isApocalypseMode();
+		InfectionTier tier = state.tiers().currentTier();
+		boolean apocalypse = state.tiers().isApocalypseMode();
 
 		source.sendFeedback(() -> Text.literal("Virus Tier: " + tier.getLevel() + (apocalypse ? " (Apocalypse)" : "")), false);
 
@@ -96,7 +96,7 @@ public final class VirusDebugCommands {
 				random.nextBetween(-4, 4),
 				random.nextBetween(-1, 2),
 				random.nextBetween(-4, 4));
-		if (state.spawnVoidTearForCommand(world, target)) {
+		if (state.infection().spawnVoidTearForCommand(world, target)) {
 			source.sendFeedback(() -> Text.literal("Spawned Void Tear at " + target.toShortString()), false);
 			return 1;
 		}

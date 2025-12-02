@@ -9,8 +9,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.config.InfectionLogConfig.LogChannel;
-import net.cyberpunk042.config.SingularityConfig;
 import net.cyberpunk042.infection.singularity.SingularityChunkContext;
+import net.cyberpunk042.infection.singularity.SingularityDiagnostics;
+import net.cyberpunk042.infection.singularity.SingularityExecutionSettings;
 import net.cyberpunk042.util.LogSpamWatchdog;
 import net.minecraft.server.world.ServerChunkManager;
 import net.minecraft.server.world.ServerWorld;
@@ -35,7 +36,7 @@ public abstract class ServerChunkManagerMixin {
 			return;
 		}
 		if (isOutsideBorder(chunkX, chunkZ) && !SingularityChunkContext.isBypassingChunk(chunkX, chunkZ)) {
-			if (SingularityConfig.debugLogging()) {
+			if (SingularityDiagnostics.logChunkSamples()) {
 				logGuard("worldChunk", chunkX, chunkZ, "outsideBorder");
 			}
 			cir.setReturnValue(null);
@@ -57,7 +58,7 @@ public abstract class ServerChunkManagerMixin {
 			return;
 		}
 		if (isOutsideBorder(chunkX, chunkZ) && !SingularityChunkContext.isBypassingChunk(chunkX, chunkZ)) {
-			if (SingularityConfig.debugLogging()) {
+			if (SingularityDiagnostics.logChunkSamples()) {
 				logGuard("getChunk", chunkX, chunkZ, "outsideBorder");
 			}
 			cir.setReturnValue(null);
@@ -67,7 +68,7 @@ public abstract class ServerChunkManagerMixin {
 		if (create && !allowChunkGeneration()) {
 			long chunkPos = ChunkPos.toLong(chunkX, chunkZ);
 			if (!world.isChunkLoaded(chunkPos)) {
-				if (SingularityConfig.debugLogging()) {
+				if (SingularityDiagnostics.logChunkSamples()) {
 					logGuard("getChunk", chunkX, chunkZ, "generationDisabled");
 				}
 				cir.setReturnValue(null);
@@ -81,13 +82,11 @@ public abstract class ServerChunkManagerMixin {
 	}
 
 	private boolean allowChunkGeneration() {
-		return SingularityConfig.allowChunkGeneration()
-				&& world.getGameRules().getBoolean(TheVirusBlock.VIRUS_SINGULARITY_ALLOW_CHUNK_GENERATION);
+		return SingularityExecutionSettings.allowChunkGeneration(world);
 	}
 
 	private boolean allowOutsideBorderLoad() {
-		return SingularityConfig.allowOutsideBorderLoad()
-				&& world.getGameRules().getBoolean(TheVirusBlock.VIRUS_SINGULARITY_ALLOW_OUTSIDE_BORDER_LOAD);
+		return SingularityExecutionSettings.allowOutsideBorderLoad(world);
 	}
 
 	private boolean isOutsideBorder(int chunkX, int chunkZ) {

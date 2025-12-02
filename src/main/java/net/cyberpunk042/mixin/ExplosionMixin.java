@@ -35,7 +35,7 @@ public abstract class ExplosionMixin {
 	@Inject(method = "explode", at = @At("TAIL"))
 	private void theVirusBlock$handleExplosion(CallbackInfo ci) {
 		VirusWorldState state = VirusWorldState.get(world);
-		if (!state.isInfected()) {
+		if (!state.infectionState().infected()) {
 			return;
 		}
 
@@ -44,7 +44,7 @@ public abstract class ExplosionMixin {
 		}
 
 		double radius = Math.max(3.0D, power * 6.0F);
-		state.handleExplosionImpact(world, entity, pos, radius);
+		state.disturbance().handleExplosionImpact(entity, pos, radius);
 	}
 }
 

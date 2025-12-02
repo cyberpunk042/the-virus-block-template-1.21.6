@@ -3,14 +3,15 @@ package net.cyberpunk042.registry;
 import java.util.function.Function;
 
 import net.cyberpunk042.TheVirusBlock;
-import net.cyberpunk042.block.BacteriaBlock;
-import net.cyberpunk042.block.InfectedBlock;
-import net.cyberpunk042.block.InfectedGrassBlock;
-import net.cyberpunk042.block.InfectiousCubeBlock;
-import net.cyberpunk042.block.CuredInfectiousCubeBlock;
-import net.cyberpunk042.block.MatrixCubeBlock;
-import net.cyberpunk042.block.SingularityBlock;
-import net.cyberpunk042.block.VirusBlock;
+import net.cyberpunk042.block.core.BacteriaBlock;
+import net.cyberpunk042.block.core.CuredInfectiousCubeBlock;
+import net.cyberpunk042.block.core.InfectedBlock;
+import net.cyberpunk042.block.core.InfectedGrassBlock;
+import net.cyberpunk042.block.core.InfectiousCubeBlock;
+import net.cyberpunk042.block.growth.ProgressiveGrowthBlock;
+import net.cyberpunk042.block.matrix.MatrixCubeBlock;
+import net.cyberpunk042.block.singularity.SingularityBlock;
+import net.cyberpunk042.block.virus.VirusBlock;
 import net.cyberpunk042.block.corrupted.CorruptedCryingObsidianBlock;
 import net.cyberpunk042.block.corrupted.CorruptedDiamondBlock;
 import net.cyberpunk042.block.corrupted.CorruptedDirtBlock;
@@ -54,6 +55,15 @@ public final class ModBlocks {
 					.sounds(BlockSoundGroup.AMETHYST_BLOCK)
 					.dropsNothing()
 					.strength(1200.0F, 3600000.0F));
+
+	public static final ProgressiveGrowthBlock PROGRESSIVE_GROWTH_BLOCK = register("progressive_growth_block", ProgressiveGrowthBlock::new,
+			AbstractBlock.Settings.create()
+					.mapColor(MapColor.DARK_RED)
+					.requiresTool()
+					.nonOpaque()
+					.luminance(state -> 10)
+					.sounds(BlockSoundGroup.AMETHYST_BLOCK)
+					.strength(4.0F, 3600000.0F));
 
 	public static final CorruptedStoneBlock CORRUPTED_STONE = register("corrupted_stone", CorruptedStoneBlock::new,
 			AbstractBlock.Settings.create()

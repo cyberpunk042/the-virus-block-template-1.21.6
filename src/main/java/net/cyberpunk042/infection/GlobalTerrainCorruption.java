@@ -38,7 +38,7 @@ public final class GlobalTerrainCorruption {
 
 	public static void trigger(ServerWorld world, BlockPos origin) {
 		VirusWorldState state = VirusWorldState.get(world);
-		if (!state.enableTerrainCorruption()) {
+		if (!state.infectionLifecycle().enableTerrainCorruption()) {
 			return;
 		}
 		ChunkWorkTracker tracker = tracker(world);
@@ -71,7 +71,7 @@ public final class GlobalTerrainCorruption {
 
 	public static void cleanse(ServerWorld world) {
 		VirusWorldState state = VirusWorldState.get(world);
-		state.beginCleansing();
+		state.infectionLifecycle().beginCleansing();
 		ChunkWorkTracker tracker = tracker(world);
 		tracker.startCleansingPhase();
 		long[] snapshot = tracker.snapshotChunks();
@@ -126,8 +126,8 @@ public final class GlobalTerrainCorruption {
 			return;
 		}
 		VirusWorldState state = VirusWorldState.get(world);
-		boolean corrupting = state.isTerrainGloballyCorrupted();
-		boolean cleansing = state.isCleansingActive();
+		boolean corrupting = state.infectionState().terrainCorrupted();
+		boolean cleansing = state.infectionState().cleansingActive();
 		ChunkWorkTracker tracker = TRACKERS.get(world);
 		if (!corrupting && !cleansing) {
 			if (tracker != null) {
@@ -213,7 +213,7 @@ public final class GlobalTerrainCorruption {
 				for (int y = minY; y < maxY; y++) {
 					mutable.set(startX + x, y, startZ + z);
 					BlockState current = chunk.getBlockState(mutable);
-					if (VirusWorldState.get(world).isShielded(mutable)) {
+					if (VirusWorldState.get(world).shieldFieldService().isShielding(mutable)) {
 						continue;
 					}
 					BlockState replacement = convert(current);
@@ -250,7 +250,7 @@ public final class GlobalTerrainCorruption {
 		while (iterator.hasNext()) {
 			long posLong = iterator.nextLong();
 			mutable.set(BlockPos.fromLong(posLong));
-			if (VirusWorldState.get(world).isShielded(mutable)) {
+			if (VirusWorldState.get(world).shieldFieldService().isShielding(mutable)) {
 				continue;
 			}
 			BlockState replacement = cleanseBlock(chunk.getBlockState(mutable));
@@ -276,7 +276,7 @@ public final class GlobalTerrainCorruption {
 			for (int z = 0; z < 16; z++) {
 				for (int y = minY; y < maxY; y++) {
 					mutable.set(startX + x, y, startZ + z);
-					if (VirusWorldState.get(world).isShielded(mutable)) {
+					if (VirusWorldState.get(world).shieldFieldService().isShielding(mutable)) {
 						continue;
 					}
 					BlockState replacement = cleanseBlock(chunk.getBlockState(mutable));
@@ -324,7 +324,7 @@ public final class GlobalTerrainCorruption {
 				}
 				mutable.set(startX + x, surfaceY, startZ + z);
 				BlockState state = chunk.getBlockState(mutable);
-				if (VirusWorldState.get(world).isShielded(mutable)) {
+				if (VirusWorldState.get(world).shieldFieldService().isShielding(mutable)) {
 					continue;
 				}
 				if (!BoobytrapHelper.canReplaceSurface(state)) {

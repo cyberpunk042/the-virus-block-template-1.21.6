@@ -5,14 +5,19 @@ import org.slf4j.LoggerFactory;
 
 import net.cyberpunk042.command.VirusDebugCommands;
 import net.cyberpunk042.command.VirusDifficultyCommand;
+import net.cyberpunk042.command.GrowthBlockCommands;
 import net.cyberpunk042.config.InfectionConfigRegistry;
 import net.cyberpunk042.config.ModConfigBootstrap;
-import net.cyberpunk042.infection.VirusDifficulty;
 import net.cyberpunk042.infection.VirusInfectionSystem;
 import net.cyberpunk042.infection.VirusInventoryAnnouncements;
 import net.cyberpunk042.infection.VirusWorldState;
+import net.cyberpunk042.infection.VirusDifficulty;
+import net.cyberpunk042.infection.service.InfectionServices;
 import net.cyberpunk042.item.PurificationOption;
 import net.cyberpunk042.network.DifficultySyncPayload;
+import net.cyberpunk042.network.GrowthBeamPayload;
+import net.cyberpunk042.network.GrowthRingFieldPayload;
+import net.cyberpunk042.network.HorizonTintPayload;
 import net.cyberpunk042.network.PurificationTotemSelectPayload;
 import net.cyberpunk042.network.ShieldFieldRemovePayload;
 import net.cyberpunk042.network.ShieldFieldSpawnPayload;
@@ -34,12 +39,15 @@ import net.cyberpunk042.screen.ModScreenHandlers;
 import net.cyberpunk042.screen.handler.PurificationTotemScreenHandler;
 import net.cyberpunk042.screen.handler.VirusDifficultyScreenHandler;
 import net.cyberpunk042.util.DelayedServerTasks;
+import net.cyberpunk042.util.ServerRef;
+import net.cyberpunk042.growth.scheduler.GrowthScheduler;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleFactory;
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleRegistry;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
 import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
@@ -55,6 +63,7 @@ public class TheVirusBlock implements ModInitializer {
 	public static final String MOD_ID = "the-virus-block";
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 	public static final Identifier SKY_TINT_PACKET = Identifier.of(MOD_ID, "sky_tint");
+	public static final Identifier HORIZON_TINT_PACKET = Identifier.of(MOD_ID, "horizon_tint");
 	public static final String CORRUPTION_PROJECTILE_TAG = MOD_ID + ".corruption_projectile";
 	public static final String CORRUPTION_EXPLOSIVE_TAG = MOD_ID + ".corruption_explosive";
 	public static final String VIRUS_DEFENSE_BEAM_TAG = MOD_ID + ".virus_defense_beam";
@@ -70,6 +79,8 @@ public class TheVirusBlock implements ModInitializer {
 	public static final Identifier SINGULARITY_VISUAL_STOP_PACKET = Identifier.of(MOD_ID, "singularity_visual_stop");
 	public static final Identifier SINGULARITY_BORDER_PACKET = Identifier.of(MOD_ID, "singularity_border");
 	public static final Identifier SINGULARITY_SCHEDULE_PACKET = Identifier.of(MOD_ID, "singularity_schedule");
+	public static final Identifier GROWTH_BEAM_PACKET = Identifier.of(MOD_ID, "growth_beam");
+	public static final Identifier GROWTH_RING_FIELD_PACKET = Identifier.of(MOD_ID, "growth_ring_field");
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_BLOCK_TELEPORT_ENABLED =
 			GameRuleRegistry.register("virusBlockTeleportEnabled", GameRules.Category.MISC, GameRuleFactory.createBooleanRule(true));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_BLOCK_TELEPORT_RADIUS =
@@ -194,9 +205,13 @@ public class TheVirusBlock implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
+		InfectionServices.initialize(FabricLoader.getInstance().getConfigDir().resolve("the-virus-block"));
+		ServerRef.init();
+		GrowthScheduler.registerSchedulerTasks();
 		ModConfigBootstrap.prepareCommon();
 		InfectionConfigRegistry.loadCommon();
 		PayloadTypeRegistry.playS2C().register(SkyTintPayload.ID, SkyTintPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(HorizonTintPayload.ID, HorizonTintPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(DifficultySyncPayload.ID, DifficultySyncPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(VoidTearSpawnPayload.ID, VoidTearSpawnPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(VoidTearBurstPayload.ID, VoidTearBurstPayload.CODEC);
@@ -206,6 +221,8 @@ public class TheVirusBlock implements ModInitializer {
 		PayloadTypeRegistry.playS2C().register(SingularityVisualStopPayload.ID, SingularityVisualStopPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(SingularityBorderPayload.ID, SingularityBorderPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(SingularitySchedulePayload.ID, SingularitySchedulePayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(GrowthBeamPayload.ID, GrowthBeamPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(GrowthRingFieldPayload.ID, GrowthRingFieldPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(PurificationTotemSelectPayload.ID, PurificationTotemSelectPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(VirusDifficultySelectPayload.ID, VirusDifficultySelectPayload.CODEC);
 		ModBlocks.bootstrap();
@@ -216,6 +233,7 @@ public class TheVirusBlock implements ModInitializer {
 		ModItemGroups.bootstrap();
 		ModScreenHandlers.bootstrap();
 		VirusDebugCommands.register();
+		GrowthBlockCommands.register();
 		VirusInfectionSystem.init();
 		VirusInventoryAnnouncements.init();
 		ServerPlayNetworking.registerGlobalReceiver(PurificationTotemSelectPayload.ID, (payload, context) ->
@@ -237,12 +255,12 @@ public class TheVirusBlock implements ModInitializer {
 		}
 		ServerWorld world = (ServerWorld) player.getWorld();
 		VirusWorldState state = VirusWorldState.get(world);
-		if (!state.isInfected()) {
+		if (!state.infectionState().infected()) {
 			player.sendMessage(Text.translatable("message.the-virus-block.purification_totem.inactive"), true);
 			player.closeHandledScreen();
 			return;
 		}
-		if (state.isDormant() && payload.option() == PurificationOption.NO_BOOBYTRAPS) {
+		if (state.infectionState().dormant() && payload.option() == PurificationOption.NO_BOOBYTRAPS) {
 			player.sendMessage(Text.translatable("message.the-virus-block.purification_totem.boobytraps_disabled"), true);
 			player.closeHandledScreen();
 			return;
@@ -286,8 +304,8 @@ public class TheVirusBlock implements ModInitializer {
 		ServerWorld world = (ServerWorld) player.getWorld();
 		VirusWorldState state = VirusWorldState.get(world);
 		warnIfInfected(player, state);
-		state.sendShieldSnapshots(player);
-		state.syncProfileOnJoin(player);
+		state.shieldFieldService().sendSnapshots(player);
+		state.presentationCoord().syncProfileOnJoin(player);
 		grantStarterKit(player);
 		ensureFastFlight(player);
 		maybePromptDifficulty(player);
@@ -311,7 +329,7 @@ public class TheVirusBlock implements ModInitializer {
 			return;
 		}
 		ServerWorld world = (ServerWorld) player.getWorld();
-		VirusDifficulty difficulty = VirusWorldState.get(world).getDifficulty();
+		VirusDifficulty difficulty = VirusWorldState.get(world).tiers().difficulty();
 		if (difficulty != VirusDifficulty.EASY && difficulty != VirusDifficulty.MEDIUM) {
 			return;
 		}
@@ -326,7 +344,7 @@ public class TheVirusBlock implements ModInitializer {
 	private static void maybePromptDifficulty(ServerPlayerEntity player) {
 		ServerWorld world = (ServerWorld) player.getWorld();
 		VirusWorldState state = VirusWorldState.get(world);
-		if (state.hasShownDifficultyPrompt()) {
+		if (state.tiers().hasShownDifficultyPrompt()) {
 			return;
 		}
 		var server = player.getServer();
@@ -349,7 +367,9 @@ public class TheVirusBlock implements ModInitializer {
 						return;
 					}
 					if (VirusDifficultyCommand.openMenuFor(player)) {
-						state.markDifficultyPromptShown();
+						if (state.tiers().markDifficultyPromptShown()) {
+							state.markDirty();
+						}
 					}
 				});
 			});
@@ -385,7 +405,7 @@ public class TheVirusBlock implements ModInitializer {
 	}
 
 	private static void warnIfInfected(ServerPlayerEntity player, VirusWorldState state) {
-		if (!state.isInfected()) {
+		if (!state.infectionState().infected()) {
 			return;
 		}
 		showActionBar(player, Text.translatable("message.the-virus-block.infection.warning")

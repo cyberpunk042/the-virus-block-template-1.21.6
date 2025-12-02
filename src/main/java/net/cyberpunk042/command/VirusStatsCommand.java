@@ -3,7 +3,7 @@ package net.cyberpunk042.command;
 import com.mojang.brigadier.CommandDispatcher;
 import net.cyberpunk042.infection.GlobalTerrainCorruption;
 import net.cyberpunk042.infection.VirusWorldState;
-import net.cyberpunk042.infection.VirusWorldState.SingularityState;
+import net.cyberpunk042.infection.SingularityState;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.world.ServerWorld;
@@ -29,17 +29,17 @@ public final class VirusStatsCommand {
 				Text.literal(formatDuration(world.getTime()))
 		).formatted(Formatting.GRAY), false);
 
-		if (!state.isInfected()) {
+		if (!state.infectionState().infected()) {
 			source.sendFeedback(() -> Text.translatable("command.the-virus-block.stats.infection_idle").formatted(Formatting.RED), false);
 			return 1;
 		}
 
 		source.sendFeedback(() -> Text.translatable(
 				"command.the-virus-block.stats.infection_time",
-				Text.literal(formatDuration(state.getInfectionTicks()))
+				Text.literal(formatDuration(state.infectionState().totalTicks()))
 		).formatted(Formatting.GRAY), false);
 
-		long ticksUntilFinalWave = state.getTicksUntilFinalWave();
+		long ticksUntilFinalWave = state.tiers().ticksUntilFinalWave();
 		if (ticksUntilFinalWave <= 0L) {
 			source.sendFeedback(() -> Text.translatable("command.the-virus-block.stats.final_wave_now").formatted(Formatting.DARK_RED), false);
 		} else {
@@ -55,12 +55,12 @@ public final class VirusStatsCommand {
 				trackedChunks
 		).formatted(Formatting.DARK_GREEN), false);
 
-		SingularityState singularityState = state.getSingularityState();
+		SingularityState singularityState = state.singularityState().singularityState;
 		switch (singularityState) {
 			case DORMANT -> source.sendFeedback(() -> Text.translatable("command.the-virus-block.stats.singularity_dormant").formatted(Formatting.DARK_PURPLE), false);
 			case FUSING -> source.sendFeedback(() -> Text.translatable(
 					"command.the-virus-block.stats.singularity_fusing",
-					Text.literal(formatDuration(state.getSingularityTicks()))
+					Text.literal(formatDuration(state.singularityState().singularityTicks))
 			).formatted(Formatting.DARK_PURPLE), false);
 			case COLLAPSE -> source.sendFeedback(() -> Text.translatable("command.the-virus-block.stats.singularity_collapse").formatted(Formatting.DARK_PURPLE), false);
 		}

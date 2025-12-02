@@ -19,6 +19,7 @@ public final class ModItemGroups {
 					.entries((displayContext, entries) -> {
 						entries.add(ModBlocks.VIRUS_BLOCK);
 						entries.add(ModBlocks.SINGULARITY_BLOCK);
+						entries.add(ModBlocks.PROGRESSIVE_GROWTH_BLOCK);
 						entries.add(ModBlocks.CORRUPTED_STONE);
 						entries.add(ModBlocks.CORRUPTED_GLASS);
 						entries.add(ModBlocks.CORRUPTED_DIRT);

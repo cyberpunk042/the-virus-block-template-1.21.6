@@ -39,7 +39,7 @@ public class CorruptedStoneBlock extends FallingBlock {
 
 	@Override
 	public void randomTick(BlockState state, ServerWorld world, BlockPos pos, Random random) {
-		CorruptionStage targetStage = VirusWorldState.get(world).getCurrentTier().getIndex() >= 2
+		CorruptionStage targetStage = VirusWorldState.get(world).tiers().currentTier().getIndex() >= 2
 				? CorruptionStage.STAGE_2
 				: CorruptionStage.STAGE_1;
 		if (state.get(STAGE) != targetStage) {

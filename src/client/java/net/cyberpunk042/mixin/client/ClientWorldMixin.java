@@ -1,5 +1,6 @@
 package net.cyberpunk042.mixin.client;
 
+import net.cyberpunk042.client.render.VirusHorizonClientState;
 import net.cyberpunk042.client.render.VirusSkyClientState;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.util.math.MathHelper;
@@ -34,6 +35,13 @@ public abstract class ClientWorldMixin {
 		float r = MathHelper.clamp(MathHelper.lerp(mix, baseR, targetR), 0.0F, 1.0F);
 		float g = MathHelper.clamp(MathHelper.lerp(mix, baseG, targetG), 0.0F, 1.0F);
 		float b = MathHelper.clamp(MathHelper.lerp(mix, baseB, targetB), 0.0F, 1.0F);
+
+		if (VirusHorizonClientState.isActive()) {
+			float horizonMix = VirusHorizonClientState.intensity();
+			r = MathHelper.clamp(MathHelper.lerp(horizonMix, r, VirusHorizonClientState.red()), 0.0F, 1.0F);
+			g = MathHelper.clamp(MathHelper.lerp(horizonMix, g, VirusHorizonClientState.green()), 0.0F, 1.0F);
+			b = MathHelper.clamp(MathHelper.lerp(horizonMix, b, VirusHorizonClientState.blue()), 0.0F, 1.0F);
+		}
 
 		int tinted = ((int) (r * 255.0F) & 255) << 16
 				| ((int) (g * 255.0F) & 255) << 8

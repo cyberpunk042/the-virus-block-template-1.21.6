@@ -7,7 +7,7 @@ import java.util.UUID;
 
 import it.unimi.dsi.fastutil.objects.Object2ByteMap;
 import it.unimi.dsi.fastutil.objects.Object2ByteOpenHashMap;
-import net.cyberpunk042.infection.VirusWorldState.SingularityState;
+import net.cyberpunk042.infection.SingularityState;
 import net.cyberpunk042.network.DifficultySyncPayload;
 import net.cyberpunk042.network.SkyTintPayload;
 import net.minecraft.entity.boss.BossBar;
@@ -20,6 +20,8 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.World;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 
@@ -42,7 +44,26 @@ public final class VirusTierBossBar {
 			ServerPlayNetworking.send(handler.player, new SkyTintPayload(false, false));
 			ServerWorld world = (ServerWorld) handler.player.getWorld();
 			VirusWorldState state = VirusWorldState.get(world);
-			ServerPlayNetworking.send(handler.player, new DifficultySyncPayload(state.getDifficulty()));
+			ServerPlayNetworking.send(handler.player, new DifficultySyncPayload(state.tiers().difficulty()));
+		});
+
+		// Cleanup on world unload to prevent memory leaks
+		ServerWorldEvents.UNLOAD.register((server, world) -> {
+			BossBars bars = BARS.remove(world.getRegistryKey());
+			if (bars != null) {
+				if (bars.tierBar != null) {
+					clearBar(bars.tierBar);
+				}
+				if (bars.singularityBar != null) {
+					clearBar(bars.singularityBar);
+				}
+			}
+		});
+
+		// Full cleanup on server stop
+		ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
+			BARS.clear();
+			SKY_TINT.clear();
 		});
 	}
 
@@ -50,7 +71,7 @@ public final class VirusTierBossBar {
 		syncSkyTint(world, state);
 		RegistryKey<World> key = world.getRegistryKey();
 		BossBars bars = BARS.get(key);
-		if (!state.isInfected()) {
+		if (!state.infectionState().infected()) {
 			if (bars != null) {
 				if (bars.tierBar != null) {
 					clearBar(bars.tierBar);
@@ -73,7 +94,7 @@ public final class VirusTierBossBar {
 	}
 
 	private static void updateTierBar(ServerWorld world, VirusWorldState state, BossBars bars) {
-		if (state.getSingularityState() != SingularityState.DORMANT) {
+		if (state.singularityState().singularityState != SingularityState.DORMANT) {
 			if (bars.tierBar != null) {
 				clearBar(bars.tierBar);
 			}
@@ -90,7 +111,7 @@ public final class VirusTierBossBar {
 	}
 
 	private static void updateSingularityBar(ServerWorld world, VirusWorldState state, BossBars bars) {
-		SingularityState singularityState = state.getSingularityState();
+		SingularityState singularityState = state.singularityState().singularityState;
 		boolean active = singularityState == SingularityState.FUSING || singularityState == SingularityState.COLLAPSE;
 		ServerBossBar bar = bars.singularityBar;
 		if (!active) {
@@ -140,11 +161,11 @@ public final class VirusTierBossBar {
 
 	private static void updateBarSegments(ServerBossBar bar, VirusWorldState state) {
 		float progressRatio = getProgressRatio(state);
-		float healthRatio = (float) state.getHealthPercent();
-		int displayTier = state.getCurrentTier().getIndex() + 1;
-		String key = state.isDormant() ? "bossbar.the-virus-block.state.calm" : "bossbar.the-virus-block.state.active";
+		float healthRatio = (float) state.tiers().getHealthPercent();
+		int displayTier = state.tiers().currentTier().getIndex() + 1;
+		String key = state.infectionState().dormant() ? "bossbar.the-virus-block.state.calm" : "bossbar.the-virus-block.state.active";
 
-		if (state.isApocalypseMode()) {
+		if (state.tiers().isApocalypseMode()) {
 			MutableText vulnerableTitle = Text.translatable("bossbar.the-virus-block.vulnerable")
 					.formatted(Formatting.RED)
 					.append(Text.literal(String.format(" [%d%%]", Math.round(healthRatio * 100))).formatted(Formatting.DARK_RED));
@@ -155,7 +176,7 @@ public final class VirusTierBossBar {
 		}
 
 		MutableText title = Text.translatable("bossbar.the-virus-block.tier", displayTier, Text.translatable(key))
-				.formatted(state.isDormant() ? Formatting.AQUA : Formatting.DARK_PURPLE)
+				.formatted(state.infectionState().dormant() ? Formatting.AQUA : Formatting.DARK_PURPLE)
 				.append(Text.literal(String.format("  [P:%d%%] ", Math.round(progressRatio * 100))).formatted(Formatting.AQUA))
 				.append(Text.literal(String.format("[H:%d%%]", Math.round(healthRatio * 100))).formatted(Formatting.DARK_RED));
 		bar.setName(title);
@@ -165,7 +186,7 @@ public final class VirusTierBossBar {
 	}
 
 	private static void updateSingularityFuseBar(ServerBossBar bar, VirusWorldState state) {
-		float progress = MathHelper.clamp(state.getSingularityFuseProgress(), 0.0F, 1.0F);
+		float progress = MathHelper.clamp(state.singularity().fusing().fuseProgress(), 0.0F, 1.0F);
 		int percent = Math.round(progress * 100.0F);
 		MutableText title = Text.translatable("bossbar.the-virus-block.singularity.fuse")
 				.formatted(Formatting.GOLD)
@@ -176,9 +197,9 @@ public final class VirusTierBossBar {
 	}
 
 	private static void updateSingularityCollapseBar(ServerBossBar bar, VirusWorldState state) {
-		float remaining = MathHelper.clamp(state.getSingularityCollapseProgress(), 0.0F, 1.0F);
+		float remaining = MathHelper.clamp(state.singularity().fusing().collapseProgress(), 0.0F, 1.0F);
 		int percent = Math.round(remaining * 100.0F);
-		boolean priming = state.getSingularityCollapseDelayTicks() > 0;
+		boolean priming = state.singularityState().singularityCollapseBarDelay > 0;
 		String key = priming
 				? "bossbar.the-virus-block.singularity.collapse_priming"
 				: "bossbar.the-virus-block.singularity.collapse";
@@ -191,11 +212,11 @@ public final class VirusTierBossBar {
 	}
 
 	private static float getProgressRatio(VirusWorldState state) {
-		int duration = state.getCurrentTierDuration();
+		int duration = state.tiers().duration(state.tiers().currentTier());
 		if (duration <= 0) {
 			return 1.0F;
 		}
-		return MathHelper.clamp((float) state.getTicksInTier() / (float) duration, 0.0F, 1.0F);
+		return MathHelper.clamp((float) state.tiers().ticksInTier() / (float) duration, 0.0F, 1.0F);
 	}
 
 	private static void syncPlayers(ServerWorld world, ServerBossBar bar) {
@@ -213,8 +234,8 @@ public final class VirusTierBossBar {
 	}
 
 	private static void syncSkyTint(ServerWorld world, VirusWorldState state) {
-		boolean skyCorrupted = state.isInfected() && (state.getCurrentTier().getIndex() >= 0 || state.isApocalypseMode());
-		boolean fluidsCorrupted = state.areLiquidsCorrupted(world);
+		boolean skyCorrupted = state.infectionState().infected() && (state.tiers().currentTier().getIndex() >= 0 || state.tiers().isApocalypseMode());
+		boolean fluidsCorrupted = state.tiers().areLiquidsCorrupted(world);
 		byte encoded = encodeSkyState(skyCorrupted, fluidsCorrupted);
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			byte cached = SKY_TINT.getOrDefault(player.getUuid(), (byte) 0);

@@ -1,0 +1,9 @@
+{
+  "id": "the-virus-block:beam",
+  "primary_texture": "the-virus-block:textures/misc/glow_beam_primary.png",
+  "secondary_texture": "the-virus-block:textures/misc/glow_beam_secondary.png",
+  "primary_alpha": 0.7,
+  "secondary_alpha": 0.9,
+  "spin_speed": 2.0
+}
+

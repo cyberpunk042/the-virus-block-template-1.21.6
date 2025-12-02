@@ -31,7 +31,7 @@ public class CorruptedGlassBlock extends TransparentBlock {
 	@Override
 	public BlockState onBreak(World world, BlockPos pos, BlockState state, PlayerEntity player) {
 		if (!world.isClient) {
-			if (world instanceof ServerWorld serverWorld && VirusWorldState.get(serverWorld).isShielded(pos)) {
+			if (world instanceof ServerWorld serverWorld && VirusWorldState.get(serverWorld).shieldFieldService().isShielding(pos)) {
 				return super.onBreak(world, pos, state, player);
 			}
 			world.createExplosion(null, pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D, 1.8F, World.ExplosionSourceType.BLOCK);
@@ -47,7 +47,7 @@ public class CorruptedGlassBlock extends TransparentBlock {
 
 	@Override
 	public void randomTick(BlockState state, ServerWorld world, BlockPos pos, Random random) {
-		CorruptionStage targetStage = VirusWorldState.get(world).getCurrentTier().getIndex() >= 2
+		CorruptionStage targetStage = VirusWorldState.get(world).tiers().currentTier().getIndex() >= 2
 				? CorruptionStage.STAGE_2
 				: CorruptionStage.STAGE_1;
 		if (state.get(STAGE) != targetStage) {

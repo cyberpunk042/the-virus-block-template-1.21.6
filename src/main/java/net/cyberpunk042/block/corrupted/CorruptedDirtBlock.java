@@ -23,11 +23,11 @@ public class CorruptedDirtBlock extends Block {
 			return;
 		}
 		VirusWorldState infection = VirusWorldState.get(world);
-		if (!infection.areLiquidsCorrupted(world)) { // ensures infection is active and at least tier 2
+		if (!infection.tiers().areLiquidsCorrupted(world)) { // ensures infection is active and at least tier 2
 			return;
 		}
 		int chance = Math.max(0, world.getGameRules().getInt(TheVirusBlock.VIRUS_WORM_SPAWN_CHANCE));
-		chance = MathHelper.clamp(MathHelper.floor(chance * infection.getDifficulty().getWormSpawnMultiplier()), 0, 1000);
+		chance = MathHelper.clamp(MathHelper.floor(chance * infection.tiers().difficulty().getWormSpawnMultiplier()), 0, 1000);
 		if (chance <= 0) {
 			return;
 		}

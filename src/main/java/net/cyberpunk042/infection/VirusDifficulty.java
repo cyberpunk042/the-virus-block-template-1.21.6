@@ -99,6 +99,15 @@ public enum VirusDifficulty {
 		return matrixCubeDamageMultiplier;
 	}
 
+	public float getTeleportChance() {
+		return switch (this) {
+			case EASY -> 0.20F;
+			case MEDIUM -> 0.30F;
+			case HARD -> 0.40F;
+			case EXTREME -> 0.50F;
+		};
+	}
+
 	public Identifier getIconTexture() {
 		return iconTexture;
 	}

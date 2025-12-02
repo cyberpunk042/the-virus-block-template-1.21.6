@@ -17,8 +17,8 @@ public final class ModConfigBootstrap {
 			return;
 		}
 		commonPrepared = true;
-		initialize(SingularityConfig.class);
 		initialize(InfectionLogConfig.class);
+		initialize(SingularityConfig.class);
 	}
 
 	public static synchronized void prepareClient() {

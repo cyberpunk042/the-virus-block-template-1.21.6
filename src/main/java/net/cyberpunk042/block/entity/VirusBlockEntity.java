@@ -37,7 +37,7 @@ public class VirusBlockEntity extends BlockEntity {
 		}
 
 		VirusWorldState infection = VirusWorldState.get(serverWorld);
-		infection.registerSource(serverWorld, pos);
+		infection.sources().registerSource(infection.sourceState(), pos);
 
 		entity.auraTick++;
 
@@ -51,8 +51,8 @@ public class VirusBlockEntity extends BlockEntity {
 	}
 
 	private void applyAura(ServerWorld world, BlockPos pos, VirusWorldState infection) {
-		InfectionTier tier = infection.getCurrentTier();
-		double radius = infection.getActiveAuraRadius();
+		InfectionTier tier = infection.tiers().currentTier();
+		double radius = infection.combat().getActiveAuraRadius();
 
 		long now = world.getTime();
 		Box area = new Box(pos).expand(radius);
@@ -77,7 +77,7 @@ public class VirusBlockEntity extends BlockEntity {
 			return false;
 		}
 
-		long cooldown = Math.max(40L, 160L - infection.getCurrentTier().getIndex() * 20L - (infection.isApocalypseMode() ? 20L : 0L));
+		long cooldown = Math.max(40L, 160L - infection.tiers().currentTier().getIndex() * 20L - (infection.tiers().isApocalypseMode() ? 20L : 0L));
 		auraCooldowns.put(target.getUuid(), now + cooldown);
 
 		if (auraTick % 200 == 0) {
@@ -92,7 +92,7 @@ public class VirusBlockEntity extends BlockEntity {
 		target.addStatusEffect(new StatusEffectInstance(StatusEffects.POISON, 60 + tierIndex * 20, tierIndex >= 3 ? 1 : 0, false, true));
 
 		if (tierIndex >= 1 && target instanceof ServerPlayerEntity player) {
-			forceHungerDrop(player, tierIndex, infection.isApocalypseMode());
+			forceHungerDrop(player, tierIndex, infection.tiers().isApocalypseMode());
 		}
 
 		if (tierIndex >= 2) {
@@ -107,7 +107,7 @@ public class VirusBlockEntity extends BlockEntity {
 			target.addStatusEffect(new StatusEffectInstance(StatusEffects.MINING_FATIGUE, 100, 1, false, true));
 		}
 
-		if (infection.isApocalypseMode() && random.nextFloat() < 0.2F) {
+		if (infection.tiers().isApocalypseMode() && random.nextFloat() < 0.2F) {
 			target.addStatusEffect(new StatusEffectInstance(StatusEffects.WITHER, 50, 0));
 		}
 	}

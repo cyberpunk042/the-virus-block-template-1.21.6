@@ -12,11 +12,15 @@ import net.cyberpunk042.client.render.SingularityBorderClientState;
 import net.cyberpunk042.client.state.SingularityScheduleClientState;
 import net.cyberpunk042.client.render.SingularityVisualManager;
 import net.cyberpunk042.client.render.blockentity.SingularityBlockEntityRenderer;
+import net.cyberpunk042.client.render.blockentity.ProgressiveGrowthBlockEntityRenderer;
+import net.cyberpunk042.client.render.item.ProgressiveGrowthItemRenderer;
 import net.cyberpunk042.client.render.ShieldFieldVisualManager;
 import net.cyberpunk042.client.render.VoidTearVisualManager;
 import net.cyberpunk042.client.render.VirusFluidRenderers;
+import net.cyberpunk042.client.render.beam.GrowthBeamRenderer;
+import net.cyberpunk042.client.render.field.GrowthRingFieldRenderer;
+import net.cyberpunk042.client.render.VirusHorizonClientState;
 import net.cyberpunk042.client.render.VirusSkyClientState;
-import net.cyberpunk042.client.render.entity.BlackholePearlEntityRenderer;
 import net.cyberpunk042.client.render.entity.CorruptedWormRenderer;
 import net.cyberpunk042.client.state.VirusDifficultyClientState;
 import net.cyberpunk042.client.screen.PurificationTotemScreen;
@@ -26,6 +30,7 @@ import net.cyberpunk042.config.ModConfigBootstrap;
 import net.cyberpunk042.infection.VirusDifficulty;
 import net.cyberpunk042.network.SkyTintPayload;
 import net.cyberpunk042.network.DifficultySyncPayload;
+import net.cyberpunk042.network.HorizonTintPayload;
 import net.cyberpunk042.network.SingularityBorderPayload;
 import net.cyberpunk042.network.SingularitySchedulePayload;
 import net.cyberpunk042.network.SingularityVisualStartPayload;
@@ -51,8 +56,14 @@ public class TheVirusBlockClient implements ClientModInitializer {
 	public void onInitializeClient() {
 		ModConfigBootstrap.prepareClient();
 		InfectionConfigRegistry.loadClient();
-		BlockRenderLayerMap.putBlocks(BlockRenderLayer.TRANSLUCENT, ModBlocks.CORRUPTED_GLASS, ModBlocks.CORRUPTED_ICE, ModBlocks.CORRUPTED_PACKED_ICE);
+		BlockRenderLayerMap.putBlocks(BlockRenderLayer.TRANSLUCENT,
+				ModBlocks.CORRUPTED_GLASS,
+				ModBlocks.CORRUPTED_ICE,
+				ModBlocks.CORRUPTED_PACKED_ICE,
+				ModBlocks.PROGRESSIVE_GROWTH_BLOCK);
 		BlockEntityRendererFactories.register(ModBlockEntities.SINGULARITY_BLOCK, SingularityBlockEntityRenderer::new);
+		BlockEntityRendererFactories.register(ModBlockEntities.PROGRESSIVE_GROWTH, ProgressiveGrowthBlockEntityRenderer::new);
+		ProgressiveGrowthItemRenderer.bootstrap();
 		CorruptedColorProviders.register();
 		VoidTearVisualManager.init();
 		ShieldFieldVisualManager.init();
@@ -63,12 +74,15 @@ public class TheVirusBlockClient implements ClientModInitializer {
 		EntityRendererRegistry.register(ModEntities.CORRUPTED_WORM, CorruptedWormRenderer::new);
 		EntityRendererRegistry.register(ModEntities.CORRUPTED_TNT, TntEntityRenderer::new);
 		EntityRendererRegistry.register(ModEntities.VIRUS_FUSE, TntEntityRenderer::new);
-		EntityRendererRegistry.register(ModEntities.BLACKHOLE_PEARL, BlackholePearlEntityRenderer::new);
 		HandledScreens.register(ModScreenHandlers.PURIFICATION_TOTEM, PurificationTotemScreen::new);
 		HandledScreens.register(ModScreenHandlers.VIRUS_DIFFICULTY, VirusDifficultyScreen::new);
 		CorruptedFireTextures.bootstrap();
+		GrowthBeamRenderer.init();
+		GrowthRingFieldRenderer.init();
 		ClientPlayNetworking.registerGlobalReceiver(SkyTintPayload.ID, (payload, context) ->
 				context.client().execute(() -> VirusSkyClientState.setState(payload.skyCorrupted(), payload.fluidsCorrupted())));
+		ClientPlayNetworking.registerGlobalReceiver(HorizonTintPayload.ID, (payload, context) ->
+				context.client().execute(() -> VirusHorizonClientState.apply(payload.enabled(), payload.intensity(), payload.argb())));
 		ClientPlayNetworking.registerGlobalReceiver(DifficultySyncPayload.ID, (payload, context) ->
 				context.client().execute(() -> VirusDifficultyClientState.set(payload.difficulty())));
 		ClientPlayNetworking.registerGlobalReceiver(SingularityVisualStartPayload.ID, (payload, context) ->
@@ -82,6 +96,7 @@ public class TheVirusBlockClient implements ClientModInitializer {
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) ->
 				client.execute(() -> {
 					VirusSkyClientState.reset();
+					VirusHorizonClientState.reset();
 					VirusDifficultyClientState.set(VirusDifficulty.HARD);
 					SingularityBorderClientState.reset();
 					SingularityScheduleClientState.reset();

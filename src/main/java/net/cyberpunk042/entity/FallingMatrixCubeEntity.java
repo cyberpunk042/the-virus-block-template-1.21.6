@@ -50,7 +50,7 @@ public class FallingMatrixCubeEntity extends FallingBlockEntity {
 
 	private boolean handleServerTick(ServerWorld world) {
 		ensureRegistered(world);
-		if (VirusWorldState.get(world).isShielded(this.getBlockPos())) {
+		if (VirusWorldState.get(world).shieldFieldService().isShielding(this.getBlockPos())) {
 			despawn(world);
 			return false;
 		}
@@ -130,7 +130,7 @@ public class FallingMatrixCubeEntity extends FallingBlockEntity {
 	}
 
 	private static boolean hitsCoreOrShell(ServerWorld world, BlockPos pos, BlockState state) {
-		if (state.isAir() && VirusWorldState.get(world).isFuseClearedBlock(pos)) {
+		if (state.isAir() && VirusWorldState.get(world).singularity().fusing().isFuseClearedBlock(pos)) {
 			return true;
 		}
 		Block block = state.getBlock();

@@ -1,6 +1,6 @@
 package net.cyberpunk042.infection;
 
-import net.cyberpunk042.block.VirusBlockProtection;
+import net.cyberpunk042.block.virus.VirusBlockProtection;
 import net.cyberpunk042.command.VirusCommand;
 import net.cyberpunk042.util.DelayedServerTasks;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;

@@ -22,7 +22,7 @@ public abstract class ZombieEntityMixin extends HostileEntity {
 		if (!(getWorld() instanceof ServerWorld serverWorld)) {
 			return;
 		}
-		if (VirusWorldState.get(serverWorld).isInfected() && this.isOnFire()) {
+		if (VirusWorldState.get(serverWorld).infectionState().infected() && this.isOnFire()) {
 			this.setFireTicks(0);
 		}
 	}

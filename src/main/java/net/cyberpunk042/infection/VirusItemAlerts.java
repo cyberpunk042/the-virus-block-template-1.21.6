@@ -59,7 +59,7 @@ public final class VirusItemAlerts {
 	}
 
 	private static boolean shouldAlert(ServerWorld world) {
-		if (VirusWorldState.get(world).isInfected()) {
+		if (VirusWorldState.get(world).infectionState().infected()) {
 			return false;
 		}
 		return world.getGameRules().getBoolean(TheVirusBlock.VIRUS_VERBOSE_INVENTORY_ALERTS);

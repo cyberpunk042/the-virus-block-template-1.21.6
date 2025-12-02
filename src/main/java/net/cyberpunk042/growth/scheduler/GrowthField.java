@@ -1,0 +1,45 @@
+package net.cyberpunk042.growth.scheduler;
+
+public enum GrowthField {
+	GROWTH_ENABLED(Type.BOOLEAN),
+	RATE_TICKS(Type.INT),
+	RATE_SCALE(Type.DOUBLE),
+	START_SCALE(Type.DOUBLE),
+	TARGET_SCALE(Type.DOUBLE),
+	MIN_SCALE(Type.DOUBLE),
+	MAX_SCALE(Type.DOUBLE),
+	HAS_COLLISION(Type.BOOLEAN),
+	DOES_DESTRUCTION(Type.BOOLEAN),
+	HAS_FUSE(Type.BOOLEAN),
+	IS_WOBBLY(Type.BOOLEAN),
+	IS_PULLING(Type.BOOLEAN),
+	IS_PUSHING(Type.BOOLEAN),
+	PULLING_FORCE(Type.DOUBLE),
+	PUSHING_FORCE(Type.DOUBLE),
+	TOUCH_DAMAGE(Type.DOUBLE),
+	GLOW_PROFILE(Type.IDENTIFIER),
+	PARTICLE_PROFILE(Type.IDENTIFIER),
+	FIELD_PROFILE(Type.IDENTIFIER),
+	PULL_PROFILE(Type.IDENTIFIER),
+	PUSH_PROFILE(Type.IDENTIFIER),
+	FUSE_PROFILE(Type.IDENTIFIER),
+	EXPLOSION_PROFILE(Type.IDENTIFIER);
+
+	public enum Type {
+		BOOLEAN,
+		INT,
+		DOUBLE,
+		IDENTIFIER
+	}
+
+	private final Type type;
+
+	GrowthField(Type type) {
+		this.type = type;
+	}
+
+	public Type type() {
+		return type;
+	}
+}
+

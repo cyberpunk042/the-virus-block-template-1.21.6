@@ -133,6 +133,7 @@ public final class InfectionLogConfig {
 		SINGULARITY_VISUAL("singularityVisual", "SingularityVisual", true, "Singularity block client/server staging logs"),
 		SINGULARITY_FUSE("singularityFuse", "Fuse", true, "Shell fuse entity orchestration"),
 		SCHEDULER("scheduler", "Scheduler", false, "Task queue updates (future controllers)"),
+		INFECTION("infection", "Infection", false, "Virus source lifecycle (placement, shells, teleport)"),
 		EFFECTS("effects", "Effects", false, "Guardian beams, FX bus dispatch diagnostics");
 
 		private final String id;

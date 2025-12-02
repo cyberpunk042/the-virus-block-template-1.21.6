@@ -107,8 +107,8 @@ public final class BlockMutationHelper {
 			int y = origin.getY() + random.nextBetween(-radius, radius);
 			int z = origin.getZ() + random.nextBetween(-radius, radius);
 
-			BlockPos horizontal = new BlockPos(x, world.getBottomY(), z);
-			if (!isChunkLoaded(world, horizontal)) {
+			// Optimized: avoid BlockPos allocation for chunk check
+			if (!isChunkLoaded(world, x, z)) {
 				continue;
 			}
 
@@ -124,7 +124,7 @@ public final class BlockMutationHelper {
 		if (!isChunkLoaded(world, pos)) {
 			return;
 		}
-		if (state.isShielded(pos)) {
+		if (state.shieldFieldService().isShielding(pos)) {
 			return;
 		}
 
@@ -257,7 +257,7 @@ public final class BlockMutationHelper {
 		int attempts = MathHelper.clamp(attemptsRule * tierScale, 0, 4096);
 		attempts = Math.max(attempts, anchors.size() * 40);
 		attempts = Math.min(attempts, 4096);
-		int budget = state.claimSurfaceMutations(world, tier, apocalypseMode, attempts);
+		int budget = state.infection().claimSurfaceMutations(world, tier, attempts);
 		if (budget <= 0) {
 			return false;
 		}
@@ -280,8 +280,8 @@ public final class BlockMutationHelper {
 		for (int attempt = 0; attempt < 6; attempt++) {
 			int x = anchor.getX() + random.nextBetween(-radius, radius);
 			int z = anchor.getZ() + random.nextBetween(-radius, radius);
-			BlockPos horizontal = new BlockPos(x, world.getBottomY(), z);
-			if (!isChunkLoaded(world, horizontal)) {
+			// Optimized: avoid BlockPos allocation for chunk check
+			if (!isChunkLoaded(world, x, z)) {
 				continue;
 			}
 			int topY = world.getTopY(Heightmap.Type.MOTION_BLOCKING, x, z) - 1;
@@ -294,7 +294,7 @@ public final class BlockMutationHelper {
 	}
 
 	private static boolean convertSurfaceBlock(ServerWorld world, BlockPos pos, boolean sandEnabled, boolean iceEnabled, boolean snowEnabled, VirusWorldState worldState) {
-		if (worldState.isShielded(pos)) {
+		if (worldState.shieldFieldService().isShielding(pos)) {
 			return false;
 		}
 		BlockState blockState = world.getBlockState(pos);
@@ -342,7 +342,7 @@ public final class BlockMutationHelper {
 			if (!isChunkLoaded(world, target)) {
 				continue;
 			}
-			if (worldState.isShielded(target)) {
+			if (worldState.shieldFieldService().isShielding(target)) {
 				continue;
 			}
 
@@ -369,6 +369,11 @@ public final class BlockMutationHelper {
 		return world.isChunkLoaded(ChunkPos.toLong(pos));
 	}
 
+	/** Optimized overload that avoids BlockPos allocation */
+	private static boolean isChunkLoaded(ServerWorld world, int x, int z) {
+		return world.isChunkLoaded(ChunkPos.toLong(x >> 4, z >> 4));
+	}
+
 	private static BlockState applyStage(BlockState state, InfectionTier tier) {
 		CorruptionStage stage = tier.getIndex() >= 2 ? CorruptionStage.STAGE_2 : CorruptionStage.STAGE_1;
 		if (state.contains(CorruptedStoneBlock.STAGE)) {
@@ -391,6 +396,21 @@ public final class BlockMutationHelper {
 				|| block == Blocks.RESPAWN_ANCHOR
 				|| block == Blocks.CRAFTING_TABLE
 				|| block instanceof BedBlock;
+	}
+
+	/**
+	 * Returns a corruption-staged block state based on tier index.
+	 */
+	public static BlockState stageState(Block block, int tierIndex) {
+		BlockState state = block.getDefaultState();
+		CorruptionStage stage = tierIndex >= 2 ? CorruptionStage.STAGE_2 : CorruptionStage.STAGE_1;
+		if (state.contains(CorruptedStoneBlock.STAGE)) {
+			return state.with(CorruptedStoneBlock.STAGE, stage);
+		}
+		if (state.contains(CorruptedGlassBlock.STAGE)) {
+			return state.with(CorruptedGlassBlock.STAGE, stage);
+		}
+		return state;
 	}
 }
 

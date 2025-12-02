@@ -36,10 +36,10 @@ public abstract class BedBlockMixin {
 			}
 		}
 		VirusWorldState infection = VirusWorldState.get(serverWorld);
-		if (!infection.isWithinAura(headPos)) {
+		if (!infection.combat().isWithinAura(headPos)) {
 			return;
 		}
-		if (infection.isShielded(headPos)) {
+		if (infection.shieldFieldService().isShielding(headPos)) {
 			return;
 		}
 		explode(serverWorld, headPos, headState, bedBlock);

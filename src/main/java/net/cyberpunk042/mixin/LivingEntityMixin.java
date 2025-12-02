@@ -42,7 +42,7 @@ public abstract class LivingEntityMixin extends Entity {
 
 		if (source.isIn(DamageTypeTags.IS_FIRE) && self instanceof PlayerEntity player && player.isInLava()) {
 			VirusWorldState state = VirusWorldState.get(world);
-			if (state.areLiquidsCorrupted(world)) {
+			if (state.tiers().areLiquidsCorrupted(world)) {
 				player.extinguish();
 				theVirusBlock$grantCorruptedRegen(player);
 				cir.setReturnValue(false);
@@ -90,8 +90,8 @@ public abstract class LivingEntityMixin extends Entity {
 		}
 
 		VirusWorldState state = VirusWorldState.get(serverWorld);
-		int tier = state.getCurrentTier().getIndex();
-		boolean liquidsCorrupted = state.areLiquidsCorrupted(serverWorld);
+		int tier = state.tiers().currentTier().getIndex();
+		boolean liquidsCorrupted = state.tiers().areLiquidsCorrupted(serverWorld);
 		if (liquidsCorrupted && player.isInLava()) {
 			player.extinguish();
 			theVirusBlock$grantCorruptedRegen(player);

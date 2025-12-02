@@ -120,6 +120,7 @@ public final class CorruptionProfiler {
 		return world.getRegistryKey().getValue();
 	}
 
+	// Keyed by dimension ID - naturally bounded to number of dimensions (~3-5)
 	private static final Map<Identifier, Long> LAST_BOOBYTRAP_LOG = new ConcurrentHashMap<>();
 	private static final long BOOBYTRAP_LOG_INTERVAL_TICKS = 40;
 

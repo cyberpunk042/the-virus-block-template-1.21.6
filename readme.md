@@ -297,79 +297,119 @@ Most tuning happens through gamerules. Here are the high-impact ones (defaults i
 | `virusMatrixCubeMaxActive` | `200` | Cap on simultaneous Matrix Cubes raining from the sky. |
 | `virusBoobytrapsEnabled` | `true` | Controls spontaneous boobytrap placement/explosions. |
 | `virusWormsEnabled` | `true` | Allows corrupted dirt/boobytraps to spawn corrupted worms. |
-| `virusSingularityAllowChunkGeneration` | `false` | Runtime switch; actual default comes from `config/the-virus-block/singularity.json`. Only when both the config and this gamerule are `true` will the collapse generate/load missing chunks. |
+| `virusSingularityAllowChunkGeneration` | `false` | Runtime switch; actual default comes from `config/the-virus-block/services.json -> singularity.execution`. Only when both the config and this gamerule are `true` will the collapse generate/load missing chunks. |
 | `virusSingularityAllowOutsideBorderLoad` | `false` | Runtime switch; combined with the config, it determines whether chunks outside the active border can be touched. |
 | `virusSingularityCollapseEnabled` | `true` | Live override for the collapse itself; both this gamerule and the config flag must remain `true` for the singularity collapse to progress. |
 
-> **Server Config:** `config/the-virus-block/singularity.json` defines the hard defaults for chunk generation/outside-border loading, telemetry, and fluid draining so servers can lock behaviour before the world even starts. The gamerules above simply mirror those values at runtime.
+> **Server Config:** `config/the-virus-block/services.json` defines the hard defaults for chunk generation/outside-border loading, diagnostics, fuse timings, guardian FX, etc., while `config/the-virus-block/dimension_profiles/<dimension>.json` captures per-dimension collapse physics/FX. The gamerules above simply mirror those values at runtime.
 
-### Singularity Config (`config/the-virus-block/singularity.json`)
+### Singularity Services (`config/the-virus-block/services.json`)
 
 ```jsonc
 {
-  "allowChunkGeneration": false,
-  "allowOutsideBorderLoad": false,
-  "debugLogging": true,
-  "drainWaterAhead": true,
-  "waterDrainOffset": 5,
-  "multithreadCollapse": false,
-  "respectProtectedBlocks": true,
-  "collapseMode": "ring_slice",
-  "collapseParticles": false,
-  "fillMode": "air",
-  "collapseWorkerCount": 4,
-  "collapseTickDelay": 1,
-  "collapseEnabled": true,
-  "fuseExplosionDelayTicks": 400,
-  "fuseAnimationDelayTicks": 20,
-  "fusePulseInterval": 8,
-  "collapseViewDistance": 0,
-  "collapseSimulationDistance": 0,
-  "collapseBroadcastMode": "immediate",
-  "collapseBroadcastRadius": 96,
-  "chunkPreGenEnabled": true,
-  "chunkPreGenRadiusBlocks": 0,
-  "chunkPreGenChunksPerTick": 128,
-  "chunkPreloadEnabled": true,
-  "chunkPreloadChunksPerTick": 64,
-  "radiusDelays": [
-    { "side": 1, "ticks": 1 },
-    { "side": 3, "ticks": 1 },
-    { "side": 5, "ticks": 2 },
-    { "side": 9, "ticks": 4 },
-    { "side": 21, "ticks": 8 }
-  ],
-  "barrierStartRadius": 192.0,
-  "barrierEndRadius": 0.5,
-  "barrierInterpolationTicks": 600
+  "singularity": {
+    "execution": {
+      "collapseEnabled": true,
+      "allowChunkGeneration": true,
+      "allowOutsideBorderLoad": true,
+      "multithreaded": false,
+      "workerCount": 4,
+      "mode": "ring_slice"
+    },
+    "collapseBarDelayTicks": 60,
+    "collapseCompleteHoldTicks": 40,
+    "coreChargeTicks": 80,
+    "resetDelayTicks": 160
+  },
+  "diagnostics": {
+    "enabled": true,
+    "logChunkSamples": true,
+    "logBypasses": true,
+    "logSampleIntervalTicks": 20,
+    "logSpam": {
+      "enableSpamDetection": true,
+      "perSecondThreshold": 10,
+      "perMinuteThreshold": 200,
+      "suppressWhenTriggered": true
+    }
+  },
+  "fuse": {
+    "explosionDelayTicks": 400,
+    "shellCollapseTicks": 20,
+    "pulseIntervalTicks": 8
+  }
 }
 ```
 
-- `allowChunkGeneration` / `allowOutsideBorderLoad` guard the chunk manager mixins; if either is `false`, the collapse skips new terrain regardless of gamerules.
-- `debugLogging` enables per-tick collapse summaries (columns processed, skips, water cells cleared) to make troubleshooting easy.
-- `drainWaterAhead` / `waterDrainOffset` control the proactive fluid pass that clears water/lava a few blocks ahead of the erosion front so oceans don’t explode into waterfalls mid-collapse.
-- `multithreadCollapse` toggles the collapse worker scheduler. When enabled, slices are processed on background threads sized according to `collapseWorkerCount` (rounded to multiples of four so you can request 4/8/12 on a 12-core machine).
-- `respectProtectedBlocks` keeps bedrock/negative-hardness blocks intact even during chunk wipes; turn it off for pure obliteration.
-- `collapseMode` selects between the two modern destruction paths: `"ring_slice"` (outer shell in 16 passes) and `"ring_slice_chunk"` (full chunk vaporization).
-- `collapseParticles` gates the ash/sound spam for each cleared block; leave it `false` when profiling.
-- `fillMode` picks the `/fill` behavior used by the collapse: `"air"` replaces blocks directly, `"destroy"` mimics `/fill … destroy` (breaks blocks, spawns drops).
-- `fillShape` decides how each chunk is iterated while it is being hollowed out. `"matrix"` (default) sweeps in XYZ order, while `"column"`, `"row"`, `"vector"`, and `"outline"` bias the carve for specific visuals or performance profiles.
-- `useNativeFill` lets you toggle between the high-speed direct block replacement path (`false`) and a vanilla-style fill (`true`) that fires block updates and respects drops at the cost of extra TPS.
-- `collapseWorkerCount` is ignored until `multithreadCollapse` is `true`, but once threading is on we reduce the value to the nearest multiple of four and clamp it to `availableCores - 1`.
-- `collapseTickDelay` is the per-batch cooldown in ticks; raising it slows the collapse cadence without touching throughput math.
-- `collapseEnabled` is the master kill-switch: when `false`, fusing still detonates after its timer but no singularity block is spawned and no terrain is chewed away. The gamerule `virusSingularityCollapseEnabled` can override this live without reopening the config.
-- `fuseExplosionDelayTicks` controls how long (in ticks) the fuse counts down once Tier 5 ends. `fuseAnimationDelayTicks` determines how long into the fuse the shell collapse animation triggers. `fusePulseInterval` is the base time between fuse pulses (smaller numbers = more frequent).
-- `collapseViewDistance` / `collapseSimulationDistance` optionally override the vanilla player-manager distances during the collapse (set each to `0` to leave vanilla behaviour). The overrides are logged on the `singularity` channel and automatically restored once the event finishes.
-- `collapseBroadcastMode` / `collapseBroadcastRadius` control how aggressively we stream collapse block updates to clients. `immediate` mirrors vanilla; `delayed`/`summary` skip packets for chunks farther than the configured radius (in blocks) and replay them later when a player gets close (`summary` also logs a short digest).
-- `radiusDelays` now define the tick cooldown for rings at or below the listed side length so you can slow the final rings without editing code.
-- `chunkPreGenRadiusBlocks` accepts `0` to inherit `barrierStartRadius`. Use the other chunk fields to tune (or disable) the pre-generation/preload cadence.
-- `barrierStartRadius` determines how far out the protective border spawns (and therefore how far we preload/pregenerate).
-- `barrierEndRadius` clamps how tight the border shrinks by the finale.
-- `barrierInterpolationTicks` feeds directly into the border interpolation so you can speed up or slow down the shrink animation.
+### Dimension Profile (`config/the-virus-block/dimension_profiles/overworld.json`)
+
+```jsonc
+{
+  "collapse": {
+    "columns_per_tick": 8,
+    "tick_interval": 20,
+    "max_radius_chunks": 12,
+    "mode": "erode",
+    "ring_start_delay_ticks": 40,
+    "ring_duration_ticks": 200,
+    "barrier_start_radius": 120.0,
+    "barrier_end_radius": 0.5,
+    "barrier_duration_ticks": 1000,
+    "chunk_pregen_enabled": true,
+    "chunk_preload_enabled": true,
+    "drain_water_ahead": true,
+    "water_drain_offset": 1,
+    "collapse_particles": false,
+    "fill_mode": "air",
+    "fill_shape": "outline",
+    "outline_thickness": 2,
+    "use_native_fill": true,
+    "respect_protected_blocks": true,
+    "radius_delays": [
+      { "side": 1, "ticks": 150 },
+      { "side": 3, "ticks": 100 },
+      { "side": 9, "ticks": 40 },
+      { "side": 15, "ticks": 20 }
+    ]
+  }
+}
+```
+
+- `singularity.execution.allowChunkGeneration` / `allowOutsideBorderLoad` guard the chunk manager mixins; if either is `false`, the collapse skips new terrain regardless of gamerules.
+- `diagnostics.enabled` enables per-tick collapse summaries (columns processed, skips, water cells cleared). `logChunkSamples` controls whether `SingularityChunkContext` flushes chunk/border digests, `logBypasses` controls bypass spam, and `logSampleIntervalTicks` throttles those messages.
+- `drain_water_ahead` / `water_drain_offset` (dimension profile) control the proactive fluid pass that clears water/lava a few blocks ahead of the erosion front so oceans don’t explode into waterfalls mid-collapse.
+- `singularity.execution.multithreaded` toggles the collapse worker scheduler. When enabled, slices are processed on background threads sized according to `workerCount` (rounded to multiples of four so you can request 4/8/12 on a 12-core machine).
+- `respect_protected_blocks` keeps bedrock/negative-hardness blocks intact even during chunk wipes; turn it off for pure obliteration.
+- `collapse.mode` selects between the two modern destruction paths: `"erode"` (outer shell in passes) and `"slab"`/future variants. The execution enum (`singularity.execution.mode`) currently selects between the ring slice implementations.
+- `collapse_particles` gates the ash/sound spam for each cleared block; leave it `false` when profiling.
+- `fill_mode` picks the `/fill` behavior used by the collapse: `"air"` replaces blocks directly, `"destroy"` mimics `/fill … destroy` (breaks blocks, spawns drops).
+- `fill_shape` decides how each chunk is iterated while it is being hollowed out. `"matrix"` sweeps in XYZ order, while `"column"`, `"row"`, `"vector"`, and `"outline"` bias the carve for specific visuals or performance profiles; `outline_thickness` widens the outline strategy.
+- `use_native_fill` lets you toggle between the high-speed direct block replacement path (`false`) and a vanilla-style fill (`true`) that fires block updates and respects drops at the cost of extra TPS.
+- `singularity.execution.workerCount` is ignored until `multithreaded` is `true`, but once threading is on we reduce the value to the nearest multiple of four and clamp it to `availableCores - 1`.
+- `collapse.tick_interval` is the per-batch cooldown in ticks; raising it slows the collapse cadence without touching throughput math.
+- `singularity.execution.collapseEnabled` is the master kill-switch: when `false`, fusing still detonates after its timer but no singularity block is spawned and no terrain is chewed away. The gamerule `virusSingularityCollapseEnabled` can override this live without reopening the config.
+- `fuse.explosionDelayTicks`, `fuse.shellCollapseTicks`, and `fuse.pulseIntervalTicks` control the fuse timeline (delay before detonation, shell collapse timing, ambient pulse cadence).
+- `collapse.view_distance_chunks` / `simulation_distance_chunks` optionally override the vanilla player-manager distances during the collapse (set each to `0` to leave vanilla behaviour). The overrides are logged on the `singularity` channel and automatically restored once the event finishes.
+- `collapse.broadcast_mode` / `broadcast_radius_blocks` control how aggressively we stream collapse block updates to clients. `immediate` mirrors vanilla; `delayed`/`summary` skip packets for chunks farther than the configured radius (in blocks) and replay them later when a player gets close (`summary` also logs a short digest).
+- `collapse.radius_delays` define the tick cooldown for rings at or below the listed side length so you can slow the final rings without editing code.
+- `chunk_pregen_*`/`chunk_preload_*` fields tune (or disable) the pre-generation/preload cadence and chunk budgets.
+- `barrier_start_radius`, `barrier_end_radius`, and `barrier_duration_ticks` determine how far out the protective border spawns, how tight it shrinks, and how fast the interpolation runs.
+
+#### Diagnostics Commands
+
+Operators can tune these knobs live via `/virusblock singularity diagnostics …`:
+
+- `enable|disable` – master switch for diagnostics sampling/logging.
+- `chunksamples enable|disable` – toggles per-tick chunk/border summaries.
+- `bypasses enable|disable` – toggles bypass stack logging.
+- `interval <ticks>` – adjusts the sampling cooldown.
+- `spam enable|disable` – gates the per-channel spam watchdog.
+- `spam persecond <count>` / `spam perminute <count>` – updates rate thresholds.
+- `spam suppress enable|disable` – decides whether spammy templates are muted after an alert.
 
 #### Collapse Sync Commands
 
-Use `/virusblock singularity viewdistance <chunks>` or `/virusblock singularity simulationdistance <chunks>` to update the overrides at runtime (set `0` to disable). The commands simply persist the values back into `singularity.json`; the overrides are applied the moment a collapse arms and are restored automatically afterward.  
+Use `/virusblock singularity viewdistance <chunks>` or `/virusblock singularity simulationdistance <chunks>` to update the overrides at runtime (set `0` to disable). The commands persist the values back into the active dimension profile JSON; the overrides are applied the moment a collapse arms and are restored automatically afterward.  
 Use `/virusblock singularity broadcast mode <immediate|delayed|summary>` and `/virusblock singularity broadcast radius <blocks>` to switch the collapse broadcast profile without editing the config.
 
 ### Example Preset (`configs/virus_contained.mcfunction`)

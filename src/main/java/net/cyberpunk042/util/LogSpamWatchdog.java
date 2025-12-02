@@ -7,7 +7,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import net.cyberpunk042.config.InfectionLogConfig;
 import net.cyberpunk042.config.InfectionLogConfig.LogChannel;
 import net.cyberpunk042.config.InfectionLogConfig.LogWatchdogSettings;
-import net.cyberpunk042.config.SingularityConfig;
+import net.cyberpunk042.infection.service.ServiceConfig;
+import net.cyberpunk042.infection.singularity.SingularityDiagnostics;
 
 /**
  * Tracks per-template log rates so we can detect and optionally suppress spammy log
@@ -119,8 +120,8 @@ public final class LogSpamWatchdog {
 
 	private static ActiveSettings resolveSettings(LogChannel channel) {
 		if (channel == LogChannel.SINGULARITY) {
-			SingularityConfig.LogSpamSettings singularity = SingularityConfig.loggingWatchdog();
-			if (singularity != null && singularity.enableSpamDetection) {
+			ServiceConfig.LogSpamSettings singularity = SingularityDiagnostics.logSpamSettings();
+			if (singularity.enableSpamDetection) {
 				return new ActiveSettings(true,
 						singularity.perSecondThreshold,
 						singularity.perMinuteThreshold,

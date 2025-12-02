@@ -1,6 +1,7 @@
 {
   "block.the-virus-block.virus_block": "Virus Block",
   "block.the-virus-block.singularity_block": "Singularity Block",
+  "block.the-virus-block.progressive_growth_block": "Progressive Growth Block",
   "block.the-virus-block.corrupted_stone": "Corrupted Stone",
   "block.the-virus-block.corrupted_glass": "Corrupted Glass",
   "block.the-virus-block.corrupted_dirt": "Corrupted Dirt",
@@ -23,6 +24,7 @@
   "block.the-virus-block.infected_grass": "Infected Grass",
   "item.the-virus-block.virus_block": "Virus Block",
   "item.the-virus-block.singularity_block": "Singularity Block",
+  "item.the-virus-block.progressive_growth_block": "Progressive Growth Block",
   "item.the-virus-block.corrupted_stone": "Corrupted Stone",
   "item.the-virus-block.corrupted_glass": "Corrupted Glass",
   "item.the-virus-block.corrupted_dirt": "Corrupted Dirt",

@@ -23,7 +23,7 @@ public class PurificationTotemItem extends Item {
 			return ActionResult.SUCCESS;
 		}
 		VirusWorldState state = VirusWorldState.get(serverWorld);
-		if (!state.isInfected()) {
+		if (!state.infectionState().infected()) {
 			user.sendMessage(Text.translatable("message.the-virus-block.purification_totem.inactive"), true);
 			return ActionResult.FAIL;
 		}

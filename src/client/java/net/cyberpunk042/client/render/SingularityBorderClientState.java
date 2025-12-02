@@ -4,7 +4,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.cyberpunk042.config.ColorConfig;
 import net.cyberpunk042.config.ColorConfig.ColorSlot;
-import net.cyberpunk042.infection.VirusWorldState.SingularityState;
+import net.cyberpunk042.infection.SingularityState;
 import net.cyberpunk042.network.SingularityBorderPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.MinecraftClient;

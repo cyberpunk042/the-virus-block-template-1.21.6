@@ -4,8 +4,9 @@ import java.util.Locale;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.cyberpunk042.config.SingularityConfig;
 import net.cyberpunk042.registry.ModBlocks;
+import net.cyberpunk042.infection.profile.CollapseFillMode;
+import net.cyberpunk042.infection.profile.CollapseFillShape;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.server.MinecraftServer;
@@ -29,11 +30,13 @@ public final class BulkFillHelper {
 
 	public static int clearVolume(ServerWorld world,
 			BlockBox box,
-			SingularityConfig.CollapseFillMode mode,
-			SingularityConfig.FillShape shape,
+			CollapseFillMode mode,
+			CollapseFillShape shape,
 			boolean respectProtected,
+			int outlineThickness,
+			boolean useNativeFill,
 			int updateFlags) {
-		if (shouldUseNativeFill(shape, box)) {
+		if (shouldUseNativeFill(useNativeFill, shape, box)) {
 			int result = runNativeFill(world, box, mode, null);
 			if (result >= 0) {
 				return result;
@@ -52,7 +55,7 @@ public final class BulkFillHelper {
 		for (int y = minY; y <= maxY; y++) {
 			for (int x = minX; x <= maxX; x++) {
 				for (int z = minZ; z <= maxZ; z++) {
-					if (!shouldFillShape(x, y, z, minX, minY, minZ, maxX, maxY, maxZ, shape)) {
+					if (!shouldFillShape(x, y, z, minX, minY, minZ, maxX, maxY, maxZ, shape, outlineThickness)) {
 						continue;
 					}
 					mutable.set(x, y, z);
@@ -63,7 +66,7 @@ public final class BulkFillHelper {
 					if (respectProtected && state.getHardness(world, mutable) < 0.0F) {
 						continue;
 					}
-					if (mode == SingularityConfig.CollapseFillMode.DESTROY) {
+					if (mode == CollapseFillMode.DESTROY) {
 						if (world.breakBlock(mutable, false)) {
 							cleared++;
 						}
@@ -77,11 +80,11 @@ public final class BulkFillHelper {
 		return cleared;
 	}
 
-	private static boolean shouldUseNativeFill(SingularityConfig.FillShape shape, BlockBox box) {
-		if (!SingularityConfig.useNativeFill()) {
+	private static boolean shouldUseNativeFill(boolean useNativeFill, CollapseFillShape shape, BlockBox box) {
+		if (!useNativeFill) {
 			return false;
 		}
-		if (shape != SingularityConfig.FillShape.MATRIX) {
+		if (shape != CollapseFillShape.MATRIX) {
 			return false;
 		}
 		long volume = boxVolume(box);
@@ -90,7 +93,7 @@ public final class BulkFillHelper {
 
 	private static int runNativeFill(ServerWorld world,
 			BlockBox box,
-			SingularityConfig.CollapseFillMode mode,
+			CollapseFillMode mode,
 			@Nullable String replaceFilter) {
 		MinecraftServer server = world.getServer();
 		if (server == null) {
@@ -114,7 +117,7 @@ public final class BulkFillHelper {
 					box.getMaxZ(),
 					replaceFilter);
 		} else {
-			String modeArg = mode == SingularityConfig.CollapseFillMode.DESTROY ? "destroy" : "replace";
+			String modeArg = mode == CollapseFillMode.DESTROY ? "destroy" : "replace";
 			command = String.format(Locale.ROOT,
 					"fill %d %d %d %d %d %d minecraft:air %s",
 					box.getMinX(),
@@ -133,14 +136,14 @@ public final class BulkFillHelper {
 		}
 	}
 
-	public static boolean clearFluidRange(ServerWorld world, BlockBox box, String blockId) {
+	public static boolean clearFluidRange(ServerWorld world, BlockBox box, String blockId, boolean useNativeFill) {
 		if (box == null || blockId == null || blockId.isBlank()) {
 			return false;
 		}
 		if (boxVolume(box) > FILL_COMMAND_LIMIT) {
 			return false;
 		}
-		return runNativeFill(world, box, SingularityConfig.CollapseFillMode.AIR, blockId) >= 0;
+		return runNativeFill(world, box, CollapseFillMode.AIR, blockId) >= 0;
 	}
 
 	private static long boxVolume(BlockBox box) {
@@ -158,30 +161,25 @@ public final class BulkFillHelper {
 			int maxX,
 			int maxY,
 			int maxZ,
-			SingularityConfig.FillShape shape) {
+			CollapseFillShape shape,
+			int thickness) {
+		int halfThickness = Math.max(0, (thickness - 1) / 2);
 		return switch (shape) {
 			case MATRIX -> true;
 			case COLUMN -> {
+				// Vertical column centered in X/Z, with thickness
 				int centerX = (minX + maxX) >> 1;
 				int centerZ = (minZ + maxZ) >> 1;
-				yield x == centerX && z == centerZ;
+				yield Math.abs(x - centerX) <= halfThickness && Math.abs(z - centerZ) <= halfThickness;
 			}
 			case ROW -> {
+				// Horizontal row along X axis, centered in Y/Z, with thickness
 				int centerY = (minY + maxY) >> 1;
 				int centerZ = (minZ + maxZ) >> 1;
-				yield y == centerY && z == centerZ;
+				yield Math.abs(y - centerY) <= halfThickness && Math.abs(z - centerZ) <= halfThickness;
 			}
-			case VECTOR -> shouldFillVector(x, y, z, minX, minY, minZ, maxX, maxY, maxZ);
-			case OUTLINE -> outlineMask(x,
-					y,
-					z,
-					minX,
-					minY,
-					minZ,
-					maxX,
-					maxY,
-					maxZ,
-					SingularityConfig.outlineThickness());
+			case VECTOR -> shouldFillVector(x, y, z, minX, minY, minZ, maxX, maxY, maxZ, halfThickness);
+			case OUTLINE -> outlineMask(x, y, z, minX, minY, minZ, maxX, maxY, maxZ, thickness);
 		};
 	}
 
@@ -193,29 +191,32 @@ public final class BulkFillHelper {
 			int minZ,
 			int maxX,
 			int maxY,
-			int maxZ) {
+			int maxZ,
+			int halfThickness) {
 		int sizeX = maxX - minX + 1;
 		int sizeY = maxY - minY + 1;
 		int sizeZ = maxZ - minZ + 1;
-		if (sizeX <= 1) {
+		// If any dimension is 1, fill everything
+		if (sizeX <= 1 || sizeZ <= 1 || sizeY <= 1) {
 			return true;
 		}
-		if (sizeZ <= 1) {
-			return true;
-		}
-		if (sizeY <= 1) {
-			return true;
-		}
+		// Fill along the longest dimension with thickness perpendicular
 		if (sizeY >= sizeX && sizeY >= sizeZ) {
-			int centerY = (minY + maxY) >> 1;
-			return y == centerY;
+			// Y is longest - fill along Y, thickness in X/Z
+			int centerX = (minX + maxX) >> 1;
+			int centerZ = (minZ + maxZ) >> 1;
+			return Math.abs(x - centerX) <= halfThickness && Math.abs(z - centerZ) <= halfThickness;
 		}
 		if (sizeX >= sizeZ) {
-			int centerX = (minX + maxX) >> 1;
-			return x == centerX;
+			// X is longest - fill along X, thickness in Y/Z
+			int centerY = (minY + maxY) >> 1;
+			int centerZ = (minZ + maxZ) >> 1;
+			return Math.abs(y - centerY) <= halfThickness && Math.abs(z - centerZ) <= halfThickness;
 		}
-		int centerZ = (minZ + maxZ) >> 1;
-		return z == centerZ;
+		// Z is longest - fill along Z, thickness in X/Y
+		int centerX = (minX + maxX) >> 1;
+		int centerY = (minY + maxY) >> 1;
+		return Math.abs(x - centerX) <= halfThickness && Math.abs(y - centerY) <= halfThickness;
 	}
 
 	private static boolean shouldSkip(BlockState state) {

@@ -60,7 +60,7 @@ public enum PurificationOption {
 	}
 
 	public void apply(ServerWorld world, ServerPlayerEntity player, VirusWorldState state) {
-		if (!isVisible(state.getDifficulty())) {
+		if (!isVisible(state.tiers().difficulty())) {
 			player.sendMessage(Text.translatable("message.the-virus-block.purification.bleed_hp_locked").formatted(Formatting.RED), true);
 			return;
 		}
@@ -74,8 +74,8 @@ public enum PurificationOption {
 	}
 
 	private static void applyNoBoobytraps(ServerWorld world, ServerPlayerEntity player, VirusWorldState state) {
-		if (!state.isDormant()) {
-			state.disableBoobytraps(world);
+		if (!state.infectionState().dormant()) {
+			state.infectionLifecycle().disableBoobytraps();
 			player.sendMessage(Text.translatable("message.the-virus-block.purification.no_boobytraps").formatted(Formatting.GREEN), false);
 		} else {
 			player.sendMessage(Text.translatable("message.the-virus-block.purification_totem.boobytraps_disabled").formatted(Formatting.GRAY), true);
@@ -83,12 +83,12 @@ public enum PurificationOption {
 	}
 
 	private static void applyNoShell(ServerWorld world, ServerPlayerEntity player, VirusWorldState state) {
-		state.collapseShells(world);
+		state.shell().collapse(world, state.getVirusSources());
 		player.sendMessage(Text.translatable("message.the-virus-block.purification.no_shell").formatted(Formatting.RED), false);
 	}
 
 	private static void applyHalfHp(ServerWorld world, ServerPlayerEntity player, VirusWorldState state) {
-		boolean reduced = state.reduceMaxHealth(world, 0.5D);
+		boolean reduced = state.tierProgression().reduceMaxHealth(0.5D);
 		player.sendMessage(Text.translatable(
 				reduced
 						? "message.the-virus-block.purification.max_hp"
@@ -96,7 +96,7 @@ public enum PurificationOption {
 	}
 
 	private static void applyBleedHp(ServerWorld world, ServerPlayerEntity player, VirusWorldState state) {
-		boolean drained = state.bleedHealth(world, 0.5D);
+		boolean drained = state.tierProgression().bleedHealth(0.5D);
 		player.sendMessage(Text.translatable(
 				drained
 						? "message.the-virus-block.purification.bleed_hp"
