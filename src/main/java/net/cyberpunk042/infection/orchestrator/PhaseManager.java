@@ -1,5 +1,7 @@
 package net.cyberpunk042.infection.orchestrator;
 
+
+import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.infection.SingularityState;
 import net.cyberpunk042.infection.VirusWorldState;
@@ -81,7 +83,7 @@ public final class PhaseManager {
 			dispatchPhase(singularity.state().singularityState, ctx);
 
 		} catch (Exception e) {
-			LOGGER.error("[PhaseManager] Phase tick failed for state: {}", 
+			Logging.ORCHESTRATOR.error("[PhaseManager] Phase tick failed for state: {}", 
 				singularity.state().singularityState, e);
 		}
 	}
@@ -105,7 +107,7 @@ public final class PhaseManager {
 		try {
 			singularity.fusing().beginFusing(contextFactory.apply(world), fuseDelay);
 		} catch (Exception e) {
-			LOGGER.error("[PhaseManager] beginFusing failed", e);
+			Logging.ORCHESTRATOR.error("[PhaseManager] beginFusing failed", e);
 		}
 	}
 
@@ -114,7 +116,7 @@ public final class PhaseManager {
 		try {
 			singularity.phase().handleFuseCountdownComplete(contextFactory.apply(world));
 		} catch (Exception e) {
-			LOGGER.error("[PhaseManager] handleFuseCountdownComplete failed", e);
+			Logging.ORCHESTRATOR.error("[PhaseManager] handleFuseCountdownComplete failed", e);
 		}
 	}
 
@@ -123,7 +125,7 @@ public final class PhaseManager {
 		try {
 			singularity.lifecycle().startPostCollapseReset();
 		} catch (Exception e) {
-			LOGGER.error("[PhaseManager] startPostCollapseReset failed", e);
+			Logging.ORCHESTRATOR.error("[PhaseManager] startPostCollapseReset failed", e);
 		}
 	}
 
@@ -132,7 +134,7 @@ public final class PhaseManager {
 		try {
 			singularity.lifecycle().processSingularityReset();
 		} catch (Exception e) {
-			LOGGER.error("[PhaseManager] processSingularityReset failed", e);
+			Logging.ORCHESTRATOR.error("[PhaseManager] processSingularityReset failed", e);
 		}
 	}
 
@@ -141,7 +143,7 @@ public final class PhaseManager {
 		try {
 			singularity.lifecycle().finishSingularity();
 		} catch (Exception e) {
-			LOGGER.error("[PhaseManager] finishSingularity failed", e);
+			Logging.ORCHESTRATOR.error("[PhaseManager] finishSingularity failed", e);
 		}
 	}
 
@@ -150,7 +152,7 @@ public final class PhaseManager {
 		try {
 			return singularity.lifecycle().abortSingularity();
 		} catch (Exception e) {
-			LOGGER.error("[PhaseManager] abortSingularity failed", e);
+			Logging.ORCHESTRATOR.error("[PhaseManager] abortSingularity failed", e);
 			return false;
 		}
 	}

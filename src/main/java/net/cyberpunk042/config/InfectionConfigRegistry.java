@@ -1,10 +1,11 @@
 package net.cyberpunk042.config;
 
+
+import net.cyberpunk042.log.Logging;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-import net.cyberpunk042.TheVirusBlock;
 
 /**
  * Small facade that keeps track of every JSON-backed configuration module
@@ -43,7 +44,7 @@ public final class InfectionConfigRegistry {
 		try {
 			handle.saver().run();
 		} catch (Exception ex) {
-			TheVirusBlock.LOGGER.error("Failed to save config {}", id, ex);
+			Logging.CONFIG.error("Failed to save config {}", id, ex);
 		}
 	}
 
@@ -54,7 +55,7 @@ public final class InfectionConfigRegistry {
 					try {
 						handle.loader().run();
 					} catch (Exception ex) {
-						TheVirusBlock.LOGGER.error("Failed to load config {}", handle.id(), ex);
+						Logging.CONFIG.error("Failed to load config {}", handle.id(), ex);
 					}
 				});
 	}

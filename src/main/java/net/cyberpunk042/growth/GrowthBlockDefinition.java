@@ -18,19 +18,18 @@ public record GrowthBlockDefinition(
 		boolean hasCollision,
 		boolean doesDestruction,
 		boolean hasFuse,
-		boolean isWobbly,
-		boolean isPulling,
-		boolean isPushing,
-		double pullingForce,
-		double pushingForce,
 		double touchDamage,
+		Identifier growthProfileId,
 		Identifier glowProfileId,
 		Identifier particleProfileId,
 		Identifier fieldProfileId,
 		Identifier pullProfileId,
 		Identifier pushProfileId,
 		Identifier fuseProfileId,
-		Identifier explosionProfileId) {
+		Identifier explosionProfileId,
+		Identifier opacityProfileId,
+		Identifier spinProfileId,
+		Identifier wobbleProfileId) {
 
 	public static GrowthBlockDefinition defaults() {
 		return new GrowthBlockDefinition(
@@ -44,20 +43,19 @@ public record GrowthBlockDefinition(
 				1.4D,
 				true,
 				false,
-				true,
-				true,
-				true,
 				false,
-				1.0D,
-				0.5D,
 				4.0D,
-				Identifier.of("the-virus-block", "prototype"),
-				Identifier.of("the-virus-block", "default"),
-				Identifier.of("the-virus-block", "default_field"),
-				Identifier.of("the-virus-block", "default_pull"),
-				Identifier.of("the-virus-block", "default_push"),
-				Identifier.of("the-virus-block", "default_fuse"),
-				Identifier.of("the-virus-block", "default_explosion"));
+				Identifier.of("the-virus-block", "default_growth"),
+				Identifier.of("the-virus-block", "magma"),
+				Identifier.of("the-virus-block", "none_particle"),
+				Identifier.of("the-virus-block", "none_field"),
+				Identifier.of("the-virus-block", "none_pull"),
+				Identifier.of("the-virus-block", "none_push"),
+				Identifier.of("the-virus-block", "none_fuse"),
+				Identifier.of("the-virus-block", "default_explosion"),
+				Identifier.of("the-virus-block", "default_opacity"),
+				Identifier.of("the-virus-block", "default_spin"),
+				Identifier.of("the-virus-block", "none_wobble"));
 	}
 
 	public int sanitizedRate() {

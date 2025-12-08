@@ -1,7 +1,10 @@
 package net.cyberpunk042.growth.scheduler;
 
+
+import net.cyberpunk042.log.Logging;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -10,6 +13,8 @@ import org.jetbrains.annotations.Nullable;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 
 import net.cyberpunk042.growth.GrowthBlockDefinition;
+import net.cyberpunk042.growth.GrowthProfile;
+import net.cyberpunk042.growth.GrowthRegistry;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtHelper;
 import net.minecraft.util.Identifier;
@@ -78,7 +83,13 @@ public final class GrowthOverrides {
 			return overrides;
 		}
 		for (String key : tag.getKeys()) {
-			GrowthField field = GrowthField.valueOf(key);
+			GrowthField field;
+			try {
+				field = GrowthField.valueOf(key.toUpperCase(Locale.ROOT));
+			} catch (IllegalArgumentException ex) {
+				Logging.SCHEDULER.warn("[GrowthOverrides] Ignoring unknown override key '{}'", key);
+				continue;
+			}
 			switch (field.type()) {
 				case BOOLEAN -> tag.getBoolean(key).ifPresent(val -> overrides.values.put(field, val));
 				case INT -> tag.getInt(key).ifPresent(val -> overrides.values.put(field, val));
@@ -103,31 +114,43 @@ public final class GrowthOverrides {
 	}
 
 	public GrowthBlockDefinition apply(GrowthBlockDefinition base) {
+		return apply(base, null);
+	}
+
+	public GrowthBlockDefinition apply(GrowthBlockDefinition base, @Nullable GrowthRegistry registry) {
+		Identifier appliedGrowthProfile = getIdentifier(GrowthField.GROWTH_PROFILE, base.growthProfileId());
+		GrowthProfile preset = registry != null ? registry.growthProfile(appliedGrowthProfile) : null;
+		boolean presetEnabled = preset != null ? preset.growthEnabled() : base.growthEnabled();
+		int presetRate = preset != null ? preset.rateTicks() : base.rateTicks();
+		double presetRateScale = preset != null ? preset.rateScale() : base.rateScale();
+		double presetStart = preset != null ? preset.startScale() : base.startScale();
+		double presetTarget = preset != null ? preset.targetScale() : base.targetScale();
+		double presetMin = preset != null ? preset.minScale() : base.minScale();
+		double presetMax = preset != null ? preset.maxScale() : base.maxScale();
 		return new GrowthBlockDefinition(
 				base.id(),
-				getBoolean(GrowthField.GROWTH_ENABLED, base.growthEnabled()),
-				getInt(GrowthField.RATE_TICKS, base.rateTicks()),
-				getDouble(GrowthField.RATE_SCALE, base.rateScale()),
-				getDouble(GrowthField.START_SCALE, base.startScale()),
-				getDouble(GrowthField.TARGET_SCALE, base.targetScale()),
-				getDouble(GrowthField.MIN_SCALE, base.minScale()),
-				getDouble(GrowthField.MAX_SCALE, base.maxScale()),
+				getBoolean(GrowthField.GROWTH_ENABLED, presetEnabled),
+				getInt(GrowthField.RATE_TICKS, presetRate),
+				getDouble(GrowthField.RATE_SCALE, presetRateScale),
+				getDouble(GrowthField.START_SCALE, presetStart),
+				getDouble(GrowthField.TARGET_SCALE, presetTarget),
+				getDouble(GrowthField.MIN_SCALE, presetMin),
+				getDouble(GrowthField.MAX_SCALE, presetMax),
 				getBoolean(GrowthField.HAS_COLLISION, base.hasCollision()),
 				getBoolean(GrowthField.DOES_DESTRUCTION, base.doesDestruction()),
 				getBoolean(GrowthField.HAS_FUSE, base.hasFuse()),
-				getBoolean(GrowthField.IS_WOBBLY, base.isWobbly()),
-				getBoolean(GrowthField.IS_PULLING, base.isPulling()),
-				getBoolean(GrowthField.IS_PUSHING, base.isPushing()),
-				getDouble(GrowthField.PULLING_FORCE, base.pullingForce()),
-				getDouble(GrowthField.PUSHING_FORCE, base.pushingForce()),
 				getDouble(GrowthField.TOUCH_DAMAGE, base.touchDamage()),
+				appliedGrowthProfile,
 				getIdentifier(GrowthField.GLOW_PROFILE, base.glowProfileId()),
 				getIdentifier(GrowthField.PARTICLE_PROFILE, base.particleProfileId()),
 				getIdentifier(GrowthField.FIELD_PROFILE, base.fieldProfileId()),
 				getIdentifier(GrowthField.PULL_PROFILE, base.pullProfileId()),
 				getIdentifier(GrowthField.PUSH_PROFILE, base.pushProfileId()),
 				getIdentifier(GrowthField.FUSE_PROFILE, base.fuseProfileId()),
-				getIdentifier(GrowthField.EXPLOSION_PROFILE, base.explosionProfileId()));
+				getIdentifier(GrowthField.EXPLOSION_PROFILE, base.explosionProfileId()),
+				getIdentifier(GrowthField.OPACITY_PROFILE, base.opacityProfileId()),
+				getIdentifier(GrowthField.SPIN_PROFILE, base.spinProfileId()),
+				getIdentifier(GrowthField.WOBBLE_PROFILE, base.wobbleProfileId()));
 	}
 
 	private boolean getBoolean(GrowthField field, boolean fallback) {

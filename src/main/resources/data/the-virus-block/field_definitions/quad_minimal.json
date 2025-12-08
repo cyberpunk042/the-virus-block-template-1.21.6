@@ -1,0 +1,36 @@
+{
+  "type": "shield",
+  "baseRadius": 12.0,
+  "theme": "minimal_white",
+  "layers": [
+    {
+      "id": "shell",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.0,
+            "latSteps": 24,
+            "lonSteps": 48
+          },
+          "appearance": {
+            "color": "#FFFFFFFF",
+            "alpha": {
+              "min": 0.3,
+              "max": 0.5
+            },
+            "fill": true,
+            "glow": 0.1
+          },
+          "animation": {
+            "spin": 0.01
+          }
+        }
+      ]
+    }
+  ],
+  "modifiers": {
+    "visualScale": 1.0
+  },
+  "id": "quad_minimal"
+}

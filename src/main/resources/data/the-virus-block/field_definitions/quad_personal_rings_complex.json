@@ -1,0 +1,106 @@
+{
+  "type": "personal",
+  "baseRadius": 16.0,
+  "theme": "personal_cyan",
+  "layers": [
+    {
+      "id": "polar_rings",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.08,
+            "latSteps": 48,
+            "lonSteps": 80,
+            "latStart": 0.0,
+            "latEnd": 0.35
+          },
+          "appearance": {
+            "color": "#FFEEF9FF",
+            "alpha": {
+              "min": 0.3,
+              "max": 0.7
+            },
+            "fill": true,
+            "pattern": {
+              "type": "bands",
+              "count": 4,
+              "thickness": 0.55
+            },
+            "glow": 0.25
+          },
+          "animation": {
+            "spin": 0.012
+          }
+        }
+      ]
+    },
+    {
+      "id": "equator",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.02,
+            "latSteps": 64,
+            "lonSteps": 96,
+            "latStart": 0.35,
+            "latEnd": 0.65
+          },
+          "appearance": {
+            "color": "#FFFDFEFF",
+            "alpha": {
+              "min": 0.45,
+              "max": 0.88
+            },
+            "fill": true,
+            "pattern": {
+              "type": "bands",
+              "count": 6,
+              "thickness": 0.3
+            },
+            "glow": 0.35
+          },
+          "animation": {
+            "spin": 0.015
+          }
+        }
+      ]
+    },
+    {
+      "id": "halo",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.15,
+            "latSteps": 24,
+            "lonSteps": 48
+          },
+          "appearance": {
+            "color": "#FF161C2C",
+            "alpha": {
+              "min": 0.25,
+              "max": 0.5
+            },
+            "fill": false,
+            "wireThickness": 0.7
+          },
+          "animation": {
+            "spin": -0.008
+          }
+        }
+      ]
+    }
+  ],
+  "modifiers": {
+    "visualScale": 0.3,
+    "tilt": 0.18,
+    "swirl": 0.02
+  },
+  "prediction": {
+    "enabled": true,
+    "leadTicks": 2
+  },
+  "id": "quad_personal_rings_complex"
+}

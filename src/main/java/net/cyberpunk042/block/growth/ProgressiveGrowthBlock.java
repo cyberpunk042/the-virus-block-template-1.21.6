@@ -4,6 +4,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.mojang.serialization.MapCodec;
 
+import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.block.entity.ProgressiveGrowthBlockEntity;
 import net.cyberpunk042.growth.GrowthBlockDefinition;
 import net.cyberpunk042.growth.GrowthRegistry;
@@ -11,6 +12,7 @@ import net.cyberpunk042.growth.scheduler.GrowthOverrides;
 import net.cyberpunk042.infection.service.InfectionServiceContainer;
 import net.cyberpunk042.infection.service.InfectionServices;
 import net.cyberpunk042.registry.ModBlockEntities;
+import net.minecraft.block.Block;
 import net.minecraft.block.BlockRenderType;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.BlockWithEntity;
@@ -27,6 +29,8 @@ import net.minecraft.nbt.NbtCompound;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
+import net.minecraft.state.StateManager;
+import net.minecraft.state.property.IntProperty;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
@@ -40,17 +44,26 @@ import net.minecraft.world.World;
  * the associated block entity.
  */
 public class ProgressiveGrowthBlock extends BlockWithEntity {
+	public static final IntProperty LIGHT_LEVEL = IntProperty.of("light_level", 0, 15);
 	public static final MapCodec<ProgressiveGrowthBlock> CODEC = createCodec(ProgressiveGrowthBlock::new);
 	private static final String NBT_DEFINITION_ID = "DefinitionId";
 	private static final String NBT_OVERRIDES = "Overrides";
+	private static final Identifier BLOCK_ENTITY_ID = Identifier.of(TheVirusBlock.MOD_ID, "progressive_growth_block");
 
 	public ProgressiveGrowthBlock(Settings settings) {
 		super(settings);
+		this.setDefaultState(this.stateManager.getDefaultState().with(LIGHT_LEVEL, 10));
 	}
 
 	@Override
 	protected MapCodec<? extends BlockWithEntity> getCodec() {
 		return CODEC;
+	}
+
+	@Override
+	protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
+		super.appendProperties(builder);
+		builder.add(LIGHT_LEVEL);
 	}
 
 	@Override
@@ -109,7 +122,8 @@ public class ProgressiveGrowthBlock extends BlockWithEntity {
 
 	@Override
 	public VoxelShape getRaycastShape(BlockState state, BlockView world, BlockPos pos) {
-		return resolveShape(world, pos, ShapeType.RAYTRACE);
+		VoxelShape shape = resolveShape(world, pos, ShapeType.RAYTRACE);
+		return shape.isEmpty() ? super.getRaycastShape(state, world, pos) : shape;
 	}
 
 	@Override
@@ -156,7 +170,10 @@ public class ProgressiveGrowthBlock extends BlockWithEntity {
 		if (stack == null || id == null) {
 			return;
 		}
-		NbtComponent.set(DataComponentTypes.BLOCK_ENTITY_DATA, stack, beTag -> beTag.putString(NBT_DEFINITION_ID, id.toString()));
+		NbtComponent.set(DataComponentTypes.BLOCK_ENTITY_DATA, stack, beTag -> {
+			ensureBlockEntityId(beTag);
+			beTag.putString(NBT_DEFINITION_ID, id.toString());
+		});
 	}
 
 	@Nullable
@@ -193,11 +210,24 @@ public class ProgressiveGrowthBlock extends BlockWithEntity {
 			return;
 		}
 		if (overrides == null || overrides.isEmpty()) {
-			NbtComponent.set(DataComponentTypes.BLOCK_ENTITY_DATA, stack, beTag -> beTag.remove(NBT_OVERRIDES));
+			NbtComponent.set(DataComponentTypes.BLOCK_ENTITY_DATA, stack, beTag -> {
+				ensureBlockEntityId(beTag);
+				beTag.remove(NBT_OVERRIDES);
+			});
 		} else {
 			String snbt = overrides.toSnbt();
-			NbtComponent.set(DataComponentTypes.BLOCK_ENTITY_DATA, stack, beTag -> beTag.putString(NBT_OVERRIDES, snbt));
+			NbtComponent.set(DataComponentTypes.BLOCK_ENTITY_DATA, stack, beTag -> {
+				ensureBlockEntityId(beTag);
+				beTag.putString(NBT_OVERRIDES, snbt);
+			});
 		}
+	}
+
+	private static void ensureBlockEntityId(NbtCompound tag) {
+		if (tag == null) {
+			return;
+		}
+		tag.putString("id", BLOCK_ENTITY_ID.toString());
 	}
 }
 

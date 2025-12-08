@@ -1,5 +1,7 @@
 package net.cyberpunk042.infection;
 
+
+import net.cyberpunk042.log.Logging;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -260,7 +262,7 @@ public class VirusWorldState extends PersistentState {
 	public void installSourceService(@Nullable VirusSourceService service) {
 		this.sourceService = service != null 
 				? service 
-				: new VirusSourceService(this, collapseModule.watchdog().loggingService(), sourceState);
+				: new VirusSourceService(this, sourceState);
 	}
 
 	// ========== Operations Accessors ==========
@@ -380,7 +382,7 @@ public class VirusWorldState extends PersistentState {
 			try {
 				return extractor.apply(host);
 			} catch (Exception e) {
-				LOGGER.error("[Callbacks] Query failed", e);
+				Logging.INFECTION.error("[Callbacks] Query failed", e);
 				return null;
 			}
 		}
@@ -391,7 +393,7 @@ public class VirusWorldState extends PersistentState {
 				mutation.accept(host);
 				return true;
 			} catch (Exception e) {
-				LOGGER.error("[Callbacks] Mutation failed", e);
+				Logging.INFECTION.error("[Callbacks] Mutation failed", e);
 				return false;
 			}
 		}
@@ -410,7 +412,7 @@ public class VirusWorldState extends PersistentState {
 
 		@Override
 		public void cancel(UUID taskId) {
-			LOGGER.debug("[Callbacks] Cancel requested for task {} - not supported", taskId);
+			Logging.INFECTION.debug("[Callbacks] Cancel requested for task {} - not supported", taskId);
 		}
 
 		@Override

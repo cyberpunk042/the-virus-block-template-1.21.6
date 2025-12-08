@@ -1,5 +1,7 @@
 package net.cyberpunk042.infection.orchestrator;
 
+
+import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.infection.api.InfectionScenario;
 import net.cyberpunk042.infection.api.ScenarioRegistry;
@@ -77,10 +79,10 @@ public final class ScenarioManager {
 			try {
 				scenario.onAttach(contextFactory.apply(world));
 				this.attached = scenario;
-				LOGGER.debug("[ScenarioManager] Attached scenario: {} for dimension: {}",
+				Logging.ORCHESTRATOR.debug("[ScenarioManager] Attached scenario: {} for dimension: {}",
 					scenario.id(), world.getRegistryKey().getValue());
 			} catch (Exception e) {
-				LOGGER.error("[ScenarioManager] Failed to attach scenario: {} for dimension: {}",
+				Logging.ORCHESTRATOR.error("[ScenarioManager] Failed to attach scenario: {} for dimension: {}",
 					scenario.id(), world.getRegistryKey().getValue(), e);
 				return null;
 			}
@@ -99,9 +101,9 @@ public final class ScenarioManager {
 			this.attached = null;
 			try {
 				scenario.onDetach(contextFactory.apply(world));
-				LOGGER.debug("[ScenarioManager] Detached scenario: {}", scenarioId);
+				Logging.ORCHESTRATOR.debug("[ScenarioManager] Detached scenario: {}", scenarioId);
 			} catch (Exception e) {
-				LOGGER.error("[ScenarioManager] Error during scenario detach: {}", scenarioId, e);
+				Logging.ORCHESTRATOR.error("[ScenarioManager] Error during scenario detach: {}", scenarioId, e);
 			}
 		}
 	}
@@ -123,11 +125,11 @@ public final class ScenarioManager {
 				boolean infected = context.state().infectionState().infected();
 				scenario.tickInfection(context, infected);
 			} catch (Exception e) {
-				LOGGER.error("[ScenarioManager] Scenario tick failed for {}", activeId(), e);
+				Logging.ORCHESTRATOR.error("[ScenarioManager] Scenario tick failed for {}", activeId(), e);
 			}
 			long elapsed = (System.nanoTime() - start) / 1_000_000;
 			if (elapsed > 10) {
-				LOGGER.debug("[ScenarioManager] Scenario tick took {}ms", elapsed);
+				Logging.ORCHESTRATOR.debug("[ScenarioManager] Scenario tick took {}ms", elapsed);
 			}
 		}
 	}

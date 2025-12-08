@@ -1,0 +1,70 @@
+{
+  "type": "shield",
+  "baseRadius": 20.0,
+  "theme": "dual_layer_blue",
+  "layers": [
+    {
+      "id": "core",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 0.95,
+            "latSteps": 36,
+            "lonSteps": 80
+          },
+          "appearance": {
+            "color": "#FFF5F9FF",
+            "alpha": {
+              "min": 0.5,
+              "max": 0.95
+            },
+            "fill": true,
+            "glow": 0.25
+          },
+          "animation": {
+            "spin": 0.04
+          }
+        }
+      ]
+    },
+    {
+      "id": "halo",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.18,
+            "latSteps": 32,
+            "lonSteps": 64
+          },
+          "appearance": {
+            "color": "#FFDFF4FF",
+            "alpha": {
+              "min": 0.35,
+              "max": 0.8
+            },
+            "fill": true,
+            "glow": 0.4
+          },
+          "animation": {
+            "spin": -0.02,
+            "phase": 0.15
+          }
+        }
+      ]
+    }
+  ],
+  "modifiers": {
+    "visualScale": 0.32,
+    "tilt": 0.12,
+    "swirl": 0.45
+  },
+  "beam": {
+    "enabled": true,
+    "innerRadius": 0.045,
+    "outerRadius": 0.09,
+    "color": "#FFF0B6FF"
+  },
+  "id": "quad_dual_layer"
+}

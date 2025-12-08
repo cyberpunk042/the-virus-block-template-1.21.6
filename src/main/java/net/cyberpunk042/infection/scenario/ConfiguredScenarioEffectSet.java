@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-import net.cyberpunk042.config.InfectionLogConfig.LogChannel;
 import net.cyberpunk042.infection.api.EffectBus;
 import net.cyberpunk042.infection.events.CollapseChunkVeilEvent;
 import net.cyberpunk042.infection.events.CoreChargeTickEvent;
@@ -12,7 +11,7 @@ import net.cyberpunk042.infection.events.CoreDetonationEvent;
 import net.cyberpunk042.infection.events.DissipationTickEvent;
 import net.cyberpunk042.infection.events.RingChargeTickEvent;
 import net.cyberpunk042.infection.events.RingPulseEvent;
-import net.cyberpunk042.util.InfectionLog;
+import net.cyberpunk042.log.Logging;
 import net.minecraft.util.Identifier;
 
 final class ConfiguredScenarioEffectSet implements ScenarioEffectSet {
@@ -31,7 +30,7 @@ final class ConfiguredScenarioEffectSet implements ScenarioEffectSet {
 	@Override
 	public void install(EffectBus bus) {
 		this.bus = bus;
-		InfectionLog.info(LogChannel.EFFECTS, "[scenario:{} palette:{}] install effect-set {}",
+		Logging.EFFECTS.info("[scenario:{} palette:{}] install effect-set {}",
 				scenarioId, paletteId, behavior.getClass().getSimpleName());
 		register(CoreChargeTickEvent.class, behavior.coreCharge());
 		register(CoreDetonationEvent.class, behavior.coreDetonation());
@@ -47,7 +46,7 @@ final class ConfiguredScenarioEffectSet implements ScenarioEffectSet {
 		}
 		bus.register(type, handler);
 		registrations.add(new Registration<>(type, handler));
-		InfectionLog.info(LogChannel.EFFECTS, "[scenario:{} palette:{}] register {}", scenarioId, paletteId, type.getSimpleName());
+		Logging.EFFECTS.info("[scenario:{} palette:{}] register {}", scenarioId, paletteId, type.getSimpleName());
 	}
 
 	@Override
@@ -56,7 +55,7 @@ final class ConfiguredScenarioEffectSet implements ScenarioEffectSet {
 			unregister(registration);
 		}
 		registrations.clear();
-		InfectionLog.info(LogChannel.EFFECTS, "[scenario:{} palette:{}] effect-set closed", scenarioId, paletteId);
+		Logging.EFFECTS.info("[scenario:{} palette:{}] effect-set closed", scenarioId, paletteId);
 	}
 
 	private <T> void unregister(Registration<T> registration) {

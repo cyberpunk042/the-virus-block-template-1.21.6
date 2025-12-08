@@ -1,0 +1,69 @@
+{
+  "type": "shield",
+  "baseRadius": 15.0,
+  "theme": "cyber_cyan",
+  "layers": [
+    {
+      "id": "wireframe",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.0,
+            "latSteps": 24,
+            "lonSteps": 48
+          },
+          "appearance": {
+            "color": "@wire",
+            "alpha": {
+              "min": 0.6,
+              "max": 0.9
+            },
+            "fill": false,
+            "wireThickness": 1.5
+          },
+          "animation": {
+            "spin": 0.03,
+            "spinAxis": "y"
+          }
+        }
+      ]
+    },
+    {
+      "id": "glow",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 0.95,
+            "latSteps": 16,
+            "lonSteps": 32
+          },
+          "appearance": {
+            "color": "@glow",
+            "alpha": {
+              "min": 0.1,
+              "max": 0.25
+            },
+            "fill": true,
+            "glow": 0.8
+          },
+          "animation": {
+            "spin": -0.01,
+            "alphaPulse": 0.08,
+            "alphaPulseAmount": 0.5
+          }
+        }
+      ]
+    }
+  ],
+  "modifiers": {
+    "visualScale": 1.0,
+    "swirl": 0.3
+  },
+  "prediction": {
+    "enabled": true,
+    "leadTicks": 2
+  },
+  "id": "quad_shield_cyber"
+}

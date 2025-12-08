@@ -1,11 +1,11 @@
 package net.cyberpunk042.infection.service;
 
+
+import net.cyberpunk042.log.Logging;
 import java.util.Objects;
 
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import java.util.List;
-import net.cyberpunk042.TheVirusBlock;
-import net.cyberpunk042.config.InfectionLogConfig.LogChannel;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.infection.SingularityState;
 import net.cyberpunk042.infection.service.CollapseQueueService.PreCollapseDrainageJob;
@@ -102,7 +102,7 @@ public final class SingularityPhaseService {
 		state.singularityRingTickAccumulator = 0L;
 		host.singularity().ensureCenter(world);
 		if (host.singularityState().center == null) {
-			TheVirusBlock.LOGGER.warn("[Singularity] Unable to prepare collapse queue because center is null");
+			Logging.SINGULARITY.topic("phase").warn("[Singularity] Unable to prepare collapse queue because center is null");
 			return;
 		}
 		// Ring planner removed - CollapseProcessor manages collapse state
@@ -112,7 +112,7 @@ public final class SingularityPhaseService {
 	public void deploySingularityBorder() {
 		ServerWorld world = host.world();
 		if (host.singularityState().center == null) {
-			TheVirusBlock.LOGGER.warn("[SingularityPhase] Cannot deploy border: center is null");
+			Logging.SINGULARITY.topic("phase").warn("[SingularityPhase] Cannot deploy border: center is null");
 			return;
 		}
 		double centerX = host.singularityState().center.getX() + 0.5D;
@@ -125,23 +125,21 @@ public final class SingularityPhaseService {
 		singularity().singularityTotalRingTicks = (long) ringStages * host.collapseConfig().configuredCollapseTickInterval();
 		long durationTicks = host.collapseConfig().configuredBorderDurationTicks();
 		long durationMillis = Math.max(50L, durationTicks * 50L);
-		host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-				"Deploying border center=({},{}) outerRadius={} finalRadius={} initialDiameter={} finalDiameter={} durationTicks={}",
-				String.format("%.2f", centerX),
-				String.format("%.2f", centerZ),
-				String.format("%.2f", outerRadius),
-				String.format("%.2f", finalRadius),
-				String.format("%.2f", initialDiameter),
-				String.format("%.2f", finalDiameter),
-				durationTicks);
+		Logging.SINGULARITY.topic("border")
+				.kv("center", String.format("%.2f,%.2f", centerX, centerZ))
+				.kv("outerRadius", String.format("%.2f", outerRadius))
+				.kv("finalRadius", String.format("%.2f", finalRadius))
+				.kv("initialDiameter", String.format("%.2f", initialDiameter))
+				.kv("finalDiameter", String.format("%.2f", finalDiameter))
+				.kv("durationTicks", durationTicks)
+				.info("Deploying border");
 		host.singularity().border().deploy(host.singularity().borderState(), world, centerX, centerZ, initialDiameter, finalDiameter,
 				durationTicks);
 		singularity().singularityRingTickAccumulator = 0L;
 		singularity().singularityRingIndex = -1;
 		singularity().singularityRingPendingChunks = 0;
 		host.markDirty();
-		host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-				"Border initialized size={} (should equal initialDiameter)",
+		Logging.SINGULARITY.info("Border initialized size={} (should equal initialDiameter)",
 				String.format("%.2f", world.getWorldBorder().getSize()));
 		SingularityHudService.BorderSyncData data = host.collapse().createBorderSyncData(initialDiameter, 0L, finalDiameter);
 		host.singularity().phase().syncSingularityBorder(data);
@@ -166,6 +164,10 @@ public final class SingularityPhaseService {
 		}
 		if (singularity().singularityState != SingularityState.FUSING) {
 			host.collapseModule().queues().setPreCollapseDrainageJob(null);
+			return;
+		}
+		// Wait for preGen to complete before starting water drainage
+		if (!host.singularity().chunkPreparationState().preGenComplete) {
 			return;
 		}
 		if (job.delayTicks() > 0) {
@@ -213,12 +215,12 @@ public final class SingularityPhaseService {
 			try {
 				world.setChunkForced(pos.x, pos.z, true);
 				if (SingularityDiagnostics.enabled()) {
-					host.collapseModule().watchdog().log(LogChannel.SINGULARITY, "pinned chunk {}", pos);
+					Logging.SINGULARITY.info("pinned chunk {}", pos);
 				}
 			} catch (IllegalStateException ex) {
 				singularity().singularityPinnedChunks.remove(packed);
 				if (SingularityDiagnostics.enabled()) {
-					TheVirusBlock.LOGGER.warn("[Singularity] failed to pin chunk {} ({})", pos, ex.getMessage());
+					Logging.SINGULARITY.topic("phase").warn("[Singularity] failed to pin chunk {} ({})", pos, ex.getMessage());
 				}
 			}
 		}
@@ -236,12 +238,12 @@ public final class SingularityPhaseService {
 				world.setChunkForced(pos.x, pos.z, false);
 			} catch (IllegalStateException ex) {
 				if (SingularityDiagnostics.enabled()) {
-					TheVirusBlock.LOGGER.warn("[Singularity] failed to unpin chunk {} ({})", pos, ex.getMessage());
+					Logging.SINGULARITY.topic("phase").warn("[Singularity] failed to unpin chunk {} ({})", pos, ex.getMessage());
 				}
 			}
 		}
 		singularity().singularityPinnedChunks.clear();
-		host.collapseModule().watchdog().log(LogChannel.SINGULARITY, "[unload] released {} forced chunks", released);
+		Logging.SINGULARITY.info("[unload] released {} forced chunks", released);
 	}
 
 	public boolean areAllCollapseChunksPinned(List<Long> queueSnapshot) {
@@ -359,8 +361,7 @@ public final class SingularityPhaseService {
 		if (changed) {
 			host.singularityState().distanceOverrideActive = true;
 			if (SingularityDiagnostics.enabled()) {
-				host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-						"[vanillaSync] viewDistance={} (orig={}) simulationDistance={} (orig={})",
+				Logging.SINGULARITY.info("[vanillaSync] viewDistance={} (orig={}) simulationDistance={} (orig={})",
 						manager.getViewDistance(),
 						host.singularityState().viewDistanceSnapshot,
 						manager.getSimulationDistance(),
@@ -386,8 +387,7 @@ public final class SingularityPhaseService {
 			manager.setSimulationDistance(host.singularityState().simulationDistanceSnapshot);
 		}
 		if (SingularityDiagnostics.enabled()) {
-			host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-					"[vanillaSync] restored viewDistance={} simulationDistance={}",
+			Logging.SINGULARITY.info("[vanillaSync] restored viewDistance={} simulationDistance={}",
 					manager.getViewDistance(),
 					manager.getSimulationDistance());
 		}
@@ -433,7 +433,7 @@ public final class SingularityPhaseService {
 				host.singularity().borderState().targetDiameter);
 		broadcastManager.syncBorder(world, currentData);
 		if (SingularityDiagnostics.enabled()) {
-			host.collapseModule().watchdog().log(LogChannel.SINGULARITY, "[skipCollapse] {}", reason);
+			Logging.SINGULARITY.info("[skipCollapse] {}", reason);
 		}
 		broadcastManager.flush(world, true);
 		state.collapseBufferedChunks.clear();
@@ -459,7 +459,7 @@ public final class SingularityPhaseService {
 		host.collapseModule().queues().setResetDelay(0);
 		// Destruction service removed - CollapseProcessor manages collapse state
 		if (SingularityDiagnostics.enabled()) {
-			host.collapseModule().watchdog().log(LogChannel.SINGULARITY, "[prep] reset collapse staging reason={}", reason);
+			Logging.SINGULARITY.info("[prep] reset collapse staging reason={}", reason);
 		}
 	}
 
@@ -555,7 +555,7 @@ public final class SingularityPhaseService {
 		
 		boolean inward = singularity().singularityCollapseDescending;
 		
-		TheVirusBlock.LOGGER.info("[SingularityPhase] Starting collapse: radius={} blocks, duration={} ticks ({} seconds)", 
+		Logging.SINGULARITY.topic("phase").info("[SingularityPhase] Starting collapse: radius={} blocks, duration={} ticks ({} seconds)", 
 				(int) startRadius, durationTicks, durationTicks / 20);
 
 		host.singularity().collapseProcessor().start(center, startRadius, endRadius, durationTicks, inward);

@@ -1,0 +1,33 @@
+{
+  "id": "quad_test_wireframe",
+  "type": "test",
+  "baseRadius": 3.0,
+  "theme": "cyber_green",
+  "layers": [
+    {
+      "id": "main",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.0,
+            "latSteps": 16,
+            "lonSteps": 32
+          },
+          "appearance": {
+            "color": "@wire",
+            "alpha": {
+              "min": 0.8,
+              "max": 1.0
+            },
+            "fill": "wireframe",
+            "wireThickness": 1.5
+          },
+          "animation": {
+            "spin": 0.015
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,388 @@
+package net.cyberpunk042.client.visual.mesh;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Builder for creating {@link Mesh} instances.
+ * 
+ * <h2>Basic Usage</h2>
+ * <pre>
+ * // Create a simple triangle
+ * Mesh triangle = MeshBuilder.triangles()
+ *     .vertex(0, 0, 0)    // Returns index 0
+ *     .vertex(1, 0, 0)    // Returns index 1
+ *     .vertex(0, 1, 0)    // Returns index 2
+ *     .triangle(0, 1, 2)  // Connect vertices
+ *     .build();
+ * </pre>
+ * 
+ * <h2>Sphere Tessellation</h2>
+ * <pre>
+ * // Create a sphere using spherical coordinates
+ * MeshBuilder builder = MeshBuilder.triangles();
+ * int segments = 16;
+ * 
+ * // Add vertices for each latitude/longitude
+ * for (int lat = 0; lat <= segments; lat++) {
+ *     float theta = lat * PI / segments;
+ *     for (int lon = 0; lon < segments; lon++) {
+ *         float phi = lon * 2 * PI / segments;
+ *         builder.sphericalVertex(theta, phi, radius);
+ *     }
+ * }
+ * 
+ * // Add triangles connecting vertices...
+ * Mesh sphere = builder.build();
+ * </pre>
+ * 
+ * <h2>Wireframe</h2>
+ * <pre>
+ * // Create wireframe using LINES
+ * Mesh wireframe = MeshBuilder.lines()
+ *     .vertex(0, 0, 0)
+ *     .vertex(1, 0, 0)
+ *     .vertex(1, 1, 0)
+ *     .line(0, 1)   // First edge
+ *     .line(1, 2)   // Second edge
+ *     .build();
+ * </pre>
+ * 
+ * <h2>Reusing Builder</h2>
+ * <p>Call {@link #clear()} to reuse a builder for multiple meshes.
+ * 
+ * @see Mesh
+ * @see Vertex
+ * @see PrimitiveType
+ */
+public final class MeshBuilder {
+    
+    // ─────────────────────────────────────────────────────────────────────────────
+    // State
+    // ─────────────────────────────────────────────────────────────────────────────
+    
+    private final List<Vertex> vertices = new ArrayList<>();
+    private final List<Integer> indices = new ArrayList<>();
+    private final PrimitiveType primitiveType;  // Set at construction, immutable
+    
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Constructors / Factory Methods
+    // ─────────────────────────────────────────────────────────────────────────────
+    
+    /**
+     * Creates a new mesh builder for the given primitive type.
+     * <p>Prefer static factory methods: {@link #triangles()}, {@link #lines()}, etc.
+     */
+    public MeshBuilder(PrimitiveType primitiveType) {
+        this.primitiveType = primitiveType;
+    }
+    
+    /**
+     * Creates a builder for triangle meshes.
+     * <p>Most common - used for solid/translucent geometry.
+     */
+    public static MeshBuilder triangles() {
+        return new MeshBuilder(PrimitiveType.TRIANGLES);
+    }
+    
+    /**
+     * Creates a builder for quad meshes.
+     * <p>Used for billboard/sprite geometry.
+     */
+    public static MeshBuilder quads() {
+        return new MeshBuilder(PrimitiveType.QUADS);
+    }
+    
+    /**
+     * Creates a builder for line meshes.
+     * <p>Used for wireframe rendering.
+     */
+    public static MeshBuilder lines() {
+        return new MeshBuilder(PrimitiveType.LINES);
+    }
+    
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Adding Vertices
+    // ─────────────────────────────────────────────────────────────────────────────
+    
+    /**
+     * Adds a vertex and returns its index.
+     * <p>Store the returned index to reference this vertex when adding primitives.
+     * 
+     * @param vertex the vertex to add
+     * @return index of the added vertex (for use in triangle/line/quad calls)
+     */
+    public int addVertex(Vertex vertex) {
+        int index = vertices.size();
+        vertices.add(vertex);
+        return index;
+    }
+    
+    /**
+     * Adds a position-only vertex.
+     * <p>Normal and UV are zeroed. Use for wireframe.
+     * 
+     * @return index of the added vertex
+     */
+    public int vertex(float x, float y, float z) {
+        return addVertex(Vertex.pos(x, y, z));
+    }
+    
+    /**
+     * Adds a vertex with position and normal.
+     * <p>UV is zeroed. Use for lit geometry without textures.
+     * 
+     * @return index of the added vertex
+     */
+    public int vertex(float x, float y, float z, float nx, float ny, float nz) {
+        return addVertex(Vertex.posNormal(x, y, z, nx, ny, nz));
+    }
+    
+    /**
+     * Adds a complete vertex with position, normal, and UV.
+     * 
+     * @return index of the added vertex
+     */
+    public int vertex(float x, float y, float z, float nx, float ny, float nz, float u, float v) {
+        return addVertex(new Vertex(x, y, z, nx, ny, nz, u, v));
+    }
+    
+    /**
+     * Adds a vertex on a unit sphere at the given spherical coordinates.
+     * <p>See {@link Vertex#spherical(float, float)} for coordinate system.
+     * 
+     * @param theta polar angle (0 = top, PI = bottom)
+     * @param phi azimuthal angle (0 to 2*PI)
+     * @return index of the added vertex
+     */
+    public int sphericalVertex(float theta, float phi) {
+        return addVertex(Vertex.spherical(theta, phi));
+    }
+    
+    /**
+     * Adds a vertex on a sphere at the given spherical coordinates with radius.
+     * 
+     * @param theta polar angle (0 = top, PI = bottom)
+     * @param phi azimuthal angle (0 to 2*PI)
+     * @param radius sphere radius
+     * @return index of the added vertex
+     */
+    public int sphericalVertex(float theta, float phi, float radius) {
+        return addVertex(Vertex.spherical(theta, phi, radius));
+    }
+    
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Adding Primitives (indices)
+    // ─────────────────────────────────────────────────────────────────────────────
+    
+    /**
+     * Adds a triangle connecting three vertices by index.
+     * <p>Only valid for {@link PrimitiveType#TRIANGLES} builders.
+     * 
+     * <p>Winding order matters for face culling:
+     * Counter-clockwise = front face (usually visible).
+     * 
+     * @param i0 first vertex index
+     * @param i1 second vertex index
+     * @param i2 third vertex index
+     * @return this builder for chaining
+     * @throws IllegalStateException if not a TRIANGLES builder
+     */
+    public MeshBuilder triangle(int i0, int i1, int i2) {
+        if (primitiveType != PrimitiveType.TRIANGLES) {
+            throw new IllegalStateException("Cannot add triangle to " + primitiveType + " mesh");
+        }
+        indices.add(i0);
+        indices.add(i1);
+        indices.add(i2);
+        return this;
+    }
+    
+    /**
+     * Adds a quad connecting four vertices by index.
+     * <p>Only valid for {@link PrimitiveType#QUADS} builders.
+     * 
+     * @param i0 first vertex index
+     * @param i1 second vertex index
+     * @param i2 third vertex index
+     * @param i3 fourth vertex index
+     * @return this builder for chaining
+     * @throws IllegalStateException if not a QUADS builder
+     */
+    public MeshBuilder quad(int i0, int i1, int i2, int i3) {
+        if (primitiveType != PrimitiveType.QUADS) {
+            throw new IllegalStateException("Cannot add quad to " + primitiveType + " mesh");
+        }
+        indices.add(i0);
+        indices.add(i1);
+        indices.add(i2);
+        indices.add(i3);
+        return this;
+    }
+    
+    /**
+     * Adds a line segment connecting two vertices by index.
+     * <p>Only valid for {@link PrimitiveType#LINES} builders.
+     * 
+     * @param i0 first vertex index (line start)
+     * @param i1 second vertex index (line end)
+     * @return this builder for chaining
+     * @throws IllegalStateException if not a LINES builder
+     */
+    public MeshBuilder line(int i0, int i1) {
+        if (primitiveType != PrimitiveType.LINES) {
+            throw new IllegalStateException("Cannot add line to " + primitiveType + " mesh");
+        }
+        indices.add(i0);
+        indices.add(i1);
+        return this;
+    }
+    
+    /**
+     * Adds a quad as two triangles (for TRIANGLES builders).
+     * <p>Useful when you need quads but are building a triangle mesh.
+     * 
+     * <p>Vertex order (counter-clockwise):
+     * <pre>
+     * topLeft ─── topRight
+     *    │           │
+     * bottomLeft ─ bottomRight
+     * </pre>
+     * 
+     * @param topLeft top-left vertex index
+     * @param topRight top-right vertex index
+     * @param bottomRight bottom-right vertex index
+     * @param bottomLeft bottom-left vertex index
+     * @return this builder for chaining
+     */
+    public MeshBuilder quadAsTriangles(int topLeft, int topRight, int bottomRight, int bottomLeft) {
+        // Two triangles forming a quad (DEFAULT pattern)
+        triangle(topLeft, bottomLeft, topRight);      // Upper-left triangle
+        triangle(topRight, bottomLeft, bottomRight);  // Lower-right triangle
+        return this;
+    }
+    
+    /**
+     * Adds a quad as triangles using a specific triangle pattern.
+     * 
+     * @param topLeft top-left vertex index
+     * @param topRight top-right vertex index
+     * @param bottomRight bottom-right vertex index
+     * @param bottomLeft bottom-left vertex index
+     * @param pattern the triangle pattern to use
+     * @return this builder for chaining
+     */
+    public MeshBuilder quadAsTriangles(int topLeft, int topRight, int bottomRight, int bottomLeft, 
+                                        net.cyberpunk042.visual.pattern.QuadPattern pattern) {
+        if (pattern == null) {
+            return quadAsTriangles(topLeft, topRight, bottomRight, bottomLeft);
+        }
+        
+        // Map corner indices
+        int[] corners = {topLeft, topRight, bottomRight, bottomLeft};
+        
+        // Emit triangles based on pattern
+        for (net.cyberpunk042.visual.pattern.QuadPattern.Corner[] tri : pattern.triangles()) {
+            if (tri.length >= 3) {
+                int v0 = cornerToIndex(corners, tri[0]);
+                int v1 = cornerToIndex(corners, tri[1]);
+                int v2 = cornerToIndex(corners, tri[2]);
+                triangle(v0, v1, v2);
+            }
+        }
+        return this;
+    }
+    
+    /**
+     * Maps a Corner enum to the corresponding vertex index.
+     */
+    private int cornerToIndex(int[] corners, net.cyberpunk042.visual.pattern.QuadPattern.Corner corner) {
+        return switch (corner) {
+            case TOP_LEFT -> corners[0];
+            case TOP_RIGHT -> corners[1];
+            case BOTTOM_RIGHT -> corners[2];
+            case BOTTOM_LEFT -> corners[3];
+        };
+    }
+    
+    /**
+     * Adds a quad as triangles using a list of triangle corner arrays.
+     * Used for dynamic/shuffled patterns.
+     *
+     * @param topLeft top-left vertex index
+     * @param topRight top-right vertex index
+     * @param bottomRight bottom-right vertex index
+     * @param bottomLeft bottom-left vertex index
+     * @param triangles list of Corner arrays (each with 3 corners)
+     * @return this builder for chaining
+     */
+    public MeshBuilder quadAsTriangles(int topLeft, int topRight, int bottomRight, int bottomLeft, 
+                                        java.util.List<net.cyberpunk042.visual.pattern.QuadPattern.Corner[]> triangles) {
+        if (triangles == null || triangles.isEmpty()) {
+            return quadAsTriangles(topLeft, topRight, bottomRight, bottomLeft);
+        }
+        
+        // Map corner indices
+        int[] corners = {topLeft, topRight, bottomRight, bottomLeft};
+        
+        // Emit triangles based on provided list
+        for (net.cyberpunk042.visual.pattern.QuadPattern.Corner[] tri : triangles) {
+            if (tri.length >= 3) {
+                int v0 = cornerToIndex(corners, tri[0]);
+                int v1 = cornerToIndex(corners, tri[1]);
+                int v2 = cornerToIndex(corners, tri[2]);
+                triangle(v0, v1, v2);
+            }
+        }
+        return this;
+    }
+    
+    // ─────────────────────────────────────────────────────────────────────────────
+    // State Queries
+    // ─────────────────────────────────────────────────────────────────────────────
+    
+    /**
+     * Returns the current number of vertices added.
+     */
+    public int vertexCount() {
+        return vertices.size();
+    }
+    
+    /**
+     * Returns the current number of indices added.
+     */
+    public int indexCount() {
+        return indices.size();
+    }
+    
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Build / Reset
+    // ─────────────────────────────────────────────────────────────────────────────
+    
+    /**
+     * Clears all vertices and indices, allowing reuse of this builder.
+     * <p>Primitive type remains the same.
+     * 
+     * @return this builder for chaining
+     */
+    public MeshBuilder clear() {
+        vertices.clear();
+        indices.clear();
+        return this;
+    }
+    
+    /**
+     * Builds and returns the immutable {@link Mesh}.
+     * <p>The builder can still be used after this (add more, build again).
+     * 
+     * @return new immutable Mesh containing all added vertices and indices
+     */
+    public Mesh build() {
+        // Convert List<Integer> to int[] for Mesh constructor
+        int[] indexArray = new int[indices.size()];
+        for (int i = 0; i < indices.size(); i++) {
+            indexArray[i] = indices.get(i);
+        }
+        return new Mesh(vertices, indexArray, primitiveType);
+    }
+}

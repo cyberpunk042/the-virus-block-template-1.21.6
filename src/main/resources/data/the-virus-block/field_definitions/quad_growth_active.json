@@ -1,0 +1,68 @@
+{
+  "type": "growth",
+  "baseRadius": 4.0,
+  "theme": "organic_green",
+  "layers": [
+    {
+      "id": "outer",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.0,
+            "latSteps": 24,
+            "lonSteps": 48
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": {
+              "min": 0.2,
+              "max": 0.5
+            },
+            "fill": true,
+            "glow": 0.4
+          },
+          "animation": {
+            "spin": 0.02,
+            "pulse": 0.08,
+            "pulseAmount": 0.15,
+            "alphaPulse": 0.08,
+            "alphaPulseAmount": 0.6
+          }
+        }
+      ]
+    },
+    {
+      "id": "inner",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 0.5,
+            "latSteps": 16,
+            "lonSteps": 32
+          },
+          "appearance": {
+            "color": "@glow",
+            "alpha": {
+              "min": 0.4,
+              "max": 0.7
+            },
+            "fill": true,
+            "glow": 0.7
+          },
+          "animation": {
+            "spin": -0.04,
+            "pulse": 0.1,
+            "pulseAmount": 0.2
+          }
+        }
+      ]
+    }
+  ],
+  "modifiers": {
+    "pulsing": true,
+    "swirl": 0.2
+  },
+  "id": "quad_growth_active"
+}

@@ -1,13 +1,13 @@
 package net.cyberpunk042.infection.service;
 
+
+import net.cyberpunk042.log.Logging;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Objects;
 
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
-import net.cyberpunk042.TheVirusBlock;
-import net.cyberpunk042.config.InfectionLogConfig.LogChannel;
 import net.cyberpunk042.infection.SingularityState;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.infection.singularity.SingularityChunkContext;
@@ -60,12 +60,20 @@ public final class ChunkPreparationService {
 				state.preloadQueue.clear();
 				state.preloadMissingChunks = 0;
 				state.preloadComplete = true;
-				host.collapseModule().watchdog().log(LogChannel.SINGULARITY, "[preload] skipped (disabled via config)");
+				Logging.SINGULARITY.info("[preload] skipped (disabled via config)");
 			}
 			return;
 		}
 		if (state.preloadComplete) {
 			return;
+		}
+		// Wait for preGen to complete before starting preload
+		if (!state.preGenComplete) {
+			return;
+		}
+		// Populate preload queue from preGen results if empty
+		if (state.preloadQueue.isEmpty() && state.preGenCenter != null) {
+			populatePreloadQueue();
 		}
 		if (state.preloadQueue.isEmpty()) {
 			finishChunkPreload(world);
@@ -83,7 +91,7 @@ public final class ChunkPreparationService {
 				if (world.isChunkLoaded(packed)) {
 					host.singularity().phase().pinSingularityChunk(pos);
 					if (SingularityDiagnostics.enabled()) {
-						host.collapseModule().watchdog().log(LogChannel.SINGULARITY, "preload chunk ready {} (already loaded)", pos);
+						Logging.SINGULARITY.info("preload chunk ready {} (already loaded)", pos);
 					}
 					continue;
 				}
@@ -97,10 +105,9 @@ public final class ChunkPreparationService {
 						host.singularity().phase().pinSingularityChunk(pos);
 						if (SingularityDiagnostics.enabled()) {
 							if (allowGeneration) {
-								host.collapseModule().watchdog().log(LogChannel.SINGULARITY, "preload chunk loaded {}", pos);
+								Logging.SINGULARITY.info("preload chunk loaded {}", pos);
 							} else {
-								host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-										"preload chunk loaded {} (generation disabled, disk fetch only)",
+								Logging.SINGULARITY.info("preload chunk loaded {} (generation disabled, disk fetch only)",
 										pos);
 							}
 						}
@@ -126,7 +133,7 @@ public final class ChunkPreparationService {
 				state.preGenQueue.clear();
 				state.preGenMissingChunks = 0;
 				state.preGenComplete = true;
-				host.collapseModule().watchdog().log(LogChannel.SINGULARITY, "[preGen] skipped (disabled via config)");
+				Logging.SINGULARITY.info("[preGen] skipped (disabled via config)");
 			}
 			return;
 		}
@@ -164,8 +171,7 @@ public final class ChunkPreparationService {
 		logPreGenProgress(before - state.preGenQueue.size(), state.preGenQueue.size());
 		if (state.preGenQueue.isEmpty()) {
 			state.preGenComplete = true;
-			host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-					"[preGen] complete center={} total={} missing={}",
+			Logging.SINGULARITY.info("[preGen] complete center={} total={} missing={}",
 					state.preGenCenter,
 					state.preGenTotalChunks,
 					state.preGenMissingChunks);
@@ -187,12 +193,29 @@ public final class ChunkPreparationService {
 			appendChunkRing(centerChunk, radius, seen, state.preGenQueue);
 		}
 		state.preGenTotalChunks = state.preGenQueue.size();
-		host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-				"[preGen] queued {} chunks within {} blocks (center={})",
+		Logging.SINGULARITY.info("[preGen] queued {} chunks within {} blocks (center={})",
 				state.preGenTotalChunks,
 				String.format("%.2f", host.collapseConfig().configuredPreGenRadiusBlocks()),
 				state.preGenCenter);
 		host.markDirty();
+	}
+
+	/**
+	 * Populates preload queue with the same chunks that were pre-generated.
+	 * Called after preGen completes.
+	 */
+	private void populatePreloadQueue() {
+		if (state.preGenCenter == null) {
+			return;
+		}
+		state.preloadQueue.clear();
+		state.preloadMissingChunks = 0;
+		LongSet seen = new LongOpenHashSet();
+		for (int radius = host.collapseConfig().configuredPregenRadiusChunks(); radius >= 0; radius--) {
+			appendChunkRing(state.preGenCenter, radius, seen, state.preloadQueue);
+		}
+		Logging.SINGULARITY.info("[preload] queued {} chunks (after preGen complete)",
+				state.preloadQueue.size());
 	}
 
 	private void appendChunkRing(ChunkPos center, int radius, LongSet seen, Deque<Long> target) {
@@ -227,13 +250,12 @@ public final class ChunkPreparationService {
 			return;
 		}
 		state.preloadComplete = true;
-		host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-				"[preload] complete missing={} pinned={}",
+		Logging.SINGULARITY.info("[preload] complete missing={} pinned={}",
 				state.preloadMissingChunks,
 				host.singularityState().singularityPinnedChunks.size());
 		state.preloadLogCooldown = SingularityLifecycleService.PRELOAD_LOG_INTERVAL;
 		if (state.preloadMissingChunks > 0) {
-			TheVirusBlock.LOGGER.warn("[Singularity] {} collapse chunks were not prepared before the event. Enable chunk generation or pre-load the area to avoid skips.",
+			Logging.SINGULARITY.warn("[Singularity] {} collapse chunks were not prepared before the event. Enable chunk generation or pre-load the area to avoid skips.",
 					state.preloadMissingChunks);
 		}
 		// Schedule pre-collapse water drainage now that chunks are loaded
@@ -243,7 +265,7 @@ public final class ChunkPreparationService {
 	private void handlePreloadFailure(ChunkPos pos, boolean generationAttempted, String reason) {
 		state.preloadMissingChunks++;
 		if (SingularityDiagnostics.enabled()) {
-			TheVirusBlock.LOGGER.warn("[Singularity] chunk preload failed for {} (generationAllowed={} reason={})",
+			Logging.SINGULARITY.warn("[Singularity] chunk preload failed for {} (generationAllowed={} reason={})",
 					pos,
 					generationAttempted,
 					reason == null ? "<unknown>" : reason);
@@ -256,8 +278,7 @@ public final class ChunkPreparationService {
 			return;
 		}
 		state.preloadLogCooldown = SingularityLifecycleService.PRELOAD_LOG_INTERVAL;
-		host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-				"[preload] processed={} remaining={} missing={} pinned={}",
+		Logging.SINGULARITY.info("[preload] processed={} remaining={} missing={} pinned={}",
 				processed,
 				remaining,
 				state.preloadMissingChunks,
@@ -270,8 +291,7 @@ public final class ChunkPreparationService {
 			return;
 		}
 		state.preGenLogCooldown = SingularityLifecycleService.PREGEN_LOG_INTERVAL;
-		host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-				"[preGen] processed={} remaining={} missing={} center={}",
+		Logging.SINGULARITY.info("[preGen] processed={} remaining={} missing={} center={}",
 				processed,
 				remaining,
 				state.preGenMissingChunks,
@@ -289,7 +309,7 @@ public final class ChunkPreparationService {
 		boolean bypassing = SingularityChunkContext.isBypassingChunk(chunk.x, chunk.z);
 		boolean outsideBorder = !world.getWorldBorder().contains(chunk.getCenterX(), chunk.getCenterZ());
 		double distance = host.collapseModule().execution().chunkDistanceFromCenter(chunk.toLong());
-		TheVirusBlock.LOGGER.warn("[Singularity] chunk load failed phase={} chunk={} allowGen={} bypass={} outsideBorder={} distance={} thread={}",
+		Logging.SINGULARITY.warn("[Singularity] chunk load failed phase={} chunk={} allowGen={} bypass={} outsideBorder={} distance={} thread={}",
 				phase,
 				chunk,
 				generationAllowed,

@@ -1,0 +1,32 @@
+{
+  "id": "quad_test_type_a",
+  "type": "test",
+  "baseRadius": 3.0,
+  "theme": "crimson",
+  "layers": [
+    {
+      "id": "main",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.0,
+            "latSteps": 12,
+            "lonSteps": 24,
+            "algorithm": "type_a"
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": {
+              "min": 0.7,
+              "max": 0.9
+            }
+          },
+          "animation": {
+            "spin": 0.01
+          }
+        }
+      ]
+    }
+  ]
+}

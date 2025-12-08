@@ -76,9 +76,9 @@ public final class DimensionProfile {
 		private static final WaterDrainDeferred DEFAULT_WATER_DRAIN_DEFERRED = WaterDrainDeferred.defaults();
 		private static final boolean DEFAULT_COLLAPSE_PARTICLES = false;
 		private static final CollapseFillMode DEFAULT_FILL_MODE = CollapseFillMode.AIR;
-		private static final CollapseFillShape DEFAULT_FILL_SHAPE = CollapseFillShape.OUTLINE;
-		private static final int DEFAULT_OUTLINE_THICKNESS = 2;
-		private static final boolean DEFAULT_USE_NATIVE_FILL = true;
+		private static final CollapseFillShape DEFAULT_FILL_SHAPE = CollapseFillShape.WALLS;  // Faster than OUTLINE
+		private static final int DEFAULT_OUTLINE_THICKNESS = 2;  // 2-block walls by default
+		private static final boolean DEFAULT_USE_NATIVE_FILL = false;  // Block-by-block unless explicitly enabled
 		private static final boolean DEFAULT_RESPECT_PROTECTED = true;
 		private static final int DEFAULT_MAX_OPERATIONS_PER_TICK = 1;
 		private static final boolean DEFAULT_COLLAPSE_INWARD = true;

@@ -1,0 +1,32 @@
+{
+  "id": "quad_test_scanlines",
+  "type": "test",
+  "baseRadius": 3.0,
+  "theme": "cyber_green",
+  "layers": [
+    {
+      "id": "main",
+      "primitives": [
+        {
+          "type": "stripes",
+          "alternate": false,
+          "shape": {
+            "radius": 1.0
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": {
+              "min": 0.4,
+              "max": 0.6
+            }
+          },
+          "animation": {
+            "spin": 0.0
+          },
+          "count": 20,
+          "width": 0.2
+        }
+      ]
+    }
+  ]
+}

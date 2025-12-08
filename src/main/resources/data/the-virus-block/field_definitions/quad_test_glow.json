@@ -1,0 +1,33 @@
+{
+  "id": "quad_test_glow",
+  "type": "test",
+  "baseRadius": 3.0,
+  "theme": "aurora",
+  "layers": [
+    {
+      "id": "main",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.0,
+            "latSteps": 16,
+            "lonSteps": 32
+          },
+          "appearance": {
+            "color": "@glow",
+            "alpha": {
+              "min": 0.5,
+              "max": 0.8
+            },
+            "glow": 0.8
+          },
+          "animation": {
+            "pulse": 0.1,
+            "pulseAmount": 0.1
+          }
+        }
+      ]
+    }
+  ]
+}

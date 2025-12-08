@@ -1,5 +1,7 @@
 package net.cyberpunk042.infection.api;
 
+
+import net.cyberpunk042.log.Logging;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -12,7 +14,6 @@ import org.jetbrains.annotations.Nullable;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
-import net.cyberpunk042.TheVirusBlock;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.util.Identifier;
 
@@ -98,7 +99,7 @@ public final class SimpleVirusScheduler implements VirusScheduler, VirusSchedule
 			}
 			Optional<VirusScheduler.PersistedTask> task = VirusSchedulerTaskRegistry.decode(snapshot.type(), snapshot.payload());
 			if (task.isEmpty()) {
-				TheVirusBlock.LOGGER.warn("[VirusScheduler] Missing task factory for {}", snapshot.type());
+				Logging.CONFIG.warn("[VirusScheduler] Missing task factory for {}", snapshot.type());
 				continue;
 			}
 			tasks.add(new ScheduledTask(Math.max(0, snapshot.remainingTicks()), task.get(), task.get()));
@@ -109,7 +110,7 @@ public final class SimpleVirusScheduler implements VirusScheduler, VirusSchedule
 		try {
 			task.run();
 		} catch (Throwable error) {
-			TheVirusBlock.LOGGER.error("[VirusScheduler] task failed", error);
+			Logging.CONFIG.error("[VirusScheduler] task failed", error);
 		}
 	}
 

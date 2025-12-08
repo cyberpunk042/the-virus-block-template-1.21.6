@@ -1,0 +1,94 @@
+{
+  "type": "shield",
+  "baseRadius": 14.0,
+  "theme": "aurora",
+  "layers": [
+    {
+      "id": "outer",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.0,
+            "latSteps": 32,
+            "lonSteps": 64
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": {
+              "min": 0.3,
+              "max": 0.5
+            },
+            "fill": true,
+            "glow": 0.4
+          },
+          "animation": {
+            "spin": 0.015,
+            "phase": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "middle",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 0.9,
+            "latSteps": 24,
+            "lonSteps": 48
+          },
+          "appearance": {
+            "color": "@secondary",
+            "alpha": {
+              "min": 0.25,
+              "max": 0.45
+            },
+            "fill": true,
+            "glow": 0.35
+          },
+          "animation": {
+            "spin": -0.02,
+            "phase": 2.09
+          }
+        }
+      ]
+    },
+    {
+      "id": "inner",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 0.8,
+            "latSteps": 20,
+            "lonSteps": 40
+          },
+          "appearance": {
+            "color": "@accent",
+            "alpha": {
+              "min": 0.2,
+              "max": 0.4
+            },
+            "fill": true,
+            "glow": 0.5
+          },
+          "animation": {
+            "spin": 0.025,
+            "phase": 4.19
+          }
+        }
+      ]
+    }
+  ],
+  "modifiers": {
+    "visualScale": 1.0,
+    "swirl": 0.2
+  },
+  "prediction": {
+    "enabled": true,
+    "leadTicks": 2
+  },
+  "id": "quad_shield_aurora"
+}

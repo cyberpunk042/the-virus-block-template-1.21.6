@@ -1,0 +1,31 @@
+{
+  "id": "edge_test_thick",
+  "type": "test",
+  "baseRadius": 3.0,
+  "theme": "crimson",
+  "layers": [
+    {
+      "id": "main",
+      "primitives": [
+        {
+          "type": "cage",
+          "shape": {
+            "radius": 1.0
+          },
+          "latLines": 8,
+          "lonLines": 12,
+          "appearance": {
+            "color": "@primary",
+            "alpha": {"min": 0.7, "max": 0.9},
+            "wireThickness": 4.0,
+            "glow": 0.6
+          },
+          "animation": {
+            "spin": -0.03
+          }
+        }
+      ]
+    }
+  ]
+}
+

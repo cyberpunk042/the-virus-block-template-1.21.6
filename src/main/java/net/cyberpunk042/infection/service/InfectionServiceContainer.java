@@ -1,5 +1,7 @@
 package net.cyberpunk042.infection.service;
 
+import net.cyberpunk042.log.Logging;
+
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.function.BiFunction;
@@ -25,7 +27,6 @@ import org.jetbrains.annotations.Nullable;
 public final class InfectionServiceContainer {
 	private final ConfigService config;
 	private final ServiceConfig settings;
-	private final LoggingService logging;
 	private final WatchdogService watchdog;
 	private final AlertingService alerting;
 	private final EffectBusFactory effectBusFactory;
@@ -43,7 +44,6 @@ public final class InfectionServiceContainer {
 	private InfectionServiceContainer(Builder builder) {
 		this.config = builder.config;
 		this.settings = builder.settings;
-		this.logging = builder.logging;
 		this.watchdog = builder.watchdog;
 		this.alerting = builder.alerting;
 		this.effectBusFactory = builder.effectBusFactory;
@@ -65,10 +65,6 @@ public final class InfectionServiceContainer {
 
 	public ServiceConfig settings() {
 		return settings;
-	}
-
-	public LoggingService logging() {
-		return logging;
 	}
 
 	public WatchdogService watchdog() {
@@ -134,7 +130,6 @@ public final class InfectionServiceContainer {
 	public static final class Builder {
 		private final ConfigService config;
 		private ServiceConfig settings;
-		private LoggingService logging;
 		private WatchdogService watchdog;
 		private AlertingService alerting;
 		private EffectBusFactory effectBusFactory;
@@ -150,11 +145,6 @@ public final class InfectionServiceContainer {
 
 		private Builder(Path configDir) {
 			this.config = new ConfigService(Objects.requireNonNull(configDir, "configDir"));
-		}
-
-		public Builder logging(LoggingService logging) {
-			this.logging = logging;
-			return this;
 		}
 
 		public Builder watchdog(WatchdogService watchdog) {
@@ -264,30 +254,28 @@ public final class InfectionServiceContainer {
 			if (settings.diagnostics.logSpam == null) {
 				settings.diagnostics.logSpam = new ServiceConfig.LogSpamSettings();
 			}
-			LoggingService loggingService = logging != null ? logging : new LoggingService();
-			AlertingService alertingService = alerting != null ? alerting : new AlertingService(loggingService);
-			WatchdogService watchdogService = watchdog != null ? watchdog : new WatchdogService(loggingService, alertingService);
+			AlertingService alertingService = alerting != null ? alerting : new AlertingService();
+			WatchdogService watchdogService = watchdog != null ? watchdog : new WatchdogService(alertingService);
 			EffectBusFactory effectBuses = effectBusFactory != null ? effectBusFactory
-					: state -> new SimpleEffectBus(new EffectBusTelemetry(loggingService, state));
+					: state -> new SimpleEffectBus(new EffectBusTelemetry(state));
 			Supplier<VirusScheduler> schedulers = schedulerFactory != null ? schedulerFactory : SimpleVirusScheduler::new;
-			ScenarioRegistryLoader scenarioLoader = new ScenarioRegistryLoader(config, loggingService);
+			ScenarioRegistryLoader scenarioLoader = new ScenarioRegistryLoader(config);
 			Supplier<ScenarioRegistry> scenarios = scenarioRegistryFactory != null ? scenarioRegistryFactory : scenarioLoader::load;
 			Function<VirusWorldState, CollapseBroadcastManager> broadcasts =
 					broadcastFactory != null ? broadcastFactory : BufferedCollapseBroadcastManager::new;
 			SingularityHudService hudService = hud != null ? hud : new SingularityHudService();
 			SingularityTelemetryService telemetryService = telemetry != null ? telemetry
-					: new SingularityTelemetryService(loggingService);
+					: new SingularityTelemetryService();
 			GuardianFxService guardianFxService = guardianFx != null ? guardianFx : new GuardianFxService();
 			GuardianSpawnService guardianSpawnService = this.guardianSpawnService != null ? this.guardianSpawnService
-					: new GuardianSpawnService(loggingService);
+					: new GuardianSpawnService();
 			BiFunction<VirusWorldState, VirusSourceService.State, VirusSourceService> sourceFactory =
 					this.sourceFactory != null
 							? this.sourceFactory
-							: (state, sourceState) -> new VirusSourceService(state, loggingService, sourceState);
+							: (state, sourceState) -> new VirusSourceService(state, sourceState);
 			if (growthRegistry == null) {
 				growthRegistry = GrowthRegistry.load(config);
 			}
-			this.logging = loggingService;
 			this.watchdog = watchdogService;
 			this.alerting = alertingService;
 			this.effectBusFactory = effectBuses;

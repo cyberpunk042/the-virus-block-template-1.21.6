@@ -1,0 +1,109 @@
+{
+  "_comment": "Multi-axis rotating rings like a gyroscope",
+  "type": "shield",
+  "baseRadius": 5.0,
+  "theme": "cyber_blue",
+  "layers": [
+    {
+      "id": "horizontal_ring",
+      "primitives": [
+        {
+          "type": "ring",
+          "shape": {
+            "y": 0.0,
+            "radius": 1.0,
+            "thickness": 0.03,
+            "segments": 64
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": 0.8,
+            "fill": "solid",
+            "glow": 0.5
+          },
+          "animation": {
+            "spin": 0.12,
+            "spinAxis": "Y"
+          }
+        }
+      ]
+    },
+    {
+      "id": "vertical_ring_1",
+      "primitives": [
+        {
+          "type": "ring",
+          "shape": {
+            "y": 0.0,
+            "radius": 0.95,
+            "thickness": 0.03,
+            "segments": 64
+          },
+          "appearance": {
+            "color": "@secondary",
+            "alpha": 0.7,
+            "fill": "solid",
+            "glow": 0.4
+          },
+          "animation": {
+            "spin": -0.08,
+            "spinAxis": "X"
+          },
+          "transform": {
+            "rotationX": 90
+          }
+        }
+      ]
+    },
+    {
+      "id": "vertical_ring_2",
+      "primitives": [
+        {
+          "type": "ring",
+          "shape": {
+            "y": 0.0,
+            "radius": 0.9,
+            "thickness": 0.03,
+            "segments": 64
+          },
+          "appearance": {
+            "color": "@glow",
+            "alpha": 0.6,
+            "fill": "solid",
+            "glow": 0.6
+          },
+          "animation": {
+            "spin": 0.1,
+            "spinAxis": "Z"
+          },
+          "transform": {
+            "rotationZ": 90
+          }
+        }
+      ]
+    },
+    {
+      "id": "core",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 0.25,
+            "algorithm": "type_e"
+          },
+          "appearance": {
+            "color": "@glow",
+            "alpha": 1.0,
+            "fill": "solid",
+            "glow": 1.0
+          },
+          "animation": {
+            "pulse": 0.1,
+            "pulseAmount": 0.2
+          }
+        }
+      ]
+    }
+  ],
+  "id": "segment_gyroscope"
+}

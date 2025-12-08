@@ -1,0 +1,29 @@
+{
+  "id": "segment_test_ring_glow",
+  "type": "test",
+  "baseRadius": 2.5,
+  "theme": "crimson",
+  "layers": [
+    {
+      "id": "main",
+      "primitives": [
+        {
+          "type": "ring",
+          "radius": 2.0,
+          "appearance": {
+            "color": "@glow",
+            "alpha": {
+              "min": 0.5,
+              "max": 0.8
+            },
+            "glow": 0.6
+          },
+          "shape": {
+            "y": 0,
+            "thickness": 0.3
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 package net.cyberpunk042.infection;
 
+
+import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.TheVirusBlock;
 
 import java.util.List;
@@ -92,7 +94,7 @@ public final class CollapseOperations {
 			}
 			return true;
 		} catch (Exception e) {
-			LOGGER.error("[CollapseOperations] tryCompleteCollapse failed", e);
+			Logging.INFECTION.error("[CollapseOperations] tryCompleteCollapse failed", e);
 			return false;
 		}
 	}
@@ -127,7 +129,7 @@ public final class CollapseOperations {
 		try {
 			return doForceStartSingularity(world, seconds, fallbackCenter);
 		} catch (Exception e) {
-			LOGGER.error("[CollapseOperations] forceStartSingularity failed", e);
+			Logging.INFECTION.error("[CollapseOperations] forceStartSingularity failed", e);
 			return false;
 		}
 	}

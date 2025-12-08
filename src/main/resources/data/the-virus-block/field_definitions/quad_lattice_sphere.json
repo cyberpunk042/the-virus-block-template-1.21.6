@@ -1,0 +1,54 @@
+{
+  "_comment": "Dense lattice pattern sphere",
+  "type": "shield",
+  "baseRadius": 5.0,
+  "theme": "magma",
+  "layers": [
+    {
+      "id": "lattice",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.0,
+            "latSteps": 12,
+            "lonSteps": 24
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": 0.8,
+            "fill": "wireframe",
+            "wireThickness": 1.5,
+            "glow": 0.5
+          },
+          "animation": {
+            "spin": 0.02
+          }
+        }
+      ]
+    },
+    {
+      "id": "core_glow",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 0.3,
+            "algorithm": "type_e"
+          },
+          "appearance": {
+            "color": "@glow",
+            "alpha": 1.0,
+            "fill": "solid",
+            "glow": 1.0
+          },
+          "animation": {
+            "pulse": 0.12,
+            "pulseAmount": 0.3
+          }
+        }
+      ]
+    }
+  ],
+  "id": "quad_lattice_sphere"
+}

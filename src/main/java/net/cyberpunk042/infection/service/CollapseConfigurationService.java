@@ -114,6 +114,10 @@ public final class CollapseConfigurationService {
 		}
 		DimensionProfile.Collapse collapse = profile.collapse();
 		DimensionProfile.Physics physics = profile.physics();
+		System.out.println("[CollapseConfig] Applying profile " + profile.id()
+				+ " fillShape=" + collapse.fillShape()
+				+ " thickness=" + collapse.outlineThickness()
+				+ " useNativeFill=" + collapse.useNativeFill());
 
 		// Use profile's columnsPerTick as default if not explicitly set
 		CollapseFillProfile baseProfile = collapse.fillProfile();
@@ -148,6 +152,9 @@ public final class CollapseConfigurationService {
 		this.fillShapeConfig = collapse.fillShape() != null ? collapse.fillShape() : fillProfile.shape();
 		this.outlineThicknessConfig = Math.max(1, collapse.outlineThickness() > 0 ? collapse.outlineThickness() : fillProfile.thickness());
 		this.useNativeFillConfig = collapse.useNativeFill();
+		System.out.println("[CollapseConfig] -> effective fillShape=" + this.fillShapeConfig
+				+ " thickness=" + this.outlineThicknessConfig
+				+ " useNativeFill=" + this.useNativeFillConfig);
 		this.respectProtectedBlocksConfig = collapse.respectProtectedBlocks();
 		this.maxOperationsPerTickConfig = Math.max(1, collapse.maxOperationsPerTick() > 0 ? collapse.maxOperationsPerTick() : fillProfile.maxOperationsPerTick());
 		this.collapseInwardConfig = collapse.collapseInward();
@@ -352,6 +359,9 @@ public final class CollapseConfigurationService {
 				configuredUseNativeFill(),
 				configuredRespectProtectedBlocks(),
 				configuredMaxOperationsPerTick());
+		System.out.println("[CollapseConfig] Cached erosion settings: shape=" + configuredFillShape()
+				+ " thickness=" + configuredOutlineThickness()
+				+ " useNativeFill=" + configuredUseNativeFill());
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────────
@@ -468,6 +478,8 @@ public final class CollapseConfigurationService {
 		applySingularityGamerule(world,
 				TheVirusBlock.VIRUS_SINGULARITY_ALLOW_OUTSIDE_BORDER_LOAD,
 				configuredOutsideBorderAllowed());
+		// Set high block limit for /fill command to handle large collapse volumes
+		ensureCommandBlockLimit(world, 100_000_000);
 	}
 
 	private void applySingularityGamerule(ServerWorld world,
@@ -476,6 +488,18 @@ public final class CollapseConfigurationService {
 		GameRules.BooleanRule gamerule = world.getGameRules().get(rule);
 		if (gamerule.get() != desired) {
 			gamerule.set(desired, world.getServer());
+		}
+	}
+
+	/**
+	 * Ensures commandModificationBlockLimit is set high enough for collapse operations.
+	 */
+	private void ensureCommandBlockLimit(ServerWorld world, int minLimit) {
+		GameRules.IntRule rule = world.getGameRules().get(GameRules.COMMAND_MODIFICATION_BLOCK_LIMIT);
+		int current = rule.get();
+		if (current < minLimit) {
+			System.out.println("[Singularity] Setting commandModificationBlockLimit: " + current + " -> " + minLimit);
+			rule.set(minLimit, world.getServer());
 		}
 	}
 }

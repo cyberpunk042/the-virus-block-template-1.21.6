@@ -9,12 +9,10 @@ import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 
-import net.cyberpunk042.config.InfectionLogConfig.LogChannel;
 import net.cyberpunk042.infection.profile.CollapseBroadcastMode;
 import net.cyberpunk042.infection.service.InfectionServiceContainer;
 import net.cyberpunk042.infection.service.InfectionServices;
-import net.cyberpunk042.infection.service.LoggingService;
-import net.cyberpunk042.util.InfectionLog;
+import net.cyberpunk042.log.Logging;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
@@ -51,7 +49,7 @@ public final class SingularityChunkContext {
 		Context ctx = ACTIVE.get();
 		if (ctx != null && (ctx.world == world || world == null)) {
 			if (chunkLoggingEnabled()) {
-				log(LogChannel.SINGULARITY,
+				Logging.SINGULARITY.topic("chunk").info(
 						"tick={} colsProcessed={} colsCompleted={} blocksCleared={} skippedMissing={} skippedBorder={} waterRemoved={}",
 						world.getTime(),
 						ctx.columnsProcessed,
@@ -297,7 +295,7 @@ public final class SingularityChunkContext {
 					builder.append("; ");
 				}
 			}
-			log(LogChannel.SINGULARITY, builder.toString());
+			Logging.SINGULARITY.topic("chunk").info( builder.toString());
 			blockedChunks.clear();
 		}
 
@@ -352,7 +350,7 @@ public final class SingularityChunkContext {
 				}
 				broadcastSamples.clear();
 			}
-			log(LogChannel.SINGULARITY, builder.toString());
+			Logging.SINGULARITY.topic("chunk").info( builder.toString());
 			broadcastBuffered = 0;
 			broadcastFlushed = 0;
 		}
@@ -378,7 +376,7 @@ public final class SingularityChunkContext {
 			return;
 		}
 		ctx.missingSamples++;
-		log(LogChannel.SINGULARITY, "sample missing chunk={} dist={} allowGen={}",
+		Logging.SINGULARITY.topic("chunk").info( "sample missing chunk={} dist={} allowGen={}",
 				formatChunk(chunk),
 				formatDistance(distance),
 				generationAllowed);
@@ -393,7 +391,7 @@ public final class SingularityChunkContext {
 			return;
 		}
 		ctx.borderSamples++;
-		log(LogChannel.SINGULARITY, "sample border skip chunk={} dist={} borderRadius={}",
+		Logging.SINGULARITY.topic("chunk").info( "sample border skip chunk={} dist={} borderRadius={}",
 				formatChunk(chunk),
 				formatDistance(distance),
 				formatDistance(borderRadius));
@@ -407,7 +405,7 @@ public final class SingularityChunkContext {
 		if (!bypassLoggingEnabled()) {
 			return;
 		}
-		log(LogChannel.SINGULARITY,
+		Logging.SINGULARITY.topic("chunk").info(
 				"[bypass] {} chunk={} count={} thread={}",
 				action,
 				chunk,
@@ -419,14 +417,5 @@ public final class SingularityChunkContext {
 		return chunk.x + "," + chunk.z;
 	}
 
-	private static void log(LogChannel channel, String message, Object... args) {
-		InfectionServiceContainer c = InfectionServices.container();
-		LoggingService logging = c != null ? c.logging() : null;
-		if (logging != null) {
-			logging.info(channel, message, args);
-		} else {
-			InfectionLog.info(channel, message, args);
-		}
-	}
 }
 

@@ -1,5 +1,7 @@
 package net.cyberpunk042.infection.state;
 
+import net.cyberpunk042.log.Logging;
+
 import net.cyberpunk042.infection.InfectionTier;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.infection.service.AmbientPressureService;
@@ -46,7 +48,7 @@ public final class CombatModule {
 	}
 
 	public void installGuardianSpawnService(@Nullable GuardianSpawnService service) {
-		this.guardianSpawnService = service != null ? service : new GuardianSpawnService(host.collapseModule().watchdog().loggingService());
+		this.guardianSpawnService = service != null ? service : new GuardianSpawnService();
 	}
 
 	public GuardianSpawnService guardianSpawnService() {

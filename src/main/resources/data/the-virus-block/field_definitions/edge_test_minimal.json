@@ -1,0 +1,31 @@
+{
+  "id": "edge_test_minimal",
+  "type": "test",
+  "baseRadius": 3.0,
+  "theme": "golden",
+  "layers": [
+    {
+      "id": "main",
+      "primitives": [
+        {
+          "type": "cage",
+          "shape": {
+            "radius": 1.0
+          },
+          "latLines": 2,
+          "lonLines": 4,
+          "appearance": {
+            "color": "@primary",
+            "alpha": {"min": 0.9, "max": 1.0},
+            "wireThickness": 3.0,
+            "glow": 0.2
+          },
+          "animation": {
+            "spin": 0.08
+          }
+        }
+      ]
+    }
+  ]
+}
+

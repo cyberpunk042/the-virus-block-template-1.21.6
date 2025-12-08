@@ -1,5 +1,7 @@
 package net.cyberpunk042.infection.orchestrator;
 
+
+import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.infection.api.EffectBus;
@@ -87,18 +89,18 @@ public final class ServiceHub {
 		try {
 			this.schedulerService.tick();
 		} catch (Exception e) {
-			LOGGER.error("[ServiceHub] Scheduler tick failed", e);
+			Logging.ORCHESTRATOR.error("[ServiceHub] Scheduler tick failed", e);
 		}
 
 		try {
 			collapseBroadcastManagerOrNoop().tick(world);
 		} catch (Exception e) {
-			LOGGER.error("[ServiceHub] Collapse broadcast tick failed", e);
+			Logging.ORCHESTRATOR.error("[ServiceHub] Collapse broadcast tick failed", e);
 		}
 		
 		long elapsed = (System.nanoTime() - start) / 1_000_000;
 		if (elapsed > 10) {
-			LOGGER.debug("[ServiceHub] Tick took {}ms", elapsed);
+			Logging.ORCHESTRATOR.debug("[ServiceHub] Tick took {}ms", elapsed);
 		}
 	}
 
@@ -109,7 +111,7 @@ public final class ServiceHub {
 	 */
 	public void installFromContainer(VirusWorldState host, @Nullable InfectionServiceContainer container) {
 		if (container == null) {
-			LOGGER.debug("[ServiceHub] No container provided - using defaults");
+			Logging.ORCHESTRATOR.debug("[ServiceHub] No container provided - using defaults");
 			return;
 		}
 		EffectBus bus = container.createEffectBus(host);

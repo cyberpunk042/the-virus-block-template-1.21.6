@@ -1,6 +1,7 @@
 package net.cyberpunk042.infection.controller.phase;
 
-import net.cyberpunk042.TheVirusBlock;
+
+import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.infection.api.SingularityContext;
 import net.cyberpunk042.infection.collapse.CollapseBroadcastManager;
@@ -30,7 +31,7 @@ public final class CollapsePhaseHandler {
 		
 		// Log border deployment status once when delay expires
 		if (barDelay == 0 && pendingDeploy) {
-			TheVirusBlock.LOGGER.info("[CollapsePhase] Border deployment triggered (delay expired)");
+			Logging.PHASE.info("[CollapsePhase] Border deployment triggered (delay expired)");
 			broadcast.deployBorder(world);
 		} else if (barDelay <= 0 && pendingDeploy) {
 			// Already past delay but still pending - deploy now

@@ -1,11 +1,12 @@
 package net.cyberpunk042.infection.service;
 
+
+import net.cyberpunk042.log.Logging;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
 
-import net.cyberpunk042.config.InfectionLogConfig.LogChannel;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.infection.profile.CollapseFillMode;
 import net.cyberpunk042.infection.profile.CollapseFillShape;
@@ -95,9 +96,12 @@ public final class CollapseProcessor {
 		deferredDrainQueue.clear();
 		host.markDirty();
 		
-		host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-				"[CollapseProcessor] Started: center={} startRadius={} endRadius={} duration={} ticks ({} seconds) inward={}",
-				center, startRadius, endRadius, durationTicks, durationTicks / 20, inward);
+		Logging.SINGULARITY.at(center)
+				.kv("startRadius", startRadius)
+				.kv("endRadius", endRadius)
+				.kv("duration", durationTicks + " ticks (" + durationTicks / 20 + "s)")
+				.kv("inward", inward)
+				.info("[CollapseProcessor] Started collapse");
 	}
 
 	/**
@@ -158,8 +162,7 @@ public final class CollapseProcessor {
 		if (state.elapsedTicks >= state.durationTicks) {
 			state.active = false;
 			host.markDirty();
-			host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-					"[CollapseProcessor] Complete! Processed {} rings over {} ticks ({} seconds)", 
+			Logging.SINGULARITY.info("[CollapseProcessor] Complete! Processed {} rings over {} ticks ({} seconds)", 
 					(int) state.startRadius, state.elapsedTicks, state.elapsedTicks / 20);
 			return false;
 		}
@@ -202,8 +205,7 @@ public final class CollapseProcessor {
 				
 				// Log first few rings to verify processing
 				if (ring >= state.startRadius - 3 || ring <= 3) {
-					host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-							"[CollapseProcessor] Processing ring {} (lastRing={}, currentRing={})", 
+					Logging.SINGULARITY.info("[CollapseProcessor] Processing ring {} (lastRing={}, currentRing={})", 
 							ring, lastRing, currentRing);
 				}
 			}
@@ -219,8 +221,7 @@ public final class CollapseProcessor {
 				
 				// Log first few rings to verify processing
 				if (ring <= 3 || ring >= state.startRadius - 3) {
-					host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-							"[CollapseProcessor] Processing ring {} (lastRing={}, currentRing={})", 
+					Logging.SINGULARITY.info("[CollapseProcessor] Processing ring {} (lastRing={}, currentRing={})", 
 							ring, lastRing, currentRing);
 				}
 			}
@@ -234,8 +235,7 @@ public final class CollapseProcessor {
 			int processedRings = state.inward 
 					? (int) state.startRadius - currentRing 
 					: currentRing;
-			host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-					"[CollapseProcessor] Ring {} of {} ({}%) - {} rings this tick", 
+			Logging.SINGULARITY.info("[CollapseProcessor] Ring {} of {} ({}%) - {} rings this tick", 
 					processedRings, 
 					(int) state.startRadius,
 					Math.round(progress * 100),
@@ -339,7 +339,7 @@ public final class CollapseProcessor {
 		// COLUMN/ROW/VECTOR affect a thin slice - higher scaling
 		int multiplier = switch (shape) {
 			case MATRIX -> 1;          // All blocks - no scaling
-			case OUTLINE -> 2;         // Shell only - 2x throughput
+			case OUTLINE, WALLS -> 2;  // Shell/walls only - 2x throughput
 			case COLUMN, ROW -> 4;     // Thin line - 4x throughput
 			case VECTOR -> 4;          // Thin line along longest axis - 4x throughput
 		};
@@ -484,8 +484,7 @@ public final class CollapseProcessor {
 		
 		// Log first few fills to verify
 		if (radius >= state.startRadius - 3 || radius <= 3) {
-			host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-					"[CollapseProcessor] fillSliceAtRadius: radius={} outerRadius={} fillShape={} cleared={} blocks", 
+			Logging.SINGULARITY.info("[CollapseProcessor] fillSliceAtRadius: radius={} outerRadius={} fillShape={} cleared={} blocks", 
 					(int) radius, outerRadius, fillShape, cleared);
 		}
 	}

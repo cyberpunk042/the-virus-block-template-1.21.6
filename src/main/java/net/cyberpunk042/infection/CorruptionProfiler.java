@@ -1,5 +1,7 @@
 package net.cyberpunk042.infection;
 
+
+import net.cyberpunk042.log.Logging;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,7 +23,7 @@ public final class CorruptionProfiler {
 			return;
 		}
 		String action = cleanse ? "cleansed" : "corrupted";
-		TheVirusBlock.LOGGER.info("[CorruptionProfiler:{}] chunk {} {} {} blocks",
+		Logging.INFECTION.topic("chunk").info("[CorruptionProfiler:{}] chunk {} {} {} blocks",
 				worldId(world), pos, action, conversions);
 	}
 
@@ -29,7 +31,7 @@ public final class CorruptionProfiler {
 		if (!shouldLogBoobytrap(world)) {
 			return;
 		}
-		TheVirusBlock.LOGGER.info("[CorruptionProfiler:{}] boobytrap {} armed at {}",
+		Logging.INFECTION.topic("chunk").info("[CorruptionProfiler:{}] boobytrap {} armed at {}",
 				worldId(world), type, pos);
 	}
 
@@ -37,7 +39,7 @@ public final class CorruptionProfiler {
 		if (conversions <= 0 || !shouldLogBoobytrap(world)) {
 			return;
 		}
-		TheVirusBlock.LOGGER.info("[CorruptionProfiler:{}] boobytrap {} spread {} blocks around {}",
+		Logging.INFECTION.topic("chunk").info("[CorruptionProfiler:{}] boobytrap {} spread {} blocks around {}",
 				worldId(world), type, conversions, pos);
 	}
 
@@ -45,15 +47,20 @@ public final class CorruptionProfiler {
 		if (!shouldLogBoobytrap(world)) {
 			return;
 		}
-		TheVirusBlock.LOGGER.info("[CorruptionProfiler:{}] boobytrap {} triggered ({}) at {} hitting {} players",
-				worldId(world), type, reason, pos, affectedPlayers);
+		Logging.INFECTION.topic("boobytrap")
+				.at(pos)
+				.kv("world", worldId(world))
+				.kv("type", type)
+				.kv("reason", reason)
+				.kv("affectedPlayers", affectedPlayers)
+				.warn("[CorruptionProfiler] Boobytrap triggered");
 	}
 
 	public static void logMatrixCubeSkip(ServerWorld world, String reason, @Nullable String detail, int active, int maxActive) {
 		if (!isEnabled(world)) {
 			return;
 		}
-		TheVirusBlock.LOGGER.info("[CorruptionProfiler:{}] matrix cube skipped: {}{} (active {}/{})",
+		Logging.INFECTION.topic("chunk").info("[CorruptionProfiler:{}] matrix cube skipped: {}{} (active {}/{})",
 				worldId(world),
 				reason,
 				detail == null || detail.isEmpty() ? "" : " [" + detail + "]",
@@ -65,7 +72,7 @@ public final class CorruptionProfiler {
 		if (!isEnabled(world)) {
 			return;
 		}
-		TheVirusBlock.LOGGER.info("[CorruptionProfiler:{}] matrix cube armed at {} (active {}/{})",
+		Logging.INFECTION.topic("chunk").info("[CorruptionProfiler:{}] matrix cube armed at {} (active {}/{})",
 				worldId(world), pos, active + 1, maxActive);
 	}
 
@@ -73,7 +80,7 @@ public final class CorruptionProfiler {
 		if (!isEnabled(world)) {
 			return;
 		}
-		TheVirusBlock.LOGGER.info("[CorruptionProfiler:{}] matrix cube entity spawned at {}",
+		Logging.INFECTION.topic("chunk").info("[CorruptionProfiler:{}] matrix cube entity spawned at {}",
 				worldId(world), pos);
 	}
 
@@ -81,15 +88,22 @@ public final class CorruptionProfiler {
 		if (!isEnabled(world)) {
 			return;
 		}
-		TheVirusBlock.LOGGER.info("[CorruptionProfiler:{}] matrix cube attempt anchor={} target={} sea={} anchorY={} base={} maxY={}",
-				worldId(world), anchor, target, seaLevel, anchorY, base, maxY);
+		Logging.INFECTION.topic("matrix")
+				.at(anchor)
+				.kv("world", worldId(world))
+				.kv("target", target)
+				.kv("seaLevel", seaLevel)
+				.kv("anchorY", anchorY)
+				.kv("base", base)
+				.kv("maxY", maxY)
+				.info("[CorruptionProfiler] Matrix cube attempt");
 	}
 
 	public static void logMatrixCubeCleanup(ServerWorld world, @Nullable BlockPos pos, UUID id) {
 		if (!isEnabled(world)) {
 			return;
 		}
-		TheVirusBlock.LOGGER.info("[CorruptionProfiler:{}] matrix cube tracker pruned {} at {}",
+		Logging.INFECTION.topic("chunk").info("[CorruptionProfiler:{}] matrix cube tracker pruned {} at {}",
 				worldId(world), id, pos == null ? "unknown" : pos);
 	}
 
@@ -97,7 +111,7 @@ public final class CorruptionProfiler {
 		if (!isEnabled(world)) {
 			return;
 		}
-		TheVirusBlock.LOGGER.info("[CorruptionProfiler:{}] event {} at {}{}",
+		Logging.INFECTION.topic("chunk").info("[CorruptionProfiler:{}] event {} at {}{}",
 				worldId(world),
 				type.name(),
 				origin == null ? "unknown" : origin,
@@ -108,7 +122,7 @@ public final class CorruptionProfiler {
 		if (!isEnabled(world)) {
 			return;
 		}
-		TheVirusBlock.LOGGER.info("[CorruptionProfiler:{}] worm spawned at {}",
+		Logging.INFECTION.topic("chunk").info("[CorruptionProfiler:{}] worm spawned at {}",
 				worldId(world), pos);
 	}
 

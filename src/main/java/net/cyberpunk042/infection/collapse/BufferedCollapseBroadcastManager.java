@@ -3,8 +3,7 @@ package net.cyberpunk042.infection.collapse;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.infection.profile.CollapseBroadcastMode;
 import net.cyberpunk042.infection.service.SingularityHudService.BorderSyncData;
-import net.cyberpunk042.config.InfectionLogConfig.LogChannel;
-import net.cyberpunk042.util.InfectionLog;
+import net.cyberpunk042.log.Logging;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.ChunkPos;
 
@@ -106,7 +105,7 @@ public final class BufferedCollapseBroadcastManager implements CollapseBroadcast
 
 		if (!toFlush.isEmpty()) {
 			if (mode == CollapseBroadcastMode.SUMMARY) {
-				InfectionLog.info(LogChannel.SINGULARITY, "[broadcast] %d chunks flushed (radius=%d), %d still buffered",
+				Logging.SINGULARITY.info("[broadcast] %d chunks flushed (radius=%d), %d still buffered",
 						toFlush.size(), broadcastRadius, bufferedChunks.size() - toFlush.size());
 			}
 			bufferedChunks.removeAll(toFlush);
@@ -117,7 +116,7 @@ public final class BufferedCollapseBroadcastManager implements CollapseBroadcast
 
 	private void flushInternal(ServerWorld world, boolean force, CollapseBroadcastMode mode) {
 		if (mode == CollapseBroadcastMode.SUMMARY && !bufferedChunks.isEmpty()) {
-			InfectionLog.info(LogChannel.SINGULARITY, "[broadcast] %d chunks flushed (force=%s)",
+			Logging.SINGULARITY.info("[broadcast] %d chunks flushed (force=%s)",
 					bufferedChunks.size(), force);
 		}
 		bufferedChunks.clear();

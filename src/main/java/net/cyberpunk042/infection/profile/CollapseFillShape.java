@@ -10,7 +10,8 @@ public enum CollapseFillShape {
 	ROW("row"),
 	VECTOR("vector"),
 	MATRIX("matrix"),
-	OUTLINE("outline");
+	OUTLINE("outline"),
+	WALLS("walls");  // 4 separate wall commands - faster than outline
 
 	private final String id;
 
@@ -23,7 +24,7 @@ public enum CollapseFillShape {
 	}
 
 	public static CollapseFillShape defaultShape() {
-		return OUTLINE;
+		return WALLS;  // 4 wall commands - much faster than OUTLINE
 	}
 
 	@Nullable

@@ -6,13 +6,13 @@ import org.slf4j.LoggerFactory;
 import net.cyberpunk042.command.VirusDebugCommands;
 import net.cyberpunk042.command.VirusDifficultyCommand;
 import net.cyberpunk042.command.GrowthBlockCommands;
+import net.cyberpunk042.command.GrowthCollisionCommand;
 import net.cyberpunk042.config.InfectionConfigRegistry;
 import net.cyberpunk042.config.ModConfigBootstrap;
 import net.cyberpunk042.infection.VirusInfectionSystem;
 import net.cyberpunk042.infection.VirusInventoryAnnouncements;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.infection.VirusDifficulty;
-import net.cyberpunk042.infection.service.InfectionServices;
 import net.cyberpunk042.item.PurificationOption;
 import net.cyberpunk042.network.DifficultySyncPayload;
 import net.cyberpunk042.network.GrowthBeamPayload;
@@ -42,12 +42,17 @@ import net.cyberpunk042.util.DelayedServerTasks;
 import net.cyberpunk042.util.ServerRef;
 import net.cyberpunk042.growth.scheduler.GrowthScheduler;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.cyberpunk042.log.Logging;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.cyberpunk042.log.LogConfig;
+import net.cyberpunk042.log.LogCommands;
+import net.cyberpunk042.log.LogChatBridge;
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleFactory;
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleRegistry;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
 import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
@@ -205,11 +210,25 @@ public class TheVirusBlock implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
-		InfectionServices.initialize(FabricLoader.getInstance().getConfigDir().resolve("the-virus-block"));
 		ServerRef.init();
 		GrowthScheduler.registerSchedulerTasks();
 		ModConfigBootstrap.prepareCommon();
 		InfectionConfigRegistry.loadCommon();
+		
+		// Initialize command protection system
+		net.cyberpunk042.command.util.CommandKnobConfig.reload();
+		net.cyberpunk042.command.util.CommandProtection.reload();
+		net.cyberpunk042.command.util.CommandProtection.auditDeviations();
+		
+		// Initialize logging system
+		LogConfig.load();
+		
+		// Initialize field system
+		net.cyberpunk042.field.FieldSystemInit.init();
+		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, env) -> 
+			LogCommands.register(dispatcher));
+		ServerLifecycleEvents.SERVER_STARTED.register(LogChatBridge::setServer);
+		ServerLifecycleEvents.SERVER_STOPPED.register(s -> LogChatBridge.setServer(null));
 		PayloadTypeRegistry.playS2C().register(SkyTintPayload.ID, SkyTintPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(HorizonTintPayload.ID, HorizonTintPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(DifficultySyncPayload.ID, DifficultySyncPayload.CODEC);
@@ -234,6 +253,7 @@ public class TheVirusBlock implements ModInitializer {
 		ModScreenHandlers.bootstrap();
 		VirusDebugCommands.register();
 		GrowthBlockCommands.register();
+		GrowthCollisionCommand.register();
 		VirusInfectionSystem.init();
 		VirusInventoryAnnouncements.init();
 		ServerPlayNetworking.registerGlobalReceiver(PurificationTotemSelectPayload.ID, (payload, context) ->
@@ -243,7 +263,7 @@ public class TheVirusBlock implements ModInitializer {
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
 				server.execute(() -> handlePlayerJoin(handler.player)));
 
-		LOGGER.info("The Virus Block is primed. Containment is impossible.");
+		Logging.CONFIG.info("The Virus Block is primed. Containment is impossible.");
 	}
 
 	private static void handlePurificationSelection(ServerPlayerEntity player, PurificationTotemSelectPayload payload) {

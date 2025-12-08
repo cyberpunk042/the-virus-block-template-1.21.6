@@ -1,11 +1,12 @@
 package net.cyberpunk042.infection.service;
 
+
+import net.cyberpunk042.log.Logging;
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
-import net.cyberpunk042.config.InfectionLogConfig.LogChannel;
 import net.cyberpunk042.infection.InfectionTier;
 import net.cyberpunk042.infection.VirusDifficulty;
 import net.cyberpunk042.infection.VirusWorldState;
@@ -184,8 +185,7 @@ public final class VoidTearService {
 		CorruptionProfiler.logTierEvent(world, VirusEventType.VOID_TEAR,
 				tearPos,
 				"source=" + pending.source() + " affected=" + affected + " radius=" + pending.radius() + " duration=100");
-		host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-				"[voidTear] source={} affected={} radius={} duration=100",
+		Logging.SINGULARITY.info("[voidTear] source={} affected={} radius={} duration=100",
 				pending.source(),
 				affected,
 				pending.radius());

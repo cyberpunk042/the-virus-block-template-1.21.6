@@ -1,0 +1,55 @@
+{
+  "_comment": "Two synchronized rings at same height, counter-rotating",
+  "type": "personal",
+  "baseRadius": 3.5,
+  "theme": "aurora",
+  "layers": [
+    {
+      "id": "ring_a",
+      "primitives": [
+        {
+          "type": "ring",
+          "shape": {
+            "y": 0.0,
+            "radius": 0.8,
+            "thickness": 0.06,
+            "segments": 48
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": 0.8,
+            "fill": "solid",
+            "glow": 0.5
+          },
+          "animation": {
+            "spin": 0.1
+          }
+        }
+      ]
+    },
+    {
+      "id": "ring_b",
+      "primitives": [
+        {
+          "type": "ring",
+          "shape": {
+            "y": 0.0,
+            "radius": 1.0,
+            "thickness": 0.06,
+            "segments": 48
+          },
+          "appearance": {
+            "color": "@secondary",
+            "alpha": 0.8,
+            "fill": "solid",
+            "glow": 0.5
+          },
+          "animation": {
+            "spin": -0.1
+          }
+        }
+      ]
+    }
+  ],
+  "id": "segment_double_ring"
+}

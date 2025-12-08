@@ -1,0 +1,75 @@
+{
+  "type": "force",
+  "baseRadius": 6.0,
+  "theme": "energy_blue",
+  "layers": [
+    {
+      "id": "dome",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.0,
+            "latSteps": 32,
+            "lonSteps": 64,
+            "latStart": 0.0,
+            "latEnd": 0.5,
+            "lonStart": 0.0,
+            "lonEnd": 1.0
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": {
+              "min": 0.6,
+              "max": 0.85
+            },
+            "fill": true,
+            "glow": 0.5
+          },
+          "animation": {
+            "spin": 0.01,
+            "alphaPulse": 0.05,
+            "alphaPulseAmount": 0.3
+          }
+        }
+      ]
+    },
+    {
+      "id": "edge",
+      "primitives": [
+        {
+          "type": "ring",
+          "shape": {
+            "y": 0.0,
+            "radius": 1.0,
+            "thickness": 0.1,
+            "segments": 64
+          },
+          "appearance": {
+            "color": "@glow",
+            "alpha": {
+              "min": 0.7,
+              "max": 0.95
+            },
+            "fill": true,
+            "glow": 0.8
+          },
+          "animation": {
+            "spin": -0.02
+          }
+        }
+      ]
+    }
+  ],
+  "effects": [
+    {
+      "type": "shield",
+      "strength": 1.0,
+      "falloff": "none"
+    }
+  ],
+  "modifiers": {
+    "visualScale": 1.0
+  },
+  "id": "quad_force_barrier"
+}

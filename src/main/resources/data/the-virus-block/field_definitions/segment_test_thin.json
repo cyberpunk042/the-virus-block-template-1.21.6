@@ -1,0 +1,32 @@
+{
+  "id": "segment_test_thin",
+  "type": "test",
+  "baseRadius": 3.0,
+  "theme": "cyber_blue",
+  "layers": [
+    {
+      "id": "main",
+      "primitives": [
+        {
+          "type": "ring",
+          "shape": {
+            "y": 0,
+            "radius": 1.0,
+            "thickness": 0.02,
+            "segments": 64
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": {"min": 0.7, "max": 0.9},
+            "fill": "solid",
+            "glow": 0.3
+          },
+          "animation": {
+            "spin": 0.05
+          }
+        }
+      ]
+    }
+  ]
+}
+

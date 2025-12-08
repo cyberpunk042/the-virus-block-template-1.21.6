@@ -1,5 +1,7 @@
 package net.cyberpunk042.infection.profile;
 
+
+import net.cyberpunk042.log.Logging;
 import java.io.IOException;
 import java.io.Reader;
 import java.nio.file.Files;
@@ -23,7 +25,6 @@ import com.google.gson.JsonParser;
 import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.infection.profile.DimensionProfile.Collapse;
 import net.cyberpunk042.infection.profile.DimensionProfile.Collapse.PreCollapseWaterDrainage.PreDrainMode;
-import net.cyberpunk042.infection.profile.PreDrainProfile;
 import net.cyberpunk042.infection.profile.DimensionProfile.Effects;
 import net.cyberpunk042.infection.profile.DimensionProfile.Physics;
 import net.fabricmc.loader.api.FabricLoader;
@@ -71,7 +72,7 @@ public final class DimensionProfileRegistry {
 			stream.filter(path -> path.toString().endsWith(".json"))
 					.forEach(DimensionProfileRegistry::loadProfile);
 		} catch (IOException ex) {
-			TheVirusBlock.LOGGER.error("[DimensionProfile] Failed to read profiles", ex);
+			Logging.REGISTRY.error("[DimensionProfile] Failed to read profiles", ex);
 		}
 		INITIALIZED.set(true);
 	}
@@ -158,7 +159,7 @@ public final class DimensionProfileRegistry {
 		try {
 			Files.createDirectories(PROFILE_DIR);
 		} catch (IOException ex) {
-			TheVirusBlock.LOGGER.error("[DimensionProfile] Failed to create directory {}", PROFILE_DIR, ex);
+			Logging.REGISTRY.error("[DimensionProfile] Failed to create directory {}", PROFILE_DIR, ex);
 		}
 	}
 
@@ -180,7 +181,7 @@ public final class DimensionProfileRegistry {
 			}
 			PROFILE_PATHS.put(profile.id(), target);
 		} catch (IOException ex) {
-			TheVirusBlock.LOGGER.error("[DimensionProfile] Failed to write default profile {}", target, ex);
+			Logging.REGISTRY.error("[DimensionProfile] Failed to write default profile {}", target, ex);
 		}
 	}
 
@@ -242,22 +243,27 @@ public final class DimensionProfileRegistry {
 		try (Reader reader = Files.newBufferedReader(path)) {
 			JsonElement parsed = JsonParser.parseReader(reader);
 			if (!parsed.isJsonObject()) {
-				TheVirusBlock.LOGGER.warn("[DimensionProfile] Skipping {} (not a JSON object)", path.getFileName());
+				Logging.REGISTRY.warn("[DimensionProfile] Skipping {} (not a JSON object)", path.getFileName());
 				return;
 			}
 			JsonObject root = parsed.getAsJsonObject();
 			Identifier id = parseIdentifier(root.get("id"));
 			if (id == null) {
-				TheVirusBlock.LOGGER.warn("[DimensionProfile] Skipping {} (missing or invalid id)", path.getFileName());
+				Logging.REGISTRY.warn("[DimensionProfile] Skipping {} (missing or invalid id)", path.getFileName());
 				return;
 			}
 			PROFILE_PATHS.put(id, path);
 			Collapse collapse = parseCollapse(root.getAsJsonObject("collapse"));
 			Effects effects = parseEffects(root.getAsJsonObject("effects"));
 			Physics physics = parsePhysics(root.getAsJsonObject("physics"));
+			System.out.println("[DimensionProfileRegistry] Loaded profile " + id
+					+ " from " + path
+					+ " fillShape=" + collapse.fillShape()
+					+ " thickness=" + collapse.outlineThickness()
+					+ " useNativeFill=" + collapse.useNativeFill());
 			PROFILES.put(id, DimensionProfile.of(id, collapse, effects, physics));
 		} catch (Exception ex) {
-			TheVirusBlock.LOGGER.error("[DimensionProfile] Failed to load {}", path.getFileName(), ex);
+			Logging.REGISTRY.error("[DimensionProfile] Failed to load {}", path.getFileName(), ex);
 		}
 	}
 
@@ -447,7 +453,7 @@ public final class DimensionProfileRegistry {
 		if (node.has("pre_collapse_water_drainage") && node.get("pre_collapse_water_drainage").isJsonObject()) {
 			JsonObject preNode = node.getAsJsonObject("pre_collapse_water_drainage");
 			boolean enabled = preNode.has("enabled") ? preNode.get("enabled").getAsBoolean() : preDrainage.enabled();
-			Collapse.PreCollapseWaterDrainage.PreDrainMode preMode = preDrainage.mode();
+			PreDrainMode preMode = preDrainage.mode();
 			if (preNode.has("mode")) {
 				preMode = parsePreDrainMode(preNode.get("mode").getAsString(), preMode);
 			}
@@ -537,13 +543,13 @@ public final class DimensionProfileRegistry {
 		}
 	}
 
-	private static Collapse.PreCollapseWaterDrainage.PreDrainMode parsePreDrainMode(String raw,
-			Collapse.PreCollapseWaterDrainage.PreDrainMode fallback) {
+	private static PreDrainMode parsePreDrainMode(String raw,
+			PreDrainMode fallback) {
 		if (raw == null || raw.isBlank()) {
 			return fallback;
 		}
 		try {
-			return Collapse.PreCollapseWaterDrainage.PreDrainMode.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+			return PreDrainMode.valueOf(raw.trim().toUpperCase(Locale.ROOT));
 		} catch (IllegalArgumentException ex) {
 			return fallback;
 		}
@@ -614,7 +620,7 @@ public final class DimensionProfileRegistry {
 		try (var writer = Files.newBufferedWriter(path)) {
 			GSON.toJson(root, writer);
 		} catch (IOException ex) {
-			TheVirusBlock.LOGGER.error("[DimensionProfile] Failed to update profile {}", scenarioId, ex);
+			Logging.REGISTRY.error("[DimensionProfile] Failed to update profile {}", scenarioId, ex);
 			return false;
 		}
 		PROFILE_PATHS.put(scenarioId, path);
@@ -643,7 +649,7 @@ public final class DimensionProfileRegistry {
 				return parsed.getAsJsonObject();
 			}
 		} catch (Exception ex) {
-			TheVirusBlock.LOGGER.error("[DimensionProfile] Failed to read {}", path.getFileName(), ex);
+			Logging.REGISTRY.error("[DimensionProfile] Failed to read {}", path.getFileName(), ex);
 		}
 		return null;
 	}

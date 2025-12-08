@@ -61,7 +61,7 @@ public final class ModBlocks {
 					.mapColor(MapColor.DARK_RED)
 					.requiresTool()
 					.nonOpaque()
-					.luminance(state -> 10)
+					.luminance(state -> state.get(ProgressiveGrowthBlock.LIGHT_LEVEL))
 					.sounds(BlockSoundGroup.AMETHYST_BLOCK)
 					.strength(4.0F, 3600000.0F));
 
@@ -226,7 +226,10 @@ public final class ModBlocks {
 		RegistryKey<Item> itemKey = RegistryKey.of(RegistryKeys.ITEM, id);
 		T block = factory.apply(settings.registryKey(blockKey));
 		Registry.register(Registries.BLOCK, blockKey, block);
-		BlockItem blockItem = new BlockItem(block, new Item.Settings().registryKey(itemKey));
+		Item.Settings itemSettings = new Item.Settings()
+				.registryKey(itemKey)
+				.maxCount(1);
+		BlockItem blockItem = new BlockItem(block, itemSettings);
 		Registry.register(Registries.ITEM, itemKey, blockItem);
 		return block;
 	}

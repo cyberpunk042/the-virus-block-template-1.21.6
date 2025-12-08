@@ -1,0 +1,25 @@
+{
+  "id": "segment_test_rings_wireframe",
+  "type": "test",
+  "baseRadius": 2.0,
+  "theme": "cyber_blue",
+  "layers": [
+    {
+      "id": "main",
+      "primitives": [
+        {
+          "type": "rings",
+          "ringCount": 4,
+          "innerRadius": 0.5,
+          "outerRadius": 2.0,
+          "ringThickness": 0.1,
+          "appearance": {
+            "color": "@wire",
+            "fill": "wireframe"
+          },
+          "shape": {}
+        }
+      ]
+    }
+  ]
+}

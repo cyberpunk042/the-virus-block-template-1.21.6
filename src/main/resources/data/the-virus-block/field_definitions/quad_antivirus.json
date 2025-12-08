@@ -1,0 +1,43 @@
+{
+  "type": "shield",
+  "baseRadius": 18.0,
+  "theme": "antivirus_pink",
+  "layers": [
+    {
+      "id": "shell",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.0,
+            "latSteps": 64,
+            "lonSteps": 80
+          },
+          "appearance": {
+            "color": "#FFF5F9FF",
+            "alpha": {
+              "min": 0.6,
+              "max": 0.98
+            },
+            "fill": true,
+            "glow": 0.3
+          },
+          "animation": {
+            "spin": 0.03
+          }
+        }
+      ]
+    }
+  ],
+  "modifiers": {
+    "visualScale": 0.3,
+    "swirl": 0.6
+  },
+  "beam": {
+    "enabled": true,
+    "innerRadius": 0.045,
+    "outerRadius": 0.06,
+    "color": "#FFEAFAFF"
+  },
+  "id": "quad_antivirus"
+}

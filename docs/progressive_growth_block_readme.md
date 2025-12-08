@@ -21,7 +21,7 @@
 | `min`, `max` | Hard bounds on growth. | ✅ Enforced every tick. |
 | `hasCollision` | Whether entities can collide with the block; applies even when collision damage/destruction are enabled. | ✅ Shapes toggle with scale and immediately rebuild when the flag flips (even if growth is paused). |
 | `isWobbly` | Independent wobble system: block oscillates around its origin on X/Y/Z but always returns. Scheduler can toggle it. | ⚠️ Bounding box + render now drift in sync; amplitude constants await owner tuning. |
-| `glowProfile` | Purely visual glow bundle (legal presets: lava, beam, magma, glowstone). No particles/scheduling implied. | ⚠️ Template magma/lava/beam/glowstone profiles ship with editable textures; swapping works but owner art tuning pending. |
+| `glowProfile` | Purely visual glow bundle (legal presets: lava, beam, magma, glowstone). No particles/scheduling implied. | ⚠️ Template magma/lava/beam/glowstone profiles ship with editable textures **and** per-layer tints/animations/light levels. **Atlas contract:** every glow PNG must be listed in `assets/the-virus-block/atlases/blocks.json` so native (`use_mesh:false`) layers stitch correctly; mesh layers pull textures directly and can override animation timing in JSON. |
 | `particleProfile` | Separate particle/sound preset for ambient FX (distinct from glow). | ⚠️ Profile now drives spawn interval, shape (sphere/shell/ring/column), radius/height, offsets, jitter, and optional follow-scale. Awaiting owner values. |
 | `fieldProfile` | Visual aura/mesh drawn around the block (sphere, ring, etc.) independent from glow. | ⚠️ Sphere + ring meshes render with profile-defined color, scale multiplier, and spin speed; additional meshes pending owner art. |
 | `hasFuse`, `fuseProfile` | Fuse countdown + visuals (default magma look); scheduler can toggle. | ⚠️ Fuse color pulses + shell collapse animation respect profile, and armed fuses now finish even if growth is disabled mid-countdown; explosion scripting still pending owner input. |
@@ -88,7 +88,7 @@ Legend: ✅ complete · ⚠️ partial/needs owner work · ⏳ not started
 | `hasCollision` | ✅ | Active. |
 | `doesDestruction` | ✅ | Destroys overlapping blocks each tick; fuse detonation optional. |
 | `hasFuse` / `fuseProfile` | ⚠️ | Baseline pulses done; profile editing + custom timing not. |
-| `glowProfile` | ⚠️ | Template magma/lava/beam/glowstone presets load; awaiting owner-provided textures/values. |
+| `glowProfile` | ⚠️ | Template magma/lava/beam/glowstone presets load; awaiting owner-provided textures/values. Remember to update the glow atlas (`assets/the-virus-block/atlases/blocks.json`) whenever a glow PNG is added/replaced so the native renderer doesn’t fall back to the debug sprite. |
 | `particleProfile` | ⚠️ | Interval, shape, offsets, jitter, and follow-scale now come from the profile; awaiting owner-tuned numbers/assets. |
 | `fieldProfile` | ⚠️ | Sphere + ring meshes render with per-profile tint/scale; additional meshes and art pending owner input. |
 | `isWobbly` | ⚠️ | Bounding boxes + renderer now wobble via sine offsets; constants pending owner tuning/scheduler control. |
@@ -117,7 +117,8 @@ Legend: ✅ complete · ⚠️ partial/needs owner work · ⏳ not started
 2. Let the owner tune particle/field/force presets (now that the runtime honors every knob) and capture golden configs.
 3. Build `/growthblock …` diagnostics/hot-reload + scheduler helpers so scenarios can swap profiles mid-run.
 4. Create the QA harness/dev toggle before touching the Singularity Block.
-5. Always escalate questions—no feature is assumed without explicit owner instructions.
+5. **Investigate beam mesh animation**: `scroll_speed` overrides + UV offsets are still not producing visible motion. Need a top-down render pass review (layer state, buffer contents, UV math) before assuming the shader path works.
+6. Always escalate questions—no feature is assumed without explicit owner instructions.
 # Progressive Growth Block Spec
 
 This document captures the canonical requirements for the new progressive growth
@@ -148,7 +149,7 @@ README so we stay aligned on behaviour and attribute semantics.
 | `hasCollision` | When true, hitboxes expand/shrink with `current`. False turns the block into a non-solid hazard that still deals touch damage. |
 | `doesDestruction` | Toggles whether the block triggers world destruction (Singularity mini-plan, explosions, etc.) when the fuse finishes. |
 | `hasFuse` | Enables the fuse subsystem. When true, we consult the active `fuseProfile.trigger` (auto, tool use, attack, scheduler, etc.) to decide how/when to arm—never by borrowing growth scalars. |
-| `glowProfile` | Resource identifier pointing at glow materials/particles (ex: `the-virus-block:magma`). Profiles pick textures, emissive colors, and particle presets so we can swap glows per block. |
+| `glowProfile` | Resource identifier pointing at glow materials/particles (ex: `the-virus-block:magma`). Profiles pick textures, emissive colors, mesh-only animation overrides, and the emitted light level so we can swap glows per block. |
 | `isWobbly` | Adds a sine-based wobble to both visuals and collision boxes. Think guardian laser “charging” shimmy. |
 | `isPulling` | Enables inward forces while the block grows or fuses. Behaviour comes from the selected `pullProfile` plus the `pullingForce` scalar. |
 | `isPushing` | Enables outward knockback bursts. Behaviour comes from the selected `pushProfile` plus the `pushingForce` scalar. |
@@ -184,7 +185,7 @@ author new blocks without recompiling.
    - **Field (visual shell):** `config/the-virus-block/field_profiles/*.json` describe the aura mesh/texture combos rendered around the block (independent of glow).  
    - **Particles:** `config/the-virus-block/particle_profiles/*.json` keep ambient particle/audio bundles separate from glow, including per-profile sound IDs + intervals so loops can be swapped without code changes.  
    - **Fuse:** `config/the-virus-block/fuse_profiles/*.json` pick countdown colors, textures, particles, audio, and per-phase timings, inheriting any missing fields from `ServiceConfig.Fuse`.  
-   - **Glow:** `config/the-virus-block/glow_profiles/*.json` now ship with editable templates (`magma.json`, `lava.json`, `beam.json`, `glowstone.json`) that point at extracted textures under `assets/the-virus-block/textures/misc/glow_*.png`. Replace those files or adjust alpha/spin to author new looks.
+   - **Glow:** `config/the-virus-block/glow_profiles/*.json` now ship with editable templates (`magma.json`, `lava.json`, `beam.json`, `glowstone.json`) that point at extracted textures under `assets/the-virus-block/textures/block/glow_*.png`. Replace those files or adjust alpha/spin to author new looks.
 
 4. **Scheduler Integration**  
    - Rates and fuse timers use `VirusScheduler` tasks so they persist across saves.  
@@ -201,9 +202,144 @@ Every profile is the single source of truth for its subsystem. If the owner need
 | --- | --- |
 | `id` | Resource location (`the-virus-block:magma`). |
 | `primary_texture`, `secondary_texture` | Emissive layers used by the renderer. |
-| `primary_alpha`, `secondary_alpha` | Opacity per layer. |
+| `primary_color`, `secondary_color` | Hex RGB tint applied to each layer (affects both mesh and native paths). Defaults to white if omitted. |
+| `primary_mesh_animation`, `secondary_mesh_animation` | Optional overrides for mesh layers only (frame time, interpolate flag, explicit frame list). If omitted, mesh layers follow the texture’s `.mcmeta` just like native layers. Native (`use_mesh:false`) paths always use the atlas animation; set this only when you intentionally run a layer through the mesh renderer. |
+| `light_level` | Emitted block light (0–15). Stored back onto the block state so both mesh/native paths share the same brightness. |
+| `primary_alpha`, `secondary_alpha` | Opacity per layer (lives in the opacity profile today, but glow entries may override in the future). |
 | `spin_speed` | Rotation speed. |
-| *(Future)* `color_tint`, `pulse_curve` | Additional owner-driven cosmetics. |
+### Glow Pipeline History & Gotchas
+
+1. **Atlas stitching (initial breakage).** `use_mesh:false` layers rely on the block atlas (`SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE`). When we first promoted the custom glow strips, they lived under `textures/misc/...`, never entered the block atlas, and the native cube immediately drew the magenta debug texture (`minecraft:missingno`). Fix: move the PNGs under `assets/the-virus-block/textures/block/` and list each one in `assets/the-virus-block/atlases/blocks.json`.  
+   - Sanity step: the renderer logs `"[GrowthRenderer] Atlas contains ..."` at startup. If you ever see `minecraft:missingno`, a PNG was moved/renamed without updating the atlas.
+
+2. **use_mesh:true vs. .mcmeta.** After the move, mesh layers started rendering from `textures/block/...` but still respected the `.mcmeta` inside each PNG. Copying vanilla magma/lava strips gave us animation, but we quickly hit the “works here, breaks there” loop:  
+   - `use_mesh:true` worked because the renderer slices the strip manually.  
+   - `use_mesh:false` still relied on atlas animations.  
+   - Any tweak to the JSON required editing PNG metadata, reloading resources, and praying we didn’t desync with the atlas.  
+   To break that loop we added `primary_mesh_animation` / `secondary_mesh_animation` so mesh layers can override frame timing in JSON (frametime, interpolation, explicit frame list). **These overrides only affect mesh layers**; native layers still trust the `.mcmeta` baked into the atlas.
+
+3. **Beam confusion.** Vanilla beacon textures (`entity/beacon_beam.png`) aren’t frame strips; the shader scrolls their UVs. When we copied them to our block namespace and removed the `.mcmeta`, their animation appeared to break even though they were static gradients all along.  
+   - If you want motion, set `primary_use_mesh=true` and add a mesh animation override (e.g., 16-frame scroll).  
+   - If you leave them native, the atlas will keep them static (matching vanilla).
+4. **Legacy `textures/misc/...` references.** Early glow profiles (and some configs in the wild) still pointed at `the-virus-block:textures/misc/glow_*`. Once the PNGs moved under `textures/block`, those paths immediately returned `missingno` even though the atlas was correct. The registry now ships updated defaults, but any *existing* config files under `config/the-virus-block/glow_profiles` must be updated or deleted so they regenerate. The renderer logs `"[GrowthRenderer] Atlas returned missing sprite for ... textures/misc/glow_*"` whenever a legacy config slips through—treat those logs as “fix the JSON,” not “tweak code.”  
+5. **Config coverage.** The registry now writes defaults for the new glow profiles (`lava_primary_mesh`, `beam_primary_mesh`) and the corresponding growth blocks (`lava_block`, `lava_mesh_block`, `beam_block`, `beam_mesh_block`, plus the two supersized variants). If `/growthblock give …` ever reports “unknown definition,” first look at `GrowthRegistry.ensureDefaults()`—if it doesn’t emit the JSON, neither dev nor prod clients will pick it up.
+6. **Special item renderer (in-hand / dropped).** The progressive growth item now piggybacks the block-entity renderer through the 1.21 special-model pipeline:
+   - The JSON under `assets/the-virus-block/items/progressive_growth_block.json` still needs a `base` model (`assets/the-virus-block/item/progressive_growth_block.json`). When that file was missing the item never reached our renderer and stayed invisible.  
+   - `BlockEntityRenderDispatcher.render(..)` performs a distance check using the block entity’s world position. Our fake entity lives at `(0,0,0)` while the player can be thousands of blocks away, so the dispatcher constantly skipped rendering. We now fetch the registered `BlockEntityRenderer` directly and call `render(..., Vec3d.ZERO)` to bypass the cull.  
+   - Special renderers do **not** apply the standard display transforms, so the block looked gigantic both in-hand and in the inventory icon. We now apply the same transforms vanilla uses in `assets/minecraft/models/block/block.json` (GUI = 0.625 scale @ 30°/225°, ground = 0.25 scale with a +3px lift, third-person = 0.375 scale @ 75°/±45°, first-person = 0.4 scale @ 45°/225°). This single helper fixed the icon, hand pose, and dropped-block scale in one shot.
+7. **Beam mesh animation ≠ frame slicing (still unsolved).** Vanilla beacon beams do not ship as tall strips; the shader scrolls a single 16×16 gradient down the column. Our first mesh renderer only knew how to slice stacked frames, so the beam either froze or smeared when we reused the vanilla art.  
+   - Glow profile overrides now support `scroll_speed` alongside `frame_time`/`frames`, so mesh layers can request a shader-style UV scroll instead of frame hopping.  
+   - `beam_primary_mesh.json` / `beam_secondary_mesh.json` ship with `scroll_speed: 0.02` to mimic the vanilla downward motion.  
+   - **Known gap:** even with scroll offsets wired up, the in-game beam still renders static. Atlas paths, JSON overrides, and mapV math all look correct, so there’s another missing piece (likely render state or how the mesh layer batches vertices). Leave this as an open bug; do not expect beam mesh animation to work until we diagnose the remaining issue.
+
+4. **Light levels.** Glow brightness used to be hardcoded (`.luminance(state -> 10)`). Now `GlowProfile.light_level` writes directly to the block state property `ProgressiveGrowthBlock.LIGHT_LEVEL`, so swapping glow profiles adjusts both mesh and native paths’ brightness instantly. This also keeps `/growthblock …` definitions self-contained: glow profile selection now controls textures, mesh animation, tint, and lighting in one place.
+
+5. **Config coverage.** The registry now writes defaults for the new glow profiles (`lava_primary_mesh`, `beam_primary_mesh`) and the corresponding growth blocks (`lava_mesh_block`, `beam_mesh_block`). If you add another preset, extend `ensureDefaults()` so dev clients auto-generate the JSON; otherwise `/growthblock give …` will keep returning “unknown”.
+
+> **Troubleshooting loop (documented “aha” moments):**  
+> - “It works here but not there” → check atlas logs; native layers need the PNG listed in `atlases/blocks.json`.  
+> - “Mesh layer is stuck/mis-timed” → confirm `.mcmeta` matches the strip; if you want custom timing, add `primary_mesh_animation` or `secondary_mesh_animation`.  
+> - “Beam texture stopped animating” → vanilla beams rely on shader UV scrolls, not `.mcmeta`; switch to mesh mode + animation override if you need movement.  
+> - “Light level won’t change” → ensure the glow profile’s `light_level` is set and the block entity can write to `LIGHT_LEVEL` (state property must exist; we added it in `ProgressiveGrowthBlock`).  
+> - “Native layer still shows `misc/glow_*` errors” → delete/regen the old glow profile JSON so the registry writes the new `textures/block/...` paths.  
+> - “New growth block can’t be summoned” → verify `GrowthRegistry.ensureDefaults()` emits the JSON under `config/the-virus-block/growth_blocks` (we now include `lava_block`, `lava_mesh_block`, `beam_block`, `beam_mesh_block`, `magma_supersized_destruction`, `magma_supersized_no_collision`).  
+
+### Sphere Model Generation (Non-Cubic Blocks)
+
+The progressive growth block can optionally use a **spherical JSON model** instead of a cube for item/particle rendering. This is useful for orb-like growth blocks or items.
+
+#### `SphereModelGenerator` Usage
+
+```java
+import net.cyberpunk042.sphere.SphereModelGenerator;
+import com.google.gson.JsonObject;
+import java.nio.file.Path;
+
+// Generate a spherical block model for growth blocks
+JsonObject model = SphereModelGenerator.forGrowthBlock(
+    "the-virus-block:block/growth_glow",  // texture
+    0.8                                    // radius (1.0 = full block)
+);
+
+// Save to resources
+SphereModelGenerator.saveToFile(model,
+    Path.of("src/main/resources/assets/the-virus-block/models/block/growth_sphere.json"));
+```
+
+#### Algorithm Types
+
+| Type | Method | Elements | Best For |
+|------|--------|----------|----------|
+| `TYPE_A` | Overlapping cubes | 10-15 | Accurate, close-up viewing |
+| `TYPE_E` | Rotated rectangles | 40-60 | Efficient, many instances |
+
+```java
+// Type A (default) - smoother, more accurate
+JsonObject sphereA = SphereModelGenerator.builder()
+    .typeA()
+    .radius(0.8)
+    .verticalLayers(6)      // 4-8 recommended
+    .horizontalDetail(4)    // 2-4 recommended
+    .texture("the-virus-block:block/glow_magma_primary")
+    .shade(false)           // Usually looks better off
+    .build();
+
+// Type E - fewer elements, still round
+JsonObject sphereE = SphereModelGenerator.builder()
+    .typeE()
+    .radius(0.8)
+    .verticalLayers(6)
+    .texture("the-virus-block:block/glow_magma_primary")
+    .build();
+
+// Item with display transforms
+JsonObject itemSphere = SphereModelGenerator.builder()
+    .typeA()
+    .radius(0.5)
+    .verticalLayers(4)
+    .texture("the-virus-block:item/orb")
+    .scale(0.6, 0.6, 0.6)      // GUI/hand scale
+    .translation(0, 4, 0)       // Position offset
+    .build();
+```
+
+#### Element Count Estimation
+
+```java
+// Before generating, estimate complexity
+int typeACount = SphereModelGenerator.estimateTypeAElements(6, 4);  // ~10-15
+int typeECount = SphereModelGenerator.estimateTypeEElements(6);     // ~48
+```
+
+#### Integration with Growth Block
+
+1. Generate the model during build or at runtime
+2. Reference it in your blockstate JSON:
+   ```json
+   {
+     "variants": {
+       "": { "model": "the-virus-block:block/growth_sphere" }
+     }
+   }
+   ```
+3. The `BlockEntityRenderer` still handles dynamic rendering; the JSON model is used for:
+   - Item form (inventory, dropped)
+   - Particles
+   - Block breaking animation
+
+> **Note:** The `SphereModelGenerator` creates **static JSON models**. For dynamic runtime sphere rendering (fields, shields), use `TypeASphereRenderer` or `TypeESphereRenderer` from `net.cyberpunk042.client.visual.render.sphere`.
+
+---
+
+### Asset Sourcing & Path Hygiene
+- **Vanilla capture:** All glow strips (magma, lava still/flow) and beam/glowstone textures are copied directly from the Minecraft client jar (`minecraft-clientOnly-...jar`). Each PNG sits under `assets/the-virus-block/textures/block/` with matching `.mcmeta` for the strips we animate. When updating or adding art, pull it from the same jar so animation dimensions stay correct.  
+- **Reference paths:** Every glow profile must reference `the-virus-block:textures/block/<name>.png` for both `primary_texture` and `secondary_texture`. Legacy `textures/misc/...` references will render magenta even though the PNG exists.  
+- **Atlas updates:** Whenever you add/rename a glow PNG, update `assets/the-virus-block/atlases/blocks.json` so the native path can stitch it. Mesh layers do not need this, but native ones do.  
+- **Config regeneration:** `GrowthRegistry.ensureDefaults()` writes canonical JSON under `config/the-virus-block` when files are missing. If you change a glow profile/growth block in the repo, delete the corresponding file from your runtime `config` directory so the new defaults regenerate; otherwise old files keep the wrong texture paths or IDs.  
+- **Runtime checks:** The renderer logs `Layer ... mode=BLOCK_NO_TEXTURE` with `texture=the-virus-block:textures/misc/...` whenever a config falls out of sync. Treat those logs as “update the JSON,” not “patch the renderer.”  
+- **use_mesh toggles:** Only set `primary_use_mesh=true` / `secondary_use_mesh=true` when you intentionally want manual UV slicing. Mesh layers read textures directly (no atlas), honor JSON animation overrides, and support per-layer tints; native layers require atlas registration and `.mcmeta` timing.
+
+| *(Future)* `pulse_curve` | Additional owner-driven cosmetics. |
 
 ### Particle Profile (`config/.../particle_profiles/*.json`)
 | Field | Purpose |

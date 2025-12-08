@@ -1,0 +1,119 @@
+{
+  "_comment": "Multiple nested translucent spheres",
+  "type": "shield",
+  "baseRadius": 6.0,
+  "theme": "aurora",
+  "layers": [
+    {
+      "id": "layer_1",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.0,
+            "latSteps": 16,
+            "lonSteps": 32
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": 0.2,
+            "fill": "solid",
+            "glow": 0.2
+          },
+          "animation": {
+            "spin": 0.02
+          }
+        }
+      ]
+    },
+    {
+      "id": "layer_2",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 0.8,
+            "latSteps": 12,
+            "lonSteps": 24
+          },
+          "appearance": {
+            "color": "@secondary",
+            "alpha": 0.3,
+            "fill": "solid",
+            "glow": 0.3
+          },
+          "animation": {
+            "spin": -0.025
+          }
+        }
+      ]
+    },
+    {
+      "id": "layer_3",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 0.6,
+            "latSteps": 10,
+            "lonSteps": 20
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": 0.4,
+            "fill": "solid",
+            "glow": 0.4
+          },
+          "animation": {
+            "spin": 0.03
+          }
+        }
+      ]
+    },
+    {
+      "id": "layer_4",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 0.4,
+            "latSteps": 8,
+            "lonSteps": 16
+          },
+          "appearance": {
+            "color": "@secondary",
+            "alpha": 0.5,
+            "fill": "solid",
+            "glow": 0.5
+          },
+          "animation": {
+            "spin": -0.035
+          }
+        }
+      ]
+    },
+    {
+      "id": "core",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 0.2,
+            "algorithm": "type_e"
+          },
+          "appearance": {
+            "color": "@glow",
+            "alpha": 1.0,
+            "fill": "solid",
+            "glow": 1.0
+          },
+          "animation": {
+            "pulse": 0.1,
+            "pulseAmount": 0.2
+          }
+        }
+      ]
+    }
+  ],
+  "id": "quad_onion_layers"
+}

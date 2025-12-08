@@ -1,0 +1,30 @@
+{
+  "id": "quad_test_octahedron",
+  "type": "test",
+  "baseRadius": 2.0,
+  "theme": "emerald",
+  "layers": [
+    {
+      "id": "main",
+      "primitives": [
+        {
+          "type": "polyhedron",
+          "shape": {
+            "polyType": "octahedron",
+            "radius": 1.0
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": {
+              "min": 0.6,
+              "max": 0.8
+            }
+          },
+          "animation": {
+            "spin": 0.025
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -232,9 +232,26 @@ This is a “progressive chaos” mod designed for content creation and challeng
 ## 🛠️ Development & Testing Roadmap
 
 - The ongoing `VirusWorldState` refactor, architecture diagrams, and milestone breakdowns live in `docs/architecture_readme.md`. Check it whenever you need to understand which systems are being extracted next (Scenario Registry, controllers, planners, effect bus, etc.).
+- Collision refactor notes (mixins, piston-inspired collision, remap pitfalls, log signatures) live in `docs/growth-block-collision.md`. Read it before touching the growth block mixins so you don’t repeat the sweet-spot issues or Loom remap failures.
 - `docs/virusworld_state_refactor.md` captures the Strategy/Builder/Observer patterns behind that roadmap and is the canonical blueprint referenced by engineering discussions.
 - Automated tests will land later in the roadmap; for now, **Jean runs manual QA playtests at each milestone** (controller extraction, planner service, engine integration, etc.) and records the results alongside release notes.
 - If you are contributing code, add your scenario/feature notes to the architecture doc so the manual testing checklist stays accurate.
+
+## 🧱 Growth Block Collision Mixins
+
+Player collision with multi-block growth shells now flows through a layered set of mixins plus a shared helper. Together they almost fully solve the “players glide through growth blocks” bug by forcing every server-side collision query to merge the tracker’s world-space boxes:
+
+- `EntityGrowthCollisionMixin` (Yarn) and `EntityGrowthCollisionIntermediaryMixin` (runtime) hook `Entity.findCollisionsForMovement`/`method_59920`, append growth `VoxelShape`s, and emit `[GrowthCollision:hook|sweep|move]` logs so we can prove players actually enter the vanilla collision stack.
+- `CollisionViewGrowthCollisionMixin` mirrors piston behavior by extending `CollisionView.getCollisions(...)` whenever the view is a `World` instance and the entity is a player, giving us `[GrowthCollision:cv]` breadcrumbs for every server sweep.
+- `ServerPlayNetworkHandlerMixin` wraps the `WorldView.getCollisions(...)` call inside `isEntityNotCollidingWithBlocks`. This was the breakthrough: once the anti-cheat validation sees the merged `Iterable<VoxelShape>`, server players can no longer slip through even when the client tries to predictively phase.
+- `GrowthCollisionMixinHelper` centralizes the tracker scan, logs why shapes were skipped, throttles debug box spam, and merges the vanilla/external collision lists consistently.
+
+With the `WorldView` wrap in place the collisions “stick” for survival/creative players during testing; any remaining oddities trace back to tracker coverage (e.g., growth block entities not registering) rather than missing mixins. See `docs/growth-block-collision.md` for the debugging timeline, log signatures, and future maintenance checklist.
+
+Need the old `[GrowthCollision:*]` traces again? Start the JVM with `-Dthevirusblock.growthCollisionDebug=true` to re-enable every collision log; otherwise they stay silent to avoid console spam.  
+Trying to isolate the collision pipeline? Add `-Dthevirusblock.disableCollisionViewHook=true` to temporarily disable the generic `CollisionView` mixin so only the `ServerPlayNetworkHandler` wrap remains active.
+
+When debug logging is enabled you will now see `[GrowthCollision:debug] … scenario=TOP|BOTTOM|SIDE_*` lines that spell out the exact `worldBox` vs `query` overlap for each contact type—capture one snippet per scenario when reproducing sticky collisions. Still seeing rubber-banding while walking on top? Set `-Dthevirusblock.growthTopClearance=0.15` (default `0.02`, adjustable up to `0.25`) so the helper treats anyone within that many blocks of the roof as “above” the shell and skips duplicate collisions. Prefer runtime experiments? Use `/growthcollision shape shell|solid` (permission level ≥2) to swap between the new thin-shell collider and the original solid column without restarting, and `/growthcollision dump` to log every active growth block’s bounding boxes on demand.
 
 ---
 

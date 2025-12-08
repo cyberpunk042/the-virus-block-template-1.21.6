@@ -1,0 +1,65 @@
+{
+  "type": "shield",
+  "baseRadius": 16.0,
+  "theme": "checker_cyan",
+  "layers": [
+    {
+      "id": "checker",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.0,
+            "latSteps": 32,
+            "lonSteps": 64
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": {
+              "min": 0.4,
+              "max": 0.7
+            },
+            "fill": true,
+            "pattern": {
+              "type": "checker",
+              "count": 8
+            },
+            "glow": 0.3
+          },
+          "animation": {
+            "spin": 0.02
+          }
+        }
+      ]
+    },
+    {
+      "id": "frame",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.05,
+            "latSteps": 16,
+            "lonSteps": 32
+          },
+          "appearance": {
+            "color": "@wire",
+            "alpha": {
+              "min": 0.5,
+              "max": 0.8
+            },
+            "fill": false,
+            "wireThickness": 1.0
+          },
+          "animation": {
+            "spin": -0.01
+          }
+        }
+      ]
+    }
+  ],
+  "modifiers": {
+    "visualScale": 1.0
+  },
+  "id": "quad_checker_frame"
+}

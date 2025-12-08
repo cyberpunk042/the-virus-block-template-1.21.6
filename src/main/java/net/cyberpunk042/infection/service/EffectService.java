@@ -3,10 +3,9 @@ package net.cyberpunk042.infection.service;
 import java.util.ArrayList;
 import java.util.List;
 
-import net.cyberpunk042.config.InfectionLogConfig.LogChannel;
 import net.cyberpunk042.infection.api.EffectBus;
 import net.cyberpunk042.infection.scenario.ScenarioEffectSet;
-import net.cyberpunk042.util.InfectionLog;
+import net.cyberpunk042.log.Logging;
 
 /**
  * Tracks effect-set registrations per scenario so {@link EffectBus} usage stays
@@ -23,7 +22,7 @@ public final class EffectService {
 		}
 		set.install(bus);
 		activeSets.add(set);
-		InfectionLog.info(LogChannel.EFFECTS, "[effectService] installed {}", set.getClass().getSimpleName());
+		Logging.EFFECTS.info("[effectService] installed {}", set.getClass().getSimpleName());
 	}
 
 	public void unregisterSet(ScenarioEffectSet set) {
@@ -35,7 +34,7 @@ public final class EffectService {
 				set.close();
 			} catch (Exception ignored) {
 			}
-			InfectionLog.info(LogChannel.EFFECTS, "[effectService] removed {}", set.getClass().getSimpleName());
+			Logging.EFFECTS.info("[effectService] removed {}", set.getClass().getSimpleName());
 		}
 	}
 
@@ -45,7 +44,7 @@ public final class EffectService {
 				set.close();
 			} catch (Exception ignored) {
 			}
-			InfectionLog.info(LogChannel.EFFECTS, "[effectService] removed {}", set.getClass().getSimpleName());
+			Logging.EFFECTS.info("[effectService] removed {}", set.getClass().getSimpleName());
 		}
 		activeSets.clear();
 	}

@@ -1,0 +1,57 @@
+{
+  "id": "edge_test_cage_glow",
+  "type": "test",
+  "baseRadius": 4.0,
+  "theme": "cyber_blue",
+  "layers": [
+    {
+      "id": "cage_outer",
+      "primitives": [
+        {
+          "type": "cage",
+          "latLines": 8,
+          "lonLines": 16,
+          "wireThickness": 1.0,
+          "shape": {
+            "radius": 1.0
+          },
+          "appearance": {
+            "color": "@wire",
+            "alpha": {
+              "min": 0.6,
+              "max": 0.8
+            }
+          },
+          "animation": {
+            "spin": 0.02
+          }
+        }
+      ]
+    },
+    {
+      "id": "glow_inner",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 0.6,
+            "latSteps": 12,
+            "lonSteps": 24
+          },
+          "appearance": {
+            "color": "@glow",
+            "alpha": {
+              "min": 0.3,
+              "max": 0.6
+            },
+            "glow": 0.7
+          },
+          "animation": {
+            "pulse": 0.08,
+            "pulseAmount": 0.15
+          }
+        }
+      ]
+    }
+  ]
+}

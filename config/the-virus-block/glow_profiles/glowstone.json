@@ -1,9 +1,0 @@
-{
-  "id": "the-virus-block:glowstone",
-  "primary_texture": "the-virus-block:textures/misc/glow_glowstone_primary.png",
-  "secondary_texture": "the-virus-block:textures/misc/glow_glowstone_secondary.png",
-  "primary_alpha": 0.5,
-  "secondary_alpha": 0.75,
-  "spin_speed": 0.6
-}
-

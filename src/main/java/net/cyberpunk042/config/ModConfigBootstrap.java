@@ -1,5 +1,8 @@
 package net.cyberpunk042.config;
 
+import net.cyberpunk042.infection.service.InfectionServices;
+import net.fabricmc.loader.api.FabricLoader;
+
 /**
  * Forces static initialization of config modules before the registry attempts
  * to load them. This approach keeps config classes self-contained while still
@@ -17,7 +20,7 @@ public final class ModConfigBootstrap {
 			return;
 		}
 		commonPrepared = true;
-		initialize(InfectionLogConfig.class);
+		InfectionServices.initialize(FabricLoader.getInstance().getConfigDir().resolve("the-virus-block"));
 		initialize(SingularityConfig.class);
 	}
 

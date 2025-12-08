@@ -1,0 +1,59 @@
+{
+  "_comment": "Upper hemisphere dome shield",
+  "type": "shield",
+  "baseRadius": 8.0,
+  "theme": "emerald",
+  "layers": [
+    {
+      "id": "dome",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.0,
+            "latSteps": 24,
+            "lonSteps": 48,
+            "latStart": 0.0,
+            "latEnd": 0.5
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": {
+              "min": 0.3,
+              "max": 0.6
+            },
+            "fill": "solid",
+            "glow": 0.4
+          },
+          "animation": {
+            "spin": 0.02
+          }
+        }
+      ]
+    },
+    {
+      "id": "base_ring",
+      "primitives": [
+        {
+          "type": "ring",
+          "shape": {
+            "y": 0.0,
+            "radius": 1.0,
+            "thickness": 0.08,
+            "segments": 64
+          },
+          "appearance": {
+            "color": "@glow",
+            "alpha": 0.9,
+            "fill": "solid",
+            "glow": 0.8
+          },
+          "animation": {
+            "spin": -0.04
+          }
+        }
+      ]
+    }
+  ],
+  "id": "quad_hemisphere_dome"
+}

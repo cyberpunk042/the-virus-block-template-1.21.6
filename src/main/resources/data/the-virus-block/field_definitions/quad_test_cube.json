@@ -1,0 +1,30 @@
+{
+  "id": "quad_test_cube",
+  "type": "test",
+  "baseRadius": 2.0,
+  "theme": "crimson",
+  "layers": [
+    {
+      "id": "main",
+      "primitives": [
+        {
+          "type": "polyhedron",
+          "shape": {
+            "polyType": "cube",
+            "radius": 1.0
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": {
+              "min": 0.7,
+              "max": 0.9
+            }
+          },
+          "animation": {
+            "spin": 0.02
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "id": "segment_test_rings",
+  "type": "test",
+  "baseRadius": 4.0,
+  "theme": "aurora",
+  "layers": [
+    {
+      "id": "main",
+      "primitives": [
+        {
+          "type": "rings",
+          "ringCount": 5,
+          "spacing": 0.3,
+          "shape": {
+            "innerRadius": 0.8,
+            "outerRadius": 1.0
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": {
+              "min": 0.5,
+              "max": 0.7
+            }
+          },
+          "animation": {
+            "spin": 0.03
+          }
+        }
+      ]
+    }
+  ]
+}

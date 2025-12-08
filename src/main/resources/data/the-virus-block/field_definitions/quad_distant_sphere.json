@@ -1,0 +1,35 @@
+{
+  "_comment": "Optimized for distant viewing - uses TYPE_E algorithm",
+  "type": "shield",
+  "baseRadius": 20.0,
+  "theme": "cyber_blue",
+  "layers": [
+    {
+      "id": "shell",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.0,
+            "latSteps": 8,
+            "lonSteps": 16,
+            "algorithm": "type_e"
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": 0.5,
+            "fill": "solid",
+            "glow": 0.2
+          },
+          "animation": {
+            "spin": 0.01
+          }
+        }
+      ]
+    }
+  ],
+  "modifiers": {
+    "visualScale": 1.0
+  },
+  "id": "quad_distant_sphere"
+}

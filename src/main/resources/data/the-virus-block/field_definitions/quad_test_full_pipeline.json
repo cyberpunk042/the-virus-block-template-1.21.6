@@ -1,0 +1,91 @@
+{
+  "id": "quad_test_full_pipeline",
+  "type": "test",
+  "baseRadius": 5.0,
+  "theme": "crimson",
+  "layers": [
+    {
+      "id": "type_a_sphere",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.0,
+            "latSteps": 8,
+            "lonSteps": 16,
+            "algorithm": "type_a"
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": 0.8
+          }
+        }
+      ],
+      "spin": 0.02
+    },
+    {
+      "id": "type_e_outer",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.5,
+            "latSteps": 12,
+            "lonSteps": 24,
+            "algorithm": "type_e"
+          },
+          "appearance": {
+            "color": "@secondary",
+            "alpha": 0.5
+          }
+        }
+      ],
+      "spin": -0.01
+    },
+    {
+      "id": "banded_sphere",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 2.0,
+            "latSteps": 16,
+            "lonSteps": 32,
+            "algorithm": "lat_lon"
+          },
+          "appearance": {
+            "color": "@glow",
+            "alpha": 0.4,
+            "pattern": {
+              "type": "bands",
+              "count": 6,
+              "thickness": 0.3,
+              "triangles": "meshed"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "wireframe_cage",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 2.5,
+            "latSteps": 8,
+            "lonSteps": 16,
+            "algorithm": "lat_lon"
+          },
+          "appearance": {
+            "color": "@accent",
+            "alpha": 0.7,
+            "fill": "wireframe",
+            "wireThickness": 2.0
+          }
+        }
+      ],
+      "spin": 0.005
+    }
+  ]
+}

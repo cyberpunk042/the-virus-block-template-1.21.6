@@ -1,5 +1,7 @@
 package net.cyberpunk042.recipe;
 
+
+import net.cyberpunk042.log.Logging;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -50,7 +52,7 @@ public final class VirusFallbackRecipes {
 		boolean changed = false;
 		if (current.get(CURED_CUBE_ID) == null) {
 			entries.add(createCuredCubeRecipe());
-			TheVirusBlock.LOGGER.warn("Injected fallback recipe for {} because datapack entry was missing", CURED_CUBE_ID.getValue());
+			Logging.CONFIG.warn("Injected fallback recipe for {} because datapack entry was missing", CURED_CUBE_ID.getValue());
 			changed = true;
 		}
 		if (current.get(PURIFICATION_TOTEM_NORTH_ID) == null) {
@@ -86,7 +88,7 @@ public final class VirusFallbackRecipes {
 			changed = true;
 		}
 		if (changed) {
-			TheVirusBlock.LOGGER.warn("Purification Totem fallback recipes were injected because the datapack failed to provide them.");
+			Logging.CONFIG.warn("Purification Totem fallback recipes were injected because the datapack failed to provide them.");
 		}
 		return changed;
 	}

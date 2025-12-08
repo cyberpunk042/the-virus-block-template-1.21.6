@@ -1,0 +1,32 @@
+{
+  "_comment": "Wireframe sphere cage",
+  "type": "shield",
+  "baseRadius": 6.0,
+  "theme": "crimson",
+  "layers": [
+    {
+      "id": "cage",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.0,
+            "latSteps": 8,
+            "lonSteps": 16
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": 0.9,
+            "fill": "wireframe",
+            "wireThickness": 2.0,
+            "glow": 0.6
+          },
+          "animation": {
+            "spin": 0.03
+          }
+        }
+      ]
+    }
+  ],
+  "id": "quad_wireframe_cage"
+}

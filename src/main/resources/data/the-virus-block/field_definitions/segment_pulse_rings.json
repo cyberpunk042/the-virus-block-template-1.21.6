@@ -1,0 +1,109 @@
+{
+  "_comment": "Multiple rings pulsing outward",
+  "type": "personal",
+  "baseRadius": 4.0,
+  "theme": "aurora",
+  "layers": [
+    {
+      "id": "ring_1",
+      "primitives": [
+        {
+          "type": "ring",
+          "shape": {
+            "y": 0.0,
+            "radius": 0.4,
+            "thickness": 0.03,
+            "segments": 48
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": 0.9,
+            "fill": "solid",
+            "glow": 0.6
+          },
+          "animation": {
+            "pulse": 0.15,
+            "pulseAmount": 0.3,
+            "phase": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "ring_2",
+      "primitives": [
+        {
+          "type": "ring",
+          "shape": {
+            "y": 0.0,
+            "radius": 0.65,
+            "thickness": 0.03,
+            "segments": 48
+          },
+          "appearance": {
+            "color": "@secondary",
+            "alpha": 0.7,
+            "fill": "solid",
+            "glow": 0.5
+          },
+          "animation": {
+            "pulse": 0.15,
+            "pulseAmount": 0.25,
+            "phase": 1.05
+          }
+        }
+      ]
+    },
+    {
+      "id": "ring_3",
+      "primitives": [
+        {
+          "type": "ring",
+          "shape": {
+            "y": 0.0,
+            "radius": 0.85,
+            "thickness": 0.03,
+            "segments": 48
+          },
+          "appearance": {
+            "color": "@glow",
+            "alpha": 0.5,
+            "fill": "solid",
+            "glow": 0.4
+          },
+          "animation": {
+            "pulse": 0.15,
+            "pulseAmount": 0.2,
+            "phase": 2.1
+          }
+        }
+      ]
+    },
+    {
+      "id": "ring_4",
+      "primitives": [
+        {
+          "type": "ring",
+          "shape": {
+            "y": 0.0,
+            "radius": 1.0,
+            "thickness": 0.02,
+            "segments": 48
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": 0.3,
+            "fill": "solid",
+            "glow": 0.3
+          },
+          "animation": {
+            "pulse": 0.15,
+            "pulseAmount": 0.15,
+            "phase": 3.15
+          }
+        }
+      ]
+    }
+  ],
+  "id": "segment_pulse_rings"
+}

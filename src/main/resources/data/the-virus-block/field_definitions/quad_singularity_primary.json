@@ -1,0 +1,38 @@
+{
+  "type": "anchored",
+  "baseRadius": 1.0,
+  "theme": "singularity",
+  "layers": [
+    {
+      "id": "primary_sphere",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.0,
+            "latSteps": 48,
+            "lonSteps": 96,
+            "algorithm": "lat_lon"
+          },
+          "appearance": {
+            "color": "#D92640",
+            "alpha": {
+              "min": 0.7,
+              "max": 0.95
+            },
+            "fill": "solid",
+            "glow": 0.4
+          },
+          "animation": {
+            "spin": 0.01,
+            "pulse": 0.1
+          }
+        }
+      ]
+    }
+  ],
+  "modifiers": {
+    "pulsing": true
+  },
+  "id": "quad_singularity_primary"
+}

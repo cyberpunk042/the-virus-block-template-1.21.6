@@ -1,0 +1,54 @@
+{
+  "_comment": "Vertical scanner sweep effect",
+  "type": "shield",
+  "baseRadius": 6.0,
+  "theme": "cyber_blue",
+  "layers": [
+    {
+      "id": "shell",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.0,
+            "latSteps": 16,
+            "lonSteps": 32
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": 0.2,
+            "fill": "solid",
+            "glow": 0.1
+          }
+        }
+      ]
+    },
+    {
+      "id": "scan_line",
+      "primitives": [
+        {
+          "type": "ring",
+          "shape": {
+            "y": 0.0,
+            "radius": 1.01,
+            "thickness": 0.02,
+            "segments": 64
+          },
+          "appearance": {
+            "color": "@glow",
+            "alpha": 1.0,
+            "fill": "solid",
+            "glow": 1.0
+          },
+          "animation": {
+            "pulse": 0.08,
+            "pulseAmount": 0.8,
+            "alphaPulse": 0.1,
+            "alphaPulseAmount": 0.3
+          }
+        }
+      ]
+    }
+  ],
+  "id": "quad_scanner_sweep"
+}

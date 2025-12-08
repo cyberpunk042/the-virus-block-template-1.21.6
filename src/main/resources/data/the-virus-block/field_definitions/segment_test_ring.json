@@ -1,0 +1,31 @@
+{
+  "id": "segment_test_ring",
+  "type": "test",
+  "baseRadius": 3.0,
+  "theme": "cyber_blue",
+  "layers": [
+    {
+      "id": "main",
+      "primitives": [
+        {
+          "type": "ring",
+          "shape": {
+            "innerRadius": 2.9,
+            "outerRadius": 3.0,
+            "segments": 64
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": {
+              "min": 0.6,
+              "max": 0.8
+            }
+          },
+          "animation": {
+            "spin": 0.05
+          }
+        }
+      ]
+    }
+  ]
+}

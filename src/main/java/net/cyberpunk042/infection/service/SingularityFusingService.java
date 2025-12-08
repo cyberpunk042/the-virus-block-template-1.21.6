@@ -1,5 +1,7 @@
 package net.cyberpunk042.infection.service;
 
+
+import net.cyberpunk042.log.Logging;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -10,8 +12,6 @@ import java.util.UUID;
 import net.cyberpunk042.registry.ModBlocks;
 import net.cyberpunk042.block.entity.SingularityBlockEntity;
 import net.cyberpunk042.entity.VirusFuseEntity;
-import net.cyberpunk042.config.InfectionLogConfig.LogChannel;
-import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.infection.state.TierModule;
 import net.cyberpunk042.infection.SingularityState;
@@ -139,7 +139,7 @@ public final class SingularityFusingService {
 			if (entity instanceof VirusFuseEntity fuse && fuse.isAlive()) {
 				return false;
 			}
-			host.collapseModule().watchdog().log(LogChannel.SINGULARITY_FUSE, "Removing dead fuse entity at {}", entry.getKey());
+			Logging.FUSE.info("Removing dead fuse entity at {}", entry.getKey());
 			return true;
 		});
 		for (BlockPos source : host.getVirusSources()) {
@@ -153,9 +153,9 @@ public final class SingularityFusingService {
 			VirusFuseEntity fuse = new VirusFuseEntity(world, source);
 			if (world.spawnEntity(fuse)) {
 				activeFuseEntities.put(source.toImmutable(), fuse.getUuid());
-				host.collapseModule().watchdog().log(LogChannel.SINGULARITY_FUSE, "Spawned fuse entity at {}", source);
+				Logging.FUSE.info("Spawned fuse entity at {}", source);
 			} else {
-				TheVirusBlock.LOGGER.warn("[Fuse] Failed to spawn fuse entity at {}", source);
+				Logging.SINGULARITY.topic("fusing").warn("[Fuse] Failed to spawn fuse entity at {}", source);
 			}
 		}
 	}

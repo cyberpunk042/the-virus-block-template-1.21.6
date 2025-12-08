@@ -1,7 +1,6 @@
 package net.cyberpunk042.block.entity;
 
-import net.cyberpunk042.config.InfectionLogConfig.LogChannel;
-import net.cyberpunk042.util.InfectionLog;
+import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.registry.ModBlockEntities;
 import net.cyberpunk042.network.SingularityVisualStartPayload;
 import net.cyberpunk042.network.SingularityVisualStopPayload;
@@ -89,7 +88,7 @@ public class SingularityBlockEntity extends BlockEntity {
 		stage = newStage;
 		stageStartTick = worldTime;
 		if (!clientSide) {
-			InfectionLog.info(LogChannel.SINGULARITY_VISUAL, "Stage {} -> {} at {}", previous, newStage, getPos());
+			Logging.SINGULARITY.topic("visual").info("Stage {} -> {} at {}", previous, newStage, getPos());
 			markDirty();
 			sync();
 		}

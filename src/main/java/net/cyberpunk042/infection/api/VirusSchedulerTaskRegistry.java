@@ -1,5 +1,7 @@
 package net.cyberpunk042.infection.api;
 
+
+import net.cyberpunk042.log.Logging;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -7,7 +9,6 @@ import java.util.Optional;
 import org.jetbrains.annotations.Nullable;
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import net.cyberpunk042.TheVirusBlock;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.util.Identifier;
 
@@ -39,7 +40,7 @@ public final class VirusSchedulerTaskRegistry {
 		try {
 			return Optional.ofNullable(factory.create(data == null ? new NbtCompound() : data));
 		} catch (Exception ex) {
-			TheVirusBlock.LOGGER.error("[VirusScheduler] failed to decode task {}", id, ex);
+			Logging.CONFIG.error("[VirusScheduler] failed to decode task {}", id, ex);
 			return Optional.empty();
 		}
 	}

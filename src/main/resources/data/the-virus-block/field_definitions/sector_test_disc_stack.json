@@ -1,0 +1,65 @@
+{
+  "id": "sector_test_disc_stack",
+  "type": "test",
+  "baseRadius": 2.0,
+  "theme": "aurora",
+  "layers": [
+    {
+      "id": "bottom",
+      "primitives": [
+        {
+          "type": "disc",
+          "radius": 2.0,
+          "appearance": {
+            "color": "@primary",
+            "alpha": {
+              "min": 0.5,
+              "max": 0.7
+            }
+          },
+          "shape": {
+            "y": -0.5
+          }
+        }
+      ]
+    },
+    {
+      "id": "middle",
+      "primitives": [
+        {
+          "type": "disc",
+          "radius": 1.5,
+          "appearance": {
+            "color": "@secondary",
+            "alpha": {
+              "min": 0.6,
+              "max": 0.8
+            }
+          },
+          "shape": {
+            "y": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "top",
+      "primitives": [
+        {
+          "type": "disc",
+          "radius": 1.0,
+          "appearance": {
+            "color": "@glow",
+            "alpha": {
+              "min": 0.7,
+              "max": 0.9
+            }
+          },
+          "shape": {
+            "y": 0.5
+          }
+        }
+      ]
+    }
+  ]
+}

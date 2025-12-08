@@ -1,12 +1,11 @@
 package net.cyberpunk042.infection.scenario;
 
-import net.cyberpunk042.config.InfectionLogConfig.LogChannel;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.infection.api.InfectionScenario;
 import net.cyberpunk042.infection.api.VirusWorldContext;
 import net.cyberpunk042.infection.service.InfectionServiceContainer;
 import net.cyberpunk042.infection.service.ServiceConfig;
-import net.cyberpunk042.util.InfectionLog;
+import net.cyberpunk042.log.Logging;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Identifier;
 
@@ -128,8 +127,7 @@ abstract class AbstractDimensionInfectionScenario implements InfectionScenario {
 	private void trace(VirusWorldContext context, String message, Object... args) {
 		Identifier scenario = id();
 		Identifier worldId = context.world().getRegistryKey().getValue();
-		InfectionLog.info(LogChannel.EFFECTS,
-				"[scenario:{} world:{}] " + message,
+		Logging.EFFECTS.info("[scenario:{} world:{}] " + message,
 				scenario,
 				worldId,
 				args);

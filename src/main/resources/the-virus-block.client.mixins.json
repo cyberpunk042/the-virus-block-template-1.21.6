@@ -1,0 +1,21 @@
+{
+	"required": true,
+	"package": "net.cyberpunk042.mixin.client",
+	"refmap": "the-virus-block.refmap.json",
+	"compatibilityLevel": "JAVA_21",
+  "client": [
+    "BackgroundRendererMixin",
+    "ClientWorldMixin",
+    "RainSplashParticleFactoryMixin",
+    "SnowflakeParticleFactoryMixin",
+    "SpriteContentsAccessor",
+    "WeatherRenderingMixin",
+    "PlayerEntityRendererMixin",
+    "WorldBorderRenderingMixin",
+    "access.LivingEntityRendererAccessor",
+    "GameRendererMixin"
+  ],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

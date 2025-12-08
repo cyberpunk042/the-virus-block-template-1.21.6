@@ -1,0 +1,28 @@
+{
+  "id": "quad_test_beam_glow",
+  "type": "test",
+  "baseRadius": 1.0,
+  "theme": "golden",
+  "layers": [
+    {
+      "id": "main",
+      "primitives": [
+        {
+          "type": "beam",
+          "radius": 0.2,
+          "height": 15.0,
+          "segments": 12,
+          "appearance": {
+            "color": "@glow",
+            "alpha": {
+              "min": 0.4,
+              "max": 0.7
+            },
+            "glow": 0.8
+          },
+          "shape": {}
+        }
+      ]
+    }
+  ]
+}

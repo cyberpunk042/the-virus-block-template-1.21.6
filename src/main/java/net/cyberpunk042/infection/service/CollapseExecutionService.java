@@ -1,5 +1,7 @@
 package net.cyberpunk042.infection.service;
 
+
+import net.cyberpunk042.log.Logging;
 import java.util.Objects;
 
 import net.cyberpunk042.infection.VirusWorldState;
@@ -20,7 +22,6 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.border.WorldBorder;
 
-import net.cyberpunk042.config.InfectionLogConfig.LogChannel;
 import net.cyberpunk042.infection.profile.CollapseBroadcastMode;
 import net.cyberpunk042.infection.profile.CollapseFillShape;
 import net.cyberpunk042.infection.profile.CollapseSyncProfile;

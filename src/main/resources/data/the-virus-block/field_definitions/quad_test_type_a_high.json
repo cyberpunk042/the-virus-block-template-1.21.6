@@ -1,0 +1,30 @@
+{
+  "id": "quad_test_type_a_high",
+  "type": "test",
+  "baseRadius": 3.0,
+  "theme": "cyber_green",
+  "layers": [
+    {
+      "id": "main",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.0,
+            "latSteps": 32,
+            "algorithm": "type_a"
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": {"min": 0.6, "max": 0.85},
+            "glow": 0.3
+          },
+          "animation": {
+            "spin": 0.008
+          }
+        }
+      ]
+    }
+  ]
+}
+

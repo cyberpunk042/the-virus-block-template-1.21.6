@@ -1,5 +1,7 @@
 package net.cyberpunk042.infection.service;
 
+
+import net.cyberpunk042.log.Logging;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -12,8 +14,6 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import net.cyberpunk042.TheVirusBlock;
-import net.cyberpunk042.config.InfectionLogConfig.LogChannel;
 import net.cyberpunk042.infection.InfectionTier;
 import net.cyberpunk042.infection.SingularityState;
 import net.cyberpunk042.infection.VirusWorldState;
@@ -176,7 +176,7 @@ public final class SingularityLifecycleService {
 		boolean bypassing = SingularityChunkContext.isBypassingChunk(chunk.x, chunk.z);
 		boolean outsideBorder = !world.getWorldBorder().contains(chunk.getCenterX(), chunk.getCenterZ());
 		double distance = host.collapseModule().execution().chunkDistanceFromCenter(chunk.toLong());
-		TheVirusBlock.LOGGER.warn("[Singularity] chunk load failed phase={} chunk={} allowGen={} bypass={} outsideBorder={} distance={} thread={}",
+		Logging.SINGULARITY.topic("lifecycle").warn("[Singularity] chunk load failed phase={} chunk={} allowGen={} bypass={} outsideBorder={} distance={} thread={}",
 				phase,
 				chunk,
 				generationAllowed,
@@ -203,7 +203,7 @@ public final class SingularityLifecycleService {
 		state.singularityCollapseDescending = !state.singularityCollapseDescending;
 		host.collapseModule().execution().spawnChunkVeil(chunk);
 		if (SingularityDiagnostics.enabled()) {
-			host.collapseModule().watchdog().log(LogChannel.SINGULARITY, "chunk processed {}", chunk);
+			Logging.SINGULARITY.info("chunk processed {}", chunk);
 		}
 	}
 
@@ -225,8 +225,7 @@ public final class SingularityLifecycleService {
 	public void startPostCollapseReset() {
 		ServerWorld world = host.world();
 		if (!shouldStartPostReset()) {
-			host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-					"[reset] skipped enabled={} queue={}",
+			Logging.SINGULARITY.info("[reset] skipped enabled={} queue={}",
 					host.collapseConfig().postResetConfig().enabled,
 					host.collapseModule().queues().resetQueueSize());
 			finishSingularity();
@@ -235,8 +234,7 @@ public final class SingularityLifecycleService {
 		state.singularityState = SingularityState.RESET;
 		host.collapseModule().queues().setResetDelay(Math.max(0, host.collapseModule().queues().postResetDelayTicks()));
 		host.collapseModule().queues().clearResetProcessed();
-		host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-				"[reset] init queue={} delay={} chunksPerTick={} batchRadius={} tickDelay={}",
+		Logging.SINGULARITY.info("[reset] init queue={} delay={} chunksPerTick={} batchRadius={} tickDelay={}",
 				host.collapseModule().queues().resetQueueSize(),
 				host.collapseModule().queues().resetDelay(),
 				host.collapseModule().queues().postResetChunksPerTick(),
@@ -258,14 +256,12 @@ public final class SingularityLifecycleService {
 			processed++;
 		}
 		if (host.collapseModule().queues().isResetQueueEmpty()) {
-			host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-					"[reset] complete processed={} queue=0",
+			Logging.SINGULARITY.info("[reset] complete processed={} queue=0",
 					host.collapseModule().queues().resetProcessedSize());
 			finishSingularity();
 		} else if (processed > 0) {
 			if (SingularityDiagnostics.enabled()) {
-				host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-						"[reset] processed={} remaining={}",
+				Logging.SINGULARITY.info("[reset] processed={} remaining={}",
 						processed,
 						host.collapseModule().queues().resetQueueSize());
 			}
@@ -321,10 +317,10 @@ public final class SingularityLifecycleService {
 			String command = String.format(Locale.ROOT, "chunk reset %d %d", pos.x, pos.z);
 			server.getCommandManager().executeWithPrefix(source, command);
 			if (SingularityDiagnostics.enabled()) {
-				host.collapseModule().watchdog().log(LogChannel.SINGULARITY, "[reset] chunk {}", pos);
+				Logging.SINGULARITY.info("[reset] chunk {}", pos);
 			}
 		} catch (Exception ex) {
-			TheVirusBlock.LOGGER.warn("[Singularity] chunk reset failed chunk={} reason={}", pos, ex.toString());
+			Logging.SINGULARITY.topic("lifecycle").warn("[Singularity] chunk reset failed chunk={} reason={}", pos, ex.toString());
 		}
 	}
 
@@ -434,8 +430,7 @@ public final class SingularityLifecycleService {
 			minDist = 0.0D;
 			maxDist = 0.0D;
 		}
-		host.collapseModule().watchdog().log(LogChannel.SINGULARITY,
-				"activating ring {} chunks={} threshold={} borderRadius={} chunkDist={}..{}",
+		Logging.SINGULARITY.info("activating ring {} chunks={} threshold={} borderRadius={} chunkDist={}..{}",
 				ringIndex,
 				chunkCount,
 				roundDistance(threshold),

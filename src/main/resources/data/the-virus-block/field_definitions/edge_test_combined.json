@@ -1,0 +1,80 @@
+{
+  "id": "edge_test_combined",
+  "type": "test",
+  "baseRadius": 4.0,
+  "theme": "cyber_blue",
+  "layers": [
+    {
+      "id": "cage_outer",
+      "primitives": [
+        {
+          "type": "cage",
+          "latLines": 6,
+          "lonLines": 12,
+          "wireThickness": 1.0,
+          "shape": {
+            "radius": 1.0
+          },
+          "appearance": {
+            "color": "@wire",
+            "alpha": {
+              "min": 0.5,
+              "max": 0.7
+            }
+          },
+          "animation": {
+            "spin": 0.02
+          }
+        }
+      ]
+    },
+    {
+      "id": "sphere_inner",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 0.7,
+            "latSteps": 12,
+            "lonSteps": 24
+          },
+          "appearance": {
+            "color": "@glow",
+            "alpha": {
+              "min": 0.3,
+              "max": 0.5
+            }
+          },
+          "animation": {
+            "spin": -0.01,
+            "pulse": 0.05,
+            "pulseAmount": 0.05
+          }
+        }
+      ]
+    },
+    {
+      "id": "ring_equator",
+      "primitives": [
+        {
+          "type": "ring",
+          "shape": {
+            "innerRadius": 0.95,
+            "outerRadius": 1.05,
+            "segments": 32
+          },
+          "appearance": {
+            "color": "@accent",
+            "alpha": {
+              "min": 0.8,
+              "max": 1.0
+            }
+          },
+          "animation": {
+            "spin": 0.08
+          }
+        }
+      ]
+    }
+  ]
+}

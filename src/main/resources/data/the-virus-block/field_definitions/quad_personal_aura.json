@@ -1,0 +1,42 @@
+{
+  "type": "personal",
+  "baseRadius": 2.5,
+  "theme": "soft_white",
+  "layers": [
+    {
+      "id": "aura",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.0,
+            "latSteps": 16,
+            "lonSteps": 32
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": {
+              "min": 0.05,
+              "max": 0.15
+            },
+            "fill": true,
+            "glow": 0.2
+          },
+          "animation": {
+            "alphaPulse": 0.03,
+            "alphaPulseAmount": 0.8
+          }
+        }
+      ]
+    }
+  ],
+  "modifiers": {
+    "visualScale": 1.0
+  },
+  "prediction": {
+    "enabled": true,
+    "leadTicks": 3,
+    "maxDistance": 1.0
+  },
+  "id": "quad_personal_aura"
+}

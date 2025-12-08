@@ -1,0 +1,92 @@
+{
+  "type": "personal",
+  "baseRadius": 3.0,
+  "theme": "aurora",
+  "layers": [
+    {
+      "id": "ring_inner",
+      "primitives": [
+        {
+          "type": "ring",
+          "shape": {
+            "y": 0.0,
+            "radius": 0.6,
+            "thickness": 0.08,
+            "segments": 48
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": {
+              "min": 0.6,
+              "max": 0.9
+            },
+            "fill": true,
+            "glow": 0.5
+          },
+          "animation": {
+            "spin": 0.08
+          }
+        }
+      ]
+    },
+    {
+      "id": "ring_mid",
+      "primitives": [
+        {
+          "type": "ring",
+          "shape": {
+            "y": 0.0,
+            "radius": 0.85,
+            "thickness": 0.05,
+            "segments": 64
+          },
+          "appearance": {
+            "color": "@secondary",
+            "alpha": {
+              "min": 0.4,
+              "max": 0.7
+            },
+            "fill": true,
+            "glow": 0.4
+          },
+          "animation": {
+            "spin": -0.05,
+            "phase": 1.57
+          }
+        }
+      ]
+    },
+    {
+      "id": "ring_outer",
+      "primitives": [
+        {
+          "type": "ring",
+          "shape": {
+            "y": 0.0,
+            "radius": 1.0,
+            "thickness": 0.03,
+            "segments": 96
+          },
+          "appearance": {
+            "color": "@glow",
+            "alpha": {
+              "min": 0.3,
+              "max": 0.5
+            },
+            "fill": true,
+            "glow": 0.6
+          },
+          "animation": {
+            "spin": 0.03,
+            "phase": 3.14
+          }
+        }
+      ]
+    }
+  ],
+  "prediction": {
+    "enabled": true,
+    "leadTicks": 2
+  },
+  "id": "segment_personal_rings"
+}

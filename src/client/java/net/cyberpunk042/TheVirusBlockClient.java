@@ -1,12 +1,6 @@
 package net.cyberpunk042;
 
 import net.cyberpunk042.client.color.CorruptedColorProviders;
-import net.cyberpunk042.client.command.MeshShapeCommand;
-import net.cyberpunk042.client.command.MeshStyleCommand;
-import net.cyberpunk042.client.command.ShieldPersonalCommand;
-import net.cyberpunk042.client.command.SingularityVisualCommand;
-import net.cyberpunk042.client.command.ShieldVisualCommand;
-import net.cyberpunk042.client.command.TriangleTypeCommand;
 import net.cyberpunk042.client.render.CorruptedFireTextures;
 import net.cyberpunk042.client.render.SingularityBorderClientState;
 import net.cyberpunk042.client.state.SingularityScheduleClientState;
@@ -14,7 +8,6 @@ import net.cyberpunk042.client.render.SingularityVisualManager;
 import net.cyberpunk042.client.render.blockentity.SingularityBlockEntityRenderer;
 import net.cyberpunk042.client.render.blockentity.ProgressiveGrowthBlockEntityRenderer;
 import net.cyberpunk042.client.render.item.ProgressiveGrowthItemRenderer;
-import net.cyberpunk042.client.render.ShieldFieldVisualManager;
 import net.cyberpunk042.client.render.VoidTearVisualManager;
 import net.cyberpunk042.client.render.VirusFluidRenderers;
 import net.cyberpunk042.client.render.beam.GrowthBeamRenderer;
@@ -43,13 +36,13 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
-import net.minecraft.client.render.block.entity.BlockEntityRendererFactories;
 import net.fabricmc.fabric.api.client.rendering.v1.BlockRenderLayerMap;
-import net.minecraft.client.render.BlockRenderLayer;
-import net.minecraft.client.render.entity.FallingBlockEntityRenderer;
-import net.minecraft.client.render.entity.TntEntityRenderer;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.minecraft.client.gui.screen.ingame.HandledScreens;
+import net.minecraft.client.render.BlockRenderLayer;
+import net.minecraft.client.render.block.entity.BlockEntityRendererFactories;
+import net.minecraft.client.render.entity.FallingBlockEntityRenderer;
+import net.minecraft.client.render.entity.TntEntityRenderer;
 
 public class TheVirusBlockClient implements ClientModInitializer {
 	@Override
@@ -66,7 +59,9 @@ public class TheVirusBlockClient implements ClientModInitializer {
 		ProgressiveGrowthItemRenderer.bootstrap();
 		CorruptedColorProviders.register();
 		VoidTearVisualManager.init();
-		ShieldFieldVisualManager.init();
+		// New field system - register definitions on client too (server loads JSON, client needs code defaults)
+		net.cyberpunk042.field.FieldRegistry.registerDefaults();
+		net.cyberpunk042.client.field.FieldClientInit.init();
 		SingularityVisualManager.init();
 		SingularityBorderClientState.init();
 		VirusFluidRenderers.register();
@@ -102,12 +97,9 @@ public class TheVirusBlockClient implements ClientModInitializer {
 					SingularityScheduleClientState.reset();
 				}));
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
-			ShieldVisualCommand.register(dispatcher);
-			MeshStyleCommand.register(dispatcher);
-			MeshShapeCommand.register(dispatcher);
-			TriangleTypeCommand.register(dispatcher);
-			ShieldPersonalCommand.register(dispatcher);
-			SingularityVisualCommand.register(dispatcher);
+			// Old shield commands moved to agent-tools/legacy-shield/
+			// New field system uses /fieldtest (server-side command)
+			// SingularityVisualCommand removed - using new field system
 		});
 	}
 }

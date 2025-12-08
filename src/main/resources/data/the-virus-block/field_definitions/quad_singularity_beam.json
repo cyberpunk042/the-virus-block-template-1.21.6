@@ -1,0 +1,30 @@
+{
+  "type": "anchored",
+  "baseRadius": 0.06,
+  "theme": "singularity_beam",
+  "layers": [
+    {
+      "id": "beam",
+      "primitives": [
+        {
+          "type": "beam",
+          "shape": {
+            "innerRadius": 0.045,
+            "outerRadius": 0.06,
+            "height": 256
+          },
+          "appearance": {
+            "color": "#1A1A2E",
+            "alpha": {
+              "min": 0.6,
+              "max": 0.8
+            },
+            "fill": "solid",
+            "glow": 0.3
+          }
+        }
+      ]
+    }
+  ],
+  "id": "quad_singularity_beam"
+}

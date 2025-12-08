@@ -1,0 +1,82 @@
+{
+  "_comment": "Sphere with glowing polar caps",
+  "type": "shield",
+  "baseRadius": 7.0,
+  "theme": "cyber_blue",
+  "layers": [
+    {
+      "id": "main_shell",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.0,
+            "latSteps": 24,
+            "lonSteps": 48
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": 0.3,
+            "fill": "solid",
+            "glow": 0.2
+          },
+          "animation": {
+            "spin": 0.015
+          }
+        }
+      ]
+    },
+    {
+      "id": "north_cap",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.01,
+            "latSteps": 8,
+            "lonSteps": 32,
+            "latStart": 0.0,
+            "latEnd": 0.2
+          },
+          "appearance": {
+            "color": "@glow",
+            "alpha": 0.9,
+            "fill": "solid",
+            "glow": 1.0
+          },
+          "animation": {
+            "pulse": 0.08,
+            "pulseAmount": 0.1
+          }
+        }
+      ]
+    },
+    {
+      "id": "south_cap",
+      "primitives": [
+        {
+          "type": "sphere",
+          "shape": {
+            "radius": 1.01,
+            "latSteps": 8,
+            "lonSteps": 32,
+            "latStart": 0.8,
+            "latEnd": 1.0
+          },
+          "appearance": {
+            "color": "@glow",
+            "alpha": 0.9,
+            "fill": "solid",
+            "glow": 1.0
+          },
+          "animation": {
+            "pulse": 0.08,
+            "pulseAmount": 0.1,
+            "phase": 3.14
+          }
+        }
+      ]
+    }
+  ],
+  "id": "quad_polar_caps"
+}

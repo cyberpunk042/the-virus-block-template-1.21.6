@@ -9,7 +9,7 @@
     "ring_duration_ticks": 200,
     "barrier_start_radius": 120.0,
     "barrier_end_radius": 0.5,
-    "barrier_duration_ticks": 1000,
+    "barrier_duration_ticks": 1100,
     "barrier_auto_reset": false,
     "barrier_reset_delay_ticks": 200,
     "chunk_pregen_enabled": true,
@@ -40,10 +40,12 @@
       "start_from_center": false
     },
     "collapse_particles": false,
+    "outline_thickness": 2,
+    "fill_shape": "walls",
     "fill_profile": "default",
     "fill_mode": "air",
     "collapse_inward": true,
-    "use_native_fill": true,
+    "use_native_fill": false,
     "respect_protected_blocks": true,
     "radius_delays": [
       {

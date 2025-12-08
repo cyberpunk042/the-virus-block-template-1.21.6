@@ -1,9 +1,0 @@
-{
-  "id": "the-virus-block:magma",
-  "primary_texture": "the-virus-block:textures/misc/glow_magma_primary.png",
-  "secondary_texture": "the-virus-block:textures/misc/glow_magma_secondary.png",
-  "primary_alpha": 0.65,
-  "secondary_alpha": 1.0,
-  "spin_speed": 1.0
-}
-

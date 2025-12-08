@@ -1,9 +1,0 @@
-{
-  "id": "the-virus-block:lava",
-  "primary_texture": "the-virus-block:textures/misc/glow_lava_primary.png",
-  "secondary_texture": "the-virus-block:textures/misc/glow_lava_secondary.png",
-  "primary_alpha": 0.8,
-  "secondary_alpha": 0.95,
-  "spin_speed": 1.3
-}
-

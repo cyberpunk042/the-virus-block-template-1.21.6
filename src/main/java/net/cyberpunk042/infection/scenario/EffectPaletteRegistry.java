@@ -1,5 +1,7 @@
 package net.cyberpunk042.infection.scenario;
 
+
+import net.cyberpunk042.log.Logging;
 import java.io.IOException;
 import java.io.Reader;
 import java.nio.file.Files;
@@ -36,7 +38,7 @@ final class EffectPaletteRegistry {
 		ensureLoaded();
 		return Optional.ofNullable(PALETTES.get(id))
 				.orElseGet(() -> {
-					TheVirusBlock.LOGGER.warn("[EffectPalette] Missing palette {}. Falling back to overworld palette.", id);
+					Logging.SCENARIO.warn("[EffectPalette] Missing palette {}. Falling back to overworld palette.", id);
 					return PALETTES.getOrDefault(Identifier.of(TheVirusBlock.MOD_ID, "overworld"), defaultOverworld());
 				});
 	}
@@ -52,7 +54,7 @@ final class EffectPaletteRegistry {
 			stream.filter(path -> path.toString().endsWith(".json"))
 					.forEach(EffectPaletteRegistry::loadPalette);
 		} catch (IOException ex) {
-			TheVirusBlock.LOGGER.error("[EffectPalette] Failed to read palettes", ex);
+			Logging.SCENARIO.error("[EffectPalette] Failed to read palettes", ex);
 		}
 		loaded = true;
 	}
@@ -61,17 +63,17 @@ final class EffectPaletteRegistry {
 		try (Reader reader = Files.newBufferedReader(path)) {
 			JsonElement parsed = JsonParser.parseReader(reader);
 			if (!parsed.isJsonObject()) {
-				TheVirusBlock.LOGGER.warn("[EffectPalette] Skipping {} (not a JSON object)", path.getFileName());
+				Logging.SCENARIO.warn("[EffectPalette] Skipping {} (not a JSON object)", path.getFileName());
 				return;
 			}
 			EffectPaletteConfig palette = parsePalette(parsed.getAsJsonObject());
 			if (palette.id() == null) {
-				TheVirusBlock.LOGGER.warn("[EffectPalette] Skipping {} (missing id)", path.getFileName());
+				Logging.SCENARIO.warn("[EffectPalette] Skipping {} (missing id)", path.getFileName());
 				return;
 			}
 			PALETTES.put(palette.id(), palette);
 		} catch (IOException ex) {
-			TheVirusBlock.LOGGER.error("[EffectPalette] Failed to load palette {}", path, ex);
+			Logging.SCENARIO.error("[EffectPalette] Failed to load palette {}", path, ex);
 		}
 	}
 
@@ -79,7 +81,7 @@ final class EffectPaletteRegistry {
 		try {
 			Files.createDirectories(PALETTE_DIR);
 		} catch (IOException ex) {
-			TheVirusBlock.LOGGER.error("[EffectPalette] Failed to create directory {}", PALETTE_DIR, ex);
+			Logging.SCENARIO.error("[EffectPalette] Failed to create directory {}", PALETTE_DIR, ex);
 		}
 	}
 
@@ -100,7 +102,7 @@ final class EffectPaletteRegistry {
 		try (var writer = Files.newBufferedWriter(target)) {
 			GSON.toJson(serializePalette(palette), writer);
 		} catch (IOException ex) {
-			TheVirusBlock.LOGGER.error("[EffectPalette] Failed to write default palette {}", target, ex);
+			Logging.SCENARIO.error("[EffectPalette] Failed to write default palette {}", target, ex);
 		}
 	}
 

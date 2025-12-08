@@ -1,0 +1,79 @@
+{
+  "_comment": "Target acquisition lock effect",
+  "type": "personal",
+  "baseRadius": 2.5,
+  "theme": "crimson",
+  "layers": [
+    {
+      "id": "outer_frame",
+      "primitives": [
+        {
+          "type": "ring",
+          "shape": {
+            "y": 0.0,
+            "radius": 1.0,
+            "thickness": 0.02,
+            "segments": 4
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": 0.9,
+            "fill": "solid",
+            "glow": 0.7
+          },
+          "animation": {
+            "spin": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "id": "inner_frame",
+      "primitives": [
+        {
+          "type": "ring",
+          "shape": {
+            "y": 0.0,
+            "radius": 0.6,
+            "thickness": 0.02,
+            "segments": 4
+          },
+          "appearance": {
+            "color": "@glow",
+            "alpha": 0.8,
+            "fill": "solid",
+            "glow": 0.9
+          },
+          "animation": {
+            "spin": -0.2
+          }
+        }
+      ]
+    },
+    {
+      "id": "reticle",
+      "primitives": [
+        {
+          "type": "ring",
+          "shape": {
+            "y": 0.0,
+            "radius": 0.3,
+            "thickness": 0.05,
+            "segments": 48
+          },
+          "appearance": {
+            "color": "@primary",
+            "alpha": 1.0,
+            "fill": "solid",
+            "glow": 1.0
+          },
+          "animation": {
+            "pulse": 0.2,
+            "pulseAmount": 0.15
+          }
+        }
+      ]
+    }
+  ],
+  "id": "segment_target_lock"
+}

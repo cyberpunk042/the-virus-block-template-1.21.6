@@ -1,5 +1,7 @@
 package net.cyberpunk042.infection.orchestrator;
 
+
+import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.infection.api.*;
@@ -121,7 +123,7 @@ public class DefaultWorldOrchestrator implements WorldOrchestrator, Orchestrator
 	public void tick(ServerWorld world) {
 		if (!state.canTick()) {
 			if (state == OrchestratorState.SHUTDOWN) {
-				LOGGER.warn("[Orchestrator] tick() called after shutdown - ignoring");
+				Logging.ORCHESTRATOR.warn("[Orchestrator] tick() called after shutdown - ignoring");
 			}
 			return;
 		}
@@ -143,12 +145,12 @@ public class DefaultWorldOrchestrator implements WorldOrchestrator, Orchestrator
 	@Override
 	public void shutdown(ServerWorld world) {
 		if (state.isShuttingDownOrShutdown()) {
-			LOGGER.debug("[Orchestrator] Already shutting down or shut down");
+			Logging.ORCHESTRATOR.debug("[Orchestrator] Already shutting down or shut down");
 			return;
 		}
 		
 		state = OrchestratorState.SHUTTING_DOWN;
-		LOGGER.info("[Orchestrator] Shutting down for world: {}", world.getRegistryKey().getValue());
+		Logging.ORCHESTRATOR.info("[Orchestrator] Shutting down for world: {}", world.getRegistryKey().getValue());
 		
 		scenarios.shutdown(world);
 		phases.shutdown();
