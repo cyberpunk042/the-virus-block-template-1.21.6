@@ -1,6 +1,8 @@
 package net.cyberpunk042.visual.pattern;
 
 import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.visual.pattern.QuadPattern.Corner;
+import net.cyberpunk042.visual.pattern.TrianglePattern.Vertex;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -9,7 +11,7 @@ import java.util.List;
  * Generates ALL permutations of vertex patterns for exploration.
  * 
  * <p>Use this to discover new interesting patterns by shuffling through
- * all possible vertex arrangements for each geometry type.
+ * all possible vertex arrangements for each cell type.
  * 
  * <h2>Usage</h2>
  * <pre>
@@ -19,45 +21,34 @@ import java.util.List;
  * /fieldtest shuffle type quad - Switch to quad patterns
  * </pre>
  * 
- * <h2>Geometry Types</h2>
+ * <h2>Cell Types</h2>
  * <ul>
- *   <li><b>QUAD</b>: All ways to arrange 4 corners into triangles</li>
+ *   <li><b>QUAD</b>: All ways to arrange 4 corners into 2 triangles</li>
  *   <li><b>SEGMENT</b>: All skip/phase combinations for rings</li>
  *   <li><b>SECTOR</b>: All skip/phase combinations for discs</li>
  *   <li><b>EDGE</b>: All lat/lon/skip combinations for wireframes</li>
+ *   <li><b>TRIANGLE</b>: All skip/invert combinations</li>
  * </ul>
  */
 public final class ShuffleGenerator {
     
     // =========================================================================
-    // Corner Definition (for quads)
-    // =========================================================================
-    
-    public enum Corner {
-        TL("TopLeft"),
-        TR("TopRight"),
-        BL("BottomLeft"),
-        BR("BottomRight");
-        
-        private final String display;
-        Corner(String display) { this.display = display; }
-        public String display() { return display; }
-        public String shortName() { return name(); }
-    }
-    
-    // =========================================================================
-    // Generated Quad Patterns
+    // Quad Arrangement (uses Corner enum for readability)
     // =========================================================================
     
     /**
      * A single generated quad arrangement.
+     * Uses semantic {@link Corner} enum: TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT
      */
     public record QuadArrangement(
         Corner[] tri1,      // First triangle (3 corners)
-        Corner[] tri2,      // Second triangle (3 corners, can be null for single-tri)
+        Corner[] tri2,      // Second triangle (3 corners, can be null)
         int index,          // Index in the full list
         int total           // Total arrangements
     ) {
+        /**
+         * Describes the arrangement in human-readable form.
+         */
         public String describe() {
             StringBuilder sb = new StringBuilder();
             sb.append("Tri1: ");
@@ -76,49 +67,43 @@ public final class ShuffleGenerator {
             return sb.toString();
         }
         
+        /**
+         * Returns vertex order as int[][] for rendering.
+         */
+        public int[][] toVertexOrder() {
+            int[] t1 = {tri1[0].index, tri1[1].index, tri1[2].index};
+            if (tri2 == null) {
+                return new int[][]{t1};
+            }
+            int[] t2 = {tri2[0].index, tri2[1].index, tri2[2].index};
+            return new int[][]{t1, t2};
+        }
+        
+        /**
+         * Returns detailed log string.
+         */
         public String toLogString() {
             StringBuilder sb = new StringBuilder();
             sb.append("\n  Triangle 1: ");
-            sb.append(tri1[0].display()).append(" → ");
-            sb.append(tri1[1].display()).append(" → ");
-            sb.append(tri1[2].display());
+            sb.append(tri1[0].shortName()).append(" → ");
+            sb.append(tri1[1].shortName()).append(" → ");
+            sb.append(tri1[2].shortName());
             
             if (tri2 != null) {
                 sb.append("\n  Triangle 2: ");
-                sb.append(tri2[0].display()).append(" → ");
-                sb.append(tri2[1].display()).append(" → ");
-                sb.append(tri2[2].display());
+                sb.append(tri2[0].shortName()).append(" → ");
+                sb.append(tri2[1].shortName()).append(" → ");
+                sb.append(tri2[2].shortName());
             } else {
                 sb.append("\n  (Single triangle only)");
             }
             return sb.toString();
         }
-        
-        /**
-         * Converts to a QuadPattern.Corner array for use with MeshBuilder.
-         */
-        public List<QuadPattern.Corner[]> toQuadPatternTriangles() {
-            List<QuadPattern.Corner[]> result = new ArrayList<>();
-            result.add(new QuadPattern.Corner[]{
-                mapCorner(tri1[0]), mapCorner(tri1[1]), mapCorner(tri1[2])
-            });
-            if (tri2 != null) {
-                result.add(new QuadPattern.Corner[]{
-                    mapCorner(tri2[0]), mapCorner(tri2[1]), mapCorner(tri2[2])
-                });
-            }
-            return result;
-        }
-        
-        private QuadPattern.Corner mapCorner(Corner c) {
-            return switch (c) {
-                case TL -> QuadPattern.Corner.TOP_LEFT;
-                case TR -> QuadPattern.Corner.TOP_RIGHT;
-                case BL -> QuadPattern.Corner.BOTTOM_LEFT;
-                case BR -> QuadPattern.Corner.BOTTOM_RIGHT;
-            };
-        }
     }
+    
+    // =========================================================================
+    // Segment Arrangement
+    // =========================================================================
     
     /**
      * A generated segment arrangement for rings.
@@ -157,6 +142,10 @@ public final class ShuffleGenerator {
         }
     }
     
+    // =========================================================================
+    // Sector Arrangement
+    // =========================================================================
+    
     /**
      * A generated sector arrangement for discs.
      */
@@ -182,6 +171,10 @@ public final class ShuffleGenerator {
             );
         }
     }
+    
+    // =========================================================================
+    // Edge Arrangement
+    // =========================================================================
     
     /**
      * A generated edge arrangement for wireframes.
@@ -211,6 +204,43 @@ public final class ShuffleGenerator {
     }
     
     // =========================================================================
+    // Triangle Arrangement (uses Vertex enum for readability)
+    // =========================================================================
+    
+    /**
+     * A generated triangle arrangement.
+     * Uses semantic {@link Vertex} enum: A, B, C
+     */
+    public record TriangleArrangement(
+        Vertex[] vertices,
+        int skipInterval,
+        int index,
+        int total
+    ) {
+        public String describe() {
+            return String.format("%s→%s→%s skip=%d", 
+                vertices[0].name(), vertices[1].name(), vertices[2].name(),
+                skipInterval);
+        }
+        
+        public boolean isInverted() {
+            // Standard is A→B→C, inverted is A→C→B
+            return vertices[1] == Vertex.C && vertices[2] == Vertex.B;
+        }
+        
+        public String toLogString() {
+            return String.format(
+                "\n  Winding: %s → %s → %s" +
+                "\n  Skip Interval: %d" +
+                "\n  Inverted: %s",
+                vertices[0].name(), vertices[1].name(), vertices[2].name(),
+                skipInterval,
+                isInverted() ? "YES" : "no"
+            );
+        }
+    }
+    
+    // =========================================================================
     // Pre-generated Lists
     // =========================================================================
     
@@ -218,48 +248,50 @@ public final class ShuffleGenerator {
     private static final List<SegmentArrangement> SEGMENT_ARRANGEMENTS = new ArrayList<>();
     private static final List<SectorArrangement> SECTOR_ARRANGEMENTS = new ArrayList<>();
     private static final List<EdgeArrangement> EDGE_ARRANGEMENTS = new ArrayList<>();
+    private static final List<TriangleArrangement> TRIANGLE_ARRANGEMENTS = new ArrayList<>();
     
     static {
         generateQuadArrangements();
         generateSegmentArrangements();
         generateSectorArrangements();
         generateEdgeArrangements();
+        generateTriangleArrangements();
         
-        Logging.RENDER.topic("shuffle").info(
-            "Generated shuffle permutations: {} quads, {} segments, {} sectors, {} edges",
+        Logging.FIELD.topic("shuffle").info(
+            "Generated shuffle permutations: {} quads, {} segments, {} sectors, {} edges, {} triangles",
             QUAD_ARRANGEMENTS.size(), 
             SEGMENT_ARRANGEMENTS.size(),
             SECTOR_ARRANGEMENTS.size(),
-            EDGE_ARRANGEMENTS.size()
+            EDGE_ARRANGEMENTS.size(),
+            TRIANGLE_ARRANGEMENTS.size()
         );
     }
     
     // =========================================================================
-    // Quad Generation (All corner permutations)
+    // Quad Generation (All Corner permutations)
     // =========================================================================
     
     private static void generateQuadArrangements() {
         Corner[] corners = Corner.values();
         int idx = 0;
         
-        // Generate all 2-triangle combinations
-        // Pick 3 corners for tri1, remaining logic for tri2
-        for (int a = 0; a < 4; a++) {
-            for (int b = 0; b < 4; b++) {
+        // Generate all 2-triangle combinations using Corner enum
+        for (Corner a : corners) {
+            for (Corner b : corners) {
                 if (b == a) continue;
-                for (int c = 0; c < 4; c++) {
+                for (Corner c : corners) {
                     if (c == a || c == b) continue;
                     
-                    Corner[] tri1 = {corners[a], corners[b], corners[c]};
+                    Corner[] tri1 = {a, b, c};
                     
                     // For tri2, try different combinations
-                    for (int d = 0; d < 4; d++) {
-                        for (int e = 0; e < 4; e++) {
+                    for (Corner d : corners) {
+                        for (Corner e : corners) {
                             if (e == d) continue;
-                            for (int f = 0; f < 4; f++) {
+                            for (Corner f : corners) {
                                 if (f == d || f == e) continue;
                                 
-                                Corner[] tri2 = {corners[d], corners[e], corners[f]};
+                                Corner[] tri2 = {d, e, f};
                                 QUAD_ARRANGEMENTS.add(new QuadArrangement(tri1, tri2, idx++, 0));
                             }
                         }
@@ -269,12 +301,12 @@ public final class ShuffleGenerator {
         }
         
         // Also add single-triangle variants
-        for (int a = 0; a < 4; a++) {
-            for (int b = 0; b < 4; b++) {
+        for (Corner a : corners) {
+            for (Corner b : corners) {
                 if (b == a) continue;
-                for (int c = 0; c < 4; c++) {
+                for (Corner c : corners) {
                     if (c == a || c == b) continue;
-                    Corner[] tri1 = {corners[a], corners[b], corners[c]};
+                    Corner[] tri1 = {a, b, c};
                     QUAD_ARRANGEMENTS.add(new QuadArrangement(tri1, null, idx++, 0));
                 }
             }
@@ -289,24 +321,20 @@ public final class ShuffleGenerator {
     }
     
     // =========================================================================
-    // Segment Generation (skip/phase/winding)
+    // Segment Generation
     // =========================================================================
     
     private static void generateSegmentArrangements() {
         int idx = 0;
         
-        // Skip intervals 1-8
         for (int skip = 1; skip <= 8; skip++) {
-            // Phase offsets 0 to skip-1
             for (int phase = 0; phase < skip; phase++) {
-                // Both winding directions
                 for (boolean reverse : new boolean[]{false, true}) {
                     SEGMENT_ARRANGEMENTS.add(new SegmentArrangement(skip, phase, reverse, idx++, 0));
                 }
             }
         }
         
-        // Update totals
         int total = SEGMENT_ARRANGEMENTS.size();
         for (int i = 0; i < total; i++) {
             SegmentArrangement old = SEGMENT_ARRANGEMENTS.get(i);
@@ -316,24 +344,20 @@ public final class ShuffleGenerator {
     }
     
     // =========================================================================
-    // Sector Generation (skip/phase/invert)
+    // Sector Generation
     // =========================================================================
     
     private static void generateSectorArrangements() {
         int idx = 0;
         
-        // Skip intervals 1-8
         for (int skip = 1; skip <= 8; skip++) {
-            // Phase offsets 0 to skip-1
             for (int phase = 0; phase < skip; phase++) {
-                // Invert selection
                 for (boolean invert : new boolean[]{false, true}) {
                     SECTOR_ARRANGEMENTS.add(new SectorArrangement(skip, phase, invert, idx++, 0));
                 }
             }
         }
         
-        // Update totals
         int total = SECTOR_ARRANGEMENTS.size();
         for (int i = 0; i < total; i++) {
             SectorArrangement old = SECTOR_ARRANGEMENTS.get(i);
@@ -343,30 +367,52 @@ public final class ShuffleGenerator {
     }
     
     // =========================================================================
-    // Edge Generation (lat/lon/skip)
+    // Edge Generation
     // =========================================================================
     
     private static void generateEdgeArrangements() {
         int idx = 0;
         
-        // All lat/lon combinations (except both false)
         for (boolean lat : new boolean[]{false, true}) {
             for (boolean lon : new boolean[]{false, true}) {
-                if (!lat && !lon) continue; // Skip empty
+                if (!lat && !lon) continue;
                 
-                // Skip intervals 1-6
                 for (int skip = 1; skip <= 6; skip++) {
                     EDGE_ARRANGEMENTS.add(new EdgeArrangement(lat, lon, skip, idx++, 0));
                 }
             }
         }
         
-        // Update totals
         int total = EDGE_ARRANGEMENTS.size();
         for (int i = 0; i < total; i++) {
             EdgeArrangement old = EDGE_ARRANGEMENTS.get(i);
             EDGE_ARRANGEMENTS.set(i, new EdgeArrangement(
                 old.latitude, old.longitude, old.skipInterval, i, total));
+        }
+    }
+    
+    // =========================================================================
+    // Triangle Generation (uses Vertex enum)
+    // =========================================================================
+    
+    private static void generateTriangleArrangements() {
+        int idx = 0;
+        
+        // Standard winding: A → B → C
+        Vertex[] normal = {Vertex.A, Vertex.B, Vertex.C};
+        // Inverted winding: A → C → B
+        Vertex[] inverted = {Vertex.A, Vertex.C, Vertex.B};
+        
+        for (int skip = 1; skip <= 8; skip++) {
+            TRIANGLE_ARRANGEMENTS.add(new TriangleArrangement(normal.clone(), skip, idx++, 0));
+            TRIANGLE_ARRANGEMENTS.add(new TriangleArrangement(inverted.clone(), skip, idx++, 0));
+        }
+        
+        int total = TRIANGLE_ARRANGEMENTS.size();
+        for (int i = 0; i < total; i++) {
+            TriangleArrangement old = TRIANGLE_ARRANGEMENTS.get(i);
+            TRIANGLE_ARRANGEMENTS.set(i, new TriangleArrangement(
+                old.vertices, old.skipInterval, i, total));
         }
     }
     
@@ -378,6 +424,7 @@ public final class ShuffleGenerator {
     public static int segmentCount() { return SEGMENT_ARRANGEMENTS.size(); }
     public static int sectorCount() { return SECTOR_ARRANGEMENTS.size(); }
     public static int edgeCount() { return EDGE_ARRANGEMENTS.size(); }
+    public static int triangleCount() { return TRIANGLE_ARRANGEMENTS.size(); }
     
     public static QuadArrangement getQuad(int index) {
         return QUAD_ARRANGEMENTS.get(Math.floorMod(index, QUAD_ARRANGEMENTS.size()));
@@ -395,48 +442,51 @@ public final class ShuffleGenerator {
         return EDGE_ARRANGEMENTS.get(Math.floorMod(index, EDGE_ARRANGEMENTS.size()));
     }
     
-    /**
-     * Logs a quad arrangement in detail.
-     */
+    public static TriangleArrangement getTriangle(int index) {
+        return TRIANGLE_ARRANGEMENTS.get(Math.floorMod(index, TRIANGLE_ARRANGEMENTS.size()));
+    }
+    
+    // =========================================================================
+    // Logging Helpers
+    // =========================================================================
+    
     public static void logQuad(int index) {
         QuadArrangement arr = getQuad(index);
-        Logging.RENDER.topic("shuffle").info(
+        Logging.FIELD.topic("shuffle").info(
             "[Shuffle] Quad #{}/{}" + arr.toLogString(),
             arr.index + 1, arr.total
         );
     }
     
-    /**
-     * Logs a segment arrangement in detail.
-     */
     public static void logSegment(int index) {
         SegmentArrangement arr = getSegment(index);
-        Logging.RENDER.topic("shuffle").info(
+        Logging.FIELD.topic("shuffle").info(
             "[Shuffle] Segment #{}/{}" + arr.toLogString(),
             arr.index + 1, arr.total
         );
     }
     
-    /**
-     * Logs a sector arrangement in detail.
-     */
     public static void logSector(int index) {
         SectorArrangement arr = getSector(index);
-        Logging.RENDER.topic("shuffle").info(
+        Logging.FIELD.topic("shuffle").info(
             "[Shuffle] Sector #{}/{}" + arr.toLogString(),
             arr.index + 1, arr.total
         );
     }
     
-    /**
-     * Logs an edge arrangement in detail.
-     */
     public static void logEdge(int index) {
         EdgeArrangement arr = getEdge(index);
-        Logging.RENDER.topic("shuffle").info(
+        Logging.FIELD.topic("shuffle").info(
             "[Shuffle] Edge #{}/{}" + arr.toLogString(),
             arr.index + 1, arr.total
         );
     }
+    
+    public static void logTriangle(int index) {
+        TriangleArrangement arr = getTriangle(index);
+        Logging.FIELD.topic("shuffle").info(
+            "[Shuffle] Triangle #{}/{}" + arr.toLogString(),
+            arr.index + 1, arr.total
+        );
+    }
 }
-

@@ -3,32 +3,34 @@ package net.cyberpunk042.visual.pattern;
 /**
  * Patterns for radial/fan tessellation (discs, pie charts).
  * 
- * <p>Controls which sectors are rendered in a disc.
+ * <p>Controls which sectors (pie slices) are rendered.
+ * Each sector is a triangle from center to arc edge.
  * 
  * <h2>Available Patterns</h2>
  * <ul>
- *   <li><b>DEFAULT</b>: Full disc</li>
- *   <li><b>HALF</b>: Half disc (semicircle)</li>
- *   <li><b>QUARTERS</b>: Quarter sectors only</li>
- *   <li><b>SPIRAL</b>: Spiral arrangement</li>
- *   <li><b>PINWHEEL</b>: Pinwheel/fan pattern</li>
- *   <li><b>CROSSHAIR</b>: Cross pattern</li>
+ *   <li><b>FULL</b>: All sectors rendered (default)</li>
+ *   <li><b>HALF</b>: Every other sector (half coverage)</li>
+ *   <li><b>QUARTERS</b>: Every fourth sector</li>
+ *   <li><b>PINWHEEL</b>: Alternating sectors</li>
+ *   <li><b>TRISECTOR</b>: Every third sector</li>
+ *   <li><b>SPIRAL</b>: Alternating with offset</li>
+ *   <li><b>CROSSHAIR</b>: Only cardinal directions</li>
  * </ul>
  * 
  * @see VertexPattern
  */
 public enum SectorPattern implements VertexPattern {
     
-    /** Full disc - all sectors. */
-    DEFAULT("default", 1, 0),
-    
-    /** Half disc (semicircle). */
-    HALF("half", 2, 0),
-    
-    /** Quarter sectors only. */
-    QUARTERS("quarters", 4, 0),
+    /** All sectors rendered. */
+    FULL("full", 1, 0),
     
     /** Every other sector (pinwheel). */
+    HALF("half", 2, 0),
+    
+    /** Every fourth sector. */
+    QUARTERS("quarters", 4, 0),
+    
+    /** Same as half, different name. */
     PINWHEEL("pinwheel", 2, 0),
     
     /** Every third sector. */
@@ -37,8 +39,11 @@ public enum SectorPattern implements VertexPattern {
     /** Alternating with offset. */
     SPIRAL("spiral", 2, 1),
     
-    /** Only cardinal directions. */
+    /** Only cardinal directions (every 4th, starting at 0). */
     CROSSHAIR("crosshair", 4, 0);
+    
+    /** Default pattern (alias for FULL). */
+    public static final SectorPattern DEFAULT = FULL;
     
     private final String id;
     private final int skipInterval;
@@ -50,27 +55,36 @@ public enum SectorPattern implements VertexPattern {
         this.phaseOffset = phaseOffset;
     }
     
+    // =========================================================================
+    // VertexPattern Implementation
+    // =========================================================================
+    
     @Override
     public String id() {
         return id;
     }
     
     @Override
-    public PatternGeometry geometry() {
-        return PatternGeometry.SECTOR;
+    public CellType cellType() {
+        return CellType.SECTOR;
     }
     
-    /**
-     * Determines if a sector index should be rendered.
-     * @param index Sector index (0-based)
-     * @param totalSectors Total number of sectors
-     * @return true if this sector should be rendered
-     */
-    public boolean shouldRender(int index, int totalSectors) {
+    @Override
+    public boolean shouldRender(int index, int total) {
         if (skipInterval <= 1) return true;
-        int adjusted = (index + phaseOffset) % totalSectors;
+        int adjusted = (index + phaseOffset) % total;
         return (adjusted % skipInterval) == 0;
     }
+    
+    @Override
+    public int[][] getVertexOrder() {
+        // Sectors are triangles: center, edge0, edge1
+        return new int[][]{{0, 1, 2}};
+    }
+    
+    // =========================================================================
+    // Static Utilities
+    // =========================================================================
     
     /**
      * Parses a pattern from ID string.
@@ -97,4 +111,3 @@ public enum SectorPattern implements VertexPattern {
         return ids;
     }
 }
-

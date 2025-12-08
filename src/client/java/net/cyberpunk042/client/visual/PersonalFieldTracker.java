@@ -2,7 +2,7 @@ package net.cyberpunk042.client.visual;
 
 import net.cyberpunk042.field.FieldDefinition;
 import net.cyberpunk042.field.FieldRegistry;
-import net.cyberpunk042.field.PredictionConfig;
+import net.cyberpunk042.field.instance.PredictionConfig;
 import net.cyberpunk042.field.instance.FollowMode;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerEntity;
@@ -120,11 +120,14 @@ public final class PersonalFieldTracker {
         
         // Get prediction config from definition
         FieldDefinition def = definition();
-        if (def == null || !def.prediction().enabled()) {
+        if (def == null) {
             return base;
         }
         
         PredictionConfig pred = def.prediction();
+        if (pred == null || !pred.enabled()) {
+            return base;
+        }
         
         // Apply velocity prediction
         Vec3d predicted = base;

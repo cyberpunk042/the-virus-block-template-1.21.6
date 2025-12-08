@@ -24,7 +24,7 @@ package net.cyberpunk042.visual.animation;
  * @param scrollOffset UV scroll offset for animation (0.0 - 1.0)
  * @param wrap         whether to wrap texture coordinates when scrolling
  * 
- * @see net.cyberpunk042.visual.animation.Animator
+ * @see net.cyberpunk042.client.visual.animation.AnimationApplier
  */
 public record FrameSlice(
         float minV,

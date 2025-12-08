@@ -1,106 +1,154 @@
 package net.cyberpunk042.visual.shape;
 
-import net.minecraft.util.math.Box;
+import com.google.gson.JsonObject;
+
+import net.cyberpunk042.visual.pattern.CellType;
+import org.joml.Vector3f;
+
+import java.util.Map;
+import net.cyberpunk042.visual.validation.Range;
+import net.cyberpunk042.visual.validation.ValueRange;
 
 /**
- * A platonic solid shape.
+ * Platonic solid shapes (regular polyhedra).
  * 
- * <h2>Types</h2>
+ * <h2>JSON Format</h2>
+ * <pre>
+ * "shape": {
+ *   "type": "polyhedron",
+ *   "polyType": "ICOSAHEDRON",
+ *   "radius": 1.0,
+ *   "subdivisions": 0
+ * }
+ * </pre>
+ * 
+ * <h2>Parts</h2>
  * <ul>
- *   <li>{@link Type#CUBE}: 6 faces, 8 vertices</li>
- *   <li>{@link Type#OCTAHEDRON}: 8 faces, 6 vertices (diamond shape)</li>
- *   <li>{@link Type#ICOSAHEDRON}: 20 faces, 12 vertices (approximates sphere)</li>
- *   <li>{@link Type#DODECAHEDRON}: 12 pentagonal faces, 20 vertices</li>
- *   <li>{@link Type#TETRAHEDRON}: 4 faces, 4 vertices (pyramid)</li>
+ *   <li><b>faces</b> (TRIANGLE or QUAD depending on type) - Face surfaces</li>
+ *   <li><b>edges</b> (EDGE) - Edge lines</li>
+ *   <li><b>vertices</b> (POINT) - Vertex markers (future)</li>
  * </ul>
+ * 
+ * @see PolyType
  */
 public record PolyhedronShape(
-        Type type,
-        float size
+    PolyType polyType,
+    @Range(ValueRange.RADIUS) float radius,
+    @Range(ValueRange.STEPS) int subdivisions
 ) implements Shape {
     
-    public static final String TYPE = "polyhedron";
+    /** Default icosahedron. */
+    public static PolyhedronShape cube(float radius) { 
+        return new PolyhedronShape(PolyType.CUBE, radius, 0); 
+    }
+    public static PolyhedronShape octahedron(float radius) { 
+        return new PolyhedronShape(PolyType.OCTAHEDRON, radius, 0); 
+    }
+    public static PolyhedronShape dodecahedron(float radius) { 
+        return new PolyhedronShape(PolyType.DODECAHEDRON, radius, 0); 
+    }
+    public static PolyhedronShape tetrahedron(float radius) { 
+        return new PolyhedronShape(PolyType.TETRAHEDRON, radius, 0); 
+    }
+    public static PolyhedronShape icosahedron(float radius) { 
+        return new PolyhedronShape(PolyType.ICOSAHEDRON, radius, 0); 
+    }
+    
+    public static final PolyhedronShape DEFAULT = new PolyhedronShape(
+        PolyType.ICOSAHEDRON, 1.0f, 0);
+    
+    /** Cube polyhedron. */
+    public static final PolyhedronShape CUBE = new PolyhedronShape(
+        PolyType.CUBE, 1.0f, 0);
+    
+    /** Octahedron. */
+    public static final PolyhedronShape OCTAHEDRON = new PolyhedronShape(
+        PolyType.OCTAHEDRON, 1.0f, 0);
+    
+    /** Dodecahedron. */
+    public static final PolyhedronShape DODECAHEDRON = new PolyhedronShape(
+        PolyType.DODECAHEDRON, 1.0f, 0);
+    
+    /** Tetrahedron. */
+    public static final PolyhedronShape TETRAHEDRON = new PolyhedronShape(
+        PolyType.TETRAHEDRON, 1.0f, 0);
     
     /**
-     * Platonic solid types.
+     * Creates a polyhedron of the specified type.
+     * @param type Polyhedron type
+     * @param radius Circumscribed radius
      */
-    public enum Type {
-        CUBE(6, 8),
-        OCTAHEDRON(8, 6),
-        ICOSAHEDRON(20, 12),
-        DODECAHEDRON(12, 20),
-        TETRAHEDRON(4, 4);
-        
-        private final int faces;
-        private final int vertices;
-        
-        Type(int faces, int vertices) {
-            this.faces = faces;
-            this.vertices = vertices;
-        }
-        
-        public int faces() { return faces; }
-        public int vertices() { return vertices; }
+    public static PolyhedronShape of(PolyType type, @Range(ValueRange.RADIUS) float radius) {
+        return new PolyhedronShape(type, radius, 0);
     }
     
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Factory
-    // ─────────────────────────────────────────────────────────────────────────────
-    
-    public static PolyhedronShape cube(float size) {
-        return new PolyhedronShape(Type.CUBE, size);
+    /**
+     * Creates a subdivided polyhedron (geodesic sphere effect).
+     * @param type Base type
+     * @param radius Radius
+     * @param subdivisions Subdivision level
+     */
+    public static PolyhedronShape subdivided(PolyType type, @Range(ValueRange.RADIUS) float radius, @Range(ValueRange.STEPS) int subdivisions) {
+        return new PolyhedronShape(type, radius, subdivisions);
     }
-    
-    public static PolyhedronShape octahedron(float size) {
-        return new PolyhedronShape(Type.OCTAHEDRON, size);
-    }
-    
-    public static PolyhedronShape icosahedron(float size) {
-        return new PolyhedronShape(Type.ICOSAHEDRON, size);
-    }
-    
-    public static PolyhedronShape dodecahedron(float size) {
-        return new PolyhedronShape(Type.DODECAHEDRON, size);
-    }
-    
-    public static PolyhedronShape tetrahedron(float size) {
-        return new PolyhedronShape(Type.TETRAHEDRON, size);
-    }
-    
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Shape Interface
-    // ─────────────────────────────────────────────────────────────────────────────
     
     @Override
     public String getType() {
-        return TYPE + ":" + type.name().toLowerCase();
+        return "polyhedron";
     }
     
     @Override
-    public Box getBounds() {
-        float half = size / 2;
-        return new Box(-half, -half, -half, half, half, half);
+    public Vector3f getBounds() {
+        float d = radius * 2;
+        return new Vector3f(d, d, d);
     }
     
     @Override
-    public int estimateVertexCount() {
-        return type.vertices();
+    public CellType primaryCellType() {
+        // Cube and Dodecahedron have quad faces, others have triangles
+        return switch (polyType) {
+            case CUBE -> CellType.QUAD;
+            case DODECAHEDRON -> CellType.QUAD; // Pentagons, but rendered as quads
+            default -> CellType.TRIANGLE;
+        };
     }
     
     @Override
-    public int estimateTriangleCount() {
-        return type.faces() * 2; // Most faces need 2 triangles
+    public Map<String, CellType> getParts() {
+        CellType faceType = primaryCellType();
+        return Map.of(
+            "faces", faceType,
+            "edges", CellType.EDGE
+        );
     }
     
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Modifiers
-    // ─────────────────────────────────────────────────────────────────────────────
-    
-    public PolyhedronShape withSize(float newSize) {
-        return new PolyhedronShape(type, newSize);
+    @Override
+    public JsonObject toJson() {
+        JsonObject json = new JsonObject();
+        json.addProperty("type", "polyhedron");
+        json.addProperty("polyType", polyType.name());
+        json.addProperty("radius", radius);
+        if (subdivisions != 0) json.addProperty("subdivisions", subdivisions);
+        return json;
     }
+
+    // =========================================================================
+    // Builder
+    // =========================================================================
     
-    public PolyhedronShape scaled(float scale) {
-        return new PolyhedronShape(type, size * scale);
+    public static Builder builder() { return new Builder(); }
+    
+    public static class Builder {
+        private PolyType polyType = PolyType.ICOSAHEDRON;
+        private @Range(ValueRange.RADIUS) float radius = 1.0f;
+        private @Range(ValueRange.STEPS) int subdivisions = 0;
+        
+        public Builder polyType(PolyType t) { this.polyType = t; return this; }
+        public Builder radius(float r) { this.radius = r; return this; }
+        public Builder subdivisions(int s) { this.subdivisions = s; return this; }
+        
+        public PolyhedronShape build() {
+            return new PolyhedronShape(polyType, radius, subdivisions);
+        }
     }
 }

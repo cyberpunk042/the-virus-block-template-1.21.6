@@ -1,0 +1,152 @@
+package net.cyberpunk042.client.visual.mesh;
+
+import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.visual.pattern.VertexPattern;
+import net.cyberpunk042.visual.shape.CylinderShape;
+import net.cyberpunk042.visual.visibility.VisibilityMask;
+
+/**
+ * Tessellates cylinder shapes into triangle meshes.
+ * 
+ * <h2>Geometry</h2>
+ * <p>A cylinder is a circular column. Consists of:</p>
+ * <ul>
+ *   <li>Side wall (quads)</li>
+ *   <li>Top cap (disc, optional)</li>
+ *   <li>Bottom cap (disc, optional)</li>
+ * </ul>
+ * 
+ * <h2>Taper (Cone)</h2>
+ * <p>When topRadius != radius, creates a cone or truncated cone.</p>
+ * 
+ * <h2>Partial Arc</h2>
+ * <p>When arc != 360, creates a partial cylinder (like a pipe section).</p>
+ * 
+ * @see CylinderShape
+ * @see GeometryMath#cylinderPoint
+ */
+public final class CylinderTessellator {
+    
+    private CylinderTessellator() {}
+    
+    /**
+     * Tessellates a cylinder shape into a mesh.
+     */
+    public static Mesh tessellate(CylinderShape shape, VertexPattern pattern,
+                                   VisibilityMask visibility) {
+        if (shape == null) {
+            throw new IllegalArgumentException("CylinderShape cannot be null");
+        }
+        
+        Logging.RENDER.topic("tessellate")
+            .kv("shape", "cylinder")
+            .kv("radius", shape.radius())
+            .kv("height", shape.height())
+            .kv("segments", shape.segments())
+            .debug("Tessellating cylinder");
+        
+        MeshBuilder builder = MeshBuilder.triangles();
+        
+        int segments = shape.segments();
+        float bottomR = shape.radius();
+        float topR = shape.topRadius();
+        float height = shape.height();
+        int heightSegs = shape.heightSegments();
+        float arc = GeometryMath.toRadians(shape.arc());
+        
+        float yBase = -height / 2;
+        float yTop = height / 2;
+        
+        // === SIDE WALL ===
+        tessellateSideWall(builder, segments, bottomR, topR, height, heightSegs,
+                           yBase, arc, pattern, visibility);
+        
+        // === CAPS ===
+        if (shape.capBottom()) {
+            tessellateCap(builder, segments, bottomR, yBase, false, arc);
+        }
+        if (shape.capTop()) {
+            tessellateCap(builder, segments, topR, yTop, true, arc);
+        }
+        
+        return builder.build();
+    }
+    
+    public static Mesh tessellate(CylinderShape shape) {
+        return tessellate(shape, null, null);
+    }
+    
+    // =========================================================================
+    // Side Wall
+    // =========================================================================
+    
+    private static void tessellateSideWall(MeshBuilder builder, int segments,
+                                            float bottomR, float topR, float height,
+                                            int heightSegs, float yBase, float arc,
+                                            VertexPattern pattern, VisibilityMask visibility) {
+        for (int h = 0; h < heightSegs; h++) {
+            float t0 = h / (float) heightSegs;
+            float t1 = (h + 1) / (float) heightSegs;
+            
+            for (int s = 0; s < segments; s++) {
+                float segFrac = s / (float) segments;
+                
+                if (visibility != null && !visibility.isVisible(t0, segFrac)) {
+                    continue;
+                }
+                
+                if (pattern != null && !pattern.shouldRender(h * segments + s, heightSegs * segments)) {
+                    continue;
+                }
+                
+                float angle0 = (s / (float) segments) * arc;
+                float angle1 = ((s + 1) / (float) segments) * arc;
+                
+                // Four corners
+                Vertex v00 = GeometryMath.cylinderTaperedPoint(angle0, t0, bottomR, topR, height, yBase);
+                Vertex v10 = GeometryMath.cylinderTaperedPoint(angle1, t0, bottomR, topR, height, yBase);
+                Vertex v01 = GeometryMath.cylinderTaperedPoint(angle0, t1, bottomR, topR, height, yBase);
+                Vertex v11 = GeometryMath.cylinderTaperedPoint(angle1, t1, bottomR, topR, height, yBase);
+                
+                int i00 = builder.addVertex(v00);
+                int i10 = builder.addVertex(v10);
+                int i01 = builder.addVertex(v01);
+                int i11 = builder.addVertex(v11);
+                
+                builder.triangle(i00, i10, i11);
+                builder.triangle(i00, i11, i01);
+            }
+        }
+    }
+    
+    // =========================================================================
+    // Caps
+    // =========================================================================
+    
+    private static void tessellateCap(MeshBuilder builder, int segments, 
+                                       float radius, float y, boolean isTop, float arc) {
+        // Center vertex
+        Vertex center = GeometryMath.discCenter(y);
+        center = new Vertex(center.x(), center.y(), center.z(), 
+                            0, isTop ? 1 : -1, 0, 0.5f, 0.5f);
+        int centerIdx = builder.addVertex(center);
+        
+        // Edge vertices
+        int[] edgeIndices = new int[segments + 1];
+        for (int s = 0; s <= segments; s++) {
+            float angle = (s / (float) segments) * arc;
+            Vertex v = GeometryMath.discPoint(angle, radius, y);
+            v = new Vertex(v.x(), v.y(), v.z(), 0, isTop ? 1 : -1, 0, v.u(), v.v());
+            edgeIndices[s] = builder.addVertex(v);
+        }
+        
+        // Triangulate
+        for (int s = 0; s < segments; s++) {
+            if (isTop) {
+                builder.triangle(centerIdx, edgeIndices[s], edgeIndices[s + 1]);
+            } else {
+                builder.triangle(centerIdx, edgeIndices[s + 1], edgeIndices[s]);
+            }
+        }
+    }
+}

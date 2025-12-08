@@ -1,111 +1,169 @@
 package net.cyberpunk042.visual.shape;
 
-import net.minecraft.util.math.Box;
+import com.google.gson.JsonObject;
+
+import net.cyberpunk042.visual.pattern.CellType;
+import org.joml.Vector3f;
+
+import java.util.Map;
+import net.cyberpunk042.visual.validation.Range;
+import net.cyberpunk042.visual.validation.ValueRange;
 
 /**
- * A vertical prism with N sides.
+ * N-sided prism shape (extruded polygon).
  * 
- * <h2>Parameters</h2>
+ * <h2>JSON Format</h2>
+ * <pre>
+ * "shape": {
+ *   "type": "prism",
+ *   "sides": 6,
+ *   "radius": 1.0,
+ *   "height": 2.0,
+ *   "topRadius": 1.0,
+ *   "twist": 0.0,
+ *   "heightSegments": 1,
+ *   "capTop": true,
+ *   "capBottom": true
+ * }
+ * </pre>
+ * 
+ * <h2>Parts</h2>
  * <ul>
- *   <li><b>sides</b>: Number of sides (3=triangle, 4=square, 6=hexagon, etc.)</li>
- *   <li><b>height</b>: Prism height</li>
- *   <li><b>radius</b>: Radius from center to vertices</li>
+ *   <li><b>sides</b> (QUAD) - Side faces</li>
+ *   <li><b>capTop</b> (SECTOR) - Top cap</li>
+ *   <li><b>capBottom</b> (SECTOR) - Bottom cap</li>
+ *   <li><b>edges</b> (EDGE) - Corner edges</li>
  * </ul>
  * 
- * <p>Common configurations:
- * <ul>
- *   <li>sides=3: Triangular prism</li>
- *   <li>sides=4: Square prism (rectangular column)</li>
- *   <li>sides=6: Hexagonal prism</li>
- *   <li>sides=8+: Approximates cylinder</li>
- * </ul>
- * 
- * @see net.cyberpunk042.client.visual.mesh.PrismTessellator_old
+ * @see Shape
+ * @see CellType
  */
 public record PrismShape(
-        int sides,
-        float height,
-        float radius
+    @Range(ValueRange.SIDES) int sides,
+    @Range(ValueRange.RADIUS) float radius,
+    @Range(ValueRange.POSITIVE_NONZERO) float height,
+    @Range(ValueRange.POSITIVE) float topRadius,
+    @Range(ValueRange.DEGREES_FULL) float twist,
+    @Range(ValueRange.STEPS) int heightSegments,
+    boolean capTop,
+    boolean capBottom
 ) implements Shape {
     
-    public static final String TYPE = "prism";
-    
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Defaults & Factory
-    // ─────────────────────────────────────────────────────────────────────────────
-    
     /** Default hexagonal prism. */
-    public static PrismShape defaults() {
-        return new PrismShape(6, 2.0f, 1.0f);
-    }
+    public static final PrismShape DEFAULT = new PrismShape(
+        6, 1.0f, 2.0f, 1.0f, 0, 1, true, true);
     
-    /** Quick prism with sides and radius. */
-    public static PrismShape of(int sides, float radius) {
-        return new PrismShape(sides, 2.0f, radius);
-    }
+    /** Cube (4 sides). */
+    public static final PrismShape CUBE = new PrismShape(
+        4, 1.0f, 2.0f, 1.0f, 0, 1, true, true);
     
     /** Triangular prism. */
-    public static PrismShape triangle(float radius, float height) {
-        return new PrismShape(3, height, radius);
+    public static final PrismShape TRIANGLE = new PrismShape(
+        3, 1.0f, 2.0f, 1.0f, 0, 1, true, true);
+    
+    /** Octagonal prism. */
+    public static final PrismShape OCTAGON = new PrismShape(
+        8, 1.0f, 2.0f, 1.0f, 0, 1, true, true);
+    
+    /**
+     * Creates a regular prism.
+     * @param sides Number of sides
+     * @param radius Radius
+     * @param height Height
+     */
+    public static PrismShape of(@Range(ValueRange.SIDES) int sides, @Range(ValueRange.RADIUS) float radius, @Range(ValueRange.POSITIVE_NONZERO) float height) {
+        return new PrismShape(sides, radius, height, radius, 0, 1, true, true);
     }
     
-    /** Square prism. */
-    public static PrismShape square(float radius, float height) {
-        return new PrismShape(4, height, radius);
+    /**
+     * Creates a tapered prism (cone-like).
+     * @param sides Number of sides
+     * @param bottomRadius Bottom radius
+     * @param topRadius Top radius
+     * @param height Height
+     */
+    public static PrismShape tapered(@Range(ValueRange.SIDES) int sides, float bottomRadius, @Range(ValueRange.POSITIVE) float topRadius, @Range(ValueRange.POSITIVE_NONZERO) float height) {
+        return new PrismShape(sides, bottomRadius, height, topRadius, 0, 1, true, true);
     }
-    
-    /** Hexagonal prism. */
-    public static PrismShape hexagon(float radius, float height) {
-        return new PrismShape(6, height, radius);
-    }
-    
-    /** Cylinder approximation (16 sides). */
-    public static PrismShape cylinder(float radius, float height) {
-        return new PrismShape(16, height, radius);
-    }
-    
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Shape Interface
-    // ─────────────────────────────────────────────────────────────────────────────
     
     @Override
     public String getType() {
-        return TYPE;
+        return "prism";
     }
     
     @Override
-    public Box getBounds() {
-        float halfHeight = height / 2;
-        return new Box(-radius, -halfHeight, -radius, radius, halfHeight, radius);
+    public Vector3f getBounds() {
+        float maxR = Math.max(radius, topRadius);
+        return new Vector3f(maxR * 2, height, maxR * 2);
     }
     
     @Override
-    public int estimateVertexCount() {
-        return sides * 4 + 2; // Top and bottom faces + sides
+    public CellType primaryCellType() {
+        return CellType.QUAD;
     }
     
     @Override
-    public int estimateTriangleCount() {
-        return sides * 4; // 2 triangles per side face + top/bottom
+    public Map<String, CellType> getParts() {
+        return Map.of(
+            "sides", CellType.QUAD,
+            "capTop", CellType.SECTOR,
+            "capBottom", CellType.SECTOR,
+            "edges", CellType.EDGE
+        );
     }
     
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Builder-style modifiers
-    // ─────────────────────────────────────────────────────────────────────────────
-    
-    public PrismShape withSides(int newSides) {
-        return new PrismShape(newSides, height, radius);
+    /** Whether this is a regular prism (same top/bottom radius). */
+    public boolean isRegular() {
+        return radius == topRadius;
     }
     
-    public PrismShape withHeight(float newHeight) {
-        return new PrismShape(sides, newHeight, radius);
+    /** Whether this has twist (spiral). */
+    public boolean hasTwist() {
+        return twist != 0;
     }
     
-    public PrismShape withRadius(float newRadius) {
-        return new PrismShape(sides, height, newRadius);
+    @Override
+    public JsonObject toJson() {
+        JsonObject json = new JsonObject();
+        json.addProperty("type", "prism");
+        json.addProperty("sides", sides);
+        json.addProperty("radius", radius);
+        json.addProperty("height", height);
+        if (topRadius != radius) json.addProperty("topRadius", topRadius);
+        if (twist != 0) json.addProperty("twist", twist);
+        if (heightSegments != 1) json.addProperty("heightSegments", heightSegments);
+        if (!capTop) json.addProperty("capTop", false);
+        if (!capBottom) json.addProperty("capBottom", false);
+        return json;
     }
+
+    // =========================================================================
+    // Builder
+    // =========================================================================
     
-    public PrismShape scaled(float scale) {
-        return new PrismShape(sides, height * scale, radius * scale);
+    public static Builder builder() { return new Builder(); }
+    
+    public static class Builder {
+        private @Range(ValueRange.SIDES) int sides = 6;
+        private @Range(ValueRange.RADIUS) float radius = 1.0f;
+        private @Range(ValueRange.POSITIVE_NONZERO) float height = 2.0f;
+        private @Range(ValueRange.POSITIVE) float topRadius = 1.0f;
+        private @Range(ValueRange.DEGREES_FULL) float twist = 0;
+        private @Range(ValueRange.STEPS) int heightSegments = 1;
+        private boolean capTop = true;
+        private boolean capBottom = true;
+        
+        public Builder sides(int s) { this.sides = s; return this; }
+        public Builder radius(float r) { this.radius = r; return this; }
+        public Builder height(float h) { this.height = h; return this; }
+        public Builder topRadius(float r) { this.topRadius = r; return this; }
+        public Builder twist(float t) { this.twist = t; return this; }
+        public Builder heightSegments(int s) { this.heightSegments = s; return this; }
+        public Builder capTop(boolean c) { this.capTop = c; return this; }
+        public Builder capBottom(boolean c) { this.capBottom = c; return this; }
+        
+        public PrismShape build() {
+            return new PrismShape(sides, radius, height, topRadius, twist, heightSegments, capTop, capBottom);
+        }
     }
 }

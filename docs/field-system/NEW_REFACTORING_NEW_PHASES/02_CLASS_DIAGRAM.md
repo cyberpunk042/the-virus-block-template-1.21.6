@@ -334,6 +334,30 @@
 │  │ DynamicEdgePattern     │ DynamicTrianglePattern│ ShuffleGenerator    │  │
 │  └──────────────────────────────────────────────────────────────────────┘  │
 │                                                                             │
+│  IMPLEMENTATION NOTE: Semantic Vertex Naming                               │
+│  ─────────────────────────────────────────────                             │
+│  While the interface returns int[][] for rendering efficiency,             │
+│  implementations SHOULD use semantic enums for readability:                │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ QuadPattern uses:      │ TrianglePattern uses:                      │   │
+│  │   Corner enum:         │   Vertex enum:                             │   │
+│  │   TOP_LEFT     (→ 0)   │   A (→ 0)                                  │   │
+│  │   TOP_RIGHT    (→ 1)   │   B (→ 1)                                  │   │
+│  │   BOTTOM_LEFT  (→ 2)   │   C (→ 2)                                  │   │
+│  │   BOTTOM_RIGHT (→ 3)   │                                            │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  Example: QuadPattern.FILLED_1                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  Definition (readable):                                             │   │
+│  │    Triangle 1: TOP_LEFT → TOP_RIGHT → BOTTOM_RIGHT                  │   │
+│  │    Triangle 2: BOTTOM_LEFT → TOP_LEFT → TOP_RIGHT                   │   │
+│  │                                                                     │   │
+│  │  getVertexOrder() returns (for renderer):                           │   │
+│  │    {{0, 1, 3}, {2, 0, 1}}                                           │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1031,12 +1055,70 @@
 | Waveform | SINE, SQUARE, TRIANGLE_WAVE, SAWTOOTH | visual.animation |
 | BlendMode | NORMAL, ADD, MULTIPLY, SCREEN | visual.layer |
 | PolyType | CUBE, OCTAHEDRON, ICOSAHEDRON, DODECAHEDRON, TETRAHEDRON | visual.shape |
-| SphereAlgorithm | LAT_LON, TYPE_A, TYPE_E | visual.shape |
-| FieldType | SHIELD, PERSONAL, FORCE, AURA, PORTAL | field |
+| SphereAlgorithm | UV, LAT_LON, TYPE_A, TYPE_E | visual.shape |
+| FieldType | SHIELD, PERSONAL, FORCE, AURA, PORTAL, TEST | field |
 | FollowMode | SNAP, SMOOTH, GLIDE | field.instance |
 | FieldEvent | PLAYER_DAMAGE, PLAYER_HEAL, PLAYER_DEATH, PLAYER_RESPAWN, FIELD_SPAWN, FIELD_DESPAWN | field.influence |
 | TriggerEffect | FLASH, PULSE, SHAKE, GLOW, COLOR_SHIFT | field.influence |
 | InterpolationCurve | LINEAR, EASE_IN, EASE_OUT, EASE_IN_OUT | field.influence |
+| **ValueRange** | ALPHA, NORMALIZED, PERCENTAGE, DEGREES, DEGREES_SIGNED, DEGREES_FULL, POSITIVE, POSITIVE_NONZERO, SCALE, RADIUS, STEPS, SIDES, UNBOUNDED | visual.validation |
+
+---
+
+## 18.5 Validation Utilities
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        VALIDATION SYSTEM                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                         ValueRange (enum)                           │   │
+│  ├─────────────────────────────────────────────────────────────────────┤   │
+│  │ ALPHA(0, 1)              ← opacity values                           │   │
+│  │ NORMALIZED(0, 1)         ← lat/lon ranges, progress                 │   │
+│  │ DEGREES(0, 360)          ← rotation angles                          │   │
+│  │ DEGREES_SIGNED(-180,180) ← signed angles                            │   │
+│  │ POSITIVE(0, MAX)         ← any positive                             │   │
+│  │ POSITIVE_NONZERO(0.001+) ← non-zero positive                        │   │
+│  │ SCALE(0.01, 100)         ← scale factors                            │   │
+│  │ RADIUS(0.01, MAX)        ← radius values                            │   │
+│  │ STEPS(1, 1024)           ← tessellation steps                       │   │
+│  │ SIDES(3, 64)             ← polygon sides                            │   │
+│  │ UNBOUNDED(-INF, INF)     ← any value                                │   │
+│  ├─────────────────────────────────────────────────────────────────────┤   │
+│  │ + clamp(float): float    ← clamp to range                           │   │
+│  │ + clamp(int): int        ← clamp to range                           │   │
+│  │ + isValid(float): boolean← check if in range                        │   │
+│  │ + min(): float           ← get minimum                              │   │
+│  │ + max(): float           ← get maximum                              │   │
+│  │ + normalize(float): float← convert to 0-1                           │   │
+│  │ + denormalize(float):float← convert from 0-1                        │   │
+│  │ + describe(): String     ← human-readable                           │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                      @Range (annotation)                            │   │
+│  ├─────────────────────────────────────────────────────────────────────┤   │
+│  │ Target: FIELD, PARAMETER, RECORD_COMPONENT, METHOD, LOCAL_VARIABLE  │   │
+│  │ Retention: RUNTIME                                                  │   │
+│  │ value: ValueRange                                                   │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  USAGE EXAMPLE:                                                             │
+│  ─────────────                                                              │
+│  public record AlphaRange(                                                  │
+│      @Range(ValueRange.ALPHA) float min,                                    │
+│      @Range(ValueRange.ALPHA) float max                                     │
+│  ) {                                                                        │
+│      public AlphaRange {                                                    │
+│          min = ValueRange.ALPHA.clamp(min);                                 │
+│          max = ValueRange.ALPHA.clamp(max);                                 │
+│      }                                                                      │
+│  }                                                                          │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -1065,5 +1147,124 @@
 
 ---
 
-*Class diagram v7.1 - Final review fixes applied.*
+*Class diagram v7.2 - Added ValueRange enum and @Range annotation for value validation.*
+
+---
+
+## 20. Color System
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           COLOR SYSTEM                                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────────┐       ┌─────────────────────────┐            │
+│  │      ColorTheme         │       │     ColorResolver       │            │
+│  ├─────────────────────────┤       ├─────────────────────────┤            │
+│  │ id: Identifier          │       │ theme: ColorTheme       │            │
+│  │ base: int               │       │ colorOverride: String   │            │
+│  │ roles: Map<String, int> │       ├─────────────────────────┤            │
+│  ├─────────────────────────┤       │ + resolve(String): int  │            │
+│  │ + resolve(role): int    │       │ + resolve(ref, alpha)   │            │
+│  │ + getPrimary(): int     │       │ + withTheme(theme)      │            │
+│  │ + getSecondary(): int   │       │ + isRoleReference()     │            │
+│  │ + getGlow(): int        │       │ + isHexColor()          │            │
+│  │ + getBeam(): int        │       └─────────────────────────┘            │
+│  │ + getWire(): int        │                                              │
+│  │ + getAccent(): int      │       ┌─────────────────────────┐            │
+│  ├─────────────────────────┤       │      ColorMath          │            │
+│  │ + builder(name)         │       ├─────────────────────────┤            │
+│  │ + derive(name, base)    │       │ + lighten(color, amt)   │            │
+│  └─────────────────────────┘       │ + darken(color, amt)    │            │
+│                                     │ + saturate(color, amt)  │            │
+│  Built-in Themes:                   │ + blend(a, b, factor)   │            │
+│  ├── CYBER_GREEN                    │ + withAlpha(color, a)   │            │
+│  ├── CYBER_BLUE                     │ + parseHex(String)      │            │
+│  ├── CYBER_RED                      │ + toHSL(color)          │            │
+│  ├── CYBER_PURPLE                   │ + fromHSL(h, s, l, a)   │            │
+│  ├── SINGULARITY                    └─────────────────────────┘            │
+│  └── WHITE                                                                 │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                    ColorThemeRegistry                               │   │
+│  ├─────────────────────────────────────────────────────────────────────┤   │
+│  │ + register(theme: ColorTheme)                                       │   │
+│  │ + get(id: Identifier): ColorTheme                                   │   │
+│  │ + getOrDefault(id, default): ColorTheme                             │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  INTEGRATION:                                                               │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │ Appearance.color/secondaryColor → String (e.g., "@primary", "#hex") │  │
+│  │              ↓                                                       │  │
+│  │ ColorResolver.resolve(string) → int (ARGB)                          │  │
+│  │              ↓                                                       │  │
+│  │ Renderer uses ARGB for vertex colors                                │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 21. System Initialization
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    SYSTEM INITIALIZATION                                    │
+│                    Package: field                                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                  FieldSystemInit                                     │   │
+│  ├─────────────────────────────────────────────────────────────────────┤   │
+│  │ + init(): void              ← Call during mod initialization         │   │
+│  │ + isInitialized(): boolean  ← Check initialization status           │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  Initialization Steps:                                                      │
+│  1. Register network payloads (FieldSpawnPayload, FieldRemovePayload, etc.)│
+│  2. Register commands (/field, /fieldtest)                                │
+│  3. Register resource reload listener for JSON definitions                │
+│  4. Initialize FieldLoader                                                 │
+│  5. Wire FieldManager ↔ FieldNetworking for automatic sync                 │
+│  6. Register player join handler for definition/instance sync             │
+│  7. Load built-in color themes                                             │
+│  8. Register default field definitions                                     │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 22. User Profile Management
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    USER PROFILE MANAGEMENT                                  │
+│                    Package: field                                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                  FieldProfileStore                                   │   │
+│  ├─────────────────────────────────────────────────────────────────────┤   │
+│  │ + save(name, definition): boolean  ← Save custom profile              │   │
+│  │ + load(name): Optional<FieldDefinition>  ← Load custom profile       │   │
+│  │ + loadAndRegister(name): boolean  ← Load and register in registry  │   │
+│  │ + list(): List<String>  ← List all saved profiles                    │   │
+│  │ + delete(name): boolean  ← Delete a profile                          │   │
+│  │ + exists(name): boolean  ← Check if profile exists                  │   │
+│  │ + getProfileDirectory(): Path  ← Get config directory path          │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  Storage: config/the-virus-block/profiles/*.json                           │
+│                                                                             │
+│  Purpose: Allow users to save and load custom field configurations        │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+*Class diagram v7.3 - Added FieldSystemInit (§21) and FieldProfileStore (§22) for system initialization and user profile management.*
 

@@ -167,19 +167,7 @@ public record PatternConfig(PatternType type, int count, float thickness, Vertex
         return vertexPattern instanceof EdgePattern ep ? ep : EdgePattern.DEFAULT;
     }
     
-    /**
-     * Backward compatibility: get as TrianglePattern.
-     * Maps QuadPattern to the old TrianglePattern enum.
-     * @deprecated Use {@link #quadPattern()} instead
-     */
-    @Deprecated
-    public net.cyberpunk042.visual.mesh.TrianglePattern trianglePattern() {
-        if (vertexPattern instanceof QuadPattern qp) {
-            // Map QuadPattern to TrianglePattern by name
-            return net.cyberpunk042.visual.mesh.TrianglePattern.fromString(qp.id());
-        }
-        return net.cyberpunk042.visual.mesh.TrianglePattern.DEFAULT;
-    }
+    // trianglePatternType() removed - use quadPattern() or vertexPattern() directly
     
     // =========================================================================
     // Pattern Logic

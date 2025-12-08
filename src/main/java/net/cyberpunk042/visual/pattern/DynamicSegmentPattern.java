@@ -4,9 +4,10 @@ package net.cyberpunk042.visual.pattern;
  * A dynamically generated segment pattern from shuffle exploration.
  * 
  * <p>Unlike static {@link SegmentPattern} enums, this allows runtime
- * exploration of all possible skip/phase/winding combinations.
+ * exploration of all possible segment arrangements for rings.
  * 
  * @see ShuffleGenerator
+ * @see SegmentPattern
  */
 public record DynamicSegmentPattern(
     int skipInterval,
@@ -18,27 +19,37 @@ public record DynamicSegmentPattern(
     
     @Override
     public String id() {
-        return "shuffle_seg_" + shuffleIndex;
+        return "shuffle_segment_" + shuffleIndex;
     }
     
     @Override
-    public PatternGeometry geometry() {
-        return PatternGeometry.SEGMENT;
+    public CellType cellType() {
+        return CellType.SEGMENT;
+    }
+    
+    @Override
+    public boolean shouldRender(int index, int total) {
+        // Apply skip interval and phase offset
+        int adjusted = (index + phaseOffset) % total;
+        return adjusted % skipInterval == 0;
+    }
+    
+    @Override
+    public int[][] getVertexOrder() {
+        // Segments are rendered as line pairs
+        // Winding determines direction
+        if (reverseWinding) {
+            return new int[][]{{1, 0}};  // Reversed
+        }
+        return new int[][]{{0, 1}};  // Normal
     }
     
     /**
-     * Determines if a segment index should be rendered.
+     * Human-readable description of this pattern.
      */
-    public boolean shouldRender(int index) {
-        int adjusted = (index + phaseOffset);
-        return (adjusted % skipInterval) == 0;
-    }
-    
-    /**
-     * Whether to reverse winding order for this pattern.
-     */
-    public boolean reverseWinding() {
-        return reverseWinding;
+    public String describe() {
+        return String.format("skip=%d phase=%d %s", 
+            skipInterval, phaseOffset, reverseWinding ? "reversed" : "normal");
     }
     
     /**
@@ -54,4 +65,3 @@ public record DynamicSegmentPattern(
         );
     }
 }
-

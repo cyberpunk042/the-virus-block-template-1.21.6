@@ -1,143 +1,118 @@
 package net.cyberpunk042.visual.transform;
 
-import net.cyberpunk042.log.Logging;
-
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
+import org.joml.Vector3f;
 
 /**
- * Provides time-based interpolation between transforms.
+ * Represents a transform that interpolates between two states over time.
  * 
- * <h2>Usage</h2>
- * <pre>
- * AnimatedTransform anim = AnimatedTransform.between(start, end, 20); // 20 ticks
- * Transform current = anim.getTransform(worldTime);
- * </pre>
+ * <p>Used for smooth transitions during lifecycle animations (spawn/despawn).</p>
+ * 
+ * @see Transform
+ * @see net.cyberpunk042.field.influence.LifecycleConfig
  */
-public final class AnimatedTransform {
+public class AnimatedTransform {
     
-    private final Transform start;
-    private final Transform end;
-    private final float startTime;
-    private final float duration;
-    private final EasingFunction easing;
-    
-    private AnimatedTransform(Transform start, Transform end, float startTime, float duration, EasingFunction easing) {
-        this.start = start;
-        this.end = end;
-        this.startTime = startTime;
-        this.duration = duration;
-        this.easing = easing;
-    }
-    
-    // ─────────────────────────────────────────────────────────────────────────
-    // Factory Methods
-    // ─────────────────────────────────────────────────────────────────────────
+    private final Transform from;
+    private final Transform to;
+    private float progress;
     
     /**
-     * Creates an animation between two transforms.
-     * 
-     * @param start starting transform
-     * @param end ending transform
-     * @param duration duration in ticks
+     * Creates an animated transform between two states.
+     * @param from Starting transform
+     * @param to Ending transform
      */
-    public static AnimatedTransform between(Transform start, Transform end, float duration) {
-        return new AnimatedTransform(start, end, 0, duration, EasingFunction.LINEAR);
+    public AnimatedTransform(Transform from, Transform to) {
+        this.from = from != null ? from : Transform.IDENTITY;
+        this.to = to != null ? to : Transform.IDENTITY;
+        this.progress = 0;
     }
     
     /**
-     * Creates an animation with custom start time.
+     * Creates an animated transform that starts and ends at the same state.
+     * @param transform The static transform
      */
-    public static AnimatedTransform between(Transform start, Transform end, float startTime, float duration) {
-        return new AnimatedTransform(start, end, startTime, duration, EasingFunction.LINEAR);
+    public AnimatedTransform(Transform transform) {
+        this(transform, transform);
     }
     
     /**
-     * Creates an animation with easing.
+     * Sets the animation progress.
+     * @param progress Progress from 0 (from) to 1 (to)
      */
-    public static AnimatedTransform between(Transform start, Transform end, float duration, EasingFunction easing) {
-        return new AnimatedTransform(start, end, 0, duration, easing);
+    public void setProgress(float progress) {
+        this.progress = Math.max(0, Math.min(1, progress));
     }
     
-    // ─────────────────────────────────────────────────────────────────────────
-    // Animation
-    // ─────────────────────────────────────────────────────────────────────────
+    /** Gets the current progress. */
+    public float getProgress() { return progress; }
+    
+    /** Gets the starting transform. */
+    public Transform from() { return from; }
+    
+    /** Gets the ending transform. */
+    public Transform to() { return to; }
     
     /**
-     * Gets the interpolated transform at the given time.
-     * 
-     * @param time current world time (ticks + partial)
-     * @return interpolated transform
+     * Gets the current interpolated transform.
+     * @return The interpolated transform at current progress
      */
-    public Transform getTransform(float time) {
-        float elapsed = time - startTime;
-        float t = MathHelper.clamp(elapsed / duration, 0, 1);
-        float easedT = easing.apply(t);
-        
-        Logging.RENDER.topic("anim-transform").trace(
-            "Interpolating: time={:.1f}, progress={:.2f}, eased={:.2f}",
-            time, t, easedT);
-        
-        return lerp(start, end, easedT);
+    public Transform current() {
+        if (progress <= 0) return from;
+        if (progress >= 1) return to;
+        return lerp(from, to, progress);
     }
-    
-    /**
-     * Checks if the animation is complete.
-     */
-    public boolean isComplete(float time) {
-        return time >= startTime + duration;
-    }
-    
-    /**
-     * Gets progress (0.0 to 1.0).
-     */
-    public float getProgress(float time) {
-        float elapsed = time - startTime;
-        return MathHelper.clamp(elapsed / duration, 0, 1);
-    }
-    
-    // ─────────────────────────────────────────────────────────────────────────
-    // Interpolation
-    // ─────────────────────────────────────────────────────────────────────────
     
     /**
      * Linearly interpolates between two transforms.
+     * @param a Starting transform
+     * @param b Ending transform
+     * @param t Interpolation factor (0-1)
+     * @return Interpolated transform
      */
     public static Transform lerp(Transform a, Transform b, float t) {
-        Vec3d offsetA = a.offset() != null ? a.offset() : Vec3d.ZERO;
-        Vec3d offsetB = b.offset() != null ? b.offset() : Vec3d.ZERO;
-        Vec3d offset = offsetA.lerp(offsetB, t);
+        if (t <= 0) return a;
+        if (t >= 1) return b;
         
-        Vec3d rotA = a.rotation() != null ? a.rotation() : Vec3d.ZERO;
-        Vec3d rotB = b.rotation() != null ? b.rotation() : Vec3d.ZERO;
-        Vec3d rotation = rotA.lerp(rotB, t);
+        // Lerp offset
+        Vector3f offset = null;
+        if (a.offset() != null || b.offset() != null) {
+            Vector3f aOff = a.offset() != null ? a.offset() : new Vector3f();
+            Vector3f bOff = b.offset() != null ? b.offset() : new Vector3f();
+            offset = new Vector3f(aOff).lerp(bOff, t);
+        }
         
-        float scale = MathHelper.lerp(t, a.scale(), b.scale());
+        // Lerp rotation
+        Vector3f rotation = null;
+        if (a.rotation() != null || b.rotation() != null) {
+            Vector3f aRot = a.rotation() != null ? a.rotation() : new Vector3f();
+            Vector3f bRot = b.rotation() != null ? b.rotation() : new Vector3f();
+            rotation = new Vector3f(aRot).lerp(bRot, t);
+        }
         
-        return new Transform(offset, rotation, scale);
-    }
-    
-    // ─────────────────────────────────────────────────────────────────────────
-    // Easing Functions
-    // ─────────────────────────────────────────────────────────────────────────
-    
-    @FunctionalInterface
-    public interface EasingFunction {
-        float apply(float t);
+        // Lerp scale
+        float scale = a.scale() + (b.scale() - a.scale()) * t;
         
-        EasingFunction LINEAR = t -> t;
-        EasingFunction EASE_IN = t -> t * t;
-        EasingFunction EASE_OUT = t -> 1 - (1 - t) * (1 - t);
-        EasingFunction EASE_IN_OUT = t -> t < 0.5f 
-            ? 2 * t * t 
-            : 1 - (float) Math.pow(-2 * t + 2, 2) / 2;
-        EasingFunction BOUNCE = t -> {
-            float n1 = 7.5625f;
-            float d1 = 2.75f;
-            if (t < 1 / d1) return n1 * t * t;
-            if (t < 2 / d1) return n1 * (t -= 1.5f / d1) * t + 0.75f;
-            if (t < 2.5 / d1) return n1 * (t -= 2.25f / d1) * t + 0.9375f;
-            return n1 * (t -= 2.625f / d1) * t + 0.984375f;
-        };
+        // Lerp scaleXYZ
+        Vector3f scaleXYZ = null;
+        if (a.scaleXYZ() != null || b.scaleXYZ() != null) {
+            Vector3f aScale = a.scaleXYZ() != null ? a.scaleXYZ() : new Vector3f(a.scale());
+            Vector3f bScale = b.scaleXYZ() != null ? b.scaleXYZ() : new Vector3f(b.scale());
+            scaleXYZ = new Vector3f(aScale).lerp(bScale, t);
+        }
+        
+        // Use "to" values for non-interpolatable properties
+        return new Transform(
+            t < 0.5f ? a.anchor() : b.anchor(),
+            offset,
+            rotation,
+            t < 0.5f ? a.inheritRotation() : b.inheritRotation(),
+            scale,
+            scaleXYZ,
+            t < 0.5f ? a.scaleWithRadius() : b.scaleWithRadius(),
+            t < 0.5f ? a.facing() : b.facing(),
+            t < 0.5f ? a.up() : b.up(),
+            t < 0.5f ? a.billboard() : b.billboard(),
+            t < 0.5f ? a.orbit() : b.orbit()
+        );
     }
 }

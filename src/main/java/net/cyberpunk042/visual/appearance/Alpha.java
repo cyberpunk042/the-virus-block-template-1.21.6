@@ -2,6 +2,7 @@ package net.cyberpunk042.visual.appearance;
 
 import net.cyberpunk042.log.Logging;
 import net.minecraft.util.math.MathHelper;
+import net.cyberpunk042.visual.util.FieldMath;
 
 /**
  * Alpha (transparency) configuration supporting static or pulsing values.

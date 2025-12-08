@@ -672,6 +672,101 @@ Layer values are **defaults**. Primitive values **override** when present.
 
 ---
 
+## 10.6 Color System
+
+The color system provides flexible color references and theme support for all visual elements.
+
+### Color Reference Formats
+
+Appearance colors (`color`, `secondaryColor`) accept multiple formats:
+
+| Format | Example | Description |
+|--------|---------|-------------|
+| `@role` | `"@primary"`, `"@glow"` | Theme role reference |
+| `#hex` | `"#FF00AA"`, `"#F0A"` | Hex color (RGB or RRGGBB) |
+| `#hex8` | `"#80FF00AA"` | Hex with alpha (AARRGGBB) |
+| `name` | `"cyan"`, `"gold"` | Basic color name |
+| `$slot` | `"$primaryColor"` | ColorConfig slot reference |
+
+### ColorTheme
+
+Defines a set of role-based colors:
+
+```java
+ColorTheme theme = ColorTheme.builder("cyber_green")
+    .base(0xFF00FF88)
+    .primary(0xFF00FF88)    // Main color
+    .secondary(0xFF008844)  // Complementary
+    .glow(0xFF44FFAA)       // Emissive/glow
+    .beam(0xFF00FF88)       // Vertical beam
+    .wire(0xFF00CC66)       // Wireframe
+    .accent(0xFF88FFCC)     // Highlights
+    .build();
+
+// Or auto-derive from a single base color:
+ColorTheme derived = ColorTheme.derive("custom", 0xFFFF00AA);
+```
+
+**Built-in Themes:** `CYBER_GREEN`, `CYBER_BLUE`, `CYBER_RED`, `CYBER_PURPLE`, `SINGULARITY`, `WHITE`
+
+### ColorResolver
+
+Resolves color references at render time:
+
+```java
+ColorResolver resolver = new ColorResolver(theme);
+
+int color1 = resolver.resolve("@primary");     // → theme's primary
+int color2 = resolver.resolve("@glow");        // → theme's glow
+int color3 = resolver.resolve("#FF00AA");      // → parsed hex
+int color4 = resolver.resolve("cyan");         // → 0xFF00FFFF
+```
+
+### Integration with Appearance
+
+```
+Appearance.primaryColor ("@glow")
+        ↓
+ColorResolver.resolve("@glow")
+        ↓
+0xFF44FFAA (actual ARGB int)
+        ↓
+Renderer uses this for vertex colors
+```
+
+### ColorMath Utilities
+
+Static utilities for color manipulation:
+
+| Method | Description |
+|--------|-------------|
+| `lighten(color, 0.2f)` | Lighten by 20% toward white |
+| `darken(color, 0.3f)` | Darken by 30% toward black |
+| `saturate(color, 0.1f)` | Increase saturation |
+| `blend(a, b, 0.5f)` | Blend two colors |
+| `withAlpha(color, 0.8f)` | Set alpha to 80% |
+| `parseHex("#FF00AA")` | Parse hex string |
+| `toHSL(color)` | Convert to HSL |
+
+### Color in JSON
+
+```json
+{
+  "appearance": {
+    "color": "@primary",           // Use theme's primary
+    "secondaryColor": "#FF8800",   // Explicit orange
+    "alpha": 0.8,
+    "glow": 0.5
+  }
+}
+```
+
+**Priority:** If both `colorRef` (on layer) and `color` (on primitive) are set, primitive wins.
+
+
+
+---
+
 ## 11. Implementation Priority
 
 ### Phase 1: Core Restructure

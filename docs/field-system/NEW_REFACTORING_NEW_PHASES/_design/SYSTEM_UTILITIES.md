@@ -136,13 +136,17 @@ The logging system uses channels, topics, and a fluent builder API.
 
 ### Channels Available
 
-| Channel | Label | Purpose |
-|---------|-------|---------|
-| `Logging.RENDER` | Render | Rendering, tessellation, shaders |
-| `Logging.FIELD` | Field | Field lifecycle, spawning |
-| `Logging.COMMANDS` | Commands | Command execution |
-| `Logging.NETWORK` | Network | Packet sending/receiving |
-| `Logging.REGISTRY` | Registry | Definition loading |
+| Channel | Label | Purpose | Default |
+|---------|-------|---------|---------|
+| `Logging.FIELD` | Field | Field lifecycle, spawning, parsing | INFO |
+| `Logging.RENDER` | Render | Rendering, tessellation, patterns | WARN |
+| `Logging.BINDING` | Binding | Binding evaluation (health → alpha) | OFF |
+| `Logging.ANIMATION` | Animation | Every-frame updates (spin, pulse) | OFF |
+| `Logging.NETWORK` | Network | Packet sync, multiplayer state | WARN |
+| `Logging.COMMANDS` | Commands | Command execution | INFO |
+| `Logging.REGISTRY` | Registry | Definition loading | WARN |
+
+**Note:** BINDING and ANIMATION are OFF by default because they're very verbose (tick/frame updates).
 
 ### Log Levels
 

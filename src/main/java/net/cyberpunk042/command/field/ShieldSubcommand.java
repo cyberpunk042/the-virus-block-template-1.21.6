@@ -92,7 +92,7 @@ public final class ShieldSubcommand {
         
         CommandFeedback.info(source, "Shield definitions (" + shields.size() + "):");
         for (var def : shields) {
-            source.sendFeedback(() -> Text.literal("  " + def.id().getPath()), false);
+            source.sendFeedback(() -> Text.literal("  " + def.id()), false);
         }
         return shields.size();
     }

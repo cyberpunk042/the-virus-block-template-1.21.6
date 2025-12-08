@@ -1,6 +1,9 @@
 package net.cyberpunk042.mixin;
 
 import net.cyberpunk042.TheVirusBlock;
+import net.cyberpunk042.field.influence.CombatTracker;
+import net.cyberpunk042.field.influence.FieldEvent;
+import net.cyberpunk042.field.influence.TriggerEventDispatcher;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.registry.ModStatusEffects;
 import net.cyberpunk042.util.VirusMobAllyHelper;
@@ -81,6 +84,34 @@ public abstract class LivingEntityMixin extends Entity {
 			return amount * 0.25F;
 		}
 		return amount;
+	}
+
+	/**
+	 * F156: Dispatch PLAYER_DAMAGE event when a player takes damage.
+	 * F166: Hook CombatTracker for binding sources.
+	 */
+	@Inject(method = "damage(Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/entity/damage/DamageSource;F)Z",
+			at = @At(value = "RETURN"), require = 1)
+	private void theVirusBlock$dispatchDamageEvent(ServerWorld world, DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+		LivingEntity self = (LivingEntity) (Object) this;
+		// Only dispatch if damage was actually applied (return value is true) and entity is a player
+		if (cir.getReturnValue() && self instanceof PlayerEntity player) {
+			// F156: Trigger event for visual effects
+			TriggerEventDispatcher.dispatch(FieldEvent.PLAYER_DAMAGE, player, amount);
+			// F166: Track combat state for bindings
+			CombatTracker.onDamageTaken(player, amount);
+		}
+	}
+
+	/**
+	 * F156: Dispatch PLAYER_HEAL event when a player heals.
+	 */
+	@Inject(method = "heal(F)V", at = @At("TAIL"), require = 1)
+	private void theVirusBlock$dispatchHealEvent(float amount, CallbackInfo ci) {
+		LivingEntity self = (LivingEntity) (Object) this;
+		if (self instanceof PlayerEntity player && amount > 0.0F) {
+			TriggerEventDispatcher.dispatch(FieldEvent.PLAYER_HEAL, player, amount);
+		}
 	}
 
 	@Inject(method = "baseTick", at = @At("TAIL"))

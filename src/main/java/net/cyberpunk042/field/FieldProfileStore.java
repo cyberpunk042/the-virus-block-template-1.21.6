@@ -107,7 +107,8 @@ public final class FieldProfileStore {
         try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
             JsonObject json = JsonParser.parseReader(reader).getAsJsonObject();
             Identifier id = Identifier.of("the-virus-block", "custom/" + sanitized);
-            FieldDefinition def = FieldDefinition.fromJson(json, id);
+            // Parse using FieldLoader
+            FieldDefinition def = new net.cyberpunk042.field.loader.FieldLoader().parseDefinition(json);
             
             Logging.REGISTRY.topic("profile").info("Loaded profile: {}", sanitized);
             return Optional.of(def);

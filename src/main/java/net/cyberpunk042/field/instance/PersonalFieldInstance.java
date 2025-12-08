@@ -3,7 +3,7 @@ package net.cyberpunk042.field.instance;
 import net.cyberpunk042.log.Logging;
 
 import net.cyberpunk042.field.FieldType;
-import net.cyberpunk042.field.PredictionConfig;
+import net.cyberpunk042.field.instance.PredictionConfig;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Vec3d;

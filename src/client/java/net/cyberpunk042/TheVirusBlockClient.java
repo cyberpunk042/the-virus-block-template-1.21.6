@@ -19,6 +19,7 @@ import net.cyberpunk042.client.state.VirusDifficultyClientState;
 import net.cyberpunk042.client.screen.PurificationTotemScreen;
 import net.cyberpunk042.client.screen.VirusDifficultyScreen;
 import net.cyberpunk042.config.InfectionConfigRegistry;
+import net.cyberpunk042.client.network.GuiClientHandlers;
 import net.cyberpunk042.config.ModConfigBootstrap;
 import net.cyberpunk042.infection.VirusDifficulty;
 import net.cyberpunk042.network.SkyTintPayload;
@@ -62,6 +63,8 @@ public class TheVirusBlockClient implements ClientModInitializer {
 		// New field system - register definitions on client too (server loads JSON, client needs code defaults)
 		net.cyberpunk042.field.FieldRegistry.registerDefaults();
 		net.cyberpunk042.client.field.FieldClientInit.init();
+		// GUI client handlers
+		GuiClientHandlers.register();
 		SingularityVisualManager.init();
 		SingularityBorderClientState.init();
 		VirusFluidRenderers.register();

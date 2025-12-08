@@ -1,6 +1,14 @@
 package net.cyberpunk042.field.instance;
 
+import net.cyberpunk042.field.FieldDefinition;
+import net.cyberpunk042.field.FieldRegistry;
+import net.cyberpunk042.field.influence.DecayConfig;
+import net.cyberpunk042.field.influence.FieldEvent;
+import net.cyberpunk042.field.influence.LifecycleConfig;
+import net.cyberpunk042.field.influence.TriggerEventDispatcher;
 import net.cyberpunk042.log.Logging;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 
 /**
@@ -25,8 +33,9 @@ import net.minecraft.server.world.ServerWorld;
  */
 public class FieldLifecycle {
     
-    private static final int FADE_IN_TICKS = 10;
-    private static final int FADE_OUT_TICKS = 10;
+    // Default values (used when no LifecycleConfig is present)
+    private static final int DEFAULT_FADE_IN_TICKS = 10;
+    private static final int DEFAULT_FADE_OUT_TICKS = 10;
     
     // ─────────────────────────────────────────────────────────────────────────
     // Lifecycle Events
@@ -43,6 +52,14 @@ public class FieldLifecycle {
             "Field spawned: {} at {}", 
             instance.definitionId(), 
             instance.position());
+        
+        // F156: Dispatch FIELD_SPAWN event if this is a personal field
+        if (instance.ownerUuid() != null && world != null) {
+            PlayerEntity player = world.getPlayerByUuid(instance.ownerUuid());
+            if (player instanceof ServerPlayerEntity serverPlayer) {
+                TriggerEventDispatcher.dispatch(FieldEvent.FIELD_SPAWN, serverPlayer, instance);
+            }
+        }
         
         // Apply initial effects
         applySpawnEffects(instance, world);
@@ -78,6 +95,14 @@ public class FieldLifecycle {
             instance.definitionId(),
             instance.age());
         
+        // F156: Dispatch FIELD_DESPAWN event if this is a personal field
+        if (instance.ownerUuid() != null && world != null) {
+            PlayerEntity player = world.getPlayerByUuid(instance.ownerUuid());
+            if (player instanceof ServerPlayerEntity serverPlayer) {
+                TriggerEventDispatcher.dispatch(FieldEvent.FIELD_DESPAWN, serverPlayer, instance);
+            }
+        }
+        
         // Clean up any effects
         cleanupEffects(instance, world);
     }
@@ -86,17 +111,64 @@ public class FieldLifecycle {
     // Fade Handling
     // ─────────────────────────────────────────────────────────────────────────
     
+    /**
+     * F161: Updates lifecycle state based on age and config.
+     */
     private void updateFadeState(FieldInstance instance, int age) {
-        if (age < FADE_IN_TICKS) {
-            // Fading in
-            float progress = (float) age / FADE_IN_TICKS;
-            instance.setAlpha(progress);
-        } else if (instance.isRemoved()) {
-            // Already removed, fade complete
-            instance.setAlpha(0);
-        } else {
-            instance.setAlpha(1.0f);
+        LifecycleConfig config = getLifecycleConfig(instance);
+        int fadeIn = config != null ? config.fadeIn() : DEFAULT_FADE_IN_TICKS;
+        int fadeOut = config != null ? config.fadeOut() : DEFAULT_FADE_OUT_TICKS;
+        
+        switch (instance.lifecycleState()) {
+            case SPAWNING -> {
+                if (age < fadeIn) {
+                    float progress = fadeIn > 0 ? (float) age / fadeIn : 1.0f;
+                    instance.setFadeProgress(progress);
+                    instance.setAlpha(progress);
+                    // Apply scaleIn if configured
+                    if (config != null && config.scaleIn() > 0) {
+                        instance.setScale(progress);
+                    }
+                } else {
+                    instance.activate();
+                }
+            }
+            case ACTIVE -> {
+                instance.setFadeProgress(1.0f);
+                instance.setAlpha(1.0f);
+                // Apply decay if configured
+                if (config != null && config.decay() != null && config.decay().isActive()) {
+                    DecayConfig decay = config.decay();
+                    float decayed = decay.apply(instance.alpha());
+                    instance.setAlpha(decayed);
+                }
+            }
+            case DESPAWNING -> {
+                // Calculate how long we've been despawning
+                // (This assumes we track despawn start somewhere, simplified here)
+                float progress = instance.fadeProgress() - (1.0f / Math.max(1, fadeOut));
+                if (progress <= 0) {
+                    instance.complete();
+                } else {
+                    instance.setFadeProgress(progress);
+                    instance.setAlpha(progress);
+                    if (config != null && config.scaleOut() > 0) {
+                        instance.setScale(progress);
+                    }
+                }
+            }
+            case COMPLETE -> {
+                instance.setAlpha(0);
+            }
         }
+    }
+    
+    /**
+     * Gets the LifecycleConfig for an instance from its definition.
+     */
+    private LifecycleConfig getLifecycleConfig(FieldInstance instance) {
+        FieldDefinition def = FieldRegistry.get(instance.definitionId());
+        return def != null ? def.lifecycle() : null;
     }
     
     // ─────────────────────────────────────────────────────────────────────────

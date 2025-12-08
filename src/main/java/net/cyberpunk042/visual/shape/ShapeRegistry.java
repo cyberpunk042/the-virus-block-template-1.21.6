@@ -148,7 +148,7 @@ public final class ShapeRegistry {
             float latEnd = getFloat(params, "latEnd", 1.0f);
             float lonStart = getFloat(params, "lonStart", 0.0f);
             float lonEnd = getFloat(params, "lonEnd", 1.0f);
-            String algorithm = getString(params, "algorithm", SphereShape.DEFAULT_ALGORITHM);
+            SphereAlgorithm algorithm = SphereAlgorithm.values()[0];
             return new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm);
         });
         
@@ -158,7 +158,7 @@ public final class ShapeRegistry {
             float radius = getFloat(params, "radius", 1.0f);
             float thickness = getFloat(params, "thickness", 0.1f);
             int segments = getInt(params, "segments", 48);
-            return new RingShape(y, radius, thickness, segments);
+            return new RingShape(radius - thickness/2, radius + thickness/2, segments, y, 0f, 360f, thickness, 0f);
         });
         
         // Disc (filled circle)
@@ -166,7 +166,7 @@ public final class ShapeRegistry {
             float y = getFloat(params, "y", 0);
             float radius = getFloat(params, "radius", 1.0f);
             int segments = getInt(params, "segments", 48);
-            return new DiscShape(y, radius, segments);
+            return new DiscShape(y, segments, 0f, radius, 0f, 360f, 1);
         });
         
         // Prism
@@ -174,7 +174,7 @@ public final class ShapeRegistry {
             int sides = getInt(params, "sides", 6);
             float radius = getFloat(params, "radius", 1.0f);
             float height = getFloat(params, "height", 1.0f);
-            return new PrismShape(sides, radius, height);
+            return new PrismShape(sides, radius, radius, height, 0f, 1, true, true);
         });
         
         // Beam
@@ -182,7 +182,7 @@ public final class ShapeRegistry {
             float radius = getFloat(params, "radius", 0.05f);
             float height = getFloat(params, "height", 256.0f);
             int segments = getInt(params, "segments", 8);
-            return new CylinderShape(radius, height, segments);
+            return new CylinderShape(radius, height, segments, radius, 1, true, true, 360f);
         });
         
         // Polyhedron

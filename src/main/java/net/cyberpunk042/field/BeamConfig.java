@@ -1,111 +1,130 @@
 package net.cyberpunk042.field;
 
 import com.google.gson.JsonObject;
-import net.cyberpunk042.visual.color.ColorMath;
+import net.cyberpunk042.log.Logging;
+import org.jetbrains.annotations.Nullable;
+
+import net.cyberpunk042.visual.animation.PulseConfig;
+import net.cyberpunk042.visual.validation.Range;
+import net.cyberpunk042.visual.validation.ValueRange;
 
 /**
- * Configuration for a beacon-style beam that extends upward from a field.
+ * Configuration for central beam effect on fields.
  * 
- * <p>Used primarily for anti-virus shields and similar effects to mark
- * protected areas with a visible light column.
- * 
- * <h2>Properties</h2>
- * <ul>
- *   <li><b>enabled</b>: Whether the beam should render</li>
- *   <li><b>innerRadius</b>: Radius of the inner bright beam</li>
- *   <li><b>outerRadius</b>: Radius of the outer glow</li>
- *   <li><b>color</b>: ARGB color of the beam</li>
- * </ul>
- * 
- * @see FieldDefinition
+ * <h2>JSON Format</h2>
+ * <pre>
+ * "beam": {
+ *   "enabled": true,
+ *   "innerRadius": 0.05,
+ *   "outerRadius": 0.1,
+ *   "color": "@beam",
+ *   "height": 10.0,
+ *   "glow": 0.5,
+ *   "pulse": { "scale": 0.1, "speed": 1.0 }
+ * }
+ * </pre>
  */
 public record BeamConfig(
     boolean enabled,
-    float innerRadius,
-    float outerRadius,
-    int color
+    @Range(ValueRange.RADIUS) float innerRadius,
+    @Range(ValueRange.RADIUS) float outerRadius,
+    String color,
+    @Range(ValueRange.POSITIVE) float height,
+    @Range(ValueRange.ALPHA) float glow,
+    @Nullable PulseConfig pulse
 ) {
+
+    // === Static Constants ===
+    public static final BeamConfig DISABLED = new BeamConfig(false, 0f, 0f, "@beam", 0f, 0f, null);
+    public static final BeamConfig DEFAULT_BEAM = new BeamConfig(true, 0.05f, 0.1f, "@beam", 10f, 0.5f, null);
     
-    /** Default disabled beam config */
-    public static final BeamConfig DISABLED = new BeamConfig(false, 0.0f, 0.0f, 0xFFFFFFFF);
-    
-    /** Default enabled beam config (white, medium size) */
-    public static final BeamConfig DEFAULT = new BeamConfig(true, 0.04f, 0.06f, 0xFFFFFFFF);
-    
-    /**
-     * Creates a beam config with custom color.
-     */
-    public static BeamConfig colored(int color) {
-        return new BeamConfig(true, 0.04f, 0.06f, color);
-    }
-    
-    /**
-     * Creates a beam config with custom size and color.
-     */
     public static BeamConfig custom(float innerRadius, float outerRadius, int color) {
-        return new BeamConfig(true, innerRadius, outerRadius, color);
+        return new BeamConfig(true, innerRadius, outerRadius, "@beam", 10f, 0.5f, null);
     }
     
-    /**
-     * Parses beam config from JSON.
-     * 
-     * <p>Expected format:
-     * <pre>
-     * {
-     *   "enabled": true,
-     *   "innerRadius": 0.04,
-     *   "outerRadius": 0.06,
-     *   "color": "#FFFFFFFF"
-     * }
-     * </pre>
-     */
-    public static BeamConfig fromJson(JsonObject json) {
-        if (json == null) {
-            return DISABLED;
-        }
-        
-        boolean enabled = json.has("enabled") && json.get("enabled").getAsBoolean();
-        if (!enabled) {
-            return DISABLED;
-        }
-        
-        float innerRadius = json.has("innerRadius") 
-            ? json.get("innerRadius").getAsFloat() 
-            : json.has("inner_radius") ? json.get("inner_radius").getAsFloat() : 0.04f;
-        
-        float outerRadius = json.has("outerRadius") 
-            ? json.get("outerRadius").getAsFloat() 
-            : json.has("outer_radius") ? json.get("outer_radius").getAsFloat() : 0.06f;
-        
-        int color = 0xFFFFFFFF;
-        if (json.has("color")) {
-            String colorStr = json.get("color").getAsString();
-            color = ColorMath.parseHex(colorStr);
-        }
-        
-        return new BeamConfig(true, innerRadius, outerRadius, color);
-    }
-    
-    /**
-     * Serializes this config to JSON.
-     */
     public JsonObject toJson() {
         JsonObject json = new JsonObject();
         json.addProperty("enabled", enabled);
-        if (enabled) {
-            json.addProperty("innerRadius", innerRadius);
-            json.addProperty("outerRadius", outerRadius);
-            json.addProperty("color", String.format("#%08X", color));
-        }
+        json.addProperty("innerRadius", innerRadius);
+        json.addProperty("outerRadius", outerRadius);
+        json.addProperty("color", color);
+        json.addProperty("height", height);
+        json.addProperty("glow", glow);
         return json;
     }
+
+    /** No beam. */
+    public static final BeamConfig NONE = new BeamConfig(false, 0.05f, 0.1f, "@beam", 10, 0, null);
+    
+    /** Default beam. */
+    
+    /** Pulsing beam. */
+    public static final BeamConfig PULSING = new BeamConfig(true, 0.05f, 0.1f, "@beam", 10, 0.5f, 
+        PulseConfig.DEFAULT);
+    
+    /** Whether beam is active. */
+    public boolean isActive() { return enabled; }
+    
+    /** Whether beam has pulsing. */
+    public boolean hasPulse() { return pulse != null && pulse.isActive(); }
+    
+    // =========================================================================
+    // JSON Parsing
+    // =========================================================================
     
     /**
-     * Returns the color with inner alpha applied (brighter).
+     * Parses a BeamConfig from JSON.
+     * @param json The JSON object
+     * @return Parsed config
      */
-    public int innerColor() {
-        // Inner beam is 40% alpha version of the main color
-        int a = 0x64; // ~40% alpha
-        return (a << 24) | (color & 0x00FFFFFF);
+    public static BeamConfig fromJson(JsonObject json) {
+        if (json == null) return NONE;
+        
+        Logging.FIELD.topic("parse").trace("Parsing BeamConfig...");
+        
+        boolean enabled = json.has("enabled") ? json.get("enabled").getAsBoolean() : true;
+        float innerRadius = json.has("innerRadius") ? json.get("innerRadius").getAsFloat() : 0.05f;
+        float outerRadius = json.has("outerRadius") ? json.get("outerRadius").getAsFloat() : 0.1f;
+        String color = json.has("color") ? json.get("color").getAsString() : "@beam";
+        float height = json.has("height") ? json.get("height").getAsFloat() : 10.0f;
+        float glow = json.has("glow") ? json.get("glow").getAsFloat() : 0.5f;
+        
+        PulseConfig pulse = null;
+        if (json.has("pulse")) {
+            pulse = PulseConfig.fromJson(json.getAsJsonObject("pulse"));
+        }
+        
+        BeamConfig result = new BeamConfig(enabled, innerRadius, outerRadius, color, height, glow, pulse);
+        Logging.FIELD.topic("parse").trace("Parsed BeamConfig: enabled={}, innerRadius={}, height={}", 
+            enabled, innerRadius, height);
+        return result;
+    }
+    
+    // =========================================================================
+    // Builder
+    // =========================================================================
+    
+    public static Builder builder() { return new Builder(); }
+    
+    public static class Builder {
+        private boolean enabled = true;
+        private @Range(ValueRange.RADIUS) float innerRadius = 0.05f;
+        private @Range(ValueRange.RADIUS) float outerRadius = 0.1f;
+        private String color = "@beam";
+        private @Range(ValueRange.POSITIVE) float height = 10;
+        private @Range(ValueRange.ALPHA) float glow = 0.5f;
+        private @Nullable PulseConfig pulse = null;
+        
+        public Builder enabled(boolean e) { this.enabled = e; return this; }
+        public Builder innerRadius(float r) { this.innerRadius = r; return this; }
+        public Builder outerRadius(float r) { this.outerRadius = r; return this; }
+        public Builder color(String c) { this.color = c; return this; }
+        public Builder height(float h) { this.height = h; return this; }
+        public Builder glow(float g) { this.glow = g; return this; }
+        public Builder pulse(PulseConfig p) { this.pulse = p; return this; }
+        
+        public BeamConfig build() {
+            return new BeamConfig(enabled, innerRadius, outerRadius, color, height, glow, pulse);
+        }
     }
 }

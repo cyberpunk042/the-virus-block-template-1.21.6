@@ -40,6 +40,11 @@ public abstract class FieldInstance {
     protected boolean alive;
     protected boolean removed;
     
+    // F162: Lifecycle state tracking
+    protected LifecycleState lifecycleState = LifecycleState.SPAWNING;
+    // F163: Fade progress (0.0 → 1.0 during transitions)
+    protected float fadeProgress = 0.0f;
+    
     protected FieldInstance(long id, Identifier definitionId, FieldType type, Vec3d position) {
         this.id = id;
         this.definitionId = definitionId;
@@ -70,6 +75,14 @@ public abstract class FieldInstance {
     public boolean isAlive() { return alive && !removed; }
     public boolean isRemoved() { return removed; }
     
+    // F162-F163: Lifecycle state accessors
+    public LifecycleState lifecycleState() { return lifecycleState; }
+    public float fadeProgress() { return fadeProgress; }
+    public boolean isSpawning() { return lifecycleState == LifecycleState.SPAWNING; }
+    public boolean isActive() { return lifecycleState == LifecycleState.ACTIVE; }
+    public boolean isDespawning() { return lifecycleState == LifecycleState.DESPAWNING; }
+    public boolean isComplete() { return lifecycleState == LifecycleState.COMPLETE; }
+    
     // ─────────────────────────────────────────────────────────────────────────────
     // Modifiers
     // ─────────────────────────────────────────────────────────────────────────────
@@ -92,6 +105,48 @@ public abstract class FieldInstance {
     
     public void setMaxLifeTicks(int ticks) {
         this.maxLifeTicks = ticks;
+    }
+    
+    // F162: Lifecycle state transitions
+    public void setLifecycleState(LifecycleState state) {
+        if (this.lifecycleState != state) {
+            Logging.FIELD.topic("lifecycle").debug(
+                "Field {} state: {} → {}", id, this.lifecycleState, state);
+            this.lifecycleState = state;
+            this.fadeProgress = 0.0f; // Reset progress on state change
+        }
+    }
+    
+    // F163: Fade progress
+    public void setFadeProgress(float progress) {
+        this.fadeProgress = Math.max(0f, Math.min(1f, progress));
+    }
+    
+    /**
+     * Advances to ACTIVE state (called when spawn animation completes).
+     */
+    public void activate() {
+        if (lifecycleState == LifecycleState.SPAWNING) {
+            setLifecycleState(LifecycleState.ACTIVE);
+            setFadeProgress(1.0f);
+        }
+    }
+    
+    /**
+     * Begins despawn animation.
+     */
+    public void beginDespawn() {
+        if (lifecycleState == LifecycleState.ACTIVE || lifecycleState == LifecycleState.SPAWNING) {
+            setLifecycleState(LifecycleState.DESPAWNING);
+        }
+    }
+    
+    /**
+     * Marks lifecycle as complete (ready for removal).
+     */
+    public void complete() {
+        setLifecycleState(LifecycleState.COMPLETE);
+        this.alive = false;
     }
     
     // ─────────────────────────────────────────────────────────────────────────────

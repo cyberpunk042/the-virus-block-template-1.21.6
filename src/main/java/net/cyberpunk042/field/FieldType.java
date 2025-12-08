@@ -3,15 +3,17 @@ package net.cyberpunk042.field;
 /**
  * Types of visual fields that can be rendered.
  * 
- * <p>Each type has different behavior and attachment semantics:
+ * <p>Each type has different behavior and attachment semantics:</p>
  * <ul>
  *   <li>{@link #SHIELD} - Protective bubble around blocks or players</li>
  *   <li>{@link #PERSONAL} - Player-attached field that follows movement</li>
- *   <li>{@link #GROWTH} - Aura around growth blocks</li>
  *   <li>{@link #FORCE} - Area effect field</li>
- *   <li>{@link #SINGULARITY} - Singularity visual effect</li>
  *   <li>{@link #AURA} - Player aura effect</li>
+ *   <li>{@link #PORTAL} - Portal visual effect</li>
  * </ul>
+ * 
+ * <p><b>Removed in Phase 1:</b> GROWTH, SINGULARITY, BARRIER
+ * (these are handled by the Growth Block system, not the Field system)</p>
  */
 public enum FieldType {
     /**
@@ -27,28 +29,22 @@ public enum FieldType {
     PERSONAL("personal"),
     
     /**
-     * Growth block aura.
-     * Rendered around progressive growth blocks.
-     */
-    GROWTH("growth"),
-    
-    /**
      * Area effect force field.
      * Used for pushing/pulling effects.
      */
     FORCE("force"),
     
     /**
-     * Singularity visual effect.
-     * Special rendering for singularity events.
-     */
-    SINGULARITY("singularity"),
-    
-    /**
      * Player aura effect.
      * Cosmetic aura around players.
      */
     AURA("aura"),
+    
+    /**
+     * Portal visual effect.
+     * For teleportation or dimensional effects.
+     */
+    PORTAL("portal"),
     
     /**
      * Test/debug field.
@@ -80,14 +76,14 @@ public enum FieldType {
      * Whether this type supports block attachment.
      */
     public boolean supportsBlock() {
-        return this == SHIELD || this == GROWTH || this == FORCE || this == SINGULARITY;
+        return this == SHIELD || this == FORCE || this == PORTAL;
     }
     
     /**
      * Whether this type supports world position spawning.
      */
     public boolean supportsWorldPosition() {
-        return this == SHIELD || this == FORCE || this == SINGULARITY;
+        return this == SHIELD || this == FORCE || this == PORTAL;
     }
     
     /**

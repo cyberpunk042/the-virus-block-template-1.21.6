@@ -4,13 +4,14 @@ package net.cyberpunk042.visual.pattern;
  * A dynamically generated edge pattern from shuffle exploration.
  * 
  * <p>Unlike static {@link EdgePattern} enums, this allows runtime
- * exploration of all possible lat/lon/skip combinations.
+ * exploration of all possible edge arrangements for wireframes.
  * 
  * @see ShuffleGenerator
+ * @see EdgePattern
  */
 public record DynamicEdgePattern(
-    boolean renderLatitude,
-    boolean renderLongitude,
+    boolean latitude,
+    boolean longitude,
     int skipInterval,
     int shuffleIndex,
     String description
@@ -22,29 +23,42 @@ public record DynamicEdgePattern(
     }
     
     @Override
-    public PatternGeometry geometry() {
-        return PatternGeometry.EDGE;
+    public CellType cellType() {
+        return CellType.EDGE;
+    }
+    
+    @Override
+    public boolean shouldRender(int index, int total) {
+        // Apply skip interval
+        return index % skipInterval == 0;
+    }
+    
+    @Override
+    public int[][] getVertexOrder() {
+        // Edges are lines - just two vertices
+        return new int[][]{{0, 1}};
     }
     
     /**
      * Whether to render latitude (horizontal) lines.
      */
     public boolean renderLatitude() {
-        return renderLatitude;
+        return latitude;
     }
     
     /**
      * Whether to render longitude (vertical) lines.
      */
     public boolean renderLongitude() {
-        return renderLongitude;
+        return longitude;
     }
     
     /**
-     * Determines if an edge at given index should be rendered.
+     * Human-readable description of this pattern.
      */
-    public boolean shouldRender(int index) {
-        return (index % skipInterval) == 0;
+    public String describe() {
+        String dirs = (latitude ? "LAT" : "") + (latitude && longitude ? "+" : "") + (longitude ? "LON" : "");
+        return String.format("%s skip=%d", dirs, skipInterval);
     }
     
     /**
@@ -60,4 +74,3 @@ public record DynamicEdgePattern(
         );
     }
 }
-

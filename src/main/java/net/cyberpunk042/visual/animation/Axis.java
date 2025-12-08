@@ -1,48 +1,64 @@
 package net.cyberpunk042.visual.animation;
 
+import org.joml.Vector3f;
+
 /**
- * Rotation axis for spin animations.
+ * Defines rotation/animation axes.
  * 
- * <h2>Axes</h2>
- * <ul>
- *   <li>{@link #X} - Pitch rotation (forward/back tilt)</li>
- *   <li>{@link #Y} - Yaw rotation (horizontal spin) - default</li>
- *   <li>{@link #Z} - Roll rotation (barrel roll)</li>
- * </ul>
+ * <p>Used by SpinConfig and other animation configurations
+ * to specify which axis the animation operates on.</p>
  * 
- * @see Animation
+ * @see SpinConfig
+ * @see OrbitConfig
  */
 public enum Axis {
-    /** Pitch rotation (forward/back tilt). */
-    X("x"),
+    /** X-axis (pitch) */
+    X(1, 0, 0),
     
-    /** Yaw rotation (horizontal spin). Default for most effects. */
-    Y("y"),
+    /** Y-axis (yaw) - most common for spinning */
+    Y(0, 1, 0),
     
-    /** Roll rotation (barrel roll). */
-    Z("z");
+    /** Z-axis (roll) */
+    Z(0, 0, 1),
     
-    private final String id;
+    /** Custom axis - use SpinConfig.customAxis */
+    CUSTOM(0, 0, 0);
     
-    Axis(String id) {
-        this.id = id;
-    }
+    private final float x, y, z;
     
-    public String id() {
-        return id;
+    Axis(float x, float y, float z) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
     }
     
     /**
-     * Parses from string, defaults to Y.
+     * Returns the axis as a normalized vector.
+     * @return A new Vector3f representing this axis
+     */
+    public Vector3f toVector() {
+        return new Vector3f(x, y, z);
+    }
+    
+    /**
+     * Returns true if this is the CUSTOM axis.
+     */
+    public boolean isCustom() {
+        return this == CUSTOM;
+    }
+
+    
+    /**
+     * Parse from string (case-insensitive).
+     * @param id The string identifier
+     * @return Matching Axis, or Y if not found
      */
     public static Axis fromId(String id) {
-        if (id == null) return Y;
-        String lower = id.toLowerCase();
-        for (Axis axis : values()) {
-            if (axis.id.equals(lower)) {
-                return axis;
-            }
+        if (id == null || id.isEmpty()) return Y;
+        try {
+            return valueOf(id.toUpperCase().replace("-", "_").replace(" ", "_"));
+        } catch (IllegalArgumentException e) {
+            return Y;
         }
-        return Y;
     }
 }

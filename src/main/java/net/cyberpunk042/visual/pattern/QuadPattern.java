@@ -1,13 +1,18 @@
 package net.cyberpunk042.visual.pattern;
 
-import java.util.Arrays;
-import java.util.List;
-
 /**
  * Patterns for quad-based tessellation (spheres, prism sides).
  * 
- * <p>Controls how each quad cell is divided into triangles.
- * The corners are: TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT
+ * <p>Controls how each 4-vertex quad cell is divided into triangles.
+ * Uses semantic {@link Corner} enum for readability.
+ * 
+ * <h2>Vertex Layout</h2>
+ * <pre>
+ * TOP_LEFT (0) ──── TOP_RIGHT (1)
+ *      │                 │
+ *      │                 │
+ * BOTTOM_LEFT (2) ─ BOTTOM_RIGHT (3)
+ * </pre>
  * 
  * <h2>Available Patterns (16 user-curated from shuffle exploration)</h2>
  * <ul>
@@ -21,12 +26,13 @@ import java.util.List;
  * </ul>
  * 
  * @see VertexPattern
+ * @see Corner
  */
 public enum QuadPattern implements VertexPattern {
     
     // =========================================================================
     // User-Curated Patterns (from shuffle exploration)
-    // These are the 16 "magic" patterns discovered during development
+    // Uses Corner enum for readability: TL=0, TR=1, BL=2, BR=3
     // =========================================================================
     
     /** Filled pattern variant 1 (#37) - Standard filled quad. */
@@ -137,12 +143,27 @@ public enum QuadPattern implements VertexPattern {
     // =========================================================================
     
     private final String id;
-    private final List<Corner[]> triangles;
+    private final Corner[] triangle1;
+    private final Corner[] triangle2;
+    private final int[][] cachedVertexOrder;
     
-    QuadPattern(String id, Corner[]... triangles) {
+    QuadPattern(String id, Corner[] triangle1, Corner[] triangle2) {
         this.id = id;
-        this.triangles = Arrays.asList(triangles);
+        this.triangle1 = triangle1;
+        this.triangle2 = triangle2;
+        // Pre-compute for renderer efficiency
+        this.cachedVertexOrder = computeVertexOrder();
     }
+    
+    private int[][] computeVertexOrder() {
+        int[] t1 = new int[]{triangle1[0].index, triangle1[1].index, triangle1[2].index};
+        int[] t2 = new int[]{triangle2[0].index, triangle2[1].index, triangle2[2].index};
+        return new int[][]{t1, t2};
+    }
+    
+    // =========================================================================
+    // VertexPattern Implementation
+    // =========================================================================
     
     @Override
     public String id() {
@@ -150,23 +171,65 @@ public enum QuadPattern implements VertexPattern {
     }
     
     @Override
-    public PatternGeometry geometry() {
-        return PatternGeometry.QUAD;
+    public CellType cellType() {
+        return CellType.QUAD;
+    }
+    
+    @Override
+    public boolean shouldRender(int index, int total) {
+        // Quad patterns always render - they just change vertex arrangement
+        return true;
     }
     
     /**
-     * Gets the triangles that make up this pattern.
+     * Gets the number of triangles this pattern produces.
      */
-    public List<Corner[]> triangles() {
-        return triangles;
+    public int triangleCount() { return cachedVertexOrder.length; }
+    
+    @Override
+    public int[][] getVertexOrder() {
+        return cachedVertexOrder;
+    }
+    
+    // =========================================================================
+    // Semantic Access (for debugging/logging)
+    // =========================================================================
+    
+    /**
+     * Gets the first triangle's corners (semantic).
+     */
+    public Corner[] triangle1() {
+        return triangle1;
     }
     
     /**
-     * Number of triangles in this pattern.
+     * Gets the second triangle's corners (semantic).
      */
-    public int triangleCount() {
-        return triangles.size();
+    public Corner[] triangle2() {
+        return triangle2;
     }
+    
+    /**
+     * Gets all triangles as an array of Corner arrays.
+     * Used by MeshBuilder for iteration.
+     */
+    public Corner[][] triangles() {
+        return new Corner[][]{triangle1, triangle2};
+    }
+    
+    /**
+     * Returns human-readable description of the pattern.
+     */
+    public String describe() {
+        return String.format("%s→%s→%s | %s→%s→%s",
+            triangle1[0].shortName(), triangle1[1].shortName(), triangle1[2].shortName(),
+            triangle2[0].shortName(), triangle2[1].shortName(), triangle2[2].shortName()
+        );
+    }
+    
+    // =========================================================================
+    // Static Utilities
+    // =========================================================================
     
     /**
      * Parses a pattern from ID string.
@@ -193,13 +256,35 @@ public enum QuadPattern implements VertexPattern {
         return ids;
     }
     
+    // =========================================================================
+    // Corner Enum (Semantic Vertex Names)
+    // =========================================================================
+    
     /**
-     * Corner positions within a quad cell.
+     * Semantic names for quad vertices.
+     * 
+     * <pre>
+     * TOP_LEFT (0) ──── TOP_RIGHT (1)
+     *      │                 │
+     * BOTTOM_LEFT (2) ─ BOTTOM_RIGHT (3)
+     * </pre>
      */
     public enum Corner {
-        TOP_LEFT,
-        TOP_RIGHT,
-        BOTTOM_LEFT,
-        BOTTOM_RIGHT
+        TOP_LEFT(0, "TL"),
+        TOP_RIGHT(1, "TR"),
+        BOTTOM_LEFT(2, "BL"),
+        BOTTOM_RIGHT(3, "BR");
+        
+        /** Index used in vertex arrays */
+        public final int index;
+        private final String shortName;
+        
+        Corner(int index, String shortName) {
+            this.index = index;
+            this.shortName = shortName;
+        }
+        
+        /** Short name for logging (TL, TR, BL, BR) */
+        public String shortName() { return shortName; }
     }
 }

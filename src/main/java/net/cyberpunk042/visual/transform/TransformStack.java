@@ -1,211 +1,197 @@
 package net.cyberpunk042.visual.transform;
 
-import net.cyberpunk042.log.Logging;
-import net.minecraft.util.math.Vec3d;
-
+import org.joml.Vector3f;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
 /**
- * Stack-based transform management for nested transformations.
+ * Stack of transforms for hierarchical rendering.
  * 
- * <p>Similar to OpenGL's matrix stack, allows pushing and popping
- * transforms to create hierarchical transformations.
- * 
- * <h2>Usage</h2>
- * <pre>
- * TransformStack stack = new TransformStack();
- * 
- * // Base transform
- * stack.push(Transform.offset(0, 1, 0));
- * 
- * // Nested transform (combines with parent)
- * stack.push(Transform.scale(0.5f));
- * Transform combined = stack.current(); // offset + scale
- * 
- * // Pop back to parent
- * stack.pop();
- * Transform parent = stack.current(); // just offset
- * </pre>
+ * <p>Allows pushing and popping transforms like a matrix stack,
+ * with accumulated effects.</p>
  * 
  * @see Transform
  */
-public final class TransformStack {
-    
-    private static final int MAX_DEPTH = 32;
+public class TransformStack {
     
     private final Deque<Transform> stack = new ArrayDeque<>();
     
-    /**
-     * Creates a new transform stack with identity transform.
-     */
     public TransformStack() {
-        stack.push(Transform.identity());
+        stack.push(Transform.IDENTITY);
     }
     
     /**
-     * Creates a transform stack with an initial transform.
+     * Pushes a copy of the current transform onto the stack.
      */
-    public TransformStack(Transform initial) {
-        stack.push(initial != null ? initial : Transform.identity());
-    }
-    
-    // ─────────────────────────────────────────────────────────────────────────
-    // Stack Operations
-    // ─────────────────────────────────────────────────────────────────────────
-    
-    /**
-     * Pushes a transform onto the stack, combining with current.
-     * 
-     * @param transform Transform to apply
-     * @return this for chaining
-     */
-    public TransformStack push(Transform transform) {
-        if (stack.size() >= MAX_DEPTH) {
-            Logging.RENDER.topic("transform").warn(
-                "TransformStack overflow (max {}), ignoring push", MAX_DEPTH);
-            return this;
-        }
-        
-        Transform current = stack.peek();
-        Transform combined = combine(current, transform);
-        stack.push(combined);
-        
-        Logging.RENDER.topic("transform").trace(
-            "Push transform (depth={})", stack.size());
-        return this;
+    public void push() {
+        stack.push(peek());
     }
     
     /**
-     * Pops the top transform, returning to parent state.
-     * 
-     * @return The popped transform
+     * Pops the top transform from the stack.
+     * @throws IllegalStateException if stack would become empty
      */
-    public Transform pop() {
+    public void pop() {
         if (stack.size() <= 1) {
-            Logging.RENDER.topic("transform").warn(
-                "TransformStack underflow, cannot pop below identity");
-            return stack.peek();
+            throw new IllegalStateException("Cannot pop the last transform from stack");
         }
-        
-        Transform popped = stack.pop();
-        Logging.RENDER.topic("transform").trace(
-            "Pop transform (depth={})", stack.size());
-        return popped;
+        stack.pop();
     }
     
     /**
-     * Gets the current combined transform.
+     * Returns the current (top) transform without removing it.
      */
-    public Transform current() {
+    public Transform peek() {
         return stack.peek();
     }
     
     /**
-     * Gets the current stack depth.
+     * Applies a transform to the current state.
+     * @param transform Transform to combine with current
+     */
+    public void apply(Transform transform) {
+        if (transform == null || transform == Transform.IDENTITY) return;
+        
+        Transform current = stack.pop();
+        stack.push(combine(current, transform));
+    }
+    
+    /**
+     * Translates the current transform.
+     * @param x X offset
+     * @param y Y offset
+     * @param z Z offset
+     */
+    public void translate(float x, float y, float z) {
+        Transform current = stack.pop();
+        Vector3f newOffset = current.offset() != null ? 
+            new Vector3f(current.offset()).add(x, y, z) : 
+            new Vector3f(x, y, z);
+        stack.push(Transform.builder()
+            .anchor(current.anchor())
+            .offset(newOffset)
+            .rotation(current.rotation())
+            .inheritRotation(current.inheritRotation())
+            .scale(current.scale())
+            .scaleXYZ(current.scaleXYZ())
+            .scaleWithRadius(current.scaleWithRadius())
+            .facing(current.facing())
+            .up(current.up())
+            .billboard(current.billboard())
+            .orbit(current.orbit())
+            .build());
+    }
+    
+    /**
+     * Scales the current transform.
+     * @param scale Uniform scale factor
+     */
+    public void scale(float scale) {
+        Transform current = stack.pop();
+        stack.push(Transform.builder()
+            .anchor(current.anchor())
+            .offset(current.offset())
+            .rotation(current.rotation())
+            .inheritRotation(current.inheritRotation())
+            .scale(current.scale() * scale)
+            .scaleXYZ(current.scaleXYZ() != null ? 
+                new Vector3f(current.scaleXYZ()).mul(scale) : null)
+            .scaleWithRadius(current.scaleWithRadius())
+            .facing(current.facing())
+            .up(current.up())
+            .billboard(current.billboard())
+            .orbit(current.orbit())
+            .build());
+    }
+    
+    /**
+     * Rotates the current transform.
+     * @param pitch X rotation in degrees
+     * @param yaw Y rotation in degrees
+     * @param roll Z rotation in degrees
+     */
+    public void rotate(float pitch, float yaw, float roll) {
+        Transform current = stack.pop();
+        Vector3f newRot = current.rotation() != null ?
+            new Vector3f(current.rotation()).add(pitch, yaw, roll) :
+            new Vector3f(pitch, yaw, roll);
+        stack.push(Transform.builder()
+            .anchor(current.anchor())
+            .offset(current.offset())
+            .rotation(newRot)
+            .inheritRotation(current.inheritRotation())
+            .scale(current.scale())
+            .scaleXYZ(current.scaleXYZ())
+            .scaleWithRadius(current.scaleWithRadius())
+            .facing(current.facing())
+            .up(current.up())
+            .billboard(current.billboard())
+            .orbit(current.orbit())
+            .build());
+    }
+    
+    /**
+     * Resets the stack to identity transform.
+     */
+    public void reset() {
+        stack.clear();
+        stack.push(Transform.IDENTITY);
+    }
+    
+    /**
+     * Returns the stack depth.
      */
     public int depth() {
         return stack.size();
     }
     
     /**
-     * Checks if stack is at root level.
+     * Combines two transforms.
+     * @param base Base transform
+     * @param applied Transform to apply on top
+     * @return Combined transform
      */
-    public boolean isAtRoot() {
-        return stack.size() == 1;
-    }
-    
-    /**
-     * Resets to identity transform.
-     */
-    public void reset() {
-        stack.clear();
-        stack.push(Transform.identity());
-        Logging.RENDER.topic("transform").trace("TransformStack reset");
-    }
-    
-    // ─────────────────────────────────────────────────────────────────────────
-    // Convenience Methods
-    // ─────────────────────────────────────────────────────────────────────────
-    
-    /**
-     * Pushes an offset transform.
-     */
-    public TransformStack pushOffset(double x, double y, double z) {
-        return push(Transform.offset(x, y, z));
-    }
-    
-    /**
-     * Pushes a scale transform.
-     */
-    public TransformStack pushScale(float scale) {
-        return push(Transform.scaled(scale));
-    }
-    
-    /**
-     * Pushes a rotation transform (Y-axis).
-     */
-    public TransformStack pushRotationY(float degrees) {
-        return push(new Transform(null, new Vec3d(0, degrees, 0), 1.0f));
-    }
-    
-    // ─────────────────────────────────────────────────────────────────────────
-    // Transform Combination
-    // ─────────────────────────────────────────────────────────────────────────
-    
-    /**
-     * Combines two transforms (parent * child).
-     */
-    private static Transform combine(Transform parent, Transform child) {
-        if (parent == null) return child;
-        if (child == null) return parent;
-        
+    private static Transform combine(Transform base, Transform applied) {
         // Combine offsets
-        Vec3d parentOffset = parent.offset() != null ? parent.offset() : Vec3d.ZERO;
-        Vec3d childOffset = child.offset() != null ? child.offset() : Vec3d.ZERO;
-        Vec3d combinedOffset = parentOffset.add(
-            childOffset.multiply(parent.scale()) // Scale child offset by parent scale
-        );
+        Vector3f offset = null;
+        if (base.offset() != null || applied.offset() != null) {
+            offset = new Vector3f();
+            if (base.offset() != null) offset.add(base.offset());
+            if (applied.offset() != null) offset.add(applied.offset());
+        }
         
         // Combine rotations
-        Vec3d parentRot = parent.rotation() != null ? parent.rotation() : Vec3d.ZERO;
-        Vec3d childRot = child.rotation() != null ? child.rotation() : Vec3d.ZERO;
-        Vec3d combinedRotation = parentRot.add(childRot);
-        
-        // Combine scales
-        float combinedScale = parent.scale() * child.scale();
-        
-        return new Transform(combinedOffset, combinedRotation, combinedScale);
-    }
-    
-    // ─────────────────────────────────────────────────────────────────────────
-    // Scoped Operations
-    // ─────────────────────────────────────────────────────────────────────────
-    
-    /**
-     * Executes an action with a temporary transform.
-     * Automatically pops when done.
-     */
-    public void withTransform(Transform transform, Runnable action) {
-        push(transform);
-        try {
-            action.run();
-        } finally {
-            pop();
+        Vector3f rotation = null;
+        if (base.rotation() != null || applied.rotation() != null) {
+            rotation = new Vector3f();
+            if (base.rotation() != null) rotation.add(base.rotation());
+            if (applied.rotation() != null) rotation.add(applied.rotation());
         }
-    }
-    
-    /**
-     * Executes an action at a specific offset.
-     */
-    public void atOffset(double x, double y, double z, Runnable action) {
-        withTransform(Transform.offset(x, y, z), action);
-    }
-    
-    /**
-     * Executes an action with a scale.
-     */
-    public void withScale(float scale, Runnable action) {
-        withTransform(Transform.scaled(scale), action);
+        
+        // Multiply scales
+        float scale = base.scale() * applied.scale();
+        
+        // Combine scaleXYZ
+        Vector3f scaleXYZ = null;
+        if (base.scaleXYZ() != null || applied.scaleXYZ() != null) {
+            Vector3f bScale = base.scaleXYZ() != null ? base.scaleXYZ() : new Vector3f(base.scale());
+            Vector3f aScale = applied.scaleXYZ() != null ? applied.scaleXYZ() : new Vector3f(applied.scale());
+            scaleXYZ = new Vector3f(bScale).mul(aScale);
+        }
+        
+        // Applied transform wins for non-additive properties
+        return new Transform(
+            applied.anchor() != Anchor.CENTER ? applied.anchor() : base.anchor(),
+            offset,
+            rotation,
+            applied.inheritRotation() && base.inheritRotation(),
+            scale,
+            scaleXYZ,
+            applied.scaleWithRadius() || base.scaleWithRadius(),
+            applied.facing() != Facing.FIXED ? applied.facing() : base.facing(),
+            applied.up() != UpVector.WORLD_UP ? applied.up() : base.up(),
+            applied.billboard() != Billboard.NONE ? applied.billboard() : base.billboard(),
+            applied.orbit() != null ? applied.orbit() : base.orbit()
+        );
     }
 }

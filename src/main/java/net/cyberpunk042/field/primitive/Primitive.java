@@ -2,64 +2,136 @@ package net.cyberpunk042.field.primitive;
 
 import net.cyberpunk042.visual.animation.Animation;
 import net.cyberpunk042.visual.appearance.Appearance;
-import net.cyberpunk042.visual.transform.Transform;
+import net.cyberpunk042.visual.fill.FillConfig;
+import net.cyberpunk042.visual.pattern.ArrangementConfig;
 import net.cyberpunk042.visual.shape.Shape;
+import net.cyberpunk042.visual.transform.Transform;
+import net.cyberpunk042.visual.visibility.VisibilityMask;
 
 /**
- * Base interface for field visual primitives.
+ * A renderable shape with complete configuration.
  * 
- * <p>Implementations are in the _legacy package during refactoring.
- * New implementations will be flat (no hierarchy) per ARCHITECTURE_PROPOSAL.md.
+ * <p>Primitives combine:</p>
+ * <ul>
+ *   <li><b>Shape</b> - Geometry (sphere, ring, disc, etc.)</li>
+ *   <li><b>Transform</b> - Position, rotation, scale</li>
+ *   <li><b>Fill</b> - How surface is rendered (solid, wireframe, cage)</li>
+ *   <li><b>Visibility</b> - Masking (bands, stripes, etc.)</li>
+ *   <li><b>Arrangement</b> - Vertex patterns per part</li>
+ *   <li><b>Appearance</b> - Color, alpha, glow</li>
+ *   <li><b>Animation</b> - Spin, pulse, phase</li>
+ *   <li><b>Link</b> - Connections to other primitives</li>
+ * </ul>
  * 
- * <h2>Tessellation</h2>
- * <p>Tessellation is handled client-side via the tessellator classes.
- * Use the primitive's shape to create the appropriate tessellator.
+ * <h2>JSON Format</h2>
+ * <pre>
+ * {
+ *   "id": "main_sphere",
+ *   "type": "sphere",
+ *   "shape": { "radius": 1.0 },
+ *   "transform": { "anchor": "CENTER" },
+ *   "fill": { "mode": "SOLID" },
+ *   "visibility": { "mask": "FULL" },
+ *   "arrangement": "filled_1",
+ *   "appearance": { "color": "@primary" },
+ *   "animation": { "spin": 0.02 },
+ *   "link": null
+ * }
+ * </pre>
  * 
- * @see net.cyberpunk042.client.visual.mesh.Tessellator
+ * @see Shape
+ * @see Transform
+ * @see Appearance
+ * @see Animation
+ * @see FillConfig
+ * @see VisibilityMask
  */
 public interface Primitive {
     
     /**
-     * Returns the geometric shape of this primitive.
-     * Per ARCHITECTURE.md naming convention.
+     * Unique identifier for this primitive within the field.
+     * <p>REQUIRED - used for linking, debugging, and references.</p>
+     * @return Primitive ID
      */
-    Shape shape();
+    String id();
     
     /**
-     * Returns the transform (offset, rotation, scale).
-     * Per ARCHITECTURE.md naming convention.
-     */
-    Transform transform();
-    
-    /**
-     * Returns the appearance (color, alpha, fill mode).
-     * Per ARCHITECTURE.md naming convention.
-     */
-    Appearance appearance();
-    
-    /**
-     * Returns the animation configuration.
-     * Per ARCHITECTURE.md naming convention.
-     */
-    Animation animation();
-    
-    /**
-     * Returns the primitive type identifier.
+     * Shape type name.
+     * @return Type (e.g., "sphere", "ring", "disc")
      */
     String type();
     
     /**
-     * Creates a copy with a new transform.
+     * The geometric shape.
+     * @return Shape configuration
      */
-    Primitive withTransform(Transform transform);
+    Shape shape();
     
     /**
-     * Creates a copy with a new appearance.
+     * Transform configuration.
+     * @return Transform (position, rotation, scale)
      */
-    Primitive withAppearance(Appearance appearance);
+    Transform transform();
     
     /**
-     * Creates a copy with a new animation.
+     * Fill configuration.
+     * @return Fill mode and options
      */
-    Primitive withAnimation(Animation animation);
+    FillConfig fill();
+    
+    /**
+     * Visibility mask configuration.
+     * @return Visibility mask
+     */
+    VisibilityMask visibility();
+    
+    /**
+     * Arrangement configuration.
+     * @return Arrangement patterns per part
+     */
+    ArrangementConfig arrangement();
+    
+    /**
+     * Visual appearance.
+     * @return Appearance (color, alpha, glow, etc.)
+     */
+    Appearance appearance();
+    
+    /**
+     * Animation configuration.
+     * @return Animation (spin, pulse, etc.)
+     */
+    Animation animation();
+    
+    /**
+     * Link to other primitives.
+     * @return Link configuration, or null if not linked
+     */
+    PrimitiveLink link();
+    
+    // =========================================================================
+    // Convenience Methods
+    // =========================================================================
+    
+    /**
+     * Whether this primitive has active animation.
+     */
+    default boolean isAnimated() {
+        Animation anim = animation();
+        return anim != null && anim.isActive();
+    }
+    
+    /**
+     * Whether this primitive is linked to others.
+     */
+    default boolean isLinked() {
+        return link() != null;
+    }
+    
+    /**
+     * Gets the approximate radius of this primitive.
+     */
+    default float getRadius() {
+        return shape().getRadius();
+    }
 }

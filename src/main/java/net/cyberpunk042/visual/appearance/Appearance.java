@@ -1,246 +1,157 @@
 package net.cyberpunk042.visual.appearance;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import net.cyberpunk042.log.Logging;
+
+import org.jetbrains.annotations.Nullable;
+import net.cyberpunk042.visual.validation.Range;
+import net.cyberpunk042.visual.validation.ValueRange;
 
 /**
- * Visual appearance properties for a primitive.
+ * Visual appearance configuration for a primitive.
  * 
- * <h2>Components</h2>
- * <ul>
- *   <li><b>color</b>: Color reference (theme role like "@primary" or hex "#FF0000")</li>
- *   <li><b>alpha</b>: Opacity range for pulsing effects</li>
- *   <li><b>fill</b>: Whether to render as solid fill</li>
- *   <li><b>pattern</b>: Surface pattern (bands, checker)</li>
- *   <li><b>glow</b>: Glow/emissive intensity (0.0 - 1.0)</li>
- *   <li><b>wireThickness</b>: Line thickness for wireframe mode</li>
- * </ul>
+ * <p>Appearance controls colors, transparency, and effects.
+ * Animation is handled separately by Animation record.</p>
  * 
- * <h2>Usage Examples</h2>
+ * <h2>JSON Format</h2>
  * <pre>
- * Appearance.solid("@primary")
- * Appearance.translucent("@glow", 0.4f, 0.8f)
- * Appearance.banded("@secondary", 4, 0.3f)
- * Appearance.wireframe("@wire", 1.5f)
+ * "appearance": {
+ *   "color": "@primary",
+ *   "alpha": { "min": 0.6, "max": 0.8 },
+ *   "glow": 0.5,
+ *   "emissive": 0.0,
+ *   "saturation": 1.0,
+ *   "brightness": 1.0,
+ *   "hueShift": 0.0,
+ *   "secondaryColor": "@secondary",
+ *   "colorBlend": 0.0
+ * }
  * </pre>
  * 
  * @see AlphaRange
- * @see PatternConfig
+ * @see net.cyberpunk042.visual.animation.Animation
  */
 public record Appearance(
-        String color,
-        AlphaRange alpha,
-        FillMode fill,
-        PatternConfig pattern,
-        float glow,
-        float wireThickness
+    String color,
+    AlphaRange alpha,
+    @Range(ValueRange.ALPHA) float glow,
+    @Range(ValueRange.ALPHA) float emissive,
+    @Range(ValueRange.ALPHA) float saturation,
+    @Range(ValueRange.ALPHA) float brightness,
+    @Range(ValueRange.DEGREES) float hueShift,
+    @Nullable String secondaryColor,
+    @Range(ValueRange.ALPHA) float colorBlend
 ) {
+    /** Default appearance. */
+    public static Appearance defaults() { return DEFAULT; }
     
-    // =========================================================================
-    // Presets
-    // =========================================================================
+    public static Appearance wireframe(String color) { 
+        return builder().color(color).build();
+    }
     
-    /** Default appearance: primary color, semi-transparent, filled. */
+    public static Appearance translucent(String color, float alpha) { 
+        return builder().color(color).alpha(AlphaRange.of(alpha)).build();
+    }
+    
     public static final Appearance DEFAULT = new Appearance(
-        "@primary", AlphaRange.TRANSLUCENT, FillMode.SOLID, PatternConfig.NONE, 0.0f, 1.0f);
+        "@primary", AlphaRange.DEFAULT, 0, 0, 1, 1, 0, null, 0);
+    
+    /** Glowing appearance. */
+    public static final Appearance GLOWING = new Appearance(
+        "@primary", AlphaRange.DEFAULT, 0.8f, 0.5f, 1, 1, 0, null, 0);
+    
+    /** Translucent appearance. */
+    public static final Appearance TRANSLUCENT = new Appearance(
+        "@primary", AlphaRange.of(0.3f), 0, 0, 1, 1, 0, null, 0);
+    
+    /**
+     * Creates a simple solid-color appearance.
+     * @param color Color reference (e.g., "@primary", "#FF0000")
+     */
+    public static Appearance color(String color) {
+        return new Appearance(color, AlphaRange.OPAQUE, 0, 0, 1, 1, 0, null, 0);
+    }
+    
+    /**
+     * Creates an appearance with glow.
+     * @param color Color reference
+     * @param glow Glow intensity (0-1)
+     */
+    public static Appearance glowing(String color, @Range(ValueRange.ALPHA) float glow) {
+        return new Appearance(color, AlphaRange.DEFAULT, glow, glow * 0.5f, 1, 1, 0, null, 0);
+    }
+    
+    /** Whether glow is active. */
+    public boolean hasGlow() { return glow > 0; }
+    
+    /** Whether emissive is active. */
+    public boolean hasEmissive() { return emissive > 0; }
+    
+    /** Whether secondary color is used. */
+    public boolean hasSecondaryColor() { return secondaryColor != null && colorBlend > 0; }
     
     // =========================================================================
-    // Factory Methods
+    // Builder
     // =========================================================================
     
-    public static Appearance defaults() {
-        return DEFAULT;
-    }
-    
+    public static Builder builder() { return new Builder(); }
     /**
-     * Solid opaque appearance.
+     * Serializes this appearance to JSON.
      */
-    public static Appearance solid(String color) {
-        return new Appearance(color, AlphaRange.OPAQUE, FillMode.SOLID, PatternConfig.NONE, 0.0f, 1.0f);
-    }
-    
-    /**
-     * Translucent appearance with pulsing alpha.
-     */
-    public static Appearance translucent(String color, float alphaMin, float alphaMax) {
-        return new Appearance(color, AlphaRange.of(alphaMin, alphaMax), FillMode.SOLID, PatternConfig.NONE, 0.0f, 1.0f);
-    }
-    
-    /**
-     * Translucent appearance with fixed alpha.
-     */
-    public static Appearance translucent(String color, float alpha) {
-        return new Appearance(color, AlphaRange.fixed(alpha), FillMode.SOLID, PatternConfig.NONE, 0.0f, 1.0f);
-    }
-    
-    /**
-     * Wireframe appearance.
-     */
-    public static Appearance wireframe(String color) {
-        return new Appearance(color, AlphaRange.OPAQUE, FillMode.WIREFRAME, PatternConfig.NONE, 0.0f, 1.0f);
-    }
-    
-    /**
-     * Wireframe with custom thickness.
-     */
-    public static Appearance wireframe(String color, float thickness) {
-        return new Appearance(color, AlphaRange.OPAQUE, FillMode.WIREFRAME, PatternConfig.NONE, 0.0f, thickness);
-    }
-    
-    /**
-     * Glowing appearance.
-     */
-    public static Appearance glowing(String color, float glow) {
-        return new Appearance(color, AlphaRange.STRONG, FillMode.SOLID, PatternConfig.NONE, glow, 1.0f);
-    }
-    
-    /**
-     * Banded appearance with stripes.
-     */
-    public static Appearance banded(String color, int bandCount, float bandThickness) {
-        return new Appearance(color, AlphaRange.TRANSLUCENT, FillMode.SOLID, 
-            PatternConfig.bands(bandCount, bandThickness), 0.0f, 1.0f);
-    }
-    
-    /**
-     * Checker pattern appearance.
-     */
-    public static Appearance checker(String color, int divisions) {
-        return new Appearance(color, AlphaRange.TRANSLUCENT, FillMode.SOLID,
-            PatternConfig.checker(divisions), 0.0f, 1.0f);
-    }
-    
-    // =========================================================================
-    // Builder-style
-    // =========================================================================
-    
-    public Appearance withColor(String newColor) {
-        return new Appearance(newColor, alpha, fill, pattern, glow, wireThickness);
-    }
-    
-    public Appearance withAlpha(AlphaRange newAlpha) {
-        return new Appearance(color, newAlpha, fill, pattern, glow, wireThickness);
-    }
-    
-    public Appearance withAlpha(float min, float max) {
-        return new Appearance(color, AlphaRange.of(min, max), fill, pattern, glow, wireThickness);
-    }
-    
-    public Appearance withFill(FillMode newFill) {
-        return new Appearance(color, alpha, newFill, pattern, glow, wireThickness);
-    }
-    
-    public Appearance withPattern(PatternConfig newPattern) {
-        return new Appearance(color, alpha, fill, newPattern, glow, wireThickness);
-    }
-    
-    public Appearance withGlow(float newGlow) {
-        return new Appearance(color, alpha, fill, pattern, newGlow, wireThickness);
-    }
-    
-    public Appearance withWireThickness(float thickness) {
-        return new Appearance(color, alpha, fill, pattern, glow, thickness);
-    }
-    
-    // =========================================================================
-    // Computed Properties
-    // =========================================================================
-    
-    /**
-     * Gets the current alpha value (midpoint of range).
-     * For animated alpha, use {@link AlphaRange#at(float)}.
-     */
-    public float currentAlpha() {
-        return alpha.midpoint();
-    }
-    
-    /**
-     * Checks if this appearance has any visible pattern.
-     */
-    public boolean hasPattern() {
-        return pattern.hasPattern();
-    }
-    
-    /**
-     * Checks if alpha is pulsing.
-     */
-    public boolean isPulsing() {
-        return alpha.isPulsing();
-    }
-    
-    // =========================================================================
-    // JSON Serialization
-    // =========================================================================
-    
     public JsonObject toJson() {
         JsonObject json = new JsonObject();
-        json.addProperty("color", color);
-        
-        // Alpha - compact format if not pulsing
-        if (alpha.isPulsing()) {
-            json.add("alpha", alpha.toJson());
-        } else {
-            json.addProperty("alpha", alpha.min());
-        }
-        
-        json.addProperty("fill", fill.id());
-        
-        // Pattern - only include if has effect
-        if (pattern.hasPattern()) {
-            json.add("pattern", pattern.toJson());
-        }
-        
-        if (glow > 0) {
-            json.addProperty("glow", glow);
-        }
-        if (wireThickness != 1.0f) {
-            json.addProperty("wireThickness", wireThickness);
-        }
-        
+        if (color != null) json.addProperty("color", color);
+        if (secondaryColor != null) json.addProperty("secondaryColor", secondaryColor);
+        if (alpha != null) json.add("alpha", alpha.toJson());
+        if (glow != 0) json.addProperty("glow", glow);
         return json;
     }
+
+
     
-    public static Appearance fromJson(JsonObject json) {
-        if (json == null) {
-            return DEFAULT;
+    public static class Builder {
+        private String color = "@primary";
+        private AlphaRange alpha = AlphaRange.DEFAULT;
+        private @Range(ValueRange.ALPHA) float glow = 0;
+        private @Range(ValueRange.ALPHA) float emissive = 0;
+        private @Range(ValueRange.ALPHA) float saturation = 1;
+        private @Range(ValueRange.ALPHA) float brightness = 1;
+        private @Range(ValueRange.DEGREES) float hueShift = 0;
+        private String secondaryColor = null;
+        private @Range(ValueRange.ALPHA) float colorBlend = 0;
+        
+        public Builder color(String c) { this.color = c; return this; }
+        public Builder alpha(AlphaRange a) { this.alpha = a; return this; }
+        public Builder alpha(float a) { this.alpha = AlphaRange.of(a); return this; }
+        public Builder glow(float g) { this.glow = g; return this; }
+        public Builder emissive(float e) { this.emissive = e; return this; }
+        public Builder saturation(float s) { this.saturation = s; return this; }
+        public Builder brightness(float b) { this.brightness = b; return this; }
+        public Builder hueShift(float h) { this.hueShift = h; return this; }
+        public Builder secondaryColor(String c) { this.secondaryColor = c; return this; }
+        public Builder colorBlend(float b) { this.colorBlend = b; return this; }
+        
+        public Appearance build() {
+            return new Appearance(color, alpha, glow, emissive, saturation, brightness, 
+                hueShift, secondaryColor, colorBlend);
         }
-        
-        String color = json.has("color") ? json.get("color").getAsString() : "@primary";
-        
-        // Parse alpha (can be float or object)
-        AlphaRange alpha;
-        if (json.has("alpha")) {
-            alpha = AlphaRange.fromJsonElement(json.get("alpha"));
-        } else {
-            alpha = AlphaRange.TRANSLUCENT;
-        }
-        
-        FillMode fill;
-        if (json.has("fill")) {
-            JsonElement fillElem = json.get("fill");
-            if (fillElem.isJsonPrimitive() && fillElem.getAsJsonPrimitive().isBoolean()) {
-                fill = fillElem.getAsBoolean() ? FillMode.SOLID : FillMode.WIREFRAME;
-            } else {
-                fill = FillMode.fromId(fillElem.getAsString());
-            }
-        } else {
-            fill = FillMode.SOLID;
-        }
-        
-        PatternConfig pattern = json.has("pattern") 
-            ? PatternConfig.fromJson(json.getAsJsonObject("pattern"))
-            : PatternConfig.NONE;
-        
-        float glow = json.has("glow") ? json.get("glow").getAsFloat() : 0.0f;
-        float wireThickness = json.has("wireThickness") ? json.get("wireThickness").getAsFloat() : 1.0f;
-        
-        Appearance result = new Appearance(color, alpha, fill, pattern, glow, wireThickness);
-        
-        Logging.RENDER.topic("appearance").trace(
-            "Parsed Appearance: color={}, alpha={:.2f}-{:.2f}, fill={}, pattern={}",
-            color, alpha.min(), alpha.max(), fill, pattern.type().id());
-        
-        return result;
     }
+
+    // =========================================================================
+    // Immutable Modifiers
+    // =========================================================================
+    
+    /**
+     * Returns a copy with the specified alpha range.
+     */
+    public Appearance withAlpha(AlphaRange newAlpha) {
+        return new Appearance(color, newAlpha, glow, emissive, saturation, brightness, hueShift, secondaryColor, colorBlend);
+    }
+    
+    /**
+     * Returns a copy with the specified color.
+     */
+    public Appearance withColor(String newColor) {
+        return new Appearance(newColor, alpha, glow, emissive, saturation, brightness, hueShift, secondaryColor, colorBlend);
+    }
+
 }

@@ -177,7 +177,9 @@ public final class FieldClientInit {
         
         try {
             var json = com.google.gson.JsonParser.parseString(payload.definitionJson()).getAsJsonObject();
-            var definition = FieldDefinition.fromJson(json, id);
+            // Parse definition using FieldLoader
+            net.cyberpunk042.field.loader.FieldLoader loader = new net.cyberpunk042.field.loader.FieldLoader();
+            var definition = loader.parseDefinition(json);
             FieldRegistry.register(definition);
             Logging.RENDER.topic("field").debug("Received definition: {}", id);
         } catch (Exception e) {

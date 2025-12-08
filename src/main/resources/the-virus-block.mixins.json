@@ -24,7 +24,9 @@
 		"EntityGrowthCollisionIntermediaryMixin",
 		"ServerPlayNetworkHandlerMixin",
 		"CollisionViewGrowthCollisionMixin",
-		"WorldCollisionGrowthIntermediaryMixin"
+		"WorldCollisionGrowthIntermediaryMixin",
+		"PlayerEntityMixin",
+		"ServerPlayerEntityMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

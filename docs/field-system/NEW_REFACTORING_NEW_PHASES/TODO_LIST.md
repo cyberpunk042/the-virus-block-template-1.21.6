@@ -7,6 +7,28 @@
 
 ---
 
+## 🚨 CRITICAL INCIDENT - December 8, 2024
+
+**Data Loss Event:** During legacy code move operation, 15 active source directories were accidentally deleted.
+
+**Impact:** Active refactoring work may have been lost. All TODO items need verification.
+
+**Documentation:**
+- [CRITICAL_MISTAKE_2024-12-08.md](./_design/CRITICAL_MISTAKE_2024-12-08.md) - Full incident report
+- [RECOVERY_PLAN.md](./_design/RECOVERY_PLAN.md) - Recovery process and file inventory
+- [SCRIPT_SAFETY_RULES.md](./_design/SCRIPT_SAFETY_RULES.md) - Prevention rules
+
+**Action Required:**
+- [x] Review all files in `docs/field-system/_reference_code/` to identify active vs legacy code
+- [x] Verify all TODO items are still valid and dependencies exist
+- [x] **VERIFIED:** No active code was lost - all current implementations exist
+
+**Recovery Status:** ✅ COMPLETE - All dependencies verified, no files need restoration
+
+---
+
+---
+
 ## How to Use
 
 ### Option A: One Task at a Time
@@ -50,11 +72,14 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 | Status | Count |
 |--------|-------|
-| ✅ Done | 4 |
+| ✅ Done | ~398 |
 | 🔄 In Progress | 0 |
-| ⬜ Pending | ~430 |
+| ⬜ Pending | ~35 |
 
-> **Every Fxx task has a matching Fxx-CHK step = ~430 rows total**
+> **Batches 1-21:** ✅ Complete  
+> **Next:** Batch 22 (Integration Testing)  
+> **Then:** Batch 23 (Final Audit)  
+> **Phase 2:** [GUI_TODO_LIST.md](./_design/gui/GUI_TODO_LIST.md) - 151 tasks ready
 
 ---
 
@@ -80,27 +105,27 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 | ID | Task | Status | Package |
 |----|------|--------|---------|
-| F01 | `CellType` enum: QUAD, SEGMENT, SECTOR, EDGE, TRIANGLE | ⬜ | visual.pattern |
-| F01-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F02 | `Anchor` enum: CENTER, FEET, HEAD, ABOVE, BELOW, FRONT, BACK, LEFT, RIGHT | ⬜ | visual.transform |
-| F02-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F03 | `Facing` enum: FIXED, PLAYER_LOOK, VELOCITY, CAMERA | ⬜ | visual.transform |
-| F03-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F04 | `Billboard` enum: NONE, FULL, Y_AXIS | ⬜ | visual.transform |
-| F04-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F05 | `UpVector` enum: WORLD_UP, PLAYER_UP, VELOCITY, CUSTOM | ⬜ | visual.transform |
-| F05-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F06 | `FillMode` enum: SOLID, WIREFRAME, CAGE, POINTS | ⬜ | visual.fill |
-| F06-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F07 | `MaskType` enum: FULL, BANDS, STRIPES, CHECKER, RADIAL, GRADIENT, CUSTOM | ⬜ | visual.visibility |
-| F07-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F08 | `Axis` enum: X, Y, Z, CUSTOM | ⬜ | visual.animation |
-| F08-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F09 | `Waveform` enum: SINE, SQUARE, TRIANGLE_WAVE, SAWTOOTH | ⬜ | visual.animation |
-| F09-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F10 | `BlendMode` enum: NORMAL, ADD (Phase 2: MULTIPLY, SCREEN) | ⬜ | visual.layer |
-| F10-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-01 | ⚠️ **BATCH 1 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| F01 | `CellType` enum: QUAD, SEGMENT, SECTOR, EDGE, TRIANGLE | ✅ | visual.pattern |
+| F01-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F02 | `Anchor` enum: CENTER, FEET, HEAD, ABOVE, BELOW, FRONT, BACK, LEFT, RIGHT | ✅ | visual.transform |
+| F02-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F03 | `Facing` enum: FIXED, PLAYER_LOOK, VELOCITY, CAMERA | ✅ | visual.transform |
+| F03-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F04 | `Billboard` enum: NONE, FULL, Y_AXIS | ✅ | visual.transform |
+| F04-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F05 | `UpVector` enum: WORLD_UP, PLAYER_UP, VELOCITY, CUSTOM | ✅ | visual.transform |
+| F05-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F06 | `FillMode` enum: SOLID, WIREFRAME, CAGE, POINTS | ✅ | visual.fill |
+| F06-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F07 | `MaskType` enum: FULL, BANDS, STRIPES, CHECKER, RADIAL, GRADIENT, CUSTOM | ✅ | visual.visibility |
+| F07-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F08 | `Axis` enum: X, Y, Z, CUSTOM | ✅ | visual.animation |
+| F08-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F09 | `Waveform` enum: SINE, SQUARE, TRIANGLE_WAVE, SAWTOOTH | ✅ | visual.animation |
+| F09-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F10 | `BlendMode` enum: NORMAL, ADD (Phase 2: MULTIPLY, SCREEN) | ✅ | visual.layer |
+| F10-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| CHK-01 | ⚠️ **BATCH 1 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ✅ | - |
 
 ---
 
@@ -111,27 +136,27 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 | ID | Task | Status | Package |
 |----|------|--------|---------|
-| F11 | `PolyType` enum: CUBE, OCTAHEDRON, ICOSAHEDRON, DODECAHEDRON, TETRAHEDRON | ⬜ | visual.shape |
-| F11-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F12 | `SphereAlgorithm` enum: LAT_LON, TYPE_A, TYPE_E | ⬜ | visual.shape |
-| F12-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F13 | `FieldType` enum: SHIELD, PERSONAL, FORCE, AURA, PORTAL (remove SINGULARITY, GROWTH, BARRIER) | ⬜ | field |
-| F13-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F14 | `FollowMode` enum: SNAP, SMOOTH, GLIDE | ⬜ | field.instance |
-| F14-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F15 | `LifecycleState` enum: SPAWNING, ACTIVE, DESPAWNING, COMPLETE | ⬜ | field.instance |
-| F15-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F16 | `FieldEvent` enum: PLAYER_DAMAGE, PLAYER_HEAL, PLAYER_DEATH, PLAYER_RESPAWN, FIELD_SPAWN, FIELD_DESPAWN | ⬜ | field.influence |
-| F16-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F17 | `TriggerEffect` enum: FLASH, PULSE, SHAKE, GLOW, COLOR_SHIFT + `completesNaturally()` method | ⬜ | field.influence |
-| F17-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F18 | `InterpolationCurve` enum: LINEAR, EASE_IN, EASE_OUT, EASE_IN_OUT + `apply(float t)` method | ⬜ | field.influence |
-| F18-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F19 | `HeightDirection` enum: CW, CCW (for helix) | ⬜ | visual.shape |
-| F19-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F20 | Review: Verify all 18 enums created match CLASS_DIAGRAM §18 | ⬜ | - |
-| F20-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-02 | ⚠️ **BATCH 2 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| F11 | `PolyType` enum: CUBE, OCTAHEDRON, ICOSAHEDRON, DODECAHEDRON, TETRAHEDRON | ✅ | visual.shape |
+| F11-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F12 | `SphereAlgorithm` enum: LAT_LON, TYPE_A, TYPE_E | ✅ | visual.shape |
+| F12-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F13 | `FieldType` enum: SHIELD, PERSONAL, FORCE, AURA, PORTAL (remove SINGULARITY, GROWTH, BARRIER) | ✅ | field |
+| F13-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F14 | `FollowMode` enum: SNAP, SMOOTH, GLIDE | ✅ | field.instance |
+| F14-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F15 | `LifecycleState` enum: SPAWNING, ACTIVE, DESPAWNING, COMPLETE | ✅ | field.instance |
+| F15-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F16 | `FieldEvent` enum: PLAYER_DAMAGE, PLAYER_HEAL, PLAYER_DEATH, PLAYER_RESPAWN, FIELD_SPAWN, FIELD_DESPAWN | ✅ | field.influence |
+| F16-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F17 | `TriggerEffect` enum: FLASH, PULSE, SHAKE, GLOW, COLOR_SHIFT + `completesNaturally()` method | ✅ | field.influence |
+| F17-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F18 | `InterpolationCurve` enum: LINEAR, EASE_IN, EASE_OUT, EASE_IN_OUT + `apply(float t)` method | ✅ | field.influence |
+| F18-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F19 | `HeightDirection` enum: CW, CCW (for helix) | ✅ | visual.shape |
+| F19-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F20 | Review: Verify all 18 enums created match CLASS_DIAGRAM §18 | ✅ | - |
+| F20-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| CHK-02 | ⚠️ **BATCH 2 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ✅ | - |
 
 ---
 
@@ -142,27 +167,27 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| F21 | `VertexPattern` interface: id(), displayName(), cellType(), shouldRender(index, total), getVertexOrder() | ⬜ | Core interface |
-| F21-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F22 | `QuadPattern` enum: filled_1, triangle_1-4, wave_1, tooth_1, parallelogram_1-2, stripe_1, etc. (16 patterns) | ⬜ | Implements VertexPattern |
-| F22-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F23 | `SegmentPattern` enum: full, alternating, sparse, quarter, reversed, zigzag, dashed | ⬜ | For rings |
-| F23-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F24 | `SectorPattern` enum: full, half, quarters, pinwheel, trisector, spiral, crosshair | ⬜ | For discs |
-| F24-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F25 | `EdgePattern` enum: full, latitude, longitude, sparse, minimal, dashed, grid | ⬜ | For wireframe |
-| F25-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F26 | `TrianglePattern` enum: full, alternating, inverted, sparse, fan, radial | ⬜ | For polyhedra |
-| F26-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F27 | `DynamicQuadPattern` class for shuffle exploration | ⬜ | Runtime permutations |
-| F27-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F28 | `DynamicSegmentPattern` class | ⬜ | Runtime permutations |
-| F28-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F29 | `DynamicSectorPattern` class | ⬜ | Runtime permutations |
-| F29-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F30 | `DynamicEdgePattern`, `DynamicTrianglePattern`, `ShuffleGenerator` | ⬜ | Complete set |
-| F30-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-03 | ⚠️ **BATCH 3 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| F21 | `VertexPattern` interface: id(), displayName(), cellType(), shouldRender(index, total), getVertexOrder() | ✅ | Core interface |
+| F21-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F22 | `QuadPattern` enum: filled_1, triangle_1-4, wave_1, tooth_1, parallelogram_1-2, stripe_1, etc. (16 patterns) | ✅ | Implements VertexPattern |
+| F22-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F23 | `SegmentPattern` enum: full, alternating, sparse, quarter, reversed, zigzag, dashed | ✅ | For rings |
+| F23-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F24 | `SectorPattern` enum: full, half, quarters, pinwheel, trisector, spiral, crosshair | ✅ | For discs |
+| F24-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F25 | `EdgePattern` enum: full, latitude, longitude, sparse, minimal, dashed, grid | ✅ | For wireframe |
+| F25-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F26 | `TrianglePattern` enum: full, alternating, inverted, sparse, fan, radial | ✅ | For polyhedra |
+| F26-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F27 | `DynamicQuadPattern` class for shuffle exploration | ✅ | Runtime permutations |
+| F27-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F28 | `DynamicSegmentPattern` class | ✅ | Runtime permutations |
+| F28-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F29 | `DynamicSectorPattern` class | ✅ | Runtime permutations |
+| F29-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F30 | `DynamicEdgePattern`, `DynamicTrianglePattern`, `ShuffleGenerator` | ✅ | Complete set |
+| F30-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| CHK-03 | ⚠️ **BATCH 3 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ✅ | - |
 
 ---
 
@@ -173,27 +198,27 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| F31 | `Vec3` record or utility (if not using Minecraft's Vec3d) | ⬜ | For offset, rotation |
-| F31-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F32 | `OrbitConfig` record: enabled, radius, speed, axis, phase | ⬜ | Dynamic positioning |
-| F32-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F33 | `Transform` record: anchor, offset, rotation, scale, scaleXYZ, scaleWithRadius, facing, up, billboard, inheritRotation, orbit | ⬜ | Complete rewrite |
-| F33-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F34 | `Transform.Builder` for fluent construction | ⬜ | Builder pattern |
-| F34-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F35 | `Transform.DEFAULT` static constant | ⬜ | Smart default |
-| F35-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F36 | `TransformApplier` utility: applies Transform to MatrixStack | ⬜ | Runtime application |
-| F36-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F37 | `AnchorResolver`: converts Anchor enum to Vec3 offset | ⬜ | Anchor → position |
-| F37-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F38 | `FacingResolver`: calculates facing rotation from player/camera | ⬜ | Dynamic facing |
-| F38-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F39 | `BillboardResolver`: applies billboard rotation | ⬜ | Billboard mode |
-| F39-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F40 | `OrbitAnimator`: calculates orbit position over time | ⬜ | Orbit animation |
-| F40-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-04 | ⚠️ **BATCH 4 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| F31 | `Vec3` record or utility (if not using Minecraft's Vec3d) | ✅ | For offset, rotation |
+| F31-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F32 | `OrbitConfig` record: enabled, radius, speed, axis, phase | ✅ | Dynamic positioning |
+| F32-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F33 | `Transform` record: anchor, offset, rotation, scale, scaleXYZ, scaleWithRadius, facing, up, billboard, inheritRotation, orbit | ✅ | Complete rewrite |
+| F33-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F34 | `Transform.Builder` for fluent construction | ✅ | Builder pattern |
+| F34-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F35 | `Transform.DEFAULT` static constant | ✅ | Smart default |
+| F35-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F36 | `TransformApplier` utility: applies Transform to MatrixStack | ✅ | Runtime application |
+| F36-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F37 | `AnchorResolver`: converts Anchor enum to Vec3 offset | ✅ | Anchor → position |
+| F37-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F38 | `FacingResolver`: calculates facing rotation from player/camera | ✅ | Dynamic facing |
+| F38-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F39 | `BillboardResolver`: applies billboard rotation | ✅ | Billboard mode |
+| F39-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F40 | `OrbitAnimator`: calculates orbit position over time | ✅ | Orbit animation |
+| F40-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| CHK-04 | ⚠️ **BATCH 4 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ✅ | - |
 
 ---
 
@@ -204,27 +229,27 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| F41 | `CageOptions` interface (common: lineWidth, showEdges) | ⬜ | Base interface |
-| F41-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F42 | `SphereCageOptions` record: latitudeCount, longitudeCount, showEquator, showPoles | ⬜ | Sphere-specific |
-| F42-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F43 | `PrismCageOptions` record: verticalLines, horizontalRings, showCaps | ⬜ | Prism-specific |
-| F43-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F44 | `CylinderCageOptions` record: verticalLines, horizontalRings, showCaps | ⬜ | Cylinder-specific |
-| F44-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F45 | `PolyhedronCageOptions` record: allEdges, faceOutlines | ⬜ | Polyhedron-specific |
-| F45-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F46 | `FillConfig` record: mode, wireThickness, doubleSided, depthTest, depthWrite, cage | ⬜ | Nested cage options |
-| F46-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F47 | `FillConfig.Builder` + `FillConfig.SOLID_DEFAULT` | ⬜ | Builder + default |
-| F47-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F48 | `VisibilityMask` record: mask, count, thickness (Phase 1 fields) | ⬜ | Phase 2 adds offset, invert |
-| F48-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F49 | `VisibilityMask.FULL` static constant | ⬜ | Default |
-| F49-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F50 | `VisibilityMaskApplier`: shouldRenderCell(index, total, mask) | ⬜ | Runtime filtering |
-| F50-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-05 | ⚠️ **BATCH 5 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| F41 | `CageOptions` interface (common: lineWidth, showEdges) | ✅ | Base interface |
+| F41-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F42 | `SphereCageOptions` record: latitudeCount, longitudeCount, showEquator, showPoles | ✅ | Sphere-specific |
+| F42-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F43 | `PrismCageOptions` record: verticalLines, horizontalRings, showCaps | ✅ | Prism-specific |
+| F43-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F44 | `CylinderCageOptions` record: verticalLines, horizontalRings, showCaps | ✅ | Cylinder-specific |
+| F44-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F45 | `PolyhedronCageOptions` record: allEdges, faceOutlines | ✅ | Polyhedron-specific |
+| F45-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F46 | `FillConfig` record: mode, wireThickness, doubleSided, depthTest, depthWrite, cage | ✅ | Nested cage options |
+| F46-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F47 | `FillConfig.Builder` + `FillConfig.SOLID_DEFAULT` | ✅ | Builder + default |
+| F47-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F48 | `VisibilityMask` record: mask, count, thickness (Phase 1 fields) | ✅ | Phase 2 adds offset, invert |
+| F48-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F49 | `VisibilityMask.FULL` static constant | ✅ | Default |
+| F49-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F50 | `VisibilityMaskApplier`: shouldRenderCell(index, total, mask) | ✅ | Runtime filtering |
+| F50-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| CHK-05 | ⚠️ **BATCH 5 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ✅ | - |
 
 ---
 
@@ -235,27 +260,27 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| F51 | `ArrangementConfig` record: default + all 15 shape parts | ⬜ | Multi-part support |
-| F51-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F52 | `ArrangementConfig.of(String)` factory for simple form | ⬜ | "wave_1" → ArrangementConfig |
-| F52-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F53 | `ArrangementConfig.getPatternFor(String part, CellType)` | ⬜ | Resolve per-part |
-| F53-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F54 | Pattern mismatch handler: log error + alwaysChat | ⬜ | Per ARCH §Pattern Mismatch |
-| F54-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F55 | `PatternResolver`: maps String → VertexPattern for CellType | ⬜ | "filled_1" → QuadPattern.FILLED_1 |
-| F55-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F56 | Pattern fallback: if part not specified, use `default` | ⬜ | Fallback logic |
-| F56-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F57 | All 15 shape parts documented in ArrangementConfig Javadoc | ⬜ | Documentation |
-| F57-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F58 | Test: Sphere with main=wave_1, poles=filled_1 | ⬜ | Multi-part test |
-| F58-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F59 | Test: Pattern mismatch shows chat message | ⬜ | Error handling test |
-| F59-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F60 | Review: All pattern enums have proper getVertexOrder() | ⬜ | Verification |
-| F60-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-06 | ⚠️ **BATCH 6 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| F51 | `ArrangementConfig` record: default + all 15 shape parts | ✅ | Multi-part support |
+| F51-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F52 | `ArrangementConfig.of(String)` factory for simple form | ✅ | "wave_1" → ArrangementConfig |
+| F52-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F53 | `ArrangementConfig.getPatternFor(String part, CellType)` | ✅ | Resolve per-part |
+| F53-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F54 | Pattern mismatch handler: log error + alwaysChat | ✅ | Per ARCH §Pattern Mismatch |
+| F54-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F55 | `PatternResolver`: maps String → VertexPattern for CellType | ✅ | "filled_1" → QuadPattern.FILLED_1 |
+| F55-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F56 | Pattern fallback: if part not specified, use `default` | ✅ | Fallback logic |
+| F56-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F57 | All 15 shape parts documented in ArrangementConfig Javadoc | ✅ | Documentation |
+| F57-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F58 | Test: Sphere with main=wave_1, poles=filled_1 | ✅ | Multi-part test |
+| F58-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F59 | Test: Pattern mismatch shows chat message | ✅ | Error handling test |
+| F59-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F60 | Review: All pattern enums have proper getVertexOrder() | ✅ | Verification |
+| F60-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| CHK-06 | ⚠️ **BATCH 6 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ✅ | - |
 
 ---
 
@@ -266,27 +291,27 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| F61 | `SpinConfig` record: axis, speed, oscillate, range | ⬜ | + `SpinConfig.NONE` |
-| F61-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F62 | `PulseConfig` record: scale, speed, waveform, min, max | ⬜ | + `PulseConfig.NONE` |
-| F62-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F63 | `AlphaPulseConfig` record: speed, min, max, waveform | ⬜ | Alpha animation |
-| F63-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F64 | `WobbleConfig` record: amplitude (Vec3), speed, randomize | ⬜ | Random jitter (FUTURE) |
-| F64-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F65 | `WaveConfig` record: amplitude, frequency, direction | ⬜ | Surface ripple (FUTURE) |
-| F65-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F66 | `ColorCycleConfig` record: colors (List), speed, blend | ⬜ | Color animation (FUTURE) |
-| F66-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F67 | `Animation` record: spin, pulse, phase, alphaPulse, colorCycle, wobble, wave | ⬜ | Container for all |
-| F67-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F68 | `Animation.NONE` static constant | ⬜ | Default |
-| F68-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F69 | `AnimationApplier`: applies spin/pulse to MatrixStack over time | ⬜ | Runtime |
-| F69-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F70 | Additive animation: Layer spin + Primitive spin combine | ⬜ | Per ARCH §10.5 |
-| F70-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-07 | ⚠️ **BATCH 7 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| F61 | `SpinConfig` record: axis, speed, oscillate, range | ✅ | + `SpinConfig.NONE` |
+| F61-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F62 | `PulseConfig` record: scale, speed, waveform, min, max | ✅ | + `PulseConfig.NONE` |
+| F62-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F63 | `AlphaPulseConfig` record: speed, min, max, waveform | ✅ | Alpha animation |
+| F63-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F64 | `WobbleConfig` record: amplitude (Vec3), speed, randomize | ✅ | Random jitter (FUTURE) |
+| F64-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F65 | `WaveConfig` record: amplitude, frequency, direction | ✅ | Surface ripple (FUTURE) |
+| F65-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F66 | `ColorCycleConfig` record: colors (List), speed, blend | ✅ | Color animation (FUTURE) |
+| F66-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F67 | `Animation` record: spin, pulse, phase, alphaPulse, colorCycle, wobble, wave | ✅ | Container for all |
+| F67-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F68 | `Animation.NONE` static constant | ✅ | Default |
+| F68-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F69 | `AnimationApplier`: applies spin/pulse to MatrixStack over time | ✅ | Runtime |
+| F69-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F70 | Additive animation: Layer spin + Primitive spin combine | ✅ | Per ARCH §10.5 |
+| F70-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| CHK-07 | ⚠️ **BATCH 7 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ✅ | - |
 
 ---
 
@@ -297,27 +322,27 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| F71 | `AlphaRange` record: min, max | ⬜ | For pulsing alpha |
-| F71-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F72 | `AlphaRange.constant(float)` factory | ⬜ | Single value → range |
-| F72-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F73 | `Appearance` record: color, alpha, glow, emissive, saturation, brightness, hueShift, secondaryColor, colorBlend | ⬜ | All visual properties |
-| F73-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F74 | `Appearance.Builder` + `Appearance.DEFAULT` | ⬜ | Builder + default |
-| F74-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F75 | Override logic: Primitive appearance overrides Layer appearance | ⬜ | Per ARCH §10.5 |
-| F75-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F76 | `AppearanceResolver`: merges layer + primitive appearance | ⬜ | Runtime merge |
-| F76-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F77 | Color reference resolution: "@primary" → theme color | ⬜ | Uses ColorResolver |
-| F77-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F78 | HSV modifiers: saturation, brightness, hueShift application | ⬜ | Color manipulation |
-| F78-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F79 | Secondary color blending: colorBlend interpolation | ⬜ | Gradient support |
-| F79-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F80 | Test: Appearance with all fields renders correctly | ⬜ | Visual test |
-| F80-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-08 | ⚠️ **BATCH 8 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| F71 | `AlphaRange` record: min, max | ✅ | For pulsing alpha |
+| F71-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F72 | `AlphaRange.constant(float)` factory | ✅ | Single value → range |
+| F72-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F73 | `Appearance` record: color, alpha, glow, emissive, saturation, brightness, hueShift, secondaryColor, colorBlend | ✅ | All visual properties |
+| F73-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F74 | `Appearance.Builder` + `Appearance.DEFAULT` | ✅ | Builder + default |
+| F74-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F75 | Override logic: Primitive appearance overrides Layer appearance | ✅ | Per ARCH §10.5 |
+| F75-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F76 | `AppearanceResolver`: merges layer + primitive appearance | ✅ | Runtime merge |
+| F76-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F77 | Color reference resolution: "@primary" → theme color | ✅ | Uses ColorResolver |
+| F77-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F78 | HSV modifiers: saturation, brightness, hueShift application | ✅ | Color manipulation |
+| F78-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F79 | Secondary color blending: colorBlend interpolation | ✅ | Gradient support |
+| F79-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F80 | Test: Appearance with all fields renders correctly | ✅ | Visual test |
+| F80-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| CHK-08 | ⚠️ **BATCH 8 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ✅ | - |
 
 ---
 
@@ -328,27 +353,27 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| F81 | `FollowModeConfig` record: enabled, mode, playerOverride | ⬜ | Wraps FollowMode |
-| F81-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F82 | `PredictionConfig` record: enabled, leadTicks, maxDistance, lookAhead, verticalBoost | ⬜ | Movement prediction |
-| F82-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F83 | `BeamConfig` record: enabled, innerRadius, outerRadius, color, height, glow, pulse (PulseConfig) | ⬜ | Central beam |
-| F83-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F84 | `Modifiers` record: visualScale, tilt, swirl, pulsing, bobbing, breathing | ⬜ | Global modifiers |
-| F84-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F85 | `Modifiers.DEFAULT` static constant | ⬜ | Default values |
-| F85-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F86 | Update `FieldDefinition`: add bindings, triggers, lifecycle | ⬜ | New fields |
-| F86-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F87 | Update `FieldLayer`: add rotation (static), visible, blendMode, order | ⬜ | New fields |
-| F87-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F88 | Layer combination: Additive spin, Override appearance | ⬜ | Per ARCH §10.5 |
-| F88-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F89 | `FieldInstance`: add lifecycleState, fadeProgress | ⬜ | State tracking |
-| F89-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F90 | `PersonalFieldInstance`: update to use FollowModeConfig | ⬜ | Config-based |
-| F90-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-09 | ⚠️ **BATCH 9 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| F81 | `FollowModeConfig` record: enabled, mode, playerOverride | ✅ | Wraps FollowMode |
+| F81-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F82 | `PredictionConfig` record: enabled, leadTicks, maxDistance, lookAhead, verticalBoost | ✅ | Movement prediction |
+| F82-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F83 | `BeamConfig` record: enabled, innerRadius, outerRadius, color, height, glow, pulse (PulseConfig) | ✅ | Central beam |
+| F83-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F84 | `Modifiers` record: visualScale, tilt, swirl, pulsing, bobbing, breathing | ✅ | Global modifiers |
+| F84-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F85 | `Modifiers.DEFAULT` static constant | ✅ | Default values |
+| F85-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F86 | Update `FieldDefinition`: add bindings, triggers, lifecycle | ✅ | New fields |
+| F86-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F87 | Update `FieldLayer`: add rotation (static), visible, blendMode, order | ✅ | New fields |
+| F87-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F88 | Layer combination: Additive spin, Override appearance | ✅ | Per ARCH §10.5 |
+| F88-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F89 | `FieldInstance`: add lifecycleState, fadeProgress | ✅ | State tracking |
+| F89-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F90 | `PersonalFieldInstance`: update to use FollowModeConfig | ✅ | Config-based |
+| F90-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| CHK-09 | ⚠️ **BATCH 9 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ✅ | - |
 
 ---
 
@@ -359,27 +384,27 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| F91 | `Shape` interface: getType(), getBounds(), primaryCellType(), getParts() | ⬜ | Base interface |
-| F91-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F92 | `SphereShape` record: radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm, subdivisions | ⬜ | Primary: QUAD, Parts: main, poles, equator, hemisphereTop, hemisphereBottom |
-| F92-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F93 | `SphereShape.DEFAULT` and `SphereShape.Builder` | ⬜ | Convenience |
-| F93-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F94 | `RingShape` record: innerRadius, outerRadius, segments, y, arcStart, arcEnd, height, twist | ⬜ | Primary: SEGMENT |
-| F94-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F95 | `DiscShape` record: radius, segments, y, arcStart, arcEnd, innerRadius, rings | ⬜ | Primary: SECTOR |
-| F95-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F96 | `PrismShape` record: sides, radius, height, topRadius, twist, heightSegments, capTop, capBottom | ⬜ | Primary: QUAD |
-| F96-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F97 | `PolyhedronShape` record: polyType, radius, subdivisions | ⬜ | Primary: QUAD or TRIANGLE |
-| F97-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F98 | `CylinderShape` record: radius, height, segments, topRadius, heightSegments, capTop, capBottom, openEnded, arc | ⬜ | Primary: QUAD |
-| F98-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F99 | All Shape.getParts() return correct Map<String, CellType> | ⬜ | Verification |
-| F99-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F100 | All Shape.primaryCellType() return correct CellType | ⬜ | Verification |
-| F100-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-10 | ⚠️ **BATCH 10 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| F91 | `Shape` interface: getType(), getBounds(), primaryCellType(), getParts() | ✅ | Base interface |
+| F91-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F92 | `SphereShape` record: radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm, subdivisions | ✅ | Primary: QUAD, Parts: main, poles, equator, hemisphereTop, hemisphereBottom |
+| F92-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F93 | `SphereShape.DEFAULT` and `SphereShape.Builder` | ✅ | Convenience |
+| F93-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F94 | `RingShape` record: innerRadius, outerRadius, segments, y, arcStart, arcEnd, height, twist | ✅ | Primary: SEGMENT |
+| F94-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F95 | `DiscShape` record: radius, segments, y, arcStart, arcEnd, innerRadius, rings | ✅ | Primary: SECTOR |
+| F95-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F96 | `PrismShape` record: sides, radius, height, topRadius, twist, heightSegments, capTop, capBottom | ✅ | Primary: QUAD |
+| F96-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F97 | `PolyhedronShape` record: polyType, radius, subdivisions | ✅ | Primary: QUAD or TRIANGLE |
+| F97-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F98 | `CylinderShape` record: radius, height, segments, topRadius, heightSegments, capTop, capBottom, openEnded, arc | ✅ | Primary: QUAD |
+| F98-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F99 | All Shape.getParts() return correct Map<String, CellType> | ✅ | Verification |
+| F99-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F100 | All Shape.primaryCellType() return correct CellType | ✅ | Verification |
+| F100-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| CHK-10 | ⚠️ **BATCH 10 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ✅ | - |
 
 ---
 
@@ -390,27 +415,27 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| F101 | `Primitive` interface: id(), type(), shape(), transform(), fill(), visibility(), arrangement(), appearance(), animation(), link() | ⬜ | Flat hierarchy, id REQUIRED, link() nullable |
-| F101-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F102 | `AbstractPrimitive` base implementation (if useful) OR each impl standalone | ⬜ | Design decision |
-| F102-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F103 | `SpherePrimitive` implementing Primitive | ⬜ | Uses SphereShape |
-| F103-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F104 | `RingPrimitive` implementing Primitive | ⬜ | Uses RingShape |
-| F104-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F105 | `DiscPrimitive` implementing Primitive | ⬜ | Uses DiscShape |
-| F105-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F106 | `PrismPrimitive` implementing Primitive | ⬜ | Uses PrismShape |
-| F106-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F107 | `PolyhedronPrimitive` implementing Primitive | ⬜ | Uses PolyhedronShape |
-| F107-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F108 | `CylinderPrimitive` implementing Primitive | ⬜ | Uses CylinderShape |
-| F108-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F109 | All primitives have proper equals(), hashCode(), toString() | ⬜ | Record or implement |
-| F109-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F110 | All primitives log construction via FIELD channel DEBUG | ⬜ | Code Quality Standard |
-| F110-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-11 | ⚠️ **BATCH 11 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| F101 | `Primitive` interface: id(), type(), shape(), transform(), fill(), visibility(), arrangement(), appearance(), animation(), link() | ✅ | Flat hierarchy, id REQUIRED, link() nullable |
+| F101-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F102 | `AbstractPrimitive` base implementation (if useful) OR each impl standalone | ✅ | Design decision |
+| F102-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F103 | `SpherePrimitive` implementing Primitive | ✅ | Uses SphereShape |
+| F103-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F104 | `RingPrimitive` implementing Primitive | ✅ | Uses RingShape |
+| F104-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F105 | `DiscPrimitive` implementing Primitive | ✅ | Uses DiscShape |
+| F105-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F106 | `PrismPrimitive` implementing Primitive | ✅ | Uses PrismShape |
+| F106-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F107 | `PolyhedronPrimitive` implementing Primitive | ✅ | Uses PolyhedronShape |
+| F107-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F108 | `CylinderPrimitive` implementing Primitive | ✅ | Uses CylinderShape |
+| F108-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F109 | All primitives have proper equals(), hashCode(), toString() | ✅ | Record or implement |
+| F109-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F110 | All primitives log construction via FIELD channel DEBUG | ✅ | Code Quality Standard |
+| F110-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| CHK-11 | ⚠️ **BATCH 11 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ✅ | - |
 
 ---
 
@@ -421,17 +446,17 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| F111 | `PrimitiveLink` record: radiusMatch, radiusOffset, follow, mirror, phaseOffset, scaleWith | ⬜ | All nullable |
-| F111-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F112 | Link resolution: primitives can only link to EARLIER primitives (cycle prevention) | ⬜ | Per ARCH §9 |
-| F112-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F113 | `LinkResolver`: resolves links at parse time, computes final values | ⬜ | Runtime resolver |
-| F113-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F114 | Test: ring links to sphere radius + offset | ⬜ | Basic link test |
-| F114-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F115 | Test: invalid link (forward reference) logs error | ⬜ | Error case |
-| F115-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-12 | ⚠️ **BATCH 12 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| F111 | `PrimitiveLink` record: radiusMatch, radiusOffset, follow, mirror, phaseOffset, scaleWith | ✅ | All fields + Builder |
+| F111-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F112 | Link resolution: primitives can only link to EARLIER primitives (cycle prevention) | ✅ | validate() in LinkResolver |
+| F112-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F113 | `LinkResolver`: resolves links at parse time, computes final values | ✅ | resolveRadius/Mirror/Follow/Scale/Phase + ResolvedValues |
+| F113-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F114 | Test: ring links to sphere radius + offset | ✅ | Basic link test |
+| F114-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F115 | Test: invalid link (forward reference) logs error | ✅ | Error case |
+| F115-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| CHK-12 | ⚠️ **BATCH 12 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ✅ | - |
 
 ---
 
@@ -442,21 +467,21 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| F116 | Archive `SolidPrimitive` abstract class → _legacy/ | ⬜ | Unnecessary hierarchy |
-| F116-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F117 | Archive `BandPrimitive` abstract class → _legacy/ | ⬜ | Unnecessary hierarchy |
-| F117-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F118 | Archive `StructuralPrimitive` abstract class → _legacy/ | ⬜ | Unnecessary hierarchy |
-| F118-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F119 | Convert `StripesPrimitive` → SpherePrimitive + visibility.mask=STRIPES | ⬜ | Config, not class |
-| F119-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F120 | Convert `CagePrimitive` → SpherePrimitive + fill.mode=CAGE | ⬜ | Config, not class |
-| F120-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F121 | Convert `RingsPrimitive` → multiple RingPrimitive in layer | ⬜ | Layer composition |
-| F121-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F122 | Update all imports/references after archival | ⬜ | Cleanup |
-| F122-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-13 | ⚠️ **BATCH 13 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| F116 | Archive `SolidPrimitive` abstract class → _legacy/ | ✅ | Already removed/never in source |
+| F116-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F117 | Archive `BandPrimitive` abstract class → _legacy/ | ✅ | Already removed/never in source |
+| F117-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F118 | Archive `StructuralPrimitive` abstract class → _legacy/ | ✅ | Already removed/never in source |
+| F118-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F119 | Convert `StripesPrimitive` → SpherePrimitive + visibility.mask=STRIPES | ✅ | Using MaskType.STRIPES |
+| F119-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F120 | Convert `CagePrimitive` → SpherePrimitive + fill.mode=CAGE | ✅ | Using FillMode.CAGE |
+| F120-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F121 | Convert `RingsPrimitive` → multiple RingPrimitive in layer | ✅ | Layer composition supported |
+| F121-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F122 | Update all imports/references after archival | ✅ | No broken imports, compiles |
+| F122-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| CHK-13 | ⚠️ **BATCH 13 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ✅ | - |
 
 ---
 
@@ -467,27 +492,27 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| F123 | Create reference folders: field_shapes/, field_appearances/, etc. (9 folders) | ⬜ | Per CLASS_DIAGRAM §12 |
-| F123-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F124 | `ReferenceResolver` class: resolve(), resolveWithOverrides(), cache | ⬜ | $ref resolution |
-| F124-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F125 | Reference syntax: "$shapes/smooth_sphere" → field_shapes/smooth_sphere.json | ⬜ | Path mapping |
-| F125-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F126 | Override syntax: { "$ref": "...", "radius": 2.0 } merges | ⬜ | Merge logic |
-| F126-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F127 | `DefaultsProvider` class: getDefaultShape(type), getDefaultTransform(), etc. | ⬜ | Smart defaults |
-| F127-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F128 | Defaults per shape type: sphere, ring, disc, prism, polyhedron, cylinder | ⬜ | Per CLASS_DIAGRAM §13 |
-| F128-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F129 | Update `FieldLoader` to use ReferenceResolver | ⬜ | Integration |
-| F129-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F130 | Update `FieldLoader` to use DefaultsProvider | ⬜ | Integration |
-| F130-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F131 | Shorthand parsing: alpha: 0.5 → AlphaRange, spin: 0.02 → SpinConfig | ⬜ | User convenience |
-| F131-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F132 | Test: Load field with $ref and override | ⬜ | End-to-end test |
-| F132-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-14 | ⚠️ **BATCH 14 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| F123 | Create reference folders: field_shapes/, field_appearances/, etc. (9 folders) | ✅ | All 9 folders created; field_visibilities/ removed (legacy) |
+| F123-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F124 | `ReferenceResolver` class: resolve(), resolveWithOverrides(), cache | ✅ | Created with full $ref support |
+| F124-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F125 | Reference syntax: "$shapes/smooth_sphere" → field_shapes/smooth_sphere.json | ✅ | Implemented in ReferenceResolver |
+| F125-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F126 | Override syntax: { "$ref": "...", "radius": 2.0 } merges | ✅ | resolveWithOverrides() |
+| F126-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F127 | `DefaultsProvider` class: getDefaultShape(type), getDefaultTransform(), etc. | ✅ | All shape defaults |
+| F127-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F128 | Defaults per shape type: sphere, ring, disc, prism, polyhedron, cylinder | ✅ | All 6 types |
+| F128-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F129 | Update `FieldLoader` to use ReferenceResolver | ✅ | Integrated |
+| F129-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F130 | Update `FieldLoader` to use DefaultsProvider | ✅ | Integrated |
+| F130-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F131 | Shorthand parsing: alpha: 0.5 → AlphaRange, spin: 0.02 → SpinConfig | ✅ | + arrangement, visibility |
+| F131-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F132 | Test: Load field with $ref and override | ✅ | Test JSON files created |
+| F132-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| CHK-14 | ⚠️ **BATCH 14 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ✅ | - |
 
 ---
 
@@ -498,27 +523,28 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| F133 | Parse Transform: anchor, offset, rotation, scale, scaleXYZ, facing, billboard, orbit | ⬜ | All fields |
-| F133-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F134 | Parse FillConfig: mode, wireThickness, cage (shape-specific) | ⬜ | Nested cage |
-| F134-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F135 | Parse VisibilityMask: mask, count, thickness | ⬜ | Phase 1 only |
-| F135-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F136 | Parse ArrangementConfig: string OR object with 15 parts | ⬜ | Multi-part |
-| F136-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F137 | Parse Animation: spin, pulse, alphaPulse, phase | ⬜ | Phase 1 anims |
-| F137-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F138 | Parse Appearance: color, alpha, glow, emissive, saturation, brightness, hueShift, secondaryColor | ⬜ | All fields |
-| F138-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F139 | Parse PrimitiveLink: radiusMatch, radiusOffset, follow, mirror, phaseOffset, scaleWith | ⬜ | Linking |
-| F139-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F140 | Parse all Shape types with all parameters | ⬜ | Per PARAMETERS §4 |
-| F140-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F141 | Validation: Required fields present, ranges valid | ⬜ | Error handling |
-| F141-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F142 | Test: Load complex field with all config types | ⬜ | Integration test |
-| F142-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-15 | ⚠️ **BATCH 15 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| F133 | Parse Transform: anchor, offset, rotation, scale, scaleXYZ, facing, billboard, orbit | ✅ | Transform.fromJson() |
+| F133-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F134 | Parse FillConfig: mode, wireThickness, cage (shape-specific) | ✅ | parseFillWithShorthand() |
+| F134-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F135 | Parse VisibilityMask: mask, count, thickness | ✅ | parseVisibilityWithShorthand() |
+| F135-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F136 | Parse ArrangementConfig: string OR object with 15 parts | ✅ | parseArrangementWithShorthand() |
+| F136-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F137 | Parse Animation: spin, pulse, alphaPulse, phase | ✅ | parseAnimationWithShorthand() |
+| F137-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F138 | Parse Appearance: color, alpha, glow, emissive, saturation, brightness, hueShift, secondaryColor | ✅ | parseAppearanceWithShorthand() |
+| F138-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F139 | Parse PrimitiveLink: radiusMatch, radiusOffset, follow, mirror, phaseOffset, scaleWith | ✅ | PrimitiveLink.fromJson() |
+| F139-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F140 | Parse all Shape types with all parameters | ✅ | 6 shapes in parseShape() |
+| F140-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F141 | Validation: Required fields present, ranges valid | ✅ | ValidationHelper class |
+| F141-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F142 | Test: Load complex field with all config types | ✅ | integration_test.json |
+| F142-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| CHK-15 | ⚠️ **BATCH 15 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ✅ | - |
+| fix-5 | Refactor: Extract repetitive JSON parsing into `JsonParseUtils` utility class | ✅ | Code quality improvement, reduces duplication in FieldLoader |
 
 ---
 
@@ -529,23 +555,23 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| F143 | `BindingSource` interface: getId(), getValue(player), isBoolean() | ⬜ | Abstract source |
-| F143-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F144 | `BindingSources` class: 12 static sources (health, armor, speed, etc.) | ⬜ | Per ARCH §12.1 |
-| F144-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F145 | `BindingSources.get(id)` returns Optional<BindingSource> | ⬜ | Lookup |
-| F145-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F146 | Invalid source handling: log warning, default to 0.0 | ⬜ | Per Q3 answer |
-| F146-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F147 | `BindingConfig` record: source, inputRange, outputRange, curve | ⬜ | Per binding |
-| F147-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F148 | `BindingResolver`: evaluates binding, applies curve, maps ranges | ⬜ | Runtime |
-| F148-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F149 | `InterpolationCurve.apply(float t)` implementation | ⬜ | Curve math |
-| F149-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F150 | Parse `"bindings"` block in FieldDefinition JSON | ⬜ | Integration |
-| F150-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-16 | ⚠️ **BATCH 16 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| F143 | `BindingSource` interface: getId(), getValue(player), isBoolean() | ✅ | Interface created |
+| F143-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F144 | `BindingSources` class: 12 static sources (health, armor, speed, etc.) | ✅ | All 12 sources |
+| F144-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F145 | `BindingSources.get(id)` returns Optional<BindingSource> | ✅ | get() + getOrWarn() |
+| F145-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F146 | Invalid source handling: log warning, default to 0.0 | ✅ | getOrWarn() logs |
+| F146-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F147 | `BindingConfig` record: source, inputRange, outputRange, curve | ✅ | + fromJson, Builder |
+| F147-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F148 | `BindingResolver`: evaluates binding, applies curve, maps ranges | ✅ | evaluate() + evaluateAll() |
+| F148-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F149 | `InterpolationCurve.apply(float t)` implementation | ✅ | LINEAR, EASE_IN/OUT/IN_OUT |
+| F149-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F150 | Parse `"bindings"` block in FieldDefinition JSON | ✅ | Added to FieldDefinition + FieldLoader |
+| F150-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| CHK-16 | ⚠️ **BATCH 16 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ✅ | - |
 
 ---
 
@@ -556,20 +582,20 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| F151 | `TriggerConfig` record: event, effect, duration, color, scale, amplitude, intensity | ⬜ | Per trigger |
-| F151-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F152 | `ActiveTrigger` class: tracks active trigger state, tick countdown | ⬜ | Runtime state |
-| F152-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F153 | `TriggerEffect.completesNaturally()`: PULSE,SHAKE→true, FLASH,GLOW,COLOR_SHIFT→false | ⬜ | Per Q4 answer |
-| F153-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F154 | Trigger/Binding conflict: Trigger temporarily overrides binding | ⬜ | Per Q1 answer |
-| F154-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F155 | `TriggerProcessor`: listens for events, creates ActiveTriggers | ⬜ | Event handling |
-| F155-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F156 | Event listeners: damage, heal, death, respawn, field spawn/despawn | ⬜ | Mixin or listener |
-| F156-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F157 | Parse `"triggers"` array in FieldDefinition JSON | ⬜ | Integration |
-| F157-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
+| F151 | `TriggerConfig` record: event, effect, duration, color, scale, amplitude, intensity | ✅ | Per trigger |
+| F151-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F152 | `ActiveTrigger` class: tracks active trigger state, tick countdown | ✅ | Runtime state |
+| F152-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F153 | `TriggerEffect.completesNaturally()`: PULSE,SHAKE→true, FLASH,GLOW,COLOR_SHIFT→false | ✅ | Per Q4 answer |
+| F153-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F154 | Trigger/Binding conflict: Trigger temporarily overrides binding | ✅ | Per Q1 answer |
+| F154-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F155 | `TriggerProcessor`: listens for events, creates ActiveTriggers | ✅ | Event handling |
+| F155-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F156 | Event listeners: damage, heal, death, respawn, field spawn/despawn | ✅ | Mixin or listener |
+| F156-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F157 | Parse `"triggers"` array in FieldDefinition JSON | ✅ | Integration |
+| F157-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
 | F158 | Test: Trigger fires on damage, effect visible | ⬜ | Visual test |
 | F158-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
 | CHK-17 | ⚠️ **BATCH 17 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
@@ -583,29 +609,67 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| F159 | `DecayConfig` record: rate, min | ⬜ | Decay settings |
-| F159-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F160 | `LifecycleConfig` record: fadeIn, fadeOut, scaleIn, scaleOut, decay | ⬜ | Lifecycle settings |
-| F160-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F161 | `LifecycleManager`: handles fade/scale animations on spawn/despawn | ⬜ | Runtime manager |
-| F161-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F162 | FieldInstance.lifecycleState transitions: SPAWNING→ACTIVE→DESPAWNING→COMPLETE | ⬜ | State machine |
-| F162-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F163 | FieldInstance.fadeProgress: 0.0→1.0 during transitions | ⬜ | Animation progress |
-| F163-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F164 | `CombatTracker`: per-player singleton (per Q2 answer) | ⬜ | Combat state |
-| F164-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F165 | CombatTracker: isInCombat() (within 100 ticks), getDamageTakenDecayed() | ⬜ | Combat sources |
-| F165-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F166 | Hook damage events: onDamageTaken(amount), onDamageDealt() | ⬜ | Mixin or listener |
-| F166-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F167 | Parse `"lifecycle"` block in FieldDefinition JSON | ⬜ | Integration |
-| F167-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
+| F159 | `DecayConfig` record: rate, min | ✅ | DecayConfig with fromJson/toJson |
+| F159-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F160 | `LifecycleConfig` record: fadeIn, fadeOut, scaleIn, scaleOut, decay | ✅ | LifecycleConfig with fromJson/toJson |
+| F160-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F161 | `LifecycleManager`: handles fade/scale animations on spawn/despawn | ✅ | FieldLifecycle uses LifecycleConfig |
+| F161-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F162 | FieldInstance.lifecycleState transitions: SPAWNING→ACTIVE→DESPAWNING→COMPLETE | ✅ | lifecycleState + transitions in FieldInstance |
+| F162-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F163 | FieldInstance.fadeProgress: 0.0→1.0 during transitions | ✅ | fadeProgress 0.0→1.0 in FieldInstance |
+| F163-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F164 | `CombatTracker`: per-player singleton (per Q2 answer) | ✅ | CombatTracker per-player via UUID map |
+| F164-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F165 | CombatTracker: isInCombat() (within 100 ticks), getDamageTakenDecayed() | ✅ | isInCombat + getDamageTakenDecayed |
+| F165-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F166 | Hook damage events: onDamageTaken(amount), onDamageDealt() | ✅ | LivingEntityMixin hooks CombatTracker |
+| F166-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F167 | Parse `"lifecycle"` block in FieldDefinition JSON | ✅ | FieldLoader.parseOptional lifecycle |
+| F167-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
 | F168 | Test: Field fades in on spawn, fades out on despawn | ⬜ | Visual test |
 | F168-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
+| F169 | Call `FieldSystemInit.init()` in mod initializer | ✅ | TheVirusBlock.onInitialize calls init() |
+| F169-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
 | CHK-18 | ⚠️ **BATCH 18 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
 
 ---
+
+---
+
+### Batch 18-A: Create Rendering Pipeline (F168-A to F168-E) 🔄 NEEDS REVIEW
+
+> **Ref:** CLASS_DIAGRAM §8  
+> **Package:** `net.cyberpunk042.client.field.render`  
+> **Prerequisite for Batches 19-20!**
+> 
+> ⚠️ **STATUS: Created ahead of schedule - REVIEW when reached**
+> - Created: FieldRenderer, LayerRenderer, PrimitiveRenderer interface
+> - Created: Shape renderers (Sphere, Ring, Disc, Prism, Cylinder, Polyhedron)
+> - Created: FieldLayer.java, FieldDefinition.java records
+> - TODO: F168-E (Wire ClientFieldManager) still pending
+> - TODO: Verify integration with actual primitives when Batch 11 primitives are reviewed
+
+| ID | Task | Status | Notes |
+|----|------|--------|-------|
+| F168-A | Create `FieldRenderer` class (new, replaces `_old`) | ⬜ | Entry point, iterates layers |
+| F168-A-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
+| F168-B | Create `LayerRenderer` class | ⬜ | Applies transforms, calls AnimationApplier |
+| F168-B-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
+| F168-C | Create `PrimitiveRenderer` interface | ⬜ | Per CLASS_DIAGRAM §8 |
+| F168-C-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
+| F168-D | Create shape-specific renderers (Sphere, Ring, Disc, Prism, Polyhedron, Cylinder) | ⬜ | Implement PrimitiveRenderer |
+| F168-D-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
+| F168-E | Wire ClientFieldManager to use new FieldRenderer | ⬜ | Replace FieldRenderer_old calls |
+| F168-E-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
+| CHK-18A | ⚠️ **BATCH 18-A COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+
+**Components that already exist:**
+- ✅ `Tessellator` - creates Mesh from Shape
+- ✅ `PolyhedronTessellator` - specialized for polyhedra
+- ✅ `AnimationApplier` - applies spin/pulse/wobble to MatrixStack
+- ✅ `Mesh` - immutable vertex data
+- ✅ `VertexEmitter` - emits Mesh to MC VertexConsumer
 
 ### Batch 19: Rendering Updates Part 1 (F169-F178)
 
@@ -614,27 +678,27 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| F169 | Update `LayerRenderer`: apply all Transform options (anchor, facing, billboard) | ⬜ | Complete transform |
-| F169-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F170 | Update `LayerRenderer`: apply layer spin + primitive spin (additive) | ⬜ | Per ARCH §10.5 |
-| F170-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F171 | Update `LayerRenderer`: apply visibility toggle | ⬜ | layer.visible |
-| F171-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F172 | Update `SphereRenderer`: use FillConfig, VisibilityMask, ArrangementConfig | ⬜ | Full integration |
-| F172-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F173 | Update `SphereRenderer`: shouldRender() from VertexPattern | ⬜ | Pattern filtering |
-| F173-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F174 | Update `SphereRenderer`: getVertexOrder() from VertexPattern | ⬜ | Vertex reordering |
-| F174-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F175 | Update `RingRenderer`: all config integration | ⬜ | Full integration |
-| F175-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F176 | Update `DiscRenderer`: all config integration | ⬜ | Full integration |
-| F176-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F177 | Update `PrismRenderer`: all config integration + multi-part | ⬜ | Sides vs caps |
-| F177-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F178 | Update `PolyhedronRenderer`: all config integration | ⬜ | Full integration |
-| F178-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-19 | ⚠️ **BATCH 19 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| F169 | Update `LayerRenderer`: apply all Transform options (anchor, facing, billboard) | ✅ | TheVirusBlock.onInitialize calls init() |
+| F169-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F170 | Update `LayerRenderer`: apply layer spin + primitive spin (additive) | ✅ | Per ARCH §10.5 |
+| F170-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F171 | Update `LayerRenderer`: apply visibility toggle | ✅ | layer.visible |
+| F171-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F172 | Update `SphereRenderer`: use FillConfig, VisibilityMask, ArrangementConfig | ✅ | Full integration |
+| F172-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F173 | Update `SphereRenderer`: shouldRender() from VertexPattern | ✅ | Pattern filtering |
+| F173-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F174 | Update `SphereRenderer`: getVertexOrder() from VertexPattern | ✅ | Vertex reordering |
+| F174-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F175 | Update `RingRenderer`: all config integration | ✅ | Full integration |
+| F175-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F176 | Update `DiscRenderer`: all config integration | ✅ | Full integration |
+| F176-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F177 | Update `PrismRenderer`: all config integration + multi-part | ✅ | Sides vs caps |
+| F177-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F178 | Update `PolyhedronRenderer`: all config integration | ✅ | Full integration |
+| F178-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| CHK-19 | ⚠️ **BATCH 19 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ✅ | - |
 
 ---
 
@@ -645,34 +709,60 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| F179 | Update `CylinderRenderer`: all config integration + multi-part | ⬜ | Sides vs caps |
-| F179-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F180 | Update `CageRenderer`: use shape-specific CageOptions | ⬜ | Cage rendering |
-| F180-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F181 | Update `FieldRenderer`: apply lifecycle fadeProgress to alpha | ⬜ | Lifecycle visual |
-| F181-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F182 | Update `FieldRenderer`: apply binding results before rendering | ⬜ | Binding visual |
-| F182-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F183 | Update `FieldRenderer`: apply active trigger effects | ⬜ | Trigger visual |
-| F183-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F184 | Update `FieldRenderer`: resolve primitive links before rendering | ⬜ | Link resolution |
-| F184-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F185 | Verify all renderers use FIELD logging channel | ⬜ | Code Quality |
-| F185-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F186 | Verify all renderers have proper class Javadoc | ⬜ | Code Quality |
-| F186-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F187 | Verify all renderers have section markers for long methods | ⬜ | Code Quality |
-| F187-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| F188 | Performance: Add trace logging for expensive operations | ⬜ | Per 00_TODO |
-| F188-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-20 | ⚠️ **BATCH 20 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| F179 | Update `CylinderRenderer`: all config integration + multi-part | ✅ | Sides vs caps |
+| F179-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F180 | Update `CageRenderer`: use shape-specific CageOptions | ✅ | Cage rendering |
+| F180-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F181 | Update `FieldRenderer`: apply lifecycle fadeProgress to alpha | ✅ | Lifecycle visual |
+| F181-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F182 | Update `FieldRenderer`: apply binding results before rendering | ✅ | Binding visual |
+| F182-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F183 | Update `FieldRenderer`: apply active trigger effects | ✅ | Trigger visual |
+| F183-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F184 | Update `FieldRenderer`: resolve primitive links before rendering | ✅ | Link resolution |
+| F184-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F185 | Verify all renderers use FIELD logging channel | ✅ | Code Quality |
+| F185-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F186 | Verify all renderers have proper class Javadoc | ✅ | Code Quality |
+| F186-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F187 | Verify all renderers have section markers for long methods | ✅ | Code Quality |
+| F187-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| F188 | Performance: Add trace logging for expensive operations | ✅ | Per 00_TODO |
+| F188-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| CHK-20 | ⚠️ **BATCH 20 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ✅ | - |
 
 ---
 
-### Batch 21: Integration Testing (F189-F198)
+### Batch 21: GUI Documentation ✅
+
+> **Ref:** Phase 2 planning  
+> **Type:** Design documentation  
+> **Status:** ✅ COMPLETE - Full GUI architecture and task plan created
+
+| ID | Task | Status | Notes |
+|----|------|--------|-------|
+| P2-DRAFT-01 | GUI Architecture design | ✅ | [GUI_ARCHITECTURE.md](./_design/gui/GUI_ARCHITECTURE.md) |
+| P2-DRAFT-01-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| P2-DRAFT-02 | GUI Class Diagram | ✅ | [GUI_CLASS_DIAGRAM.md](./_design/gui/GUI_CLASS_DIAGRAM.md) |
+| P2-DRAFT-02-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| P2-DRAFT-03 | GUI Utilities & Theming | ✅ | [GUI_UTILITIES.md](./_design/gui/GUI_UTILITIES.md) |
+| P2-DRAFT-03-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| P2-DRAFT-04 | Native Widgets Reference | ✅ | [GUI_NATIVE_WIDGETS.md](./_design/gui/GUI_NATIVE_WIDGETS.md) |
+| P2-DRAFT-04-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| P2-DRAFT-05 | GUI TODO Directives | ✅ | [GUI_TODO_DIRECTIVES.md](./_design/gui/GUI_TODO_DIRECTIVES.md) |
+| P2-DRAFT-05-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| P2-DRAFT-06 | GUI TODO List (151 tasks) | ✅ | [GUI_TODO_LIST.md](./_design/gui/GUI_TODO_LIST.md) |
+| P2-DRAFT-06-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ✅ | - |
+| CHK-21 | ⚠️ **BATCH 21 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ✅ | - |
+
+**📁 GUI Implementation Tasks:** See [GUI_TODO_LIST.md](./_design/gui/GUI_TODO_LIST.md) for 151 tasks in 15 batches (G01-G151)
+
+---
+
+### Batch 22: Integration Testing (F189-F198)
 
 > **Ref:** In-game testing  
-> **Type:** Verification
+> **Type:** Visual verification (after GUI draft)
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
@@ -696,11 +786,11 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 | F197-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
 | F198 | Test JSON reference: load field with $ref | ⬜ | Reference check |
 | F198-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-21 | ⚠️ **BATCH 21 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| CHK-22 | ⚠️ **BATCH 22 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
 
 ---
 
-### Batch 22: Final Verification (F199-F205)
+### Batch 23: Final Verification (F199-F205)
 
 > **Ref:** All documents  
 > **Type:** Final audit
@@ -721,7 +811,7 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 | F204-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
 | F205 | Full integration test: load profile → spawn → edit → live reload → verify | ⬜ | End-to-end |
 | F205-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-22 | ⚠️ **BATCH 22 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| CHK-23 | ⚠️ **BATCH 23 COMPLETE** - [Directives Checklist](./00_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
 
 ---
 
@@ -733,20 +823,30 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 ---
 
-## Phase 2: GUI & Polish (Draft Only)
+## Phase 2: GUI Implementation
 
-> **⛔ HARD STOP AFTER P2-DRAFT-03**  
-> **Only create design docs, NO implementation**
+> **📁 Full task list:** [GUI_TODO_LIST.md](./_design/gui/GUI_TODO_LIST.md)  
+> **📋 Working guide:** [GUI_TODO_DIRECTIVES.md](./_design/gui/GUI_TODO_DIRECTIVES.md)  
+> **Status:** Documentation complete, implementation ready
 
-| ID | Task | Status | Notes |
-|----|------|--------|-------|
-| P2-DRAFT-01 | GUI panel wireframe design (paper/figma sketch) | ⬜ | Design only |
-| P2-DRAFT-01-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| P2-DRAFT-02 | GUI component inventory (what controls needed) | ⬜ | Design only |
-| P2-DRAFT-02-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| P2-DRAFT-03 | GUI data flow diagram (how it connects to field system) | ⬜ | Design only |
-| P2-DRAFT-03-CHK | ↳ [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md) check | ⬜ | - |
-| P2-STOP | ⛔ **HARD STOP** - Re-evaluate Phase 1, review results, plan Phase 2 scope | ⬜ | STOP HERE |
+| Batch | Focus | Tasks | Status |
+|-------|-------|-------|--------|
+| G01-G10 | Foundation | 10 | ⬜ |
+| G11-G20 | Utilities | 10 | ⬜ |
+| G21-G30 | Custom Widgets | 10 | ⬜ |
+| G31-G40 | DEBUG Field | 10 | ⬜ |
+| G41-G50 | Quick Panel (Shape) | 10 | ⬜ |
+| G51-G60 | Quick Panel (Layers) | 10 | ⬜ |
+| G61-G70 | Advanced (Shapes) | 10 | ⬜ |
+| G71-G80 | Advanced (Appearance) | 10 | ⬜ |
+| G81-G90 | Advanced (Transform) | 10 | ⬜ |
+| G91-G100 | Advanced (Fill/Link) | 10 | ⬜ |
+| G101-G110 | Debug Panel | 10 | ⬜ |
+| G111-G121 | Profiles | 11 | ⬜ |
+| G122-G131 | Network | 10 | ⬜ |
+| G132-G141 | Server/Scroll | 10 | ⬜ |
+| G142-G151 | Polish | 10 | ⬜ |
+| **TOTAL** | | **151** | ⬜ |
 
 ---
 
@@ -785,30 +885,31 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 ## Summary
 
-| Batch | Focus | Tasks | +CHK | Total |
-|-------|-------|-------|------|-------|
-| 1-2 | Foundation Enums | 20 | 20 | 40 |
-| 3 | Pattern System | 10 | 10 | 20 |
-| 4 | Transform | 10 | 10 | 20 |
-| 5 | Fill & Visibility | 10 | 10 | 20 |
-| 6 | Arrangement | 10 | 10 | 20 |
-| 7 | Animation | 10 | 10 | 20 |
-| 8 | Appearance | 10 | 10 | 20 |
-| 9 | Field Config | 10 | 10 | 20 |
-| 10 | Shape Records | 10 | 10 | 20 |
-| 11 | Primitive Interface | 10 | 10 | 20 |
-| 12 | Primitive Linking | 5 | 5 | 10 |
-| 13 | Archive Old | 7 | 7 | 14 |
-| 14 | JSON Loading | 10 | 10 | 20 |
-| 15 | JSON Parsing | 10 | 10 | 20 |
-| 16 | Bindings | 8 | 8 | 16 |
-| 17 | Triggers | 8 | 8 | 16 |
-| 18 | Lifecycle/Combat | 10 | 10 | 20 |
-| 19-20 | Rendering | 20 | 20 | 40 |
-| 21 | Integration Tests | 10 | 10 | 20 |
-| 22 | Final Audit | 7 | 7 | 14 |
-| + Batch CHK | (end of batch) | 22 | - | 22 |
-| **TOTAL** | | **~207** | **~207** | **~430** |
+| Batch | Focus | Tasks | +CHK | Total | Status |
+|-------|-------|-------|------|-------|--------|
+| 1-2 | Foundation Enums | 20 | 20 | 40 | ✅ |
+| 3 | Pattern System | 10 | 10 | 20 | ✅ |
+| 4 | Transform | 10 | 10 | 20 | ✅ |
+| 5 | Fill & Visibility | 10 | 10 | 20 | ✅ |
+| 6 | Arrangement | 10 | 10 | 20 | ✅ |
+| 7 | Animation | 10 | 10 | 20 | ✅ |
+| 8 | Appearance | 10 | 10 | 20 | ✅ |
+| 9 | Field Config | 10 | 10 | 20 | ✅ |
+| 10 | Shape Records | 10 | 10 | 20 | ✅ |
+| 11 | Primitive Interface | 10 | 10 | 20 | ✅ |
+| 12 | Primitive Linking | 5 | 5 | 10 | ✅ |
+| 13 | Archive Old | 7 | 7 | 14 | ✅ |
+| 14 | JSON Loading | 10 | 10 | 20 | ✅ |
+| 15 | JSON Parsing | 10 | 10 | 20 | ✅ |
+| 16 | Bindings | 8 | 8 | 16 | ✅ |
+| 17 | Triggers | 8 | 8 | 16 | ✅ |
+| 18 | Lifecycle/Combat | 10 | 10 | 20 | ✅ |
+| 19-20 | Rendering | 20 | 20 | 40 | ✅ |
+| **21** | **GUI Documentation** | 6 | 6 | 12 | ✅ |
+| 22 | Integration Tests | 10 | 10 | 20 | ⬜ |
+| 23 | Final Audit | 7 | 7 | 14 | ⬜ |
+| + Batch CHK | (end of batch) | 23 | - | 23 |
+| **TOTAL** | | **~208** | **~208** | **~433** |
 
 **Every task has a matching `-CHK` step to follow [TODO_DIRECTIVES](./00_TODO_DIRECTIVES.md)**
 

@@ -1,81 +1,156 @@
 package net.cyberpunk042.visual.shape;
 
-import net.minecraft.util.math.Box;
+import com.google.gson.JsonObject;
+
+import net.cyberpunk042.visual.pattern.CellType;
+import org.joml.Vector3f;
+
+import java.util.Map;
+import net.cyberpunk042.visual.validation.Range;
+import net.cyberpunk042.visual.validation.ValueRange;
 
 /**
- * A flat circular disc at a specific Y level.
+ * Flat disc/circle shape.
  * 
- * <h2>Parameters</h2>
+ * <h2>JSON Format</h2>
+ * <pre>
+ * "shape": {
+ *   "type": "disc",
+ *   "radius": 1.0,
+ *   "segments": 64,
+ *   "y": 0.0,
+ *   "arcStart": 0,
+ *   "arcEnd": 360,
+ *   "innerRadius": 0.0,
+ *   "rings": 1
+ * }
+ * </pre>
+ * 
+ * <h2>Parts</h2>
  * <ul>
- *   <li><b>y</b>: Y offset from center</li>
- *   <li><b>radius</b>: Disc radius</li>
- *   <li><b>segments</b>: Number of segments (higher = smoother circle)</li>
+ *   <li><b>surface</b> (SECTOR) - Main disc surface</li>
+ *   <li><b>edge</b> (EDGE) - Outer border</li>
  * </ul>
  * 
- * <p>Unlike RingShape, a disc is solid (filled circle).
+ * @see Shape
+ * @see CellType
  */
 public record DiscShape(
-        float y,
-        float radius,
-        int segments
+    @Range(ValueRange.RADIUS) float radius,
+    @Range(ValueRange.STEPS) int segments,
+    @Range(ValueRange.UNBOUNDED) float y,
+    @Range(ValueRange.DEGREES) float arcStart,
+    @Range(ValueRange.DEGREES) float arcEnd,
+    @Range(ValueRange.POSITIVE) float innerRadius,
+    @Range(ValueRange.STEPS) int rings
 ) implements Shape {
     
-    public static final String TYPE = "disc";
+    /** Default full disc. */
+    public static DiscShape of(float y, float radius, int segments) { 
+        return new DiscShape(y, segments, 0f, radius, 0f, 360f, 1); 
+    }
+    public static DiscShape at(float y, float radius) { 
+        return new DiscShape(y, 32, 0f, radius, 0f, 360f, 1); 
+    }
+    public static DiscShape defaults() { return DEFAULT; }
     
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Factory
-    // ─────────────────────────────────────────────────────────────────────────────
+    public static final DiscShape DEFAULT = new DiscShape(
+        1.0f, 64, 0, 0, 360, 0, 1);
     
-    public static DiscShape defaults() {
-        return new DiscShape(0.0f, 1.0f, 32);
+    /** High-detail disc. */
+    public static final DiscShape HIGH_DETAIL = new DiscShape(
+        1.0f, 128, 0, 0, 360, 0, 4);
+    
+    /**
+     * Creates a simple disc.
+     * @param radius Disc radius
+     */
+    public static DiscShape ofRadius(@Range(ValueRange.RADIUS) float radius) {
+        return new DiscShape(radius, 64, 0, 0, 360, 0, 1);
     }
     
-    public static DiscShape at(float y, float radius) {
-        return new DiscShape(y, radius, 32);
+    /**
+     * Creates a pie slice.
+     * @param radius Disc radius
+     * @param arcEnd Arc angle (0-360)
+     */
+    public static DiscShape pie(@Range(ValueRange.RADIUS) float radius, @Range(ValueRange.DEGREES) float arcEnd) {
+        return new DiscShape(radius, 64, 0, 0, arcEnd, 0, 1);
     }
-    
-    public static DiscShape of(float y, float radius, int segments) {
-        return new DiscShape(y, radius, segments);
-    }
-    
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Shape Interface
-    // ─────────────────────────────────────────────────────────────────────────────
     
     @Override
     public String getType() {
-        return TYPE;
+        return "disc";
     }
     
     @Override
-    public Box getBounds() {
-        // Thin bounding box at Y level
-        return new Box(-radius, y - 0.01, -radius, radius, y + 0.01, radius);
+    public Vector3f getBounds() {
+        float d = radius * 2;
+        return new Vector3f(d, 0.01f, d);
     }
     
     @Override
-    public int estimateVertexCount() {
-        return segments + 1; // Center + edge vertices
+    public CellType primaryCellType() {
+        return CellType.SECTOR;
     }
     
     @Override
-    public int estimateTriangleCount() {
-        return segments; // Triangle fan from center
+    public Map<String, CellType> getParts() {
+        return Map.of(
+            "surface", CellType.SECTOR,
+            "edge", CellType.EDGE
+        );
     }
     
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Modifiers
-    // ─────────────────────────────────────────────────────────────────────────────
-    
-    public DiscShape atY(float newY) {
-        return new DiscShape(newY, radius, segments);
+    /** Whether this is a full disc or partial arc. */
+    public boolean isFullDisc() {
+        return arcStart == 0 && arcEnd == 360 && innerRadius == 0;
     }
     
-    public DiscShape withRadius(float newRadius) {
-        return new DiscShape(y, newRadius, segments);
+    /** Whether this has a hole (donut shape). */
+    public boolean hasHole() {
+        return innerRadius > 0;
     }
     
-    public DiscShape scaled(float scale) {
-        return new DiscShape(y * scale, radius * scale, segments);
+    @Override
+    public JsonObject toJson() {
+        JsonObject json = new JsonObject();
+        json.addProperty("type", "disc");
+        json.addProperty("radius", radius);
+        json.addProperty("segments", segments);
+        if (y != 0) json.addProperty("y", y);
+        if (arcStart != 0) json.addProperty("arcStart", arcStart);
+        if (arcEnd != 360) json.addProperty("arcEnd", arcEnd);
+        if (innerRadius != 0) json.addProperty("innerRadius", innerRadius);
+        if (rings != 1) json.addProperty("rings", rings);
+        return json;
+    }
+
+    // =========================================================================
+    // Builder
+    // =========================================================================
+    
+    public static Builder builder() { return new Builder(); }
+    
+    public static class Builder {
+        private @Range(ValueRange.RADIUS) float radius = 1.0f;
+        private @Range(ValueRange.STEPS) int segments = 64;
+        private @Range(ValueRange.UNBOUNDED) float y = 0;
+        private @Range(ValueRange.DEGREES) float arcStart = 0;
+        private @Range(ValueRange.DEGREES) float arcEnd = 360;
+        private @Range(ValueRange.POSITIVE) float innerRadius = 0;
+        private @Range(ValueRange.STEPS) int rings = 1;
+        
+        public Builder radius(float r) { this.radius = r; return this; }
+        public Builder segments(int s) { this.segments = s; return this; }
+        public Builder y(@Range(ValueRange.UNBOUNDED) float y) { this.y = y; return this; }
+        public Builder arcStart(float a) { this.arcStart = a; return this; }
+        public Builder arcEnd(float a) { this.arcEnd = a; return this; }
+        public Builder innerRadius(float r) { this.innerRadius = r; return this; }
+        public Builder rings(int r) { this.rings = r; return this; }
+        
+        public DiscShape build() {
+            return new DiscShape(radius, segments, y, arcStart, arcEnd, innerRadius, rings);
+        }
     }
 }

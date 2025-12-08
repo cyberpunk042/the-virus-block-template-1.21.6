@@ -76,7 +76,7 @@ public final class FieldSystemInit {
         Logging.REGISTRY.topic("field").info("Registered /field and /fieldtest command trees");
         
         // Initialize FieldLoader for hot-reload support
-        FieldLoader.initialize();
+        // FieldLoader initialized via FieldRegistry
         
         // Register resource reload listener for JSON field definitions
         // This loads definitions from data/the-virus-block/field_definitions/*.json
@@ -92,9 +92,11 @@ public final class FieldSystemInit {
                     Logging.REGISTRY.topic("field").info("Reloading field definitions from resources...");
                     FieldRegistry.clear();
                     FieldRegistry.registerDefaults();
-                    int loaded = FieldLoader.load(manager);
+                    var loader = new net.cyberpunk042.field.loader.FieldLoader();
+                    loader.load(manager);
+                    int loaded = FieldRegistry.count();
                     Logging.REGISTRY.topic("field").info("Loaded {} field definitions from JSON", loaded);
-                    FieldRegistry.logStatus();
+                    Logging.FIELD.topic("registry").info("Registry: {} fields loaded", FieldRegistry.count());
                 }
             }
         );
@@ -137,7 +139,7 @@ public final class FieldSystemInit {
         
         // Register defaults (will be supplemented by JSON on resource load)
         FieldRegistry.registerDefaults();
-        FieldRegistry.logStatus();
+        Logging.FIELD.topic("registry").info("Registry: {} fields loaded", FieldRegistry.count());
         
         Logging.REGISTRY.topic("field").info("Field system initialized");
     }

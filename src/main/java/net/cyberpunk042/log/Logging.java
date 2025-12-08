@@ -36,6 +36,18 @@ public final class Logging {
     public static final Channel INFECTION     = register(Channel.of("infection",     "Infection",     LogLevel.OFF));
     public static final Channel CALLBACKS     = register(Channel.of("callbacks",     "Callbacks",     LogLevel.WARN));
     public static final Channel FIELD         = register(Channel.of("field",         "Field",         LogLevel.INFO));
+    public static final Channel GUI = register(Channel.of("gui", "GUI", LogLevel.INFO));
+    
+    // ========== FIELD SYSTEM CHANNELS ==========
+    
+    /** Binding evaluation (player state → field properties). Very verbose - OFF by default. */
+    public static final Channel BINDING       = register(Channel.of("binding",       "Binding",       LogLevel.OFF));
+    
+    /** Animation updates (spin, pulse, wobble). Every-frame - OFF by default. */
+    public static final Channel ANIMATION     = register(Channel.of("animation",     "Animation",     LogLevel.OFF));
+    
+    /** Network sync (field packets, state sync). */
+    public static final Channel NETWORK       = register(Channel.of("network",       "Network",       LogLevel.WARN));
     
     // ========== REGISTRY ==========
     

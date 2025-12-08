@@ -1,243 +1,266 @@
 package net.cyberpunk042.visual.animation;
 
-import com.google.gson.JsonObject;
+import org.jetbrains.annotations.Nullable;
+import net.cyberpunk042.visual.validation.Range;
+import net.cyberpunk042.visual.validation.ValueRange;
 import net.cyberpunk042.log.Logging;
-import net.cyberpunk042.visual.animation.Axis;
+import com.google.gson.JsonObject;
 
 /**
- * Animation properties for a primitive.
+ * Animation configuration for a primitive.
  * 
- * <h2>Rotation Animation</h2>
- * <ul>
- *   <li><b>spin</b>: Rotation speed (radians per tick)</li>
- *   <li><b>spinAxis</b>: Axis to rotate around (X, Y, Z)</li>
- * </ul>
+ * <p>Handles all time-based effects: spin, pulse, wobble, etc.</p>
  * 
- * <h2>Scale Animation</h2>
- * <ul>
- *   <li><b>pulse</b>: Scale pulsing speed</li>
- *   <li><b>pulseAmount</b>: Scale pulsing amplitude</li>
- * </ul>
- * 
- * <h2>Alpha Animation</h2>
- * <ul>
- *   <li><b>alphaPulse</b>: Alpha oscillation speed</li>
- *   <li><b>alphaPulseAmount</b>: Alpha oscillation amplitude</li>
- * </ul>
- * 
- * <h2>Timing</h2>
- * <ul>
- *   <li><b>phase</b>: Initial phase offset (radians)</li>
- * </ul>
- * 
- * <h2>Usage Examples</h2>
+ * <h2>JSON Format</h2>
  * <pre>
- * Animation.none()                           // No animation
- * Animation.spinning(0.05f)                  // Slow Y-axis spin
- * Animation.spinning(0.05f, Axis.X)          // Pitch rotation
- * Animation.pulsing(0.1f, 0.2f)              // Scale pulse
- * Animation.alphaPulsing(0.1f, 0.3f)         // Fade in/out
+ * "animation": {
+ *   "spin": { "axis": "Y", "speed": 0.02 },
+ *   "pulse": { "scale": 0.1, "speed": 1.0 },
+ *   "phase": 0.5,
+ *   "alphaPulse": { "min": 0.5, "max": 1.0, "speed": 1.0 },
+ *   "colorCycle": { "colors": ["#FF0000", "#00FF00"], "speed": 1.0 },
+ *   "wobble": { "amplitude": [0.1, 0.05, 0.1], "speed": 1.0 },
+ *   "wave": { "amplitude": 0.1, "frequency": 2.0 }
+ * }
  * </pre>
+ * 
+ * @see SpinConfig
+ * @see PulseConfig
+ * @see AlphaPulseConfig
+ * @see ColorCycleConfig
+ * @see WobbleConfig
+ * @see WaveConfig
  */
 public record Animation(
-        float spin,
-        float pulse,
-        float pulseAmount,
-        float phase,
-        float alphaPulse,
-        float alphaPulseAmount,
-        Axis spinAxis
+    SpinConfig spin,
+    PulseConfig pulse,
+    @Range(ValueRange.NORMALIZED) float phase,
+    AlphaPulseConfig alphaPulse,
+    @Nullable ColorCycleConfig colorCycle,
+    @Nullable WobbleConfig wobble,
+    @Nullable WaveConfig wave
 ) {
+    /** No animation (static). */
+    public static Animation none() { return NONE; }
     
-    /** No animation. */
-    public static final Animation NONE = new Animation(0, 0, 0, 0, 0, 0, Axis.Y);
+    public static final Animation NONE = new Animation(
+        SpinConfig.NONE, PulseConfig.NONE, 0, AlphaPulseConfig.NONE, null, null, null);
+    
+    /** Default animation (slow spin). */
+    public static final Animation DEFAULT = new Animation(
+        SpinConfig.DEFAULT, PulseConfig.NONE, 0, AlphaPulseConfig.NONE, null, null, null);
+    
+    /** Spinning animation. */
+    public static final Animation SPINNING = new Animation(
+        SpinConfig.DEFAULT, PulseConfig.NONE, 0, AlphaPulseConfig.NONE, null, null, null);
+    
+    /** Pulsing animation. */
+    public static final Animation PULSING = new Animation(
+        SpinConfig.NONE, PulseConfig.DEFAULT, 0, AlphaPulseConfig.NONE, null, null, null);
+    
+    /**
+     * Creates spin animation.
+     * @param speed Rotation speed
+     */
+    public static Animation spin(float speed) {
+        return new Animation(
+            SpinConfig.around(Axis.Y, speed), PulseConfig.NONE, 0, 
+            AlphaPulseConfig.NONE, null, null, null);
+    }
+    
+    /**
+     * Creates pulse animation.
+     * @param amplitude Pulse amplitude
+     * @param speed Pulse speed
+     */
+    public static Animation pulse(float amplitude, float speed) {
+        return new Animation(
+            SpinConfig.NONE, PulseConfig.sine(amplitude, speed), 0,
+            AlphaPulseConfig.NONE, null, null, null);
+    }
+    
+    /**
+     * Creates spin + pulse animation.
+     * @param spinSpeed Spin speed
+     * @param pulseAmplitude Pulse amplitude
+     */
+    public static Animation spinAndPulse(float spinSpeed, float pulseAmplitude) {
+        return new Animation(
+            SpinConfig.around(Axis.Y, spinSpeed),
+            PulseConfig.sine(pulseAmplitude, 1.0f),
+            0, AlphaPulseConfig.NONE, null, null, null);
+    }
+    
+    /** Whether any animation is active. */
+    public boolean isActive() {
+        return (spin != null && spin.isActive()) ||
+               (pulse != null && pulse.isActive()) ||
+               (alphaPulse != null && alphaPulse.isActive()) ||
+               (colorCycle != null && colorCycle.isActive()) ||
+               (wobble != null && wobble.isActive()) ||
+               (wave != null && wave.isActive());
+    }
+    
+    /** Whether spin is active. */
+    public boolean hasSpin() { return spin != null && spin.isActive(); }
+    
+    /** Whether pulse is active. */
+    public boolean hasPulse() { return pulse != null && pulse.isActive(); }
+    
+    /** Whether alpha pulse is active. */
+    public boolean hasAlphaPulse() { return alphaPulse != null && alphaPulse.isActive(); }
+    
+    /** Whether color cycling is active. */
+    public boolean hasColorCycle() { return colorCycle != null && colorCycle.isActive(); }
+    
+    /** Whether wobble is active. */
+    public boolean hasWobble() { return wobble != null && wobble.isActive(); }
+    
+    /** Whether wave is active. */
+    public boolean hasWave() { return wave != null && wave.isActive(); }
+    
+
+    // =========================================================================
+    // JSON Parsing
+    // =========================================================================
+    
+    /**
+     * Parses an Animation from JSON.
+     * @param json The JSON object
+     * @return Parsed animation
+     */
+    public static Animation fromJson(JsonObject json) {
+        if (json == null) return NONE;
+        
+        Logging.FIELD.topic("parse").trace("Parsing Animation...");
+        
+        SpinConfig spin = SpinConfig.NONE;
+        if (json.has("spin")) {
+            spin = SpinConfig.fromJson(json.getAsJsonObject("spin"));
+        }
+        
+        PulseConfig pulse = PulseConfig.NONE;
+        if (json.has("pulse")) {
+            pulse = PulseConfig.fromJson(json.getAsJsonObject("pulse"));
+        }
+        
+        float phase = json.has("phase") ? json.get("phase").getAsFloat() : 0.0f;
+        
+        AlphaPulseConfig alphaPulse = AlphaPulseConfig.NONE;
+        if (json.has("alphaPulse")) {
+            alphaPulse = AlphaPulseConfig.fromJson(json.getAsJsonObject("alphaPulse"));
+        }
+        
+        ColorCycleConfig colorCycle = null;
+        if (json.has("colorCycle")) {
+            colorCycle = ColorCycleConfig.fromJson(json.getAsJsonObject("colorCycle"));
+        }
+        
+        WobbleConfig wobble = null;
+        if (json.has("wobble")) {
+            wobble = WobbleConfig.fromJson(json.getAsJsonObject("wobble"));
+        }
+        
+        WaveConfig wave = null;
+        if (json.has("wave")) {
+            wave = WaveConfig.fromJson(json.getAsJsonObject("wave"));
+        }
+        
+        Animation result = new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave);
+        Logging.FIELD.topic("parse").trace("Parsed Animation: hasSpin={}, hasPulse={}, phase={}", 
+            result.hasSpin(), result.hasPulse(), phase);
+        return result;
+    }
     
     // =========================================================================
-    // Factory Methods
+    // Builder
     // =========================================================================
     
-    public static Animation none() {
-        return NONE;
-    }
+    public static Builder builder() { return new Builder(); }
     
-    /**
-     * Creates a spin animation around Y axis.
-     */
-    public static Animation spinning(float speed) {
-        return new Animation(speed, 0, 0, 0, 0, 0, Axis.Y);
+    public static class Builder {
+        private SpinConfig spin = SpinConfig.NONE;
+        private PulseConfig pulse = PulseConfig.NONE;
+        private @Range(ValueRange.NORMALIZED) float phase = 0;
+        private AlphaPulseConfig alphaPulse = AlphaPulseConfig.NONE;
+        private ColorCycleConfig colorCycle = null;
+        private WobbleConfig wobble = null;
+        private WaveConfig wave = null;
+        
+        public Builder spin(SpinConfig s) { this.spin = s; return this; }
+        public Builder spin(float speed) { this.spin = SpinConfig.around(Axis.Y, speed); return this; }
+        public Builder pulse(PulseConfig p) { this.pulse = p; return this; }
+        public Builder phase(float p) { this.phase = p; return this; }
+        public Builder alphaPulse(AlphaPulseConfig a) { this.alphaPulse = a; return this; }
+        public Builder colorCycle(ColorCycleConfig c) { this.colorCycle = c; return this; }
+        public Builder wobble(WobbleConfig w) { this.wobble = w; return this; }
+        public Builder wave(WaveConfig w) { this.wave = w; return this; }
+        
+        public Animation build() {
+            return new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave);
+        }
     }
-    
-    /**
-     * Creates a spin animation around specified axis.
-     */
-    public static Animation spinning(float speed, Axis axis) {
-        return new Animation(speed, 0, 0, 0, 0, 0, axis);
-    }
-    
-    /**
-     * Creates a scale pulsing animation.
-     */
-    public static Animation pulsing(float speed, float amount) {
-        return new Animation(0, speed, amount, 0, 0, 0, Axis.Y);
-    }
-    
-    /**
-     * Creates an alpha pulsing animation.
-     */
-    public static Animation alphaPulsing(float speed, float amount) {
-        return new Animation(0, 0, 0, 0, speed, amount, Axis.Y);
-    }
-    
-    /**
-     * Creates combined spin and scale pulse.
-     */
-    public static Animation spinningAndPulsing(float spinSpeed, float pulseSpeed, float pulseAmount) {
-        return new Animation(spinSpeed, pulseSpeed, pulseAmount, 0, 0, 0, Axis.Y);
-    }
-    
-    /**
-     * Creates a full animation with all parameters.
-     */
-    public static Animation full(float spin, Axis axis, float pulse, float pulseAmount, 
-                                  float alphaPulse, float alphaPulseAmount, float phase) {
-        return new Animation(spin, pulse, pulseAmount, phase, alphaPulse, alphaPulseAmount, axis);
-    }
-    
+
     // =========================================================================
-    // Builder-style
+    // Immutable Modifiers
     // =========================================================================
     
-    public Animation withSpin(float newSpin) {
-        return new Animation(newSpin, pulse, pulseAmount, phase, alphaPulse, alphaPulseAmount, spinAxis);
+    /**
+     * Returns a copy with the specified spin config.
+     */
+    public Animation withSpin(SpinConfig newSpin) {
+        return new Animation(newSpin, pulse, phase, alphaPulse, colorCycle, wobble, wave);
     }
     
-    public Animation withSpinAxis(Axis axis) {
-        return new Animation(spin, pulse, pulseAmount, phase, alphaPulse, alphaPulseAmount, axis);
+    /**
+     * Returns a copy with the specified pulse config.
+     */
+    public Animation withPulse(PulseConfig newPulse) {
+        return new Animation(spin, newPulse, phase, alphaPulse, colorCycle, wobble, wave);
     }
     
-    public Animation withPulse(float newPulse, float newAmount) {
-        return new Animation(spin, newPulse, newAmount, phase, alphaPulse, alphaPulseAmount, spinAxis);
-    }
-    
-    public Animation withAlphaPulse(float newPulse, float newAmount) {
-        return new Animation(spin, pulse, pulseAmount, phase, newPulse, newAmount, spinAxis);
-    }
-    
+    /**
+     * Returns a copy with the specified phase.
+     */
     public Animation withPhase(float newPhase) {
-        return new Animation(spin, pulse, pulseAmount, newPhase, alphaPulse, alphaPulseAmount, spinAxis);
-    }
-    
-    // =========================================================================
-    // Computed Values
-    // =========================================================================
-    
-    /**
-     * Calculates current rotation at given time.
-     * @param time elapsed time in ticks
-     * @return rotation in radians
-     */
-    public float getRotation(float time) {
-        return (spin * time + phase) % (float)(Math.PI * 2);
+        return new Animation(spin, pulse, newPhase, alphaPulse, colorCycle, wobble, wave);
     }
     
     /**
-     * Calculates current scale multiplier at given time.
-     * @param time elapsed time in ticks
-     * @return scale multiplier (1.0 = no change)
+     * Serializes this animation to JSON.
      */
-    public float getScale(float time) {
-        if (pulse == 0 || pulseAmount == 0) {
-            return 1.0f;
-        }
-        return 1.0f + (float)Math.sin(pulse * time + phase) * pulseAmount;
-    }
-    
-    /**
-     * Calculates current alpha multiplier at given time.
-     * @param time elapsed time in ticks
-     * @return alpha multiplier (0.0 - 1.0 range adjustment)
-     */
-    public float getAlphaMultiplier(float time) {
-        if (alphaPulse == 0 || alphaPulseAmount == 0) {
-            return 1.0f;
-        }
-        // Sin gives -1 to 1, we want 0 to 1 for interpolation into AlphaRange
-        float sinValue = (float)Math.sin(alphaPulse * time + phase);
-        return 0.5f + sinValue * 0.5f * alphaPulseAmount;
-    }
-    
-    /**
-     * Checks if this animation has any effect.
-     */
-    public boolean isAnimated() {
-        return spin != 0 || pulse != 0 || alphaPulse != 0;
-    }
-    
-    /**
-     * Checks if this has spin animation.
-     */
-    public boolean hasSpinAnimation() {
-        return spin != 0;
-    }
-    
-    /**
-     * Checks if this has scale pulse.
-     */
-    public boolean hasScalePulse() {
-        return pulse != 0 && pulseAmount != 0;
-    }
-    
-    /**
-     * Checks if this has alpha pulse.
-     */
-    public boolean hasAlphaPulse() {
-        return alphaPulse != 0 && alphaPulseAmount != 0;
-    }
-    
-    // =========================================================================
-    // JSON Serialization
-    // =========================================================================
-    
     public JsonObject toJson() {
         JsonObject json = new JsonObject();
         
-        // Only include non-default values
-        if (spin != 0) {
-            json.addProperty("spin", spin);
-            if (spinAxis != Axis.Y) {
-                json.addProperty("spinAxis", spinAxis.id());
-            }
+        if (spin != null && spin.isActive()) {
+            json.add("spin", spin.toJson());
         }
-        if (pulse != 0) json.addProperty("pulse", pulse);
-        if (pulseAmount != 0) json.addProperty("pulseAmount", pulseAmount);
-        if (phase != 0) json.addProperty("phase", phase);
-        if (alphaPulse != 0) json.addProperty("alphaPulse", alphaPulse);
-        if (alphaPulseAmount != 0) json.addProperty("alphaPulseAmount", alphaPulseAmount);
+        
+        if (pulse != null && pulse.isActive()) {
+            json.add("pulse", pulse.toJson());
+        }
+        
+        if (phase != 0.0f) {
+            json.addProperty("phase", phase);
+        }
+        
+        if (alphaPulse != null && alphaPulse.isActive()) {
+            json.add("alphaPulse", alphaPulse.toJson());
+        }
+        
+        if (colorCycle != null && colorCycle.isActive()) {
+            json.add("colorCycle", colorCycle.toJson());
+        }
+        
+        if (wobble != null && wobble.isActive()) {
+            json.add("wobble", wobble.toJson());
+        }
+        
+        if (wave != null && wave.isActive()) {
+            json.add("wave", wave.toJson());
+        }
         
         return json;
     }
-    
-    public static Animation fromJson(JsonObject json) {
-        if (json == null) {
-            return NONE;
-        }
-        
-        float spin = json.has("spin") ? json.get("spin").getAsFloat() : 0;
-        float pulse = json.has("pulse") ? json.get("pulse").getAsFloat() : 0;
-        float pulseAmount = json.has("pulseAmount") ? json.get("pulseAmount").getAsFloat() : 0;
-        float phase = json.has("phase") ? json.get("phase").getAsFloat() : 0;
-        float alphaPulse = json.has("alphaPulse") ? json.get("alphaPulse").getAsFloat() : 0;
-        float alphaPulseAmount = json.has("alphaPulseAmount") ? json.get("alphaPulseAmount").getAsFloat() : 0;
-        Axis spinAxis = json.has("spinAxis") ? Axis.fromId(json.get("spinAxis").getAsString()) : Axis.Y;
-        
-        Animation result = new Animation(spin, pulse, pulseAmount, phase, alphaPulse, alphaPulseAmount, spinAxis);
-        
-        if (result.isAnimated()) {
-            Logging.RENDER.topic("animation").trace(
-                "Parsed Animation: spin={:.3f} ({}), pulse={:.3f}, alphaPulse={:.3f}",
-                spin, spinAxis.id(), pulse, alphaPulse);
-        }
-        
-        return result;
-    }
+
 }

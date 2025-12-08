@@ -3,16 +3,18 @@ package net.cyberpunk042.visual.pattern;
 /**
  * Patterns for segment-based tessellation (rings, arcs).
  * 
- * <p>Controls which segments are rendered and how they connect.
+ * <p>Controls which segments are rendered around a ring.
+ * Each segment is a quad connecting inner/outer radii.
  * 
  * <h2>Available Patterns</h2>
  * <ul>
- *   <li><b>DEFAULT</b>: All segments rendered</li>
- *   <li><b>ALTERNATING</b>: Every other segment (dashed look)</li>
+ *   <li><b>FULL</b>: All segments rendered (default)</li>
+ *   <li><b>ALTERNATING</b>: Every other segment</li>
  *   <li><b>SPARSE</b>: Every third segment</li>
- *   <li><b>DOUBLED</b>: Double-width segments</li>
+ *   <li><b>QUARTER</b>: Every fourth segment</li>
  *   <li><b>REVERSED</b>: Reverse winding order</li>
- *   <li><b>TAPERED</b>: Segments taper toward one end</li>
+ *   <li><b>ZIGZAG</b>: Alternating with reversed winding</li>
+ *   <li><b>DASHED</b>: Short dashes with gaps</li>
  * </ul>
  * 
  * @see VertexPattern
@@ -20,32 +22,60 @@ package net.cyberpunk042.visual.pattern;
 public enum SegmentPattern implements VertexPattern {
     
     /** All segments rendered normally. */
-    DEFAULT("default", 1, false),
+    FULL("full", 1, 0, false),
     
-    /** Every other segment (dashed ring). */
-    ALTERNATING("alternating", 2, false),
+    /** Every other segment. */
+    ALTERNATING("alternating", 2, 0, false),
     
-    /** Every third segment (sparse ring). */
-    SPARSE("sparse", 3, false),
+    /** Every third segment. */
+    SPARSE("sparse", 3, 0, false),
     
     /** Every fourth segment. */
-    QUARTER("quarter", 4, false),
+    QUARTER("quarter", 4, 0, false),
     
     /** Reverse winding order (flip normals). */
-    REVERSED("reversed", 1, true),
+    REVERSED("reversed", 1, 0, true),
     
     /** Alternating with reversed winding. */
-    ZIGZAG("zigzag", 2, true);
+    ZIGZAG("zigzag", 2, 0, true),
+    
+    /** Dashed pattern - 2 on, 2 off. */
+    DASHED("dashed", 2, 1, false);
+    
+    /** Default pattern (alias for FULL). */
+    public static final SegmentPattern DEFAULT = FULL;
     
     private final String id;
     private final int skipInterval;
+    private final int phaseOffset;
     private final boolean reverseWinding;
     
-    SegmentPattern(String id, int skipInterval, boolean reverseWinding) {
+    SegmentPattern(String id, int skipInterval, int phaseOffset, boolean reverseWinding) {
         this.id = id;
         this.skipInterval = skipInterval;
+        this.phaseOffset = phaseOffset;
         this.reverseWinding = reverseWinding;
     }
+    
+    /**
+     * Gets the skip interval for this pattern.
+     * @return Skip interval (1 = every segment, 2 = every other, etc.)
+     */
+    public int skipInterval() { return skipInterval; }
+    
+    /**
+     * Gets the phase offset for this pattern.
+     */
+    public int phaseOffset() { return phaseOffset; }
+    
+    /**
+     * Whether this pattern reverses winding.
+     */
+    public boolean reverseWinding() { return reverseWinding; }
+    
+    // =========================================================================
+    // VertexPattern Implementation
+    // =========================================================================
     
     @Override
     public String id() {
@@ -53,32 +83,29 @@ public enum SegmentPattern implements VertexPattern {
     }
     
     @Override
-    public PatternGeometry geometry() {
-        return PatternGeometry.SEGMENT;
+    public CellType cellType() {
+        return CellType.SEGMENT;
     }
     
-    /**
-     * Determines if a segment index should be rendered.
-     * @param index Segment index (0-based)
-     * @return true if this segment should be rendered
-     */
-    public boolean shouldRender(int index) {
-        return (index % skipInterval) == 0;
+    @Override
+    public boolean shouldRender(int index, int total) {
+        int adjusted = (index + phaseOffset) % total;
+        return (adjusted % skipInterval) == 0;
     }
     
-    /**
-     * Whether to reverse winding order for this pattern.
-     */
-    public boolean reverseWinding() {
-        return reverseWinding;
+    @Override
+    public int[][] getVertexOrder() {
+        // Segments are quads: inner0, inner1, outer0, outer1
+        // Two triangles: {0,1,2}, {1,3,2}
+        if (reverseWinding) {
+            return new int[][]{{0, 2, 1}, {1, 2, 3}};  // Reversed
+        }
+        return new int[][]{{0, 1, 2}, {1, 3, 2}};  // Normal
     }
     
-    /**
-     * Skip interval (1 = all, 2 = every other, etc.)
-     */
-    public int skipInterval() {
-        return skipInterval;
-    }
+    // =========================================================================
+    // Static Utilities
+    // =========================================================================
     
     /**
      * Parses a pattern from ID string.
@@ -105,4 +132,3 @@ public enum SegmentPattern implements VertexPattern {
         return ids;
     }
 }
-

@@ -13,21 +13,47 @@
 | Priority | Document | Purpose | When to Read |
 |----------|----------|---------|--------------|
 | 🔴 1 | [01_ARCHITECTURE.md](./01_ARCHITECTURE.md) | 5 Geometry Levels, Transform, JSON structure | Every time |
-| 🔴 2 | [02_CLASS_DIAGRAM.md](./02_CLASS_DIAGRAM.md) | Classes, enums, records to create | Every time |
+| 🔴 2 | [02_CLASS_DIAGRAM.md](./02_CLASS_DIAGRAM.md) | Classes, enums, records to create | Every time | 
 | 🟡 3 | [03_PARAMETERS.md](./03_PARAMETERS.md) | All parameters with defaults | When adding fields |
 | 🟡 4 | [04_SHAPE_MATRIX.md](./04_SHAPE_MATRIX.md) | Per-shape parameter status | When touching shapes |
+
+_The documents above can be updated when necessary but only when agreed with the user._
 
 ### Quick Reference Tables
 
 | What You Need | Where to Find It |
 |---------------|------------------|
 | What enums to create | CLASS_DIAGRAM §16-17 |
-| What records to create | CLASS_DIAGRAM §18 |
+| What records to create | CLASS_DIAGRAM §18-19 |
 | Shape parameter details | SHAPE_PARAMETER_MATRIX §1-9 |
 | Transform options | ARCHITECTURE §3 |
 | Fill/Visibility options | ARCHITECTURE §4-5 |
 | JSON structure | ARCHITECTURE §6 |
 | Resolved questions | ARCHITECTURE §10 |
+| **CommandKnob usage** | [SYSTEM_UTILITIES.md](./_design/SYSTEM_UTILITIES.md) §1 |
+| **Logging patterns** | [SYSTEM_UTILITIES.md](./_design/SYSTEM_UTILITIES.md) §2 |
+| **CommandFeedback** | [SYSTEM_UTILITIES.md](./_design/SYSTEM_UTILITIES.md) §3 |
+| **Value validation** | CLASS_DIAGRAM §18.5 (ValueRange, @Range) |
+| **GUI widget factory** | [GUI_UTILITIES.md](./_design/gui/GUI_UTILITIES.md) §4 |
+| **GUI constants/theming** | [GUI_UTILITIES.md](./_design/gui/GUI_UTILITIES.md) §3 |
+| **Minecraft GUI widgets** | [GUI_NATIVE_WIDGETS.md](./_design/gui/GUI_NATIVE_WIDGETS.md) |
+
+
+### Scripts Reference (Development Tools)
+
+| # | Script | Purpose | Status |
+|---|--------|---------|--------|
+| 00 | `search_native_jars.py` | Bytecode search in JARs | Updated |
+| 01 | `query_tiny_mappings.py` | Fabric mapping lookup | Updated |
+| 02 | `update_todo_batch.py` | TODO automation | ✅ Stable |
+| 03 | `usage_graph.py` | Find symbol references | Untested |
+| 04 | `class_tree.py` | Inheritance hierarchy | Untested |
+| 05 | `method_signature_scanner.py` | Find methods by descriptor | Untested |
+| 06 | `mod_interface_map.py` | Map entrypoints/mixins | Untested |
+| 07 | `config_schema_extractor.py` | Generate JSON Schema | Updated |
+| 08 | `config_profile_lint.py` | Validate profile JSONs | Untested |
+
+**Full documentation:** [`scripts/000_INSTRUCTIONS_README.md`](../../../scripts/000_INSTRUCTIONS_README.md)
 
 ---
 
@@ -85,7 +111,7 @@ When implementing a todo:
 | **PARAMETER_INVENTORY** | The "all" - every parameter at every level with defaults and status | Adding/checking fields |
 | **SHAPE_PARAMETER_MATRIX** | The "deep" - every parameter per shape type | Working on shapes |
 | **CLEANUP_PLAN** | The "before" - files to rename/move before implementing | Before Phase 1 |
-| **GUI_DESIGN** | The "later" - Phase 2 UI design | Phase 2 only |
+| **GUI docs** | Phase 2 - See [_design/gui/](./_design/gui/) folder | Phase 2 (GUI work) |
 
 ### Document Flow
 
@@ -195,9 +221,20 @@ START TODO
 | JSON | Reference system | ARCHITECTURE §6, PARAMETER_INVENTORY §14-15 |
 
 ### Phase 2: GUI & Polish
-- GUI customization panel
-- Player overrides
-- Advanced visibility masks
+
+> **📁 GUI Documentation:** [_design/gui/](`./_design/gui/`)  
+> **GUI Directives:** [GUI_TODO_DIRECTIVES.md](./_design/gui/GUI_TODO_DIRECTIVES.md)
+
+| Category | Focus | Key Documents |
+|----------|-------|---------------|
+| Foundation | Screen, state, utilities | GUI_CLASS_DIAGRAM §2, GUI_UTILITIES |
+| Quick Panel | Level 1 controls | GUI_ARCHITECTURE §2.1 |
+| Advanced Panel | Level 2 controls | GUI_CLASS_DIAGRAM §4 |
+| Debug Panel | Level 3 (operators) | GUI_ARCHITECTURE §2.1 L3 |
+| Profiles | Save/load system | GUI_CLASS_DIAGRAM §8 |
+| Network | Packets, sync | GUI_CLASS_DIAGRAM §7 |
+
+**151 tasks across 15 batches** - See [GUI_TODO_LIST.md](./_design/gui/GUI_TODO_LIST.md)
 
 ### Phase 3: Advanced Features
 - Primitive linking
@@ -209,184 +246,11 @@ START TODO
 
 ---
 
-## 🏗️ OOP Best Practices & Design Patterns
+## 🏗️ Design Patterns & OOP
 
-### Core Principles (MANDATORY)
+**Moved to:** [_design/DESIGN_PATTERNS.md](./_design/DESIGN_PATTERNS.md)
 
-| Principle | Description | Applied To |
-|-----------|-------------|------------|
-| **SRP** | Single Responsibility Principle - each class does ONE thing | Primitives, Renderers, Configs |
-| **OCP** | Open/Closed - open for extension, closed for modification | Pattern system, Shape interface |
-| **LSP** | Liskov Substitution - subtypes must be substitutable | All Primitive implementations |
-| **ISP** | Interface Segregation - many specific interfaces > one general | Shape, VertexPattern |
-| **DIP** | Dependency Inversion - depend on abstractions, not concretions | Renderers use interfaces |
-
-### Builder Pattern (PRIMARY PATTERN)
-
-Use the **Builder Pattern** for all complex configuration objects:
-
-```java
-// ✅ CORRECT: Builder pattern for immutable configs
-public record FillConfig(
-    FillMode mode,
-    float wireThickness,
-    boolean doubleSided,
-    CageOptions cage
-) {
-    public static Builder builder() { return new Builder(); }
-    
-    public static class Builder {
-        private FillMode mode = FillMode.SOLID;
-        private float wireThickness = 1.0f;
-        private boolean doubleSided = false;
-        private CageOptions cage = null;
-        
-        public Builder mode(FillMode mode) { this.mode = mode; return this; }
-        public Builder wireThickness(float t) { this.wireThickness = t; return this; }
-        public Builder doubleSided(boolean d) { this.doubleSided = d; return this; }
-        public Builder cage(CageOptions c) { this.cage = c; return this; }
-        public FillConfig build() { 
-            return new FillConfig(mode, wireThickness, doubleSided, cage); 
-        }
-    }
-}
-
-// ✅ Usage
-FillConfig config = FillConfig.builder()
-    .mode(FillMode.CAGE)
-    .wireThickness(2.0f)
-    .cage(CageOptions.forSphere(8, 16))
-    .build();
-```
-
-**Apply Builder Pattern to:**
-- [ ] `FillConfig` - complex nested structure
-- [ ] `VisibilityMask` - many optional fields
-- [ ] `Transform` - 15+ fields with defaults
-- [ ] `ArrangementConfig` - multi-part optional fields
-- [ ] `SpinConfig`, `PulseConfig` - animation configs
-- [ ] `BindingConfig`, `TriggerConfig` - external influences
-- [ ] `LifecycleConfig` - lifecycle options
-
-### Factory Pattern
-
-Use **Factory Pattern** for primitive instantiation:
-
-```java
-// ✅ CORRECT: Factory creates correct primitive type
-public class PrimitiveFactory {
-    public static Primitive create(String type, JsonObject json) {
-        return switch (type) {
-            case "sphere" -> SpherePrimitive.fromJson(json);
-            case "ring" -> RingPrimitive.fromJson(json);
-            case "disc" -> DiscPrimitive.fromJson(json);
-            // ... other types
-            default -> throw new IllegalArgumentException("Unknown: " + type);
-        };
-    }
-}
-```
-
-### Strategy Pattern (For Patterns/Algorithms)
-
-Use **Strategy Pattern** for interchangeable algorithms:
-
-```java
-// ✅ CORRECT: Patterns are strategies
-public interface VertexPattern {
-    String id();
-    CellType cellType();
-    boolean shouldRender(int index, int total);
-}
-
-// Each pattern implements the strategy
-public enum QuadPattern implements VertexPattern {
-    FILLED_1 { ... },
-    WAVE_1 { ... },
-    // ...
-}
-```
-
-### Immutability
-
-**ALL configuration objects must be immutable:**
-
-```java
-// ✅ CORRECT: Immutable record
-public record SphereShape(
-    float radius,
-    int latSteps,
-    int lonSteps,
-    SphereAlgorithm algorithm
-) implements Shape {
-    // Defensive copy in constructor if needed
-    public SphereShape {
-        if (radius <= 0) throw new IllegalArgumentException("radius must be positive");
-    }
-}
-
-// ❌ WRONG: Mutable class
-public class SphereShape {
-    private float radius; // Mutable!
-    public void setRadius(float r) { this.radius = r; } // Setter!
-}
-```
-
-### Composition Over Inheritance
-
-```java
-// ❌ WRONG: Deep inheritance hierarchy
-abstract class SolidPrimitive extends AbstractPrimitive { }
-class SpherePrimitive extends SolidPrimitive { }
-
-// ✅ CORRECT: Flat implementation with composition
-class SpherePrimitive implements Primitive {
-    private final SphereShape shape;      // Composition
-    private final Transform transform;     // Composition
-    private final FillConfig fill;         // Composition
-    private final Appearance appearance;   // Composition
-}
-```
-
-### Null Object Pattern
-
-Avoid null checks with Null Object Pattern:
-
-```java
-// ✅ CORRECT: Default/empty implementations
-public record SpinConfig(Axis axis, float speed, boolean oscillate, float range) {
-    public static final SpinConfig NONE = new SpinConfig(Axis.Y, 0, false, 360);
-    
-    public boolean isActive() { return speed != 0; }
-}
-
-// Usage: No null checks needed
-SpinConfig spin = primitive.spin() != null ? primitive.spin() : SpinConfig.NONE;
-```
-
-### SRP Examples in This Codebase
-
-| Class | Responsibility | What It Doesn't Do |
-|-------|---------------|-------------------|
-| `SphereShape` | Holds sphere geometry params | Doesn't render, doesn't tessellate |
-| `SpherePrimitive` | Combines shape + config + appearance | Doesn't render directly |
-| `SphereRenderer` | Renders a SpherePrimitive | Doesn't know about other shapes |
-| `SphereTessellator` | Converts SphereShape to Mesh | Doesn't know about rendering |
-| `FieldLoader` | Parses JSON into FieldDefinition | Doesn't manage runtime state |
-| `FieldManager` | Manages field instances | Doesn't parse JSON |
-| `CombatTracker` | Tracks combat state | Doesn't apply field effects |
-
-### Anti-Patterns to Avoid
-
-| Anti-Pattern | Example | Problem | Fix |
-|--------------|---------|---------|-----|
-| God Class | `FieldRenderer` doing parse + render + animate | Violates SRP | Split into focused classes |
-| Primitive Obsession | `render(float r, int lat, int lon, String color...)` | Too many params | Use parameter objects |
-| Leaky Abstraction | `Primitive.getTriangleList()` | Exposes implementation | Use `Tessellator` separately |
-| instanceof Chains | `if (p instanceof Sphere) else if (p instanceof Ring)...` | Violates OCP | Use polymorphism |
-| Magic Numbers | `alpha = 0.35f` | Unclear intent | Use named constants or config |
-
----
+Covers: Builder, Factory, Strategy patterns, ValueRange, Immutability, Composition, Anti-patterns
 
 ## 🛠️ Development Practices
 
@@ -395,7 +259,6 @@ SpinConfig spin = primitive.spin() != null ? primitive.spin() : SpinConfig.NONE;
 - **Use Python scripts** for bulk file modifications (never heredocs in WSL)
 - Python script workflow: 1) Write script 2) Run with `python3` 3) Compile 4) Iterate
 
-### Python Script Template
 ```python
 #!/usr/bin/env python3
 import os
@@ -440,7 +303,20 @@ for root, dirs, files in os.walk('src/main/java'):
 - [04_SHAPE_MATRIX.md](./04_SHAPE_MATRIX.md) - Per-shape details
 - [GAP.md](./GAP.md) - Missing features (bindings, triggers)
 
+### GUI Documents (Phase 2)
+- [GUI_TODO_DIRECTIVES.md](./_design/gui/GUI_TODO_DIRECTIVES.md) - **GUI working guide**
+- [GUI_TODO_LIST.md](./_design/gui/GUI_TODO_LIST.md) - 151 tasks in 15 batches
+- [GUI_ARCHITECTURE.md](./_design/gui/GUI_ARCHITECTURE.md) - Design & flow
+- [GUI_CLASS_DIAGRAM.md](./_design/gui/GUI_CLASS_DIAGRAM.md) - GUI classes
+- [GUI_UTILITIES.md](./_design/gui/GUI_UTILITIES.md) - Factory & theming
+- [GUI_NATIVE_WIDGETS.md](./_design/gui/GUI_NATIVE_WIDGETS.md) - MC widgets
+
 ### Supporting Documents
+- [README.md](./README.md) - Entry point
+- [_design/CLEANUP_PLAN.md](./_design/CLEANUP_PLAN.md) - Pre-implementation cleanup
+
+- [_design/DESIGN_PATTERNS.md](./_design/DESIGN_PATTERNS.md) - OOP patterns & principles
+- [_design/CODE_QUALITY.md](./_design/CODE_QUALITY.md) - Commenting & logging standards
 - [README.md](./README.md) - Entry point
 - [_design/CLEANUP_PLAN.md](./_design/CLEANUP_PLAN.md) - Pre-implementation cleanup
 
@@ -490,106 +366,8 @@ for root, dirs, files in os.walk('src/main/java'):
 
 ---
 
-## Code Quality Standards
+## 📝 Code Quality Standards
 
-### Commenting & Documentation
+**Moved to:** [_design/CODE_QUALITY.md](./_design/CODE_QUALITY.md)
 
-Every class must have:
-
-1. **Class-level Javadoc:**
-   ```java
-   /**
-    * Renders sphere primitives using the tessellation pipeline.
-    * 
-    * <p>Supports all FillModes (SOLID, WIREFRAME, CAGE, POINTS) and 
-    * applies VisibilityMask filtering before emission.</p>
-    * 
-    * @see SphereTessellator
-    * @see VertexEmitter
-    */
-   public class SphereRenderer implements PrimitiveRenderer {
-   ```
-
-2. **Method-level comments for non-trivial logic:**
-   ```java
-   // Apply layer spin first (rotates entire layer around anchor)
-   // Then apply primitive spin (rotates individual shape)
-   // This enables "orbiting orbs that also spin" effect
-   matrices.multiply(layerRotation);
-   matrices.multiply(primitiveRotation);
-   ```
-
-3. **Section markers for long methods:**
-   ```java
-   // === PHASE 1: Tessellation ===
-   Mesh mesh = tessellator.tessellate(shape, pattern, visibility);
-   
-   // === PHASE 2: Transform ===
-   applyTransform(matrices, primitive.transform(), time);
-   
-   // === PHASE 3: Emission ===
-   emitter.emitMesh(consumer, mesh, matrices.peek(), color, light);
-   ```
-
-### Logging Standards
-
-Every significant class must integrate with the Logging system:
-
-1. **Use the FIELD channel:**
-   ```java
-   private static final Channel LOG = Logging.FIELD;
-   ```
-
-2. **Constructor logging (DEBUG level):**
-   ```java
-   Logging.of(LOG).topic("init").debug("SphereRenderer initialized");
-   ```
-
-3. **Operation logging (TRACE level for hot paths):**
-   ```java
-   Logging.of(LOG).topic("render")
-       .with("primitive", primitive.id())
-       .with("fillMode", fill.mode())
-       .trace("Rendering sphere");
-   ```
-
-4. **Error logging with context:**
-   ```java
-   Logging.of(LOG).topic("pattern")
-       .with("expected", shape.primaryCellType())
-       .with("got", pattern.cellType())
-       .alwaysChat()  // Shows in player chat
-       .error("Pattern CellType mismatch");
-   ```
-
-5. **Performance logging (for expensive operations):**
-   ```java
-   long start = System.nanoTime();
-   // ... expensive operation ...
-   Logging.of(LOG).topic("perf")
-       .with("operation", "tessellate")
-       .with("ms", (System.nanoTime() - start) / 1_000_000.0)
-       .debug("Tessellation complete");
-   ```
-
-### Notes in Complex Areas
-
-Add `// NOTE:` comments for:
-- Design decisions that aren't obvious
-- Workarounds for Minecraft API quirks
-- Performance considerations
-- Future improvement opportunities
-
-```java
-// NOTE: We use QUADS render layer even for triangles because
-// Minecraft's line rendering has Z-fighting issues with translucent
-// surfaces. Converting to degenerate quads avoids this.
-
-// NOTE: This could be optimized by caching the mesh, but we
-// regenerate each frame to support dynamic patterns. Consider
-// caching for static patterns in Phase 2.
-
-// NOTE: Minecraft's VertexConsumer expects ARGB, not RGBA.
-// Always pack colors with (alpha << 24) | (red << 16) | ...
-```
-
+Covers: Javadoc, Comments, Logging standards, NOTE patterns, System utilities integration

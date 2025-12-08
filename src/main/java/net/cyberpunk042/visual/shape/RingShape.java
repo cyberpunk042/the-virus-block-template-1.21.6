@@ -1,91 +1,157 @@
 package net.cyberpunk042.visual.shape;
 
-import net.minecraft.util.math.Box;
+import com.google.gson.JsonObject;
+
+import net.cyberpunk042.visual.pattern.CellType;
+import org.joml.Vector3f;
+
+import java.util.Map;
+import net.cyberpunk042.visual.validation.Range;
+import net.cyberpunk042.visual.validation.ValueRange;
 
 /**
- * A horizontal ring/torus shape at a specific Y level.
+ * Ring/torus shape - a band with inner and outer radius.
  * 
- * <h2>Parameters</h2>
+ * <h2>JSON Format</h2>
+ * <pre>
+ * "shape": {
+ *   "type": "ring",
+ *   "innerRadius": 0.8,
+ *   "outerRadius": 1.0,
+ *   "segments": 64,
+ *   "y": 0.0,
+ *   "arcStart": 0,
+ *   "arcEnd": 360,
+ *   "height": 0.0,
+ *   "twist": 0.0
+ * }
+ * </pre>
+ * 
+ * <h2>Parts</h2>
  * <ul>
- *   <li><b>y</b>: Y offset from center (0 = equator level)</li>
- *   <li><b>radius</b>: Ring radius (center to middle of tube)</li>
- *   <li><b>thickness</b>: Tube thickness</li>
- *   <li><b>segments</b>: Number of segments around the ring</li>
+ *   <li><b>surface</b> (SEGMENT) - Main ring surface</li>
+ *   <li><b>innerEdge</b> (EDGE) - Inner border</li>
+ *   <li><b>outerEdge</b> (EDGE) - Outer border</li>
  * </ul>
  * 
- * @see net.cyberpunk042.client.visual.mesh.RingTessellator_old
+ * @see Shape
+ * @see CellType
  */
 public record RingShape(
-        float y,
-        float radius,
-        float thickness,
-        int segments
+    @Range(ValueRange.RADIUS) float innerRadius,
+    @Range(ValueRange.RADIUS) float outerRadius,
+    @Range(ValueRange.STEPS) int segments,
+    @Range(ValueRange.UNBOUNDED) float y,
+    @Range(ValueRange.DEGREES) float arcStart,
+    @Range(ValueRange.DEGREES) float arcEnd,
+    @Range(ValueRange.POSITIVE) float height,
+    @Range(ValueRange.DEGREES_FULL) float twist
 ) implements Shape {
     
-    public static final String TYPE = "ring";
+    /** Default ring (0.8 inner, 1.0 outer). */
+    public static final RingShape DEFAULT = new RingShape(
+        0.8f, 1.0f, 64, 0, 0, 360, 0, 0);
     
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Defaults & Factory
-    // ─────────────────────────────────────────────────────────────────────────────
+    /** Thin ring. */
+    public static final RingShape THIN = new RingShape(
+        0.95f, 1.0f, 64, 0, 0, 360, 0, 0);
     
-    /** Default ring at equator. */
-    public static RingShape defaults() {
-        return new RingShape(0.0f, 1.0f, 0.1f, 32);
+    /** Thick band. */
+    public static final RingShape THICK = new RingShape(
+        0.5f, 1.0f, 64, 0, 0, 360, 0, 0);
+    
+    /**
+     * Creates a ring at the specified Y height.
+     * @param innerRadius Inner radius
+     * @param outerRadius Outer radius
+     * @param y Y offset
+     */
+    public static RingShape at(@Range(ValueRange.RADIUS) float innerRadius, @Range(ValueRange.RADIUS) float outerRadius, @Range(ValueRange.UNBOUNDED) float y) {
+        return new RingShape(innerRadius, outerRadius, 64, y, 0, 360, 0, 0);
     }
-    
-    /** Ring at specific Y with radius. */
-    public static RingShape at(float y, float radius) {
-        return new RingShape(y, radius, 0.1f, 32);
-    }
-    
-    /** Full customization. */
-    public static RingShape of(float y, float radius, float thickness, int segments) {
-        return new RingShape(y, radius, thickness, segments);
-    }
-    
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Shape Interface
-    // ─────────────────────────────────────────────────────────────────────────────
     
     @Override
     public String getType() {
-        return TYPE;
+        return "ring";
     }
     
     @Override
-    public Box getBounds() {
-        float halfThick = thickness / 2;
-        float outer = radius + halfThick;
-        return new Box(-outer, y - halfThick, -outer, outer, y + halfThick, outer);
+    public Vector3f getBounds() {
+        float d = outerRadius * 2;
+        return new Vector3f(d, Math.max(0.1f, height), d);
     }
     
     @Override
-    public int estimateVertexCount() {
-        return segments * 4; // 4 vertices per segment for tube
+    public CellType primaryCellType() {
+        return CellType.SEGMENT;
     }
     
     @Override
-    public int estimateTriangleCount() {
-        return segments * 4; // 4 triangles per segment
+    public Map<String, CellType> getParts() {
+        return Map.of(
+            "surface", CellType.SEGMENT,
+            "innerEdge", CellType.EDGE,
+            "outerEdge", CellType.EDGE
+        );
     }
     
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Builder-style modifiers
-    // ─────────────────────────────────────────────────────────────────────────────
-    
-    public RingShape atY(float newY) {
-        return new RingShape(newY, radius, thickness, segments);
+    @Override
+    public float getRadius() {
+        return outerRadius;
     }
     
-    public RingShape withRadius(float newRadius) {
-        return new RingShape(y, newRadius, thickness, segments);
+    /** Ring thickness (outer - inner). */
+    public float thickness() {
+        return outerRadius - innerRadius;
     }
     
-    public RingShape withThickness(float newThickness) {
-        return new RingShape(y, radius, newThickness, segments);
+    /** Whether this is a full ring or arc. */
+    public boolean isFullRing() {
+        return arcStart == 0 && arcEnd == 360;
     }
     
-    public RingShape scaled(float scale) {
-        return new RingShape(y * scale, radius * scale, thickness * scale, segments);
+    @Override
+    public JsonObject toJson() {
+        JsonObject json = new JsonObject();
+        json.addProperty("type", "ring");
+        json.addProperty("innerRadius", innerRadius);
+        json.addProperty("outerRadius", outerRadius);
+        json.addProperty("segments", segments);
+        if (y != 0) json.addProperty("y", y);
+        if (arcStart != 0) json.addProperty("arcStart", arcStart);
+        if (arcEnd != 360) json.addProperty("arcEnd", arcEnd);
+        if (height != 0) json.addProperty("height", height);
+        if (twist != 0) json.addProperty("twist", twist);
+        return json;
+    }
+
+    // =========================================================================
+    // Builder
+    // =========================================================================
+    
+    public static Builder builder() { return new Builder(); }
+    
+    public static class Builder {
+        private @Range(ValueRange.RADIUS) float innerRadius = 0.8f;
+        private @Range(ValueRange.RADIUS) float outerRadius = 1.0f;
+        private @Range(ValueRange.STEPS) int segments = 64;
+        private @Range(ValueRange.UNBOUNDED) float y = 0;
+        private @Range(ValueRange.DEGREES) float arcStart = 0;
+        private @Range(ValueRange.DEGREES) float arcEnd = 360;
+        private @Range(ValueRange.POSITIVE) float height = 0;
+        private @Range(ValueRange.DEGREES_FULL) float twist = 0;
+        
+        public Builder innerRadius(float r) { this.innerRadius = r; return this; }
+        public Builder outerRadius(float r) { this.outerRadius = r; return this; }
+        public Builder segments(int s) { this.segments = s; return this; }
+        public Builder y(@Range(ValueRange.UNBOUNDED) float y) { this.y = y; return this; }
+        public Builder arcStart(float a) { this.arcStart = a; return this; }
+        public Builder arcEnd(float a) { this.arcEnd = a; return this; }
+        public Builder height(float h) { this.height = h; return this; }
+        public Builder twist(float t) { this.twist = t; return this; }
+        
+        public RingShape build() {
+            return new RingShape(innerRadius, outerRadius, segments, y, arcStart, arcEnd, height, twist);
+        }
     }
 }

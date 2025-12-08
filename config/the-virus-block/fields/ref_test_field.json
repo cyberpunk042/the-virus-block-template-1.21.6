@@ -1,0 +1,20 @@
+{
+  "id": "ref_test_field",
+  "themeId": "default",
+  "layers": [
+    {
+      "id": "layer_1",
+      "primitives": [
+        {
+          "id": "sphere_from_ref",
+          "type": "sphere",
+          "shape": {
+            "$ref": "$field_shapes/smooth_sphere",
+            "radius": 2.0
+          },
+          "alpha": 0.7
+        }
+      ]
+    }
+  ]
+}

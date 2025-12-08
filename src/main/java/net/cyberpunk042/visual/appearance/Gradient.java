@@ -1,5 +1,7 @@
 package net.cyberpunk042.visual.appearance;
 
+import net.cyberpunk042.visual.util.FieldColor; // Available for color blending
+
 import net.cyberpunk042.visual.color.ColorMath;
 import net.minecraft.util.math.MathHelper;
 

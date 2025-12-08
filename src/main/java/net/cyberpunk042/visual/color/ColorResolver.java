@@ -29,6 +29,30 @@ import java.util.Map;
  */
 public final class ColorResolver {
     
+    // =========================================================================
+    // Static Constants & Factory Methods
+    // =========================================================================
+    
+    /**
+     * Default resolver using CYBER_GREEN theme.
+     */
+    public static final ColorResolver DEFAULT = new ColorResolver();
+    
+    /**
+     * Creates a resolver that uses the given theme.
+     * 
+     * @param theme the color theme to use
+     * @return a new resolver, or DEFAULT if theme is null
+     */
+    public static ColorResolver fromTheme(ColorTheme theme) {
+        if (theme == null) return DEFAULT;
+        return new ColorResolver(theme);
+    }
+    
+    // =========================================================================
+    // Basic Colors
+    // =========================================================================
+    
     private static final Map<String, Integer> BASIC_COLORS = new HashMap<>();
     
     static {
@@ -52,8 +76,16 @@ public final class ColorResolver {
         BASIC_COLORS.put("silver", 0xFFCCCCCC);
     }
     
+    // =========================================================================
+    // Instance Fields
+    // =========================================================================
+    
     private final ColorTheme theme;
     private final String colorOverride;
+    
+    // =========================================================================
+    // Constructors
+    // =========================================================================
     
     /**
      * Creates a resolver with a theme.
@@ -78,6 +110,10 @@ public final class ColorResolver {
     public ColorResolver() {
         this(ColorTheme.CYBER_GREEN);
     }
+    
+    // =========================================================================
+    // Resolution
+    // =========================================================================
     
     /**
      * Resolves a color reference string to an ARGB value.
@@ -160,6 +196,10 @@ public final class ColorResolver {
         }
     }
     
+    // =========================================================================
+    // Accessors
+    // =========================================================================
+    
     /**
      * Gets the current theme.
      */
@@ -173,6 +213,10 @@ public final class ColorResolver {
     public ColorResolver withTheme(ColorTheme newTheme) {
         return new ColorResolver(newTheme);
     }
+    
+    // =========================================================================
+    // Static Utilities
+    // =========================================================================
     
     /**
      * Checks if a reference is a theme role reference.

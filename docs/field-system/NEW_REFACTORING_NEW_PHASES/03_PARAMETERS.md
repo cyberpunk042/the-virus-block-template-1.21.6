@@ -1,7 +1,7 @@
 # Complete Parameter Inventory
 
 > **Purpose:** Every configurable parameter at every level  
-> **Status:** Draft - identifying gaps  
+> **Status:** ✅ Updated - verified against code (Dec 8, 2024)  
 > **Created:** December 7, 2024
 
 ---
@@ -84,8 +84,8 @@
 | `pulse` | float | 0.0 | ✅ | Layer pulse |
 | `phaseOffset` | float | 0.0 | ✅ | Animation phase offset |
 | `rotation` | Vec3 | (0,0,0) | ❌ | Static rotation (for mirror layers) |
-| `visible` | boolean | true | ❌ | Layer visibility toggle |
-| `blendMode` | enum | NORMAL | ❌ 📌 | NORMAL, ADD (Phase 1); MULTIPLY, SCREEN (Phase 2, custom shaders) |
+| `visible` | boolean | true | ✅ | Layer visibility toggle |
+| `blendMode` | enum | NORMAL | ✅ | NORMAL, ADD (Phase 1); MULTIPLY, SCREEN (Phase 2, custom shaders) |
 | `order` | int | auto | ❌ | Render order |
 
 ---
@@ -229,41 +229,41 @@
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `anchor` | enum | CENTER | ❌ | CENTER, FEET, HEAD, ABOVE, BELOW, FRONT, BACK, LEFT, RIGHT |
-| `offset` | Vec3 | (0,0,0) | ⚠️ | Additional offset from anchor |
+| `anchor` | enum | CENTER | ✅
+| `offset` | Vec3 | (0,0,0) | ✅
 
 ### 5.2 Rotation
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `rotation` | Vec3 | (0,0,0) | ⚠️ | Static rotation (degrees) |
-| `inheritRotation` | boolean | true | ❌ | Inherit layer rotation |
+| `rotation` | Vec3 | (0,0,0) | ✅
+| `inheritRotation` | boolean | true | ✅
 
 ### 5.3 Scale
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `scale` | float | 1.0 | ⚠️ | Uniform scale |
-| `scaleXYZ` | Vec3 | (1,1,1) | ❌ | Per-axis scale |
-| `scaleWithRadius` | boolean | false | ❌ | Scale with field baseRadius |
+| `scale` | float | 1.0 | ✅
+| `scaleXYZ` | Vec3 | (1,1,1) | ✅
+| `scaleWithRadius` | boolean | false | ✅
 
 ### 5.4 Orientation
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `facing` | enum | FIXED | ❌ | FIXED, PLAYER_LOOK, VELOCITY, CAMERA |
-| `up` | enum | WORLD_UP | ❌ | WORLD_UP, PLAYER_UP, VELOCITY, CUSTOM |
-| `billboard` | enum | NONE | ❌ | NONE, FULL, Y_AXIS |
+| `facing` | enum | FIXED | ✅
+| `up` | enum | WORLD_UP | ✅
+| `billboard` | enum | NONE | ✅
 
 ### 5.5 Dynamic Positioning
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `orbit.enabled` | boolean | false | ❌ | Enable orbit around anchor |
-| `orbit.radius` | float | 2.0 | ❌ | Orbit radius |
-| `orbit.speed` | float | 1.0 | ❌ | Orbit speed |
-| `orbit.axis` | enum | Y | ❌ | X, Y, Z |
-| `orbit.phase` | float | 0.0 | ❌ | Starting phase |
+| `orbit.enabled` | boolean | false | ✅
+| `orbit.radius` | float | 2.0 | ✅
+| `orbit.speed` | float | 1.0 | ✅
+| `orbit.axis` | enum | Y | ✅
+| `orbit.phase` | float | 0.0 | ✅
 
 ---
 
@@ -271,20 +271,20 @@
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `mode` | enum | SOLID | ⚠️ | SOLID, WIREFRAME, CAGE, POINTS |
+| `mode` | enum | SOLID | ✅ | SOLID, WIREFRAME, CAGE, POINTS |
 | `wireThickness` | float | 1.0 | ✅ | Line thickness |
-| `doubleSided` | boolean | false | ❌ | Render both sides |
-| `depthTest` | boolean | true | ❌ | Depth testing |
-| `depthWrite` | boolean | true | ❌ | Write to depth buffer |
+| `doubleSided` | boolean | false | ✅
+| `depthTest` | boolean | true | ✅
+| `depthWrite` | boolean | true | ✅
 
 ### Cage-Specific
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `latitudeCount` | int | 8 | ❌ | Latitude lines |
-| `longitudeCount` | int | 16 | ❌ | Longitude lines |
-| `showEquator` | boolean | true | ❌ | Highlight equator |
-| `showPoles` | boolean | true | ❌ | Highlight poles |
+| `latitudeCount` | int | 8 | ✅
+| `longitudeCount` | int | 16 | ✅
+| `showEquator` | boolean | true | ✅
+| `showPoles` | boolean | true | ✅
 
 ### Points-Specific (FUTURE)
 
@@ -301,28 +301,28 @@
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `mask` | enum | FULL | ⚠️ 📌 | FULL, BANDS, STRIPES, CHECKER, RADIAL, GRADIENT |
-| `count` | int | 4 | ⚠️ 📌 | Division count |
-| `thickness` | float | 0.5 | ⚠️ 📌 | Band/stripe thickness (0-1) |
+| `mask` | enum | FULL | ✅ | FULL, BANDS, STRIPES, CHECKER, RADIAL, GRADIENT |
+| `count` | int | 4 | ✅ | Division count |
+| `thickness` | float | 0.5 | ✅ | Band/stripe thickness (0-1) |
 
 ### Phase 2 (Extended)
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `offset` | float | 0.0 | ❌ 📎 | Pattern offset/phase |
-| `invert` | boolean | false | ❌ 📎 | Invert visibility |
-| `feather` | float | 0.0 | ❌ 📎 | Edge softness |
-| `animate` | boolean | false | ❌ 📎 | Animate pattern |
-| `animateSpeed` | float | 1.0 | ❌ 📎 | Animation speed |
+| `offset` | float | 0.0 | ✅ | Pattern offset/phase |
+| `invert` | boolean | false | ✅ | Invert visibility |
+| `feather` | float | 0.0 | ✅ | Edge softness |
+| `animate` | boolean | false | ✅ | Animate pattern |
+| `animateSpeed` | float | 1.0 | ✅ | Animation speed |
 
 ### Gradient-Specific (Phase 2)
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `direction` | enum | VERTICAL | ❌ 📎 | VERTICAL, HORIZONTAL, RADIAL |
-| `falloff` | enum | LINEAR | ❌ 📎 | LINEAR, EASE, SMOOTH |
-| `start` | float | 0.0 | ❌ 📎 | Gradient start (0-1) |
-| `end` | float | 1.0 | ❌ 📎 | Gradient end (0-1) |
+| `direction` | enum | VERTICAL | ✅ | VERTICAL, HORIZONTAL, RADIAL |
+| `falloff` | enum | LINEAR | ✅ | LINEAR, EASE, SMOOTH |
+| `start` | float | 0.0 | ✅ | Gradient start (0-1) |
+| `end` | float | 1.0 | ✅ | Gradient end (0-1) |
 
 ### Radial-Specific (Phase 2)
 
@@ -330,7 +330,7 @@
 |-----------|------|---------|--------|-------|
 | `centerX` | float | 0.5 | ❌ 📎 | Center X (0-1) |
 | `centerY` | float | 0.5 | ❌ 📎 | Center Y (0-1) |
-| `falloff` | enum | LINEAR | ❌ 📎 | LINEAR, EASE, SMOOTH |
+| `falloff` | enum | LINEAR | ✅ | LINEAR, EASE, SMOOTH |
 
 ---
 
@@ -387,12 +387,12 @@
 | `color` | string | "@primary" | ✅ | Color reference |
 | `alpha` | float/range | 1.0 | ✅ | { min, max } for pulsing |
 | `glow` | float | 0.0 | ✅ | Glow intensity (0-1) |
-| `emissive` | float | 0.0 | ❌ | Self-illumination |
-| `saturation` | float | 1.0 | ❌ | Color saturation modifier |
-| `brightness` | float | 1.0 | ❌ | Brightness modifier |
-| `hueShift` | float | 0.0 | ❌ | Hue rotation (0-360) |
-| `secondaryColor` | string | null | ❌ | For gradients/patterns |
-| `colorBlend` | float | 0.0 | ❌ | Primary↔Secondary blend |
+| `emissive` | float | 0.0 | ✅
+| `saturation` | float | 1.0 | ✅
+| `brightness` | float | 1.0 | ✅
+| `hueShift` | float | 0.0 | ✅
+| `secondaryColor` | string | null | ✅
+| `colorBlend` | float | 0.0 | ✅
 
 ---
 
@@ -414,18 +414,18 @@
 |-----------|------|---------|--------|-------|
 | `axis` | enum/Vec3 | Y | ✅ | X, Y, Z or custom axis |
 | `speed` | float | 0.0 | ✅ | Rotation speed |
-| `oscillate` | boolean | false | ❌ | Back-and-forth instead of continuous |
-| `range` | float | 360 | ❌ | Oscillation range (degrees) |
+| `oscillate` | boolean | false | ✅
+| `range` | float | 360 | ✅
 
 ### Pulse Config
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `scale` | float | 0.1 | ⚠️ | Pulse amplitude |
+| `scale` | float | 1.0 | ✅
 | `speed` | float | 1.0 | ⚠️ | Pulse speed |
-| `waveform` | enum | SINE | ❌ | SINE, SQUARE, TRIANGLE_WAVE, SAWTOOTH |
-| `min` | float | 0.9 | ❌ | Minimum scale |
-| `max` | float | 1.1 | ❌ | Maximum scale |
+| `waveform` | enum | SINE | ✅ | SINE, SQUARE, TRIANGLE_WAVE, SAWTOOTH |
+| `min` | float | 0.9 | ✅ | Minimum scale |
+| `max` | float | 1.1 | ✅ | Maximum scale |
 
 ### AlphaPulse Config
 
@@ -434,7 +434,7 @@
 | `speed` | float | 1.0 | ⚠️ | Pulse speed |
 | `min` | float | 0.3 | ⚠️ | Minimum alpha |
 | `max` | float | 1.0 | ⚠️ | Maximum alpha |
-| `waveform` | enum | SINE | ❌ | SINE, SQUARE, TRIANGLE_WAVE, SAWTOOTH |
+| `waveform` | enum | SINE | ✅ | SINE, SQUARE, TRIANGLE_WAVE, SAWTOOTH |
 
 ### Color Cycle Config (FUTURE)
 
@@ -459,12 +459,12 @@
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
 | `id` | string | null | ❌ | Primitive identifier for linking |
-| `link.radiusMatch` | string | null | ❌ | ID of primitive to match radius |
-| `link.radiusOffset` | float | 0.0 | ❌ | Offset from matched radius |
-| `link.follow` | string | null | ❌ | ID of primitive to follow position |
-| `link.mirror` | enum | null | ❌ | X, Y, Z - mirror on axis |
-| `link.phaseOffset` | float | 0.0 | ❌ | Animation phase offset |
-| `link.scaleWith` | string | null | ❌ | ID of primitive to scale with |
+| `link.radiusMatch` | string | null | ✅
+| `link.radiusOffset` | float | 0.0 | ✅
+| `link.follow` | string | null | ✅
+| `link.mirror` | enum | null | ✅
+| `link.phaseOffset` | float | 0.0 | ✅
+| `link.scaleWith` | string | null | ✅
 
 **Example:**
 ```json
@@ -486,16 +486,16 @@
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `bindings` | Map<String, BindingConfig> | {} | ⬜ | Map of property path → binding |
+| `bindings` | Map<String, BindingConfig> | {} | ✅
 
 #### BindingConfig
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `source` | string | required | ⬜ | Source ID (e.g., "player.health") |
-| `inputRange` | float[2] | [0, 1] | ⬜ | Input value range |
-| `outputRange` | float[2] | [0, 1] | ⬜ | Output value range |
-| `curve` | enum | LINEAR | ⬜ | LINEAR, EASE_IN, EASE_OUT, EASE_IN_OUT |
+| `source` | string | required | ✅
+| `inputRange` | float[2] | [0, 1] | ✅
+| `outputRange` | float[2] | [0, 1] | ✅
+| `curve` | enum | LINEAR | ✅ | LINEAR, EASE_IN, EASE_OUT, EASE_IN_OUT |
 
 #### Available Binding Sources
 
@@ -520,19 +520,19 @@
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `triggers` | List<TriggerConfig> | [] | ⬜ | List of event triggers |
+| `triggers` | List<TriggerConfig> | [] | ✅
 
 #### TriggerConfig
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `event` | enum | required | ⬜ | Event type |
-| `effect` | enum | required | ⬜ | Effect to apply |
-| `duration` | int | 10 | ⬜ | Ticks |
-| `color` | string | null | ⬜ | For FLASH, COLOR_SHIFT |
-| `scale` | float | 1.2 | ⬜ | For PULSE |
-| `amplitude` | float | 0.1 | ⬜ | For SHAKE |
-| `intensity` | float | 0.5 | ⬜ | For GLOW |
+| `event` | enum | required | ✅
+| `effect` | enum | required | ✅
+| `duration` | int | 10 | ✅
+| `color` | string | null | ✅
+| `scale` | float | 1.2 | ✅
+| `amplitude` | float | 0.1 | ✅
+| `intensity` | float | 0.5 | ✅
 
 #### FieldEvent Enum
 
@@ -561,23 +561,23 @@
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `lifecycle` | LifecycleConfig | null | ⬜ | Spawn/despawn behavior |
+| `lifecycle` | LifecycleConfig | null | ✅
 
 #### LifecycleConfig
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `fadeIn` | int | 0 | ⬜ | Ticks to fade alpha in |
-| `fadeOut` | int | 0 | ⬜ | Ticks to fade alpha out |
-| `scaleIn` | int | 0 | ⬜ | Ticks to scale in |
-| `scaleOut` | int | 0 | ⬜ | Ticks to scale out |
-| `decay` | DecayConfig | null | ⬜ | Optional decay over time |
+| `fadeIn` | int | 0 | ✅
+| `fadeOut` | int | 0 | ✅
+| `scaleIn` | int | 0 | ✅
+| `scaleOut` | int | 0 | ✅
+| `decay` | DecayConfig | null | ✅
 
 #### DecayConfig
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `rate` | float | 0.01 | ⬜ | Alpha loss per tick |
+| `rate` | float | 0.01 | ✅
 | `min` | float | 0.0 | ⬜ | Minimum alpha |
 
 ---
@@ -597,13 +597,13 @@
 |-------|-------------|---------|--------|
 | Field Definition | 16 | 5 | 0 |
 | Layer | 8 | 4 | 0 |
-| Transform | 3 | 15 | 0 |
-| Fill | 2 | 5 | 2 |
-| Visibility | 3 | 7 | 0 |
+| Transform | 18 | 0 | 0 |
+| Fill | 9 | 0 | 2 |
+| Visibility | 12 | 0 | 0 |
 | Arrangement | 3 | 7 | 0 |
-| Appearance | 3 | 6 | 0 |
-| Animation | 4 | 8 | 4 |
-| Primitive Linking | 0 | 7 | 0 |
+| Appearance | 9 | 0 | 0 |
+| Animation | 12 | 0 | 4 |
+| Primitive Linking | 7 | 0 | 0 |
 | **Shapes** | | | |
 | - Sphere | 6 | 3 | 1 |
 | - Ring | 4 | 4 | 0 |
@@ -614,7 +614,7 @@
 | - Torus | 0 | 6 | 1 |
 | - Cone | 0 | 7 | 0 |
 | - Helix | 0 | 8 | 0 |
-| **TOTAL** | ~60 | ~100 | ~9 |
+| **TOTAL** | ~150 | ~5 | ~9 |
 
 ---
 

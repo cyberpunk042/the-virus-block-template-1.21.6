@@ -29,6 +29,7 @@ import net.cyberpunk042.network.SkyTintPayload;
 import net.cyberpunk042.network.VirusDifficultySelectPayload;
 import net.cyberpunk042.network.VoidTearBurstPayload;
 import net.cyberpunk042.network.VoidTearSpawnPayload;
+import net.cyberpunk042.network.gui.GuiPacketRegistration;
 import net.cyberpunk042.registry.ModBlockEntities;
 import net.cyberpunk042.registry.ModBlocks;
 import net.cyberpunk042.registry.ModEntities;
@@ -244,6 +245,9 @@ public class TheVirusBlock implements ModInitializer {
 		PayloadTypeRegistry.playS2C().register(GrowthRingFieldPayload.ID, GrowthRingFieldPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(PurificationTotemSelectPayload.ID, PurificationTotemSelectPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(VirusDifficultySelectPayload.ID, VirusDifficultySelectPayload.CODEC);
+		// GUI packet registration
+		GuiPacketRegistration.registerAll();
+		GuiPacketRegistration.registerServerHandlers();
 		ModBlocks.bootstrap();
 		ModItems.bootstrap();
 		ModBlockEntities.bootstrap();

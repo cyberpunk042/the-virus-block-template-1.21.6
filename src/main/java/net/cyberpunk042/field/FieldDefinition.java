@@ -1,289 +1,232 @@
 package net.cyberpunk042.field;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import net.cyberpunk042.field.instance.FieldEffect;
-import net.cyberpunk042.log.Logging;
-import net.cyberpunk042.visual.color.ColorTheme;
-import net.cyberpunk042.visual.color.ColorThemeRegistry;
-import net.minecraft.util.Identifier;
+import com.google.gson.JsonArray;
 
-import java.util.ArrayList;
+import net.cyberpunk042.field.influence.BindingConfig;
+import net.cyberpunk042.field.influence.LifecycleConfig;
+import net.cyberpunk042.field.influence.TriggerConfig;
+import net.cyberpunk042.field.instance.FollowModeConfig;
+import net.cyberpunk042.field.instance.PredictionConfig;
+import org.jetbrains.annotations.Nullable;
+
 import java.util.List;
+import java.util.Map;
 
 /**
- * Immutable definition of a field's visual and behavioral configuration.
+ * Complete definition of a visual field.
  * 
- * <h2>Core Properties</h2>
+ * <p>Per CLASS_DIAGRAM §1: FieldDefinition contains all configuration for a field.
+ * 
+ * <p>A field definition contains:
  * <ul>
- *   <li><b>id</b>: Unique identifier for this definition</li>
- *   <li><b>type</b>: Field type (SHIELD, PERSONAL, etc.)</li>
- *   <li><b>baseRadius</b>: Base radius before modifiers</li>
- *   <li><b>themeId</b>: Color theme reference</li>
+ *   <li><b>id</b> - Unique identifier (e.g., "shield_default")</li>
+ *   <li><b>type</b> - Field category (SHIELD, PERSONAL, etc.)</li>
+ *   <li><b>baseRadius</b> - Base scale before modifiers</li>
+ *   <li><b>themeId</b> - Color theme reference (e.g., "energy_blue")</li>
+ *   <li><b>layers</b> - Ordered list of layers to render</li>
+ *   <li><b>modifiers</b> - Visual modifiers (scale, tilt, swirl, etc.)</li>
+ *   <li><b>prediction</b> - Movement prediction config (for personal fields)</li>
+ *   <li><b>beam</b> - Central beam effect config</li>
+ *   <li><b>followMode</b> - How personal fields follow player</li>
+ *   <li><b>bindings</b> - Reactive bindings (property → external value)</li>
+ *   <li><b>triggers</b> - Event-triggered effects</li>
+ *   <li><b>lifecycle</b> - Spawn/despawn animation config</li>
  * </ul>
  * 
- * <h2>Visual Properties</h2>
- * <ul>
- *   <li><b>layers</b>: Visual layers with primitives</li>
- *   <li><b>modifiers</b>: Visual/behavior modifiers</li>
- * </ul>
- * 
- * <h2>Behavioral Properties</h2>
- * <ul>
- *   <li><b>effects</b>: Effects to apply (damage, heal, knockback)</li>
- *   <li><b>prediction</b>: Client prediction config</li>
- * </ul>
+ * <h2>JSON Format</h2>
+ * <pre>
+ * {
+ *   "id": "shield_default",
+ *   "type": "SHIELD",
+ *   "baseRadius": 1.0,
+ *   "themeId": "energy_blue",
+ *   "layers": [...],
+ *   "modifiers": { "visualScale": 1.0, "tilt": 0.0 },
+ *   "prediction": { "enabled": false },
+ *   "beam": { "enabled": false },
+ *   "followMode": { "enabled": false },
+ *   "bindings": {
+ *     "alpha": { "source": "player.health_percent", "outputRange": [0.3, 1.0] }
+ *   },
+ *   "triggers": [...],
+ *   "lifecycle": { "fadeIn": 10, "fadeOut": 10 }
+ * }
+ * </pre>
  * 
  * @see FieldLayer
+ * @see FieldType
+ * @see BindingConfig
  * @see Modifiers
- * @see FieldEffect
+ * @see PredictionConfig
+ * @see BeamConfig
+ * @see FollowModeConfig
+ * @see LifecycleConfig
  */
 public record FieldDefinition(
-        Identifier id,
-        FieldType type,
-        float baseRadius,
-        String themeId,
-        List<FieldLayer> layers,
-        Modifiers modifiers,
-        List<FieldEffect> effects,
-        PredictionConfig prediction,
-        BeamConfig beam
+    String id,
+    FieldType type,
+    float baseRadius,
+    @Nullable String themeId,
+    List<FieldLayer> layers,
+    @Nullable Modifiers modifiers,
+    @Nullable PredictionConfig prediction,
+    @Nullable BeamConfig beam,
+    @Nullable FollowModeConfig followMode,
+    Map<String, BindingConfig> bindings,
+    List<TriggerConfig> triggers,
+    @Nullable LifecycleConfig lifecycle
 ) {
     
     /**
-     * Compact constructor with validation.
+     * Creates an empty definition.
      */
-    public FieldDefinition {
-        layers = layers != null ? List.copyOf(layers) : List.of();
-        effects = effects != null ? List.copyOf(effects) : List.of();
-        modifiers = modifiers != null ? modifiers : Modifiers.DEFAULT;
-        beam = beam != null ? beam : BeamConfig.DISABLED;
-        if (baseRadius <= 0) baseRadius = 1.0f;
+    public static FieldDefinition empty(String id) {
+        return new FieldDefinition(
+            id, FieldType.SHIELD, 1.0f, null, List.of(),
+            null, null, null, null, Map.of(), List.of(), null);
     }
     
     /**
-     * Checks if beam rendering is enabled.
+     * Creates a definition with layers.
+     */
+    public static FieldDefinition of(String id, List<FieldLayer> layers) {
+        return new FieldDefinition(
+            id, FieldType.SHIELD, 1.0f, null, layers,
+            null, null, null, null, Map.of(), List.of(), null);
+    }
+    
+    /**
+     * Creates a definition with layers and theme.
+     */
+    public static FieldDefinition of(String id, List<FieldLayer> layers, String themeId) {
+        return new FieldDefinition(
+            id, FieldType.SHIELD, 1.0f, themeId, layers,
+            null, null, null, null, Map.of(), List.of(), null);
+    }
+    
+    /**
+     * Whether this field has any bindings.
+     */
+    public boolean hasBindings() {
+        return bindings != null && !bindings.isEmpty();
+    }
+    
+    /**
+     * Whether this field has a beam effect.
      */
     public boolean hasBeam() {
         return beam != null && beam.enabled();
     }
     
-    // =========================================================================
-    // Computed Properties
-    // =========================================================================
-    
     /**
-     * Gets the effective radius after modifiers.
+     * Whether this field has any triggers.
      */
-    public float effectiveRadius() {
-        return modifiers.applyRadius(baseRadius);
+    public boolean hasTriggers() {
+        return triggers != null && !triggers.isEmpty();
     }
     
     /**
-     * Gets the effective color theme.
-     */
-    public ColorTheme effectiveTheme() {
-        ColorTheme theme = ColorThemeRegistry.get(themeId);
-        return theme != null ? theme : ColorTheme.CYBER_GREEN;
-    }
-    
-    /**
-     * Checks if this field has any effects configured.
-     */
-    public boolean hasEffects() {
-        return !effects.isEmpty();
-    }
-    
-    // =========================================================================
-    // Builder
-    // =========================================================================
-    
-    public static Builder builder(Identifier id, FieldType type) {
-        return new Builder(id, type);
-    }
-    
-    public static Builder builder(String id, FieldType type) {
-        return new Builder(Identifier.of("the-virus-block", id), type);
-    }
-    
-    public static class Builder {
-        private final Identifier id;
-        private final FieldType type;
-        private float baseRadius = 1.0f;
-        private String themeId = "cyber_green";
-        private final List<FieldLayer> layers = new ArrayList<>();
-        private Modifiers modifiers = Modifiers.DEFAULT;
-        private final List<FieldEffect> effects = new ArrayList<>();
-        private PredictionConfig prediction = null;
-        private BeamConfig beam = BeamConfig.DISABLED;
-        
-        private Builder(Identifier id, FieldType type) {
-            this.id = id;
-            this.type = type;
-        }
-        
-        public Builder baseRadius(float radius) {
-            this.baseRadius = radius;
-            return this;
-        }
-        
-        public Builder theme(String themeId) {
-            this.themeId = themeId;
-            return this;
-        }
-        
-        public Builder layer(FieldLayer layer) {
-            this.layers.add(layer);
-            return this;
-        }
-        
-        public Builder modifiers(Modifiers modifiers) {
-            this.modifiers = modifiers;
-            return this;
-        }
-        
-        public Builder effect(FieldEffect effect) {
-            this.effects.add(effect);
-            return this;
-        }
-        
-        public Builder prediction(PredictionConfig config) {
-            this.prediction = config;
-            return this;
-        }
-        
-        public Builder beam(BeamConfig beam) {
-            this.beam = beam;
-            return this;
-        }
-        
-        public Builder beamEnabled(float innerRadius, float outerRadius, int color) {
-            this.beam = BeamConfig.custom(innerRadius, outerRadius, color);
-            return this;
-        }
-        
-        public FieldDefinition build() {
-            if (layers.isEmpty()) {
-                layers.add(FieldLayer.sphere("default", baseRadius, 32));
-            }
-            
-            Logging.REGISTRY.topic("field").debug(
-                "Built field definition: {} (type={}, radius={:.1f}, layers={}, effects={}, beam={})",
-                id, type.id(), baseRadius, layers.size(), effects.size(), beam.enabled());
-            
-            return new FieldDefinition(id, type, baseRadius, themeId, layers, 
-                                       modifiers, effects, prediction, beam);
-        }
-    }
-    
-    // =========================================================================
-    // JSON Parsing
-    // =========================================================================
-    
-    public static FieldDefinition fromJson(JsonObject json, Identifier id) {
-        try {
-            FieldType type = FieldType.fromId(
-                json.has("type") ? json.get("type").getAsString() : "shield");
-            
-            float baseRadius = json.has("baseRadius") 
-                ? json.get("baseRadius").getAsFloat() 
-                : json.has("radius") ? json.get("radius").getAsFloat() : 1.0f;
-            
-            String themeId = json.has("theme") ? json.get("theme").getAsString() : "cyber_green";
-            
-            // Parse layers
-            List<FieldLayer> layers = new ArrayList<>();
-            if (json.has("layers")) {
-                for (JsonElement elem : json.getAsJsonArray("layers")) {
-                    layers.add(FieldLayer.fromJson(elem.getAsJsonObject()));
-                }
-            }
-            
-            // Parse modifiers
-            Modifiers modifiers = json.has("modifiers") 
-                ? Modifiers.fromJson(json.getAsJsonObject("modifiers"))
-                : Modifiers.DEFAULT;
-            
-            // Parse effects
-            List<FieldEffect> effects = new ArrayList<>();
-            if (json.has("effects")) {
-                for (JsonElement elem : json.getAsJsonArray("effects")) {
-                    effects.add(FieldEffect.fromJson(elem.getAsJsonObject()));
-                }
-            }
-            
-            // Parse prediction
-            PredictionConfig prediction = null;
-            if (json.has("prediction")) {
-                prediction = PredictionConfig.fromJson(json.getAsJsonObject("prediction"));
-            }
-            
-            // Parse beam config
-            BeamConfig beam = json.has("beam") 
-                ? BeamConfig.fromJson(json.getAsJsonObject("beam"))
-                : BeamConfig.DISABLED;
-            
-            if (layers.isEmpty()) {
-                layers.add(FieldLayer.sphere("default", baseRadius, 32));
-            }
-            
-            Logging.REGISTRY.topic("field").debug(
-                "Parsed field definition: {} (type={}, radius={:.1f}, layers={}, effects={}, beam={})", 
-                id, type.id(), baseRadius, layers.size(), effects.size(), beam.enabled());
-            
-            return new FieldDefinition(id, type, baseRadius, themeId, layers, 
-                                       modifiers, effects, prediction, beam);
-        } catch (Exception e) {
-            Logging.REGISTRY.topic("field").error(
-                "Failed to parse field definition {}: {}", id, e.getMessage());
-            // Return a minimal valid definition
-            return new FieldDefinition(id, FieldType.SHIELD, 1.0f, "cyber_green", 
-                List.of(FieldLayer.sphere("default", 1.0f, 32)), 
-                Modifiers.DEFAULT, List.of(), null, BeamConfig.DISABLED);
-        }
-    }
-    
-    /**
-     * Serializes this definition to JSON.
+     * Serializes this field definition to JSON.
+     * 
+     * @return JSON representation of this definition
      */
     public JsonObject toJson() {
         JsonObject json = new JsonObject();
-        json.addProperty("type", type.id());
+        json.addProperty("id", id);
+        json.addProperty("type", type.name());
         json.addProperty("baseRadius", baseRadius);
-        json.addProperty("theme", themeId);
+        if (themeId != null) {
+            json.addProperty("themeId", themeId);
+        }
         
-        // Layers
+        // Serialize layers
         JsonArray layersArray = new JsonArray();
         for (FieldLayer layer : layers) {
             layersArray.add(layer.toJson());
         }
         json.add("layers", layersArray);
         
-        // Modifiers (only if not default)
-        if (!modifiers.equals(Modifiers.DEFAULT)) {
+        // Serialize optional fields
+        if (modifiers != null) {
             json.add("modifiers", modifiers.toJson());
         }
-        
-        // Effects
-        if (!effects.isEmpty()) {
-            JsonArray effectsArray = new JsonArray();
-            for (FieldEffect effect : effects) {
-                effectsArray.add(effect.toJson());
-            }
-            json.add("effects", effectsArray);
-        }
-        
-        // Prediction
         if (prediction != null) {
             json.add("prediction", prediction.toJson());
         }
-        
-        // Beam
-        if (beam != null && beam.enabled()) {
+        if (beam != null) {
             json.add("beam", beam.toJson());
+        }
+        if (followMode != null) {
+            json.add("followMode", followMode.toJson());
+        }
+        
+        // Serialize bindings
+        if (bindings != null && !bindings.isEmpty()) {
+            JsonObject bindingsObj = new JsonObject();
+            for (Map.Entry<String, BindingConfig> entry : bindings.entrySet()) {
+                bindingsObj.add(entry.getKey(), entry.getValue().toJson());
+            }
+            json.add("bindings", bindingsObj);
+        }
+        
+        // Serialize triggers
+        if (triggers != null && !triggers.isEmpty()) {
+            JsonArray triggersArray = new JsonArray();
+            for (TriggerConfig trigger : triggers) {
+                triggersArray.add(trigger.toJson());
+            }
+            json.add("triggers", triggersArray);
+        }
+        
+        if (lifecycle != null) {
+            json.add("lifecycle", lifecycle.toJson());
         }
         
         return json;
+    }
+    
+    /**
+     * Builder for complex definitions.
+     */
+    public static Builder builder(String id) {
+        return new Builder(id);
+    }
+    
+    public static class Builder {
+        private final String id;
+        private FieldType type = FieldType.SHIELD;
+        private float baseRadius = 1.0f;
+        private String themeId = null;
+        private List<FieldLayer> layers = List.of();
+        private Modifiers modifiers = null;
+        private PredictionConfig prediction = null;
+        private BeamConfig beam = null;
+        private FollowModeConfig followMode = null;
+        private Map<String, BindingConfig> bindings = Map.of();
+        private List<TriggerConfig> triggers = List.of();
+        private LifecycleConfig lifecycle = null;
+        
+        public Builder(String id) { this.id = id; }
+        
+        public Builder type(FieldType t) { this.type = t; return this; }
+        public Builder baseRadius(float r) { this.baseRadius = r; return this; }
+        public Builder themeId(String t) { this.themeId = t; return this; }
+        public Builder layers(List<FieldLayer> l) { this.layers = l; return this; }
+        public Builder layers(FieldLayer... l) { this.layers = List.of(l); return this; }
+        public Builder modifiers(Modifiers m) { this.modifiers = m; return this; }
+        public Builder prediction(PredictionConfig p) { this.prediction = p; return this; }
+        public Builder beam(BeamConfig b) { this.beam = b; return this; }
+        public Builder followMode(FollowModeConfig f) { this.followMode = f; return this; }
+        public Builder bindings(Map<String, BindingConfig> b) { this.bindings = b; return this; }
+        public Builder triggers(List<TriggerConfig> t) { this.triggers = t; return this; }
+        public Builder lifecycle(LifecycleConfig l) { this.lifecycle = l; return this; }
+        
+        public FieldDefinition build() {
+            return new FieldDefinition(
+                id, type, baseRadius, themeId, layers,
+                modifiers, prediction, beam, followMode,
+                bindings, triggers, lifecycle);
+        }
     }
 }

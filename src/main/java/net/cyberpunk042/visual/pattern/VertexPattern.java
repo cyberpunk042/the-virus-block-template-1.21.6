@@ -1,59 +1,109 @@
 package net.cyberpunk042.visual.pattern;
 
 /**
- * Abstract pattern for controlling vertex arrangement in tessellation.
+ * Interface for controlling vertex arrangement in tessellation.
  * 
- * <p>Different geometry types have different pattern implementations:
+ * <p>Each pattern type applies to a specific {@link CellType}:
  * <ul>
- *   <li>{@link QuadPattern} - For quad-based tessellation (spheres, prism sides)</li>
- *   <li>{@link SegmentPattern} - For segment-based tessellation (rings)</li>
- *   <li>{@link SectorPattern} - For radial/fan tessellation (discs)</li>
- *   <li>{@link EdgePattern} - For edge-based rendering (cages, wireframes)</li>
+ *   <li>{@link QuadPattern} - For QUAD cells (sphere lat/lon, prism sides)</li>
+ *   <li>{@link SegmentPattern} - For SEGMENT cells (rings)</li>
+ *   <li>{@link SectorPattern} - For SECTOR cells (discs)</li>
+ *   <li>{@link EdgePattern} - For EDGE cells (cages, wireframes)</li>
+ *   <li>{@link TrianglePattern} - For TRIANGLE cells (icosphere, polyhedra)</li>
  * </ul>
  * 
- * <p>Each tessellator interprets patterns specific to its geometry type.
- * If a pattern doesn't match the geometry, it falls back to DEFAULT.
+ * <h2>Two Main Operations</h2>
+ * <ol>
+ *   <li><b>shouldRender()</b> - Filter: should this cell be rendered at all?</li>
+ *   <li><b>getVertexOrder()</b> - Reorder: how to arrange vertices into triangles?</li>
+ * </ol>
+ * 
+ * <h2>Semantic Vertex Naming</h2>
+ * <p>Implementations use semantic enums internally for readability,
+ * but return {@code int[][]} for rendering efficiency:
+ * <ul>
+ *   <li>{@link QuadPattern} uses {@link QuadPattern.Corner} (TOP_LEFT, TOP_RIGHT, etc.)</li>
+ *   <li>{@link TrianglePattern} uses {@link TrianglePattern.Vertex} (A, B, C)</li>
+ * </ul>
  * 
  * <h2>JSON Format</h2>
  * <pre>
  * "appearance": {
- *   "pattern": {
- *     "type": "bands",
- *     "count": 4,
- *     "vertexPattern": "meshed"
- *   }
+ *   "arrangement": "filled_1"   // pattern name
  * }
  * </pre>
  * 
- * <h2>Live Editing</h2>
- * <pre>
- * /fieldtest edit vertex meshed
- * /fieldtest edit vertex spiral
- * </pre>
+ * @see CellType
+ * @see QuadPattern.Corner
+ * @see TrianglePattern.Vertex
  */
 public interface VertexPattern {
     
     /**
-     * Pattern identifier (lowercase).
+     * Pattern identifier (lowercase, e.g., "filled_1", "alternating").
      */
     String id();
     
     /**
-     * Display name for UI/commands.
+     * Display name for UI/commands. Defaults to id().
      */
     default String displayName() {
         return id();
     }
     
     /**
-     * Which geometry type this pattern is designed for.
+     * Which cell type this pattern is designed for.
      */
-    PatternGeometry geometry();
+    CellType cellType();
+    
+    /**
+     * Determines if a cell at the given index should be rendered.
+     * 
+     * <p>This is the primary filter method. Return false to skip a cell entirely.
+     * 
+     * @param index Cell index (0-based)
+     * @param total Total number of cells in this shape
+     * @return true if this cell should be rendered
+     */
+    boolean shouldRender(int index, int total);
+    
+    /**
+     * Gets the vertex indices for each triangle to render.
+     * 
+     * <p>For a quad (4 vertices), this typically returns two triangles.
+     * For a triangle (3 vertices), this returns one triangle.
+     * 
+     * <p>Each int[] is a triangle: {v0, v1, v2} where v0-v2 are indices
+     * into the cell's vertex array.
+     * 
+     * <h3>Vertex Index Conventions</h3>
+     * <ul>
+     *   <li><b>Quad:</b> 0=TOP_LEFT, 1=TOP_RIGHT, 2=BOTTOM_LEFT, 3=BOTTOM_RIGHT</li>
+     *   <li><b>Triangle:</b> 0=A (apex), 1=B (left), 2=C (right)</li>
+     *   <li><b>Segment:</b> 0=inner0, 1=inner1, 2=outer0, 3=outer1</li>
+     *   <li><b>Sector:</b> 0=center, 1=edge0, 2=edge1</li>
+     *   <li><b>Edge:</b> 0=start, 1=end</li>
+     * </ul>
+     * 
+     * @return Array of triangles, each triangle is 3 vertex indices
+     */
+    int[][] getVertexOrder();
+    
+    // =========================================================================
+    // Static Utilities
+    // =========================================================================
     
     /**
      * Parses any pattern from string, auto-detecting type.
-     * @param value Pattern name (e.g., "meshed", "spiral", "alternating")
-     * @return The pattern, or null if not found
+     * @param value Pattern name (e.g., "filled_1", "spiral", "alternating")
+     * @return The pattern, or QuadPattern.DEFAULT if not found
+     */
+    /**
+     * Parses any pattern from string, auto-detecting type.
+     * <p>If the pattern is not found, logs an error and returns QuadPattern.DEFAULT.</p>
+     * 
+     * @param value Pattern name (e.g., "filled_1", "spiral", "alternating")
+     * @return The pattern, or QuadPattern.DEFAULT if not found
      */
     static VertexPattern fromString(String value) {
         if (value == null || value.isEmpty()) {
@@ -75,7 +125,39 @@ public interface VertexPattern {
         pattern = EdgePattern.fromId(lower);
         if (pattern != null) return pattern;
         
+        pattern = TrianglePattern.fromId(lower);
+        if (pattern != null) return pattern;
+        
+        // Pattern not found - log error and notify player
+        net.cyberpunk042.log.Logging.FIELD.topic("pattern")
+            .reason("pattern lookup")
+            .alwaysChat()
+            .warn("Unknown pattern '{}' - falling back to filled_1", value);
+        
         return QuadPattern.DEFAULT;
+    }
+    
+    /**
+     * Resolves a pattern for a specific CellType.
+     * <p>If the pattern's cellType doesn't match, logs a mismatch error.</p>
+     * 
+     * @param patternName Pattern name
+     * @param expectedCellType The CellType the shape expects
+     * @return The pattern, or null if mismatched (caller should skip rendering)
+     */
+    static VertexPattern resolveForCellType(String patternName, CellType expectedCellType) {
+        VertexPattern pattern = fromString(patternName);
+        
+        if (pattern.cellType() != expectedCellType) {
+            net.cyberpunk042.log.Logging.FIELD.topic("pattern")
+                .reason("celltype mismatch")
+                .alwaysChat()
+                .error("Pattern '{}' is for {} but shape expects {} - skipping render",
+                    patternName, pattern.cellType(), expectedCellType);
+            return null;
+        }
+        
+        return pattern;
     }
     
     /**
@@ -87,23 +169,7 @@ public interface VertexPattern {
         for (SegmentPattern p : SegmentPattern.values()) names.add(p.id());
         for (SectorPattern p : SectorPattern.values()) names.add(p.id());
         for (EdgePattern p : EdgePattern.values()) names.add(p.id());
+        for (TrianglePattern p : TrianglePattern.values()) names.add(p.id());
         return names.toArray(new String[0]);
     }
-    
-    /**
-     * Geometry types that patterns apply to.
-     */
-    enum PatternGeometry {
-        /** Quad-based: spheres (lat/lon), prism sides */
-        QUAD,
-        /** Segment-based: rings, arcs */
-        SEGMENT,
-        /** Radial/fan: discs, pie charts */
-        SECTOR,
-        /** Edge-based: cages, wireframes */
-        EDGE,
-        /** Universal: applies to any geometry */
-        ANY
-    }
 }
-

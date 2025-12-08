@@ -1,324 +1,219 @@
 package net.cyberpunk042.visual.shape;
 
-import com.google.gson.JsonObject;
+import net.cyberpunk042.visual.pattern.CellType;
+import org.joml.Vector3f;
+
+import java.util.Map;
+import net.cyberpunk042.visual.validation.Range;
+import net.cyberpunk042.visual.validation.ValueRange;
 import net.cyberpunk042.log.Logging;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.MathHelper;
+import com.google.gson.JsonObject;
 
 /**
- * A 3D sphere shape with configurable tessellation, partial rendering, and algorithm selection.
+ * Sphere shape with configurable tessellation.
  * 
- * <h2>Core Parameters</h2>
- * <ul>
- *   <li><b>radius</b>: Sphere radius in blocks</li>
- *   <li><b>latSteps</b>: Latitude divisions (pole to pole)</li>
- *   <li><b>lonSteps</b>: Longitude divisions (around equator)</li>
- *   <li><b>algorithm</b>: Rendering algorithm (LAT_LON, TYPE_A, TYPE_E)</li>
- * </ul>
- * 
- * <h2>Partial Sphere Parameters</h2>
- * <ul>
- *   <li><b>latStart/latEnd</b>: Latitude range (0.0 = north pole, 1.0 = south pole)</li>
- *   <li><b>lonStart/lonEnd</b>: Longitude range (0.0 = start, 1.0 = full circle)</li>
- * </ul>
- * 
- * <h2>Algorithm Selection</h2>
- * <ul>
- *   <li><b>LAT_LON</b>: Default lat/lon tessellation - best for patterns, partial spheres</li>
- *   <li><b>TYPE_A</b>: Overlapping cubes - best for close-up, accurate rendering</li>
- *   <li><b>TYPE_E</b>: Rotated rectangles - best for distant/LOD, efficient</li>
- * </ul>
- * 
- * <h2>Usage Examples</h2>
+ * <h2>JSON Format</h2>
  * <pre>
- * SphereShape.of(5.0f)                           // Full sphere, LAT_LON
- * SphereShape.of(5.0f).withAlgorithm("type_a")   // Accurate sphere
- * SphereShape.hemisphere(5.0f, true)             // Upper half dome
+ * "shape": {
+ *   "type": "sphere",
+ *   "radius": 1.0,
+ *   "latSteps": 32,
+ *   "lonSteps": 64,
+ *   "latStart": 0.0,
+ *   "latEnd": 1.0,
+ *   "algorithm": "LAT_LON"
+ * }
  * </pre>
  * 
- * @see net.cyberpunk042.client.visual.mesh.SphereTessellator_old
- * @see net.cyberpunk042.client.visual.mesh.sphere.SphereAlgorithm_old
+ * <h2>Lat/Lon Range (0-1 normalized)</h2>
+ * <ul>
+ *   <li>latStart=0.0 → top (north pole)</li>
+ *   <li>latEnd=1.0 → bottom (south pole)</li>
+ *   <li>lonStart=0.0 → 0°</li>
+ *   <li>lonEnd=1.0 → 360°</li>
+ * </ul>
+ * 
+ * <h2>Parts</h2>
+ * <ul>
+ *   <li><b>main</b> (QUAD) - Main sphere surface</li>
+ *   <li><b>poles</b> (TRIANGLE) - Top/bottom pole caps</li>
+ *   <li><b>equator</b> (QUAD) - Equatorial band</li>
+ *   <li><b>hemisphereTop</b> (QUAD) - Top half</li>
+ *   <li><b>hemisphereBottom</b> (QUAD) - Bottom half</li>
+ * </ul>
+ * 
+ * @see SphereAlgorithm
  */
 public record SphereShape(
-        float radius,
-        int latSteps,
-        int lonSteps,
-        float latStart,
-        float latEnd,
-        float lonStart,
-        float lonEnd,
-        String algorithm
+    @Range(ValueRange.RADIUS) float radius,
+    @Range(ValueRange.STEPS) int latSteps,
+    @Range(ValueRange.STEPS) int lonSteps,
+    @Range(ValueRange.NORMALIZED) float latStart,
+    @Range(ValueRange.NORMALIZED) float latEnd,
+    @Range(ValueRange.NORMALIZED) float lonStart,
+    @Range(ValueRange.NORMALIZED) float lonEnd,
+    SphereAlgorithm algorithm
 ) implements Shape {
+    public static final String DEFAULT_ALGORITHM = "uv";
+
     
-    public static final String TYPE = "sphere";
-    
-    /** Default algorithm: LAT_LON tessellation */
-    public static final String DEFAULT_ALGORITHM = "lat_lon";
-    
-    // =========================================================================
-    // Compact Constructor (Validation)
-    // =========================================================================
-    
-    public SphereShape {
-        radius = Math.max(0.01f, radius);
-        latSteps = Math.max(2, latSteps);
-        lonSteps = Math.max(4, lonSteps);
-        latStart = MathHelper.clamp(latStart, 0.0f, 1.0f);
-        latEnd = MathHelper.clamp(latEnd, 0.0f, 1.0f);
-        lonStart = MathHelper.clamp(lonStart, 0.0f, 1.0f);
-        lonEnd = MathHelper.clamp(lonEnd, 0.0f, 1.0f);
-        
-        // Ensure start <= end
-        if (latStart > latEnd) {
-            float temp = latStart;
-            latStart = latEnd;
-            latEnd = temp;
-        }
-        if (lonStart > lonEnd) {
-            float temp = lonStart;
-            lonStart = lonEnd;
-            lonEnd = temp;
-        }
-        
-        // Default algorithm if null/empty
-        if (algorithm == null || algorithm.isEmpty()) {
-            algorithm = DEFAULT_ALGORITHM;
-        }
+    /** Default sphere (1.0 radius, medium detail, full sphere). */
+    public static SphereShape of(float radius) { 
+        return new SphereShape(radius, 16, 32, 0f, 1f, 0f, 1f, SphereAlgorithm.values()[0]); 
     }
+    public static SphereShape defaults() { return DEFAULT; }
     
-    // =========================================================================
-    // Factory Methods - Full Spheres
-    // =========================================================================
+    public static final SphereShape DEFAULT = new SphereShape(
+        1.0f, 32, 64, 0.0f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON);
     
-    /** Default sphere: 1 block radius, medium quality, LAT_LON algorithm. */
-    public static SphereShape defaults() {
-        return new SphereShape(1.0f, 16, 32, 0.0f, 1.0f, 0.0f, 1.0f, DEFAULT_ALGORITHM);
-    }
+    /** Low-poly sphere for performance. */
+    public static final SphereShape LOW_POLY = new SphereShape(
+        1.0f, 8, 16, 0.0f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON);
     
-    /** Quick sphere with just radius, default tessellation and algorithm. */
-    public static SphereShape of(float radius) {
-        return new SphereShape(radius, 16, 32, 0.0f, 1.0f, 0.0f, 1.0f, DEFAULT_ALGORITHM);
-    }
-    
-    /** Sphere with custom quality (steps for both lat/lon). */
-    public static SphereShape of(float radius, int steps) {
-        return new SphereShape(radius, steps, steps * 2, 0.0f, 1.0f, 0.0f, 1.0f, DEFAULT_ALGORITHM);
-    }
-    
-    /** Sphere with full control over tessellation. */
-    public static SphereShape of(float radius, int latSteps, int lonSteps) {
-        return new SphereShape(radius, latSteps, lonSteps, 0.0f, 1.0f, 0.0f, 1.0f, DEFAULT_ALGORITHM);
-    }
-    
-    /** Sphere with specified algorithm. */
-    public static SphereShape of(float radius, String algorithm) {
-        return new SphereShape(radius, 16, 32, 0.0f, 1.0f, 0.0f, 1.0f, algorithm);
-    }
-    
-    // =========================================================================
-    // Factory Methods - Partial Spheres
-    // =========================================================================
+    /** High-detail sphere. */
+    public static final SphereShape HIGH_DETAIL = new SphereShape(
+        1.0f, 64, 128, 0.0f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON);
     
     /**
-     * Creates a hemisphere (half sphere).
+     * Creates a simple sphere with default tessellation.
      * @param radius Sphere radius
-     * @param top true for upper half (dome), false for lower half (bowl)
      */
-    public static SphereShape hemisphere(float radius, boolean top) {
-        if (top) {
-            return new SphereShape(radius, 16, 32, 0.0f, 0.5f, 0.0f, 1.0f, DEFAULT_ALGORITHM);
-        } else {
-            return new SphereShape(radius, 16, 32, 0.5f, 1.0f, 0.0f, 1.0f, DEFAULT_ALGORITHM);
-        }
+    public static SphereShape ofRadius(@Range(ValueRange.RADIUS) float radius) {
+        return new SphereShape(radius, 32, 64, 0.0f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON);
     }
     
     /**
-     * Creates a latitude band (ring around sphere).
+     * Creates a top hemisphere (top half of sphere).
      * @param radius Sphere radius
-     * @param latStart Start latitude (0.0 = north pole)
-     * @param latEnd End latitude (1.0 = south pole)
      */
-    public static SphereShape band(float radius, float latStart, float latEnd) {
-        return new SphereShape(radius, 16, 32, latStart, latEnd, 0.0f, 1.0f, DEFAULT_ALGORITHM);
+    public static SphereShape hemisphereTop(@Range(ValueRange.RADIUS) float radius) {
+        return new SphereShape(radius, 16, 64, 0.0f, 0.5f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON);
     }
     
     /**
-     * Creates a longitude arc (slice of sphere).
+     * Creates a bottom hemisphere (bottom half of sphere).
      * @param radius Sphere radius
-     * @param lonStart Start longitude (0.0 = start angle)
-     * @param lonEnd End longitude (1.0 = full circle)
      */
-    public static SphereShape arc(float radius, float lonStart, float lonEnd) {
-        return new SphereShape(radius, 16, 32, 0.0f, 1.0f, lonStart, lonEnd, DEFAULT_ALGORITHM);
+    public static SphereShape hemisphereBottom(@Range(ValueRange.RADIUS) float radius) {
+        return new SphereShape(radius, 16, 64, 0.5f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON);
     }
-    
-    /**
-     * Creates an equator ring.
-     * @param radius Sphere radius
-     * @param thickness Band thickness (0.0 - 1.0 of full latitude range)
-     */
-    public static SphereShape equator(float radius, float thickness) {
-        float halfThick = thickness / 2.0f;
-        return band(radius, 0.5f - halfThick, 0.5f + halfThick);
-    }
-    
-    // =========================================================================
-    // Shape Interface
-    // =========================================================================
     
     @Override
     public String getType() {
-        return TYPE;
+        return "sphere";
     }
     
     @Override
-    public Box getBounds() {
-        return new Box(-radius, -radius, -radius, radius, radius, radius);
+    public Vector3f getBounds() {
+        float d = radius * 2;
+        return new Vector3f(d, d, d);
     }
     
     @Override
-    public int estimateVertexCount() {
-        int effectiveLatSteps = (int)(latSteps * (latEnd - latStart));
-        int effectiveLonSteps = (int)(lonSteps * (lonEnd - lonStart));
-        return (effectiveLatSteps + 1) * (effectiveLonSteps + 1);
+    public CellType primaryCellType() {
+        return CellType.QUAD;
     }
     
     @Override
-    public int estimateTriangleCount() {
-        int effectiveLatSteps = (int)(latSteps * (latEnd - latStart));
-        int effectiveLonSteps = (int)(lonSteps * (lonEnd - lonStart));
-        return effectiveLatSteps * effectiveLonSteps * 2;
+    public Map<String, CellType> getParts() {
+        return Map.of(
+            "main", CellType.QUAD,
+            "poles", CellType.TRIANGLE,
+            "equator", CellType.QUAD,
+            "hemisphereTop", CellType.QUAD,
+            "hemisphereBottom", CellType.QUAD
+        );
     }
     
-    // =========================================================================
-    // Computed Properties
-    // =========================================================================
+    @Override
+    public float getRadius() {
+        return radius;
+    }
     
-    /**
-     * Checks if this is a full sphere (no partial parameters).
-     */
+    /** Whether this is a full sphere (lat 0-1, lon 0-1). */
     public boolean isFullSphere() {
-        return latStart <= 0.001f && latEnd >= 0.999f && 
-               lonStart <= 0.001f && lonEnd >= 0.999f;
+        return latStart == 0.0f && latEnd == 1.0f && lonStart == 0.0f && lonEnd == 1.0f;
     }
     
-    /**
-     * Checks if this shape requires LAT_LON algorithm (has patterns or partial sphere).
-     */
-    public boolean requiresLatLon() {
-        return !isFullSphere();
-    }
-    
-    /**
-     * Gets the latitude coverage fraction.
-     */
-    public float latCoverage() {
-        return latEnd - latStart;
-    }
-    
-    /**
-     * Gets the longitude coverage fraction.
-     */
-    public float lonCoverage() {
-        return lonEnd - lonStart;
-    }
-    
-    /**
-     * Checks if using TYPE_A algorithm.
-     */
-    public boolean isTypeA() {
-        return "type_a".equalsIgnoreCase(algorithm);
-    }
-    
-    /**
-     * Checks if using TYPE_E algorithm.
-     */
-    public boolean isTypeE() {
-        return "type_e".equalsIgnoreCase(algorithm);
-    }
-    
-    /**
-     * Checks if using LAT_LON algorithm.
-     */
-    public boolean isLatLon() {
-        return "lat_lon".equalsIgnoreCase(algorithm) || DEFAULT_ALGORITHM.equalsIgnoreCase(algorithm);
-    }
-    
+
     // =========================================================================
-    // Builder-style modifiers
+    // JSON Parsing
     // =========================================================================
     
-    public SphereShape withRadius(float newRadius) {
-        return new SphereShape(newRadius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm);
-    }
-    
-    public SphereShape withSteps(int newLatSteps, int newLonSteps) {
-        return new SphereShape(radius, newLatSteps, newLonSteps, latStart, latEnd, lonStart, lonEnd, algorithm);
-    }
-    
-    public SphereShape withLatRange(float start, float end) {
-        return new SphereShape(radius, latSteps, lonSteps, start, end, lonStart, lonEnd, algorithm);
-    }
-    
-    public SphereShape withLonRange(float start, float end) {
-        return new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, start, end, algorithm);
-    }
-    
-    public SphereShape withAlgorithm(String newAlgorithm) {
-        return new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, newAlgorithm);
-    }
-    
-    public SphereShape scaled(float scale) {
-        return new SphereShape(radius * scale, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm);
-    }
-    
-    // =========================================================================
-    // JSON Serialization
-    // =========================================================================
-    
-    public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("type", TYPE);
-        json.addProperty("radius", radius);
-        json.addProperty("latSteps", latSteps);
-        json.addProperty("lonSteps", lonSteps);
-        
-        // Only include partial params if not full sphere
-        if (!isFullSphere()) {
-            json.addProperty("latStart", latStart);
-            json.addProperty("latEnd", latEnd);
-            json.addProperty("lonStart", lonStart);
-            json.addProperty("lonEnd", lonEnd);
-        }
-        
-        // Only include algorithm if not default
-        if (!DEFAULT_ALGORITHM.equalsIgnoreCase(algorithm)) {
-            json.addProperty("algorithm", algorithm);
-        }
-        
-        return json;
-    }
-    
+    /**
+     * Parses a SphereShape from JSON.
+     * @param json The JSON object
+     * @return Parsed shape
+     */
     public static SphereShape fromJson(JsonObject json) {
-        if (json == null) {
-            return defaults();
-        }
+        Logging.FIELD.topic("parse").trace("Parsing SphereShape...");
         
         float radius = json.has("radius") ? json.get("radius").getAsFloat() : 1.0f;
-        int latSteps = json.has("latSteps") ? json.get("latSteps").getAsInt() : 16;
-        int lonSteps = json.has("lonSteps") ? json.get("lonSteps").getAsInt() : 32;
+        int latSteps = json.has("latSteps") ? json.get("latSteps").getAsInt() : 32;
+        int lonSteps = json.has("lonSteps") ? json.get("lonSteps").getAsInt() : 64;
         float latStart = json.has("latStart") ? json.get("latStart").getAsFloat() : 0.0f;
         float latEnd = json.has("latEnd") ? json.get("latEnd").getAsFloat() : 1.0f;
         float lonStart = json.has("lonStart") ? json.get("lonStart").getAsFloat() : 0.0f;
         float lonEnd = json.has("lonEnd") ? json.get("lonEnd").getAsFloat() : 1.0f;
-        String algorithm = json.has("algorithm") ? json.get("algorithm").getAsString() : DEFAULT_ALGORITHM;
+        
+        SphereAlgorithm algorithm = SphereAlgorithm.LAT_LON;
+        if (json.has("algorithm")) {
+            String algStr = json.get("algorithm").getAsString();
+            try {
+                algorithm = SphereAlgorithm.valueOf(algStr.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                Logging.FIELD.topic("parse").warn("Invalid sphere algorithm '{}', using LAT_LON", algStr);
+            }
+        }
         
         SphereShape result = new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm);
-        
-        Logging.RENDER.topic("shape").trace(
-            "Parsed SphereShape: radius={:.2f}, algo={}, partial={}",
-            radius, algorithm, !result.isFullSphere());
-        
+        Logging.FIELD.topic("parse").trace("Parsed SphereShape: radius={}, latSteps={}, lonSteps={}, algorithm={}", 
+            radius, latSteps, lonSteps, algorithm);
         return result;
+    }
+    
+    @Override
+    public JsonObject toJson() {
+        JsonObject json = new JsonObject();
+        json.addProperty("type", "sphere");
+        json.addProperty("radius", radius);
+        json.addProperty("latSteps", latSteps);
+        json.addProperty("lonSteps", lonSteps);
+        if (latStart != 0) json.addProperty("latStart", latStart);
+        if (latEnd != 1) json.addProperty("latEnd", latEnd);
+        if (lonStart != 0) json.addProperty("lonStart", lonStart);
+        if (lonEnd != 1) json.addProperty("lonEnd", lonEnd);
+        if (algorithm != SphereAlgorithm.LAT_LON) json.addProperty("algorithm", algorithm.name());
+        return json;
+    }
+
+    // =========================================================================
+    // Builder
+    // =========================================================================
+    
+    public static Builder builder() { return new Builder(); }
+    
+    public static class Builder {
+        private @Range(ValueRange.RADIUS) float radius = 1.0f;
+        private @Range(ValueRange.STEPS) int latSteps = 32;
+        private @Range(ValueRange.STEPS) int lonSteps = 64;
+        private @Range(ValueRange.NORMALIZED) float latStart = 0.0f;
+        private @Range(ValueRange.NORMALIZED) float latEnd = 1.0f;
+        private @Range(ValueRange.NORMALIZED) float lonStart = 0.0f;
+        private @Range(ValueRange.NORMALIZED) float lonEnd = 1.0f;
+        private SphereAlgorithm algorithm = SphereAlgorithm.LAT_LON;
+        
+        public Builder radius(float r) { this.radius = r; return this; }
+        public Builder latSteps(int s) { this.latSteps = s; return this; }
+        public Builder lonSteps(int s) { this.lonSteps = s; return this; }
+        public Builder latStart(float l) { this.latStart = l; return this; }
+        public Builder latEnd(float l) { this.latEnd = l; return this; }
+        public Builder lonStart(float l) { this.lonStart = l; return this; }
+        public Builder lonEnd(float l) { this.lonEnd = l; return this; }
+        public Builder algorithm(SphereAlgorithm a) { this.algorithm = a; return this; }
+        
+        public SphereShape build() {
+            return new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm);
+        }
     }
 }

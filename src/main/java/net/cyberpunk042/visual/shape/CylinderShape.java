@@ -1,92 +1,186 @@
 package net.cyberpunk042.visual.shape;
 
-import net.minecraft.util.math.Box;
+import com.google.gson.JsonObject;
+
+import net.cyberpunk042.visual.pattern.CellType;
+import org.joml.Vector3f;
+
+import java.util.Map;
+import net.cyberpunk042.visual.validation.Range;
+import net.cyberpunk042.visual.validation.ValueRange;
 
 /**
- * A vertical cylindrical beam shape.
+ * Cylinder/tube shape (also used for beams).
  * 
- * <h2>Parameters</h2>
+ * <h2>JSON Format</h2>
+ * <pre>
+ * "shape": {
+ *   "type": "cylinder",
+ *   "radius": 0.5,
+ *   "height": 10.0,
+ *   "segments": 16,
+ *   "topRadius": 0.5,
+ *   "heightSegments": 1,
+ *   "capTop": true,
+ *   "capBottom": false,
+ *   "arc": 360
+ * }
+ * </pre>
+ * 
+ * <h2>Parts</h2>
  * <ul>
- *   <li><b>radius</b>: Beam radius</li>
- *   <li><b>height</b>: Beam height (extends up from Y=0)</li>
- *   <li><b>segments</b>: Number of segments around circumference</li>
+ *   <li><b>sides</b> (QUAD) - Cylinder wall</li>
+ *   <li><b>capTop</b> (SECTOR) - Top cap</li>
+ *   <li><b>capBottom</b> (SECTOR) - Bottom cap</li>
+ *   <li><b>edges</b> (EDGE) - Edge lines</li>
  * </ul>
  * 
- * <p>Used for vertical light beams, energy columns, etc.
- * Extends from Y=0 upward (not centered).
+ * @see Shape
+ * @see CellType
  */
 public record CylinderShape(
-        float radius,
-        float height,
-        int segments
+    @Range(ValueRange.RADIUS) float radius,
+    @Range(ValueRange.POSITIVE_NONZERO) float height,
+    @Range(ValueRange.STEPS) int segments,
+    @Range(ValueRange.POSITIVE) float topRadius,
+    @Range(ValueRange.STEPS) int heightSegments,
+    boolean capTop,
+    boolean capBottom,
+    @Range(ValueRange.DEGREES) float arc
 ) implements Shape {
     
-    public static final String TYPE = "beam";
-    
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Factory
-    // ─────────────────────────────────────────────────────────────────────────────
-    
-    public static CylinderShape defaults() {
-        return new CylinderShape(0.5f, 10.0f, 16);
+    /** Default cylinder (both caps). */
+    public static CylinderShape defaults() { return DEFAULT; }
+    public static CylinderShape thin(float height) { 
+        return new CylinderShape(0.1f, height, 16, 0.1f, 1, true, false, 360f); 
     }
     
-    public static CylinderShape of(float radius, float height) {
-        return new CylinderShape(radius, height, 16);
+    public static final CylinderShape DEFAULT = new CylinderShape(
+        0.5f, 2.0f, 32, 0.5f, 1, true, true, 360);
+    
+    /** Beam (tall, thin, top cap only - per docs default). */
+    public static final CylinderShape BEAM = new CylinderShape(
+        0.1f, 10.0f, 16, 0.1f, 1, true, false, 360);
+    
+    /** Tube (no caps). */
+    public static final CylinderShape TUBE = new CylinderShape(
+        0.5f, 2.0f, 32, 0.5f, 1, false, false, 360);
+    
+    /** Cone (tapered, both caps). */
+    public static final CylinderShape CONE = new CylinderShape(
+        1.0f, 2.0f, 32, 0.0f, 1, true, true, 360);
+    
+    /**
+     * Creates a simple cylinder with both caps.
+     * @param radius Radius
+     * @param height Height
+     */
+    public static CylinderShape of(@Range(ValueRange.RADIUS) float radius, @Range(ValueRange.POSITIVE_NONZERO) float height) {
+        return new CylinderShape(radius, height, 32, radius, 1, true, true, 360);
     }
     
-    public static CylinderShape of(float radius, float height, int segments) {
-        return new CylinderShape(radius, height, segments);
+    /**
+     * Creates a tapered cylinder (cone-like).
+     * @param bottomRadius Bottom radius
+     * @param topRadius Top radius
+     * @param height Height
+     */
+    public static CylinderShape tapered(float bottomRadius, @Range(ValueRange.POSITIVE) float topRadius, @Range(ValueRange.POSITIVE_NONZERO) float height) {
+        return new CylinderShape(bottomRadius, height, 32, topRadius, 1, true, true, 360);
     }
     
-    /** Thin beam for visual effects. */
-    public static CylinderShape thin(float height) {
-        return new CylinderShape(0.1f, height, 8);
+    /**
+     * Creates a tube (no caps).
+     * @param radius Radius
+     * @param height Height
+     */
+    public static CylinderShape tube(@Range(ValueRange.RADIUS) float radius, @Range(ValueRange.POSITIVE_NONZERO) float height) {
+        return new CylinderShape(radius, height, 32, radius, 1, false, false, 360);
     }
-    
-    /** Wide beam for force fields. */
-    public static CylinderShape wide(float height) {
-        return new CylinderShape(1.0f, height, 24);
-    }
-    
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Shape Interface
-    // ─────────────────────────────────────────────────────────────────────────────
     
     @Override
     public String getType() {
-        return TYPE;
+        return "cylinder";
     }
     
     @Override
-    public Box getBounds() {
-        // Beam extends from Y=0 upward
-        return new Box(-radius, 0, -radius, radius, height, radius);
+    public Vector3f getBounds() {
+        float maxR = Math.max(radius, topRadius);
+        return new Vector3f(maxR * 2, height, maxR * 2);
     }
     
     @Override
-    public int estimateVertexCount() {
-        return segments * 2 + 2; // Top and bottom circles
+    public CellType primaryCellType() {
+        return CellType.QUAD;
     }
     
     @Override
-    public int estimateTriangleCount() {
-        return segments * 2 + segments * 2; // Sides + caps
+    public Map<String, CellType> getParts() {
+        return Map.of(
+            "sides", CellType.QUAD,
+            "capTop", CellType.SECTOR,
+            "capBottom", CellType.SECTOR,
+            "edges", CellType.EDGE
+        );
     }
     
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Modifiers
-    // ─────────────────────────────────────────────────────────────────────────────
-    
-    public CylinderShape withRadius(float newRadius) {
-        return new CylinderShape(newRadius, height, segments);
+    /** Whether this is a regular cylinder (same top/bottom radius). */
+    public boolean isRegular() {
+        return radius == topRadius;
     }
     
-    public CylinderShape withHeight(float newHeight) {
-        return new CylinderShape(radius, newHeight, segments);
+    /** Whether this is a cone (top radius = 0). */
+    public boolean isCone() {
+        return topRadius == 0;
     }
     
-    public CylinderShape scaled(float scale) {
-        return new CylinderShape(radius * scale, height * scale, segments);
+    /** Whether this is a tube (no caps). */
+    public boolean isTube() {
+        return !capTop && !capBottom;
+    }
+    
+    @Override
+    public JsonObject toJson() {
+        JsonObject json = new JsonObject();
+        json.addProperty("type", "cylinder");
+        json.addProperty("radius", radius);
+        json.addProperty("height", height);
+        json.addProperty("segments", segments);
+        if (topRadius != radius) json.addProperty("topRadius", topRadius);
+        if (heightSegments != 1) json.addProperty("heightSegments", heightSegments);
+        if (!capTop) json.addProperty("capTop", false);
+        if (capBottom) json.addProperty("capBottom", true);
+        if (arc != 360) json.addProperty("arc", arc);
+        return json;
+    }
+
+    // =========================================================================
+    // Builder
+    // =========================================================================
+    
+    public static Builder builder() { return new Builder(); }
+    
+    public static class Builder {
+        private @Range(ValueRange.RADIUS) float radius = 0.5f;
+        private @Range(ValueRange.POSITIVE_NONZERO) float height = 2.0f;
+        private @Range(ValueRange.STEPS) int segments = 32;
+        private @Range(ValueRange.POSITIVE) float topRadius = 0.5f;
+        private @Range(ValueRange.STEPS) int heightSegments = 1;
+        private boolean capTop = true;
+        private boolean capBottom = false;  // Per docs default
+        private @Range(ValueRange.DEGREES) float arc = 360;
+        
+        public Builder radius(float r) { this.radius = r; return this; }
+        public Builder height(float h) { this.height = h; return this; }
+        public Builder segments(int s) { this.segments = s; return this; }
+        public Builder topRadius(float r) { this.topRadius = r; return this; }
+        public Builder heightSegments(int s) { this.heightSegments = s; return this; }
+        public Builder capTop(boolean c) { this.capTop = c; return this; }
+        public Builder capBottom(boolean c) { this.capBottom = c; return this; }
+        public Builder arc(float a) { this.arc = a; return this; }
+        
+        public CylinderShape build() {
+            return new CylinderShape(radius, height, segments, topRadius, heightSegments, capTop, capBottom, arc);
+        }
     }
 }

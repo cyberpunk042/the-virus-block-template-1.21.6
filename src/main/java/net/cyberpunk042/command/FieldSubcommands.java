@@ -44,7 +44,7 @@ public final class FieldSubcommands {
         root.then(CommandManager.literal("spawn")
             .then(CommandManager.argument("id", IdentifierArgumentType.identifier())
                 .suggests((ctx, builder) -> {
-                    for (Identifier id : FieldRegistry.ids()) {
+                    for (String id : FieldRegistry.ids()) {
                         builder.suggest(id.toString());
                     }
                     return builder.buildFuture();

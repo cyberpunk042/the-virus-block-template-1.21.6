@@ -33,7 +33,8 @@ src/main/java/net/cyberpunk042/
 │   ├── 📁 visibility/
 │   ├── 📁 animation/
 │   ├── 📁 appearance/
-│   └── 📁 shape/
+│   ├── 📁 shape/
+│   └── 📁 validation/                      ← ValueRange, @Range
 ├── 📁 field/
 │   ├── 📁 primitive/
 │   ├── 📁 instance/
@@ -132,6 +133,13 @@ src/main/java/net/cyberpunk042/
 | File | Status | TODO | Notes |
 |------|--------|------|-------|
 | 📄 `BlendMode.java` | ⬜ | F10 | NORMAL, ADD (Phase 2: MULTIPLY, SCREEN) |
+
+### 1.8 Validation Utilities (`visual.validation`)
+
+| File | Status | TODO | Notes |
+|------|--------|------|-------|
+| 📄 `ValueRange.java` | ✅ | - | Enum: ALPHA, NORMALIZED, DEGREES, POSITIVE, SCALE, RADIUS, STEPS, SIDES, etc. |
+| 📄 `Range.java` | ✅ | - | Annotation: @Range(ValueRange.ALPHA) for documenting valid ranges |
 
 ---
 
@@ -337,6 +345,7 @@ src/main/java/net/cyberpunk042/
 | `visual.animation` | 10 | ⬜ All new |
 | `visual.appearance` | 3 | ⬜ All new |
 | `visual.layer` | 1 | ⬜ BlendMode |
+| `visual.validation` | 2 | ✅ ValueRange, @Range |
 | `visual.shape` | 12 | ✏️ Mostly modify |
 | `field` | 5 | ✏️ Mostly modify |
 | `field.primitive` | 12 | ✏️/🗑️ Mix |

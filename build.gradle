@@ -63,6 +63,20 @@ java {
 	targetCompatibility = JavaVersion.VERSION_21
 }
 
+// Exclude legacy code from compilation (kept for reference only)
+sourceSets {
+	main {
+		java {
+			exclude '**/_legacy/**'
+		}
+	}
+	client {
+		java {
+			exclude '**/_legacy/**'
+		}
+	}
+}
+
 jar {
 	inputs.property "archivesName", project.base.archivesName
 

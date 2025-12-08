@@ -23,6 +23,8 @@
 | C2 | 2024-12-08 | Patterns | Pattern mismatch handling undefined - what if SECTOR pattern on QUAD shape? | Silent failure or crash? | **Decision:** Log error, render nothing, send chat message (see Q3) | ✅ Documented |
 | C3 | 2024-12-08 | CageOptions | Cage mode only has sphere-specific options (lat/lon count) | Prism/Poly cage won't work | **Decision:** Shape-specific CageOptions fields | ✅ Documented |
 | C4 | 2024-12-08 | Logging | **No FIELD channel!** Available: RENDER, REGISTRY, COMMANDS but no dedicated FIELD channel | Field logs mixed with other systems | **IMPLEMENTED:** Added `Logging.FIELD` channel | ✅ Fixed |
+| C5 | 2024-12-08 | Parsing | **Incomplete fromJson()!** ColorCycleConfig, WobbleConfig, WaveConfig returned NONE always | JSON configs silently ignored | **IMPLEMENTED:** Full parsing for all three | ✅ Fixed |
+| C6 | 2024-12-08 | Pipeline | **Rendering pipeline not implemented!** Design exists in CLASS_DIAGRAM §8, but code uses FieldRenderer_old | New components (AnimationApplier, Tessellator, Mesh) unused | **TODO:** Implement §8: FieldRenderer→LayerRenderer→PrimitiveRenderer→Tessellator→VertexEmitter | 🔧 TODO |
 
 ---
 
@@ -35,6 +37,11 @@
 | M3 | 2024-12-08 | Naming | Waveform.TRIANGLE conflicts with TrianglePattern | Confusion | Renamed to TRIANGLE_WAVE | ✅ Fixed |
 | M4 | 2024-12-08 | Missing | AlphaPulseConfig record not defined | Build will fail | Added to CLASS_DIAGRAM | ✅ Fixed |
 | M5 | 2024-12-08 | Missing | DynamicTrianglePattern not in dynamic patterns list | Incomplete shuffle | Added to CLASS_DIAGRAM | ✅ Fixed |
+| M6 | 2024-12-08 | Architecture | **Animator.java undocumented** - existed in code but NOT in class diagram | Orphan code confusion | Archived to `_reference_code/`. AnimationApplier is the correct impl | ✅ Fixed |
+| M7 | 2024-12-08 | Duplication | **Two animation systems**: Animator (Transform→Transform) vs AnimationApplier (MatrixStack) | Confusion, duplicated logic | Kept AnimationApplier (matches diagram), archived Animator | ✅ Fixed |
+| M8 | 2024-12-08 | Legacy | **Spin.java, Pulse.java redundant** - old runtime classes, configs now used directly | Confusion | Archived to `_reference_code/` | ✅ Fixed |
+| M9 | 2024-12-08 | Code Quality | AnimationApplier had inline switch instead of `Waveform.evaluate()` | Code duplication | Fixed to use `Waveform.evaluate()` | ✅ Fixed |
+| M10 | 2024-12-08 | Path | AnimationApplier path didn't match package declaration | Build issues | Moved to correct path | ✅ Fixed |
 
 ---
 
@@ -44,6 +51,8 @@
 |---|------|----------|-------------|--------|----------|--------|
 | m1 | 2024-12-08 | Docs | Different status symbols: ❌ vs 📋 for same meaning | Minor confusion | Acceptable - different docs | ⏳ Later |
 | m2 | 2024-12-08 | Abbreviations | Primitive interface used Vis, Arr, App, Anim | Less readable | Expanded to full names | ✅ Fixed |
+| m3 | 2024-12-08 | Utilities | Alpha.java, Gradient.java, PatternConfig.java are useful visual utilities | None - keep them! | Verified as useful, NOT legacy | ✅ Verified |
+| m4 | 2024-12-08 | Utilities | Phase.java, FrameSlice.java are animation utilities | None - keep them! | Fixed stale @see refs | ✅ Fixed |
 
 ---
 
@@ -56,6 +65,9 @@
 | TD3 | 2024-12-08 | Logging | Add `Logging.FIELD` channel | High | ✅ Done |
 | TD4 | 2024-12-08 | Logging | Consider `startTimer()`/`stopTimer()` for perf | Low | ⏳ Future |
 | TD5 | 2024-12-08 | Documentation | Document all Logging utilities | Low | ✅ Done |
+| TD6 | 2024-12-08 | Review | Check Phase.java, FrameSlice.java - legacy or needed? | Medium | ✅ NOT legacy - fixed stale @see refs |
+| TD7 | 2024-12-08 | Review | Alpha.java, Gradient.java, PatternConfig.java - legacy? | Medium | ✅ NOT legacy - useful utilities |
+| TD8 | 2024-12-08 | Consistency | Abstract `fromJson()` patterns? | Low | 🚫 Won't Fix - simple enough inline |
 
 ---
 
@@ -142,6 +154,117 @@ Logging.FIELD.topic("error")
 
 ---
 
+## 🎯 Key Patterns Discovered
+
+### Config → Runtime Pattern
+
+The animation system follows a clear pattern:
+- **Config records** (`SpinConfig`, `PulseConfig`, `WobbleConfig`, etc.) = immutable data
+- **Runtime applier** (`AnimationApplier`) = stateless transformer that applies configs to MatrixStack
+
+**Old (wrong) pattern we found:**
+```
+SpinConfig → Spin (runtime) → Transform
+PulseConfig → Pulse (runtime) → Transform  
+Animator → combines them
+```
+
+**Correct pattern (per class diagram):**
+```
+SpinConfig ──┐
+PulseConfig ─┼──→ AnimationApplier ──→ MatrixStack mutation
+WobbleConfig─┘
+```
+
+### Color System Integration
+
+ColorTheme, ColorResolver, ColorMath are **NOT legacy** - they're utilities:
+- `Appearance.color()` / `Appearance.secondaryColor()` can be color names
+- `ColorResolver.resolve(colorName, theme)` → actual ARGB int
+- `ColorMath` → blending, manipulation
+
+**Flow:**
+```
+Appearance.color = "primary"  
+       ↓  
+ColorResolver.resolve("primary", currentTheme)  
+       ↓  
+ColorTheme.get("primary") → 0xFFRRGGBB
+```
+
+### Waveform Evaluation
+
+All animation configs that use `Waveform` should use:
+```java
+float value = config.waveform().evaluate(phase);  // NOT inline switch!
+```
+
+### 🚧 Rendering Pipeline (DESIGNED but NOT IMPLEMENTED)
+
+**Design exists in CLASS_DIAGRAM §8!**
+
+**Current (legacy):**
+```
+ClientFieldManager.render()
+       ↓
+FieldRenderer_old.render(...) ← LEGACY, in _legacy folder
+       ↓
+[Old mesh code]
+```
+
+**Target (from CLASS_DIAGRAM §8):**
+```
+FieldDefinition
+       ↓
+┌──────────────────────────────────────────┐
+│ FieldRenderer                             │  Package: client.field.render
+│ + render(def, matrices, provider, ...)   │
+└──────────────────────────────────────────┘
+       ↓ for each layer
+┌──────────────────────────────────────────┐
+│ LayerRenderer                             │
+│ + render(layer, ...)                      │
+│ - applyLayerTransform(...)               │  ← uses Transform
+│ - applyLayerAnimation(...)               │  ← uses AnimationApplier!
+└──────────────────────────────────────────┘
+       ↓ for each primitive
+┌──────────────────────────────────────────┐
+│ «interface» PrimitiveRenderer             │
+│ + render(primitive, ...)                  │
+└──────────────────────────────────────────┘
+       △
+       ├── SphereRenderer
+       ├── RingRenderer
+       ├── DiscRenderer
+       ├── PrismRenderer
+       └── ...
+              ↓
+┌──────────────────────────────────────────┐
+│ Tessellator                               │  ← EXISTS! Uses PolyhedronTessellator
+│ + tessellate(shape, pattern, vis): Mesh   │
+└──────────────────────────────────────────┘
+              ↓
+┌──────────────────────────────────────────┐
+│ VertexEmitter                             │  ← NEW, needs implementation
+│ + emitMesh(consumer, mesh, matrix, ...)   │
+│ + emitQuad(...)                           │
+│ + emitLine(...)                           │
+└──────────────────────────────────────────┘
+```
+
+**What EXISTS:**
+- ✅ Tessellator (with PolyhedronTessellator)
+- ✅ AnimationApplier
+- ✅ Mesh record
+
+**What needs IMPLEMENTATION:**
+- 🔧 FieldRenderer (new, replaces FieldRenderer_old)
+- 🔧 LayerRenderer
+- 🔧 PrimitiveRenderer interface + shape impls
+- 🔧 VertexEmitter
+
+---
+
 ## 📋 Future Considerations
 
 ### Performance Timer (Low Priority)
@@ -156,6 +279,59 @@ Logging.RENDER.topic("tessellate")
 ```
 
 **Why:** Field tessellation can be expensive. Quick timing helps identify bottlenecks.
+
+---
+
+### Pattern 5: Immutable Resolution Pattern
+
+**Where:** `LinkResolver.ResolvedValues`
+
+**Pattern:**
+```java
+// When you need to "modify" immutable objects, return resolved VALUES
+public record ResolvedValues(
+    float radius,      // -1 if not linked
+    Vector3f offset,   // null if not linked  
+    float scale,       // -1 if not linked
+    float phaseOffset  // 0 if not linked
+) {
+    public boolean hasRadius() { return radius >= 0; }
+    public boolean hasAny() { return hasRadius() || hasOffset() || ... }
+}
+
+// Consumer applies values when BUILDING new objects
+Transform newTransform = LinkResolver.applyToTransform(original, resolved);
+```
+
+**Why:** When interfaces/records are immutable:
+1. Can't add `with*` methods to interfaces easily
+2. Return resolved VALUES instead of mutated objects
+3. Let the builder/parser use these values during construction
+
+**Applied to:**
+- `LinkResolver` → `ResolvedValues` for radius/offset/scale/phase
+- `Transform` → Added `withOffset()`, `withScale()` etc. (records CAN have these)
+
+---
+
+### Pattern 6: Fake Primitives (Billboarded Quads)
+
+**Where:** `AbstractPrimitiveRenderer.emitPoints()`
+
+**Pattern:**
+```java
+// GL_POINTS not available, fake with camera-facing quads
+for (Vertex v : mesh.vertices()) {
+    // Two triangles forming a tiny square at each vertex
+    emitVertex(x - half, y - half, z, ...);  // Triangle 1
+    emitVertex(x + half, y - half, z, ...);
+    emitVertex(x - half, y + half, z, ...);
+    // Triangle 2...
+}
+```
+
+**Why:** Minecraft/OpenGL doesn't support GL_POINTS for our use case.
+Tiny billboarded quads (2 triangles each) create the same visual effect.
 
 ---
 

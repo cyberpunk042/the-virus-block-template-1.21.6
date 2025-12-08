@@ -1,6 +1,7 @@
 package net.cyberpunk042.client.visual;
 
-import net.cyberpunk042.client.field._legacy.render.FieldRenderer_old;
+import net.cyberpunk042.client.field.render.FieldRenderer;
+
 import net.cyberpunk042.field.ClientFieldState;
 import net.cyberpunk042.field.FieldDefinition;
 import net.cyberpunk042.field.FieldRegistry;
@@ -296,32 +297,21 @@ public final class ClientFieldManager {
                     pattern != null ? pattern.id() : "null");
             }
             
-            net.cyberpunk042.client.visual.render.RenderOverrides_old overrides = 
-                net.cyberpunk042.client.visual.render.RenderOverrides_old.builder()
-                    .vertexPattern(pattern)
-                    .build();
-            
-            FieldRenderer_old.renderWithOverrides(
-                matrices,
-                consumers,
-                def,
-                pos,
-                state.scale(),
-                time,
-                alpha,
-                overrides
-            );
-        } else {
-            FieldRenderer_old.render(
-                matrices,
-                consumers,
-                def,
-                pos,
-                state.scale(),
-                time,
-                alpha
-            );
+            // TODO: Replace with new renderer system
+            // For now, use basic render path
+            Logging.RENDER.topic("field").warn("Legacy renderer with overrides not yet implemented - using basic render");
         }
+        
+        // Use new FieldRenderer
+        FieldRenderer.render(
+            matrices,
+            consumers,
+            def,
+            pos,
+            state.scale(),
+            time,
+            alpha
+        );
     }
     
     /**
@@ -379,7 +369,7 @@ public final class ClientFieldManager {
         Vec3d pos = personalTracker.position().subtract(camPos);
         float time = worldTime + personalTracker.phase();
         
-        FieldRenderer_old.render(
+        FieldRenderer.render(
             matrices,
             consumers,
             def,

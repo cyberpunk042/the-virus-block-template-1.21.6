@@ -10,7 +10,8 @@ package net.cyberpunk042.visual.animation;
  * </pre>
  * 
  * <p>Used to offset multiple primitives' animations to create
- * wave-like or staggered effects.
+ * wave-like or staggered effects. Phase is applied by {@code AnimationApplier}
+ * to create staggered or wave-like visual effects across multiple primitives.
  * 
  * <h2>Usage</h2>
  * <pre>
@@ -25,9 +26,9 @@ package net.cyberpunk042.visual.animation;
  * 
  * @param offset phase offset (0-1, wraps)
  * 
- * @see Animator
- * @see Spin
- * @see Pulse
+ * @see SpinConfig
+ * @see PulseConfig
+ * @see net.cyberpunk042.client.visual.animation.AnimationApplier
  */
 public record Phase(float offset) {
     
