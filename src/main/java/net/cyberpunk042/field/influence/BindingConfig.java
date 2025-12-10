@@ -65,14 +65,21 @@ public record BindingConfig(
     
     /**
      * Parses from JSON.
+     * Supports both new field format and legacy array format.
      */
     public static BindingConfig fromJson(JsonObject json) {
         if (json == null) return DEFAULT;
         
         String source = json.has("source") ? json.get("source").getAsString() : "player.health_percent";
         
+        // Support both new field format and legacy array format
         float inputMin = 0, inputMax = 1;
-        if (json.has("inputRange") && json.get("inputRange").isJsonArray()) {
+        if (json.has("inputMin")) {
+            // New format: direct fields
+            inputMin = json.get("inputMin").getAsFloat();
+            inputMax = json.has("inputMax") ? json.get("inputMax").getAsFloat() : 1;
+        } else if (json.has("inputRange") && json.get("inputRange").isJsonArray()) {
+            // Legacy format: array [min, max]
             JsonArray arr = json.getAsJsonArray("inputRange");
             if (arr.size() >= 2) {
                 inputMin = arr.get(0).getAsFloat();
@@ -81,7 +88,12 @@ public record BindingConfig(
         }
         
         float outputMin = 0, outputMax = 1;
-        if (json.has("outputRange") && json.get("outputRange").isJsonArray()) {
+        if (json.has("outputMin")) {
+            // New format: direct fields
+            outputMin = json.get("outputMin").getAsFloat();
+            outputMax = json.has("outputMax") ? json.get("outputMax").getAsFloat() : 1;
+        } else if (json.has("outputRange") && json.get("outputRange").isJsonArray()) {
+            // Legacy format: array [min, max]
             JsonArray arr = json.getAsJsonArray("outputRange");
             if (arr.size() >= 2) {
                 outputMin = arr.get(0).getAsFloat();
@@ -104,23 +116,16 @@ public record BindingConfig(
     public static Builder builder() { return new Builder(); }
     /**
      * Serializes this binding config to JSON.
+     * Uses field names directly for auto-serialization compatibility.
      */
     public JsonObject toJson() {
         JsonObject json = new JsonObject();
         json.addProperty("source", source);
-        
-        JsonArray inputRange = new JsonArray();
-        inputRange.add(inputMin);
-        inputRange.add(inputMax);
-        json.add("inputRange", inputRange);
-        
-        JsonArray outputRange = new JsonArray();
-        outputRange.add(outputMin);
-        outputRange.add(outputMax);
-        json.add("outputRange", outputRange);
-        
+        json.addProperty("inputMin", inputMin);
+        json.addProperty("inputMax", inputMax);
+        json.addProperty("outputMin", outputMin);
+        json.addProperty("outputMax", outputMax);
         json.addProperty("curve", curve.name().toLowerCase());
-        
         return json;
     }
 

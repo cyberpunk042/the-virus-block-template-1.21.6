@@ -22,8 +22,13 @@ public final class GuiConstants {
     public static final int SECTION_SPACING = 20;
     public static final int MARGIN = 10;
     public static final int TAB_HEIGHT = 24;
+    public static final int BOTTOM_BAR_HEIGHT = 28;
     public static final int HEADER_HEIGHT = 16;
     public static final int LABEL_WIDTH = 80;
+    
+    // Aliases for sub-panel consistency
+    public static final int ELEMENT_HEIGHT = WIDGET_HEIGHT;
+    public static final int ELEMENT_SPACING = SECTION_GAP;
     
     // ═══════════════════════════════════════════════════════════════════════════
     // COLORS (ARGB: 0xAARRGGBB)

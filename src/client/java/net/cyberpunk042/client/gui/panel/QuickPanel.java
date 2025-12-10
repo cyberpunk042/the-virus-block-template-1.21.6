@@ -1,6 +1,6 @@
 package net.cyberpunk042.client.gui.panel;
 
-import net.cyberpunk042.client.gui.state.GuiState;
+import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.GuiLayout;
 import net.cyberpunk042.client.gui.util.GuiWidgets;
@@ -24,6 +24,8 @@ import java.util.List;
  */
 public class QuickPanel extends AbstractPanel {
     
+    private LayerPanel layerPanel;
+    private PrimitivePanel primitivePanel;
     private CyclingButtonWidget<String> shapeDropdown;
     private LabeledSlider radiusSlider;
     private ColorButton colorButton;
@@ -43,7 +45,7 @@ public class QuickPanel extends AbstractPanel {
         @Override public String toString() { return label; }
     }
     
-    public QuickPanel(Screen parent, GuiState state) {
+    public QuickPanel(Screen parent, FieldEditState state) {
         super(parent, state);
         Logging.GUI.topic("panel").debug("QuickPanel created");
     }
@@ -52,7 +54,21 @@ public class QuickPanel extends AbstractPanel {
     public void init(int width, int height) {
         this.panelWidth = width;
         this.panelHeight = height;
-        this.layout = new GuiLayout(GuiConstants.PADDING, GuiConstants.TAB_HEIGHT + GuiConstants.PADDING);
+        
+        int startY = GuiConstants.TAB_HEIGHT + GuiConstants.PADDING;
+        
+        // Layer management row
+        layerPanel = new LayerPanel(parent, state, startY);
+        layerPanel.init(width, height);
+        startY += layerPanel.getHeight() + GuiConstants.SECTION_SPACING;
+        
+        // Primitive management row
+        primitivePanel = new PrimitivePanel(parent, state, startY);
+        primitivePanel.init(width, height);
+        layerPanel.setOnLayerChanged(() -> primitivePanel.refreshForLayerChange());
+        startY += primitivePanel.getHeight() + GuiConstants.SECTION_SPACING;
+        
+        this.layout = new GuiLayout(GuiConstants.PADDING, startY);
         
         int widgetWidth = Math.min(width - GuiConstants.PADDING * 2, GuiConstants.SLIDER_WIDTH);
         int x = layout.getX();
@@ -149,6 +165,8 @@ public class QuickPanel extends AbstractPanel {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         context.fill(0, GuiConstants.TAB_HEIGHT, panelWidth, layout.getCurrentY() + GuiConstants.PADDING, GuiConstants.BG_PANEL);
         
+        if (layerPanel != null) layerPanel.render(context, mouseX, mouseY, delta);
+        if (primitivePanel != null) primitivePanel.render(context, mouseX, mouseY, delta);
         if (shapeDropdown != null) shapeDropdown.render(context, mouseX, mouseY, delta);
         if (radiusSlider != null) radiusSlider.render(context, mouseX, mouseY, delta);
         if (colorButton != null) colorButton.render(context, mouseX, mouseY, delta);
@@ -162,6 +180,8 @@ public class QuickPanel extends AbstractPanel {
     
     public List<net.minecraft.client.gui.widget.ClickableWidget> getWidgets() {
         List<net.minecraft.client.gui.widget.ClickableWidget> list = new ArrayList<>();
+        if (layerPanel != null) list.addAll(layerPanel.getWidgets());
+        if (primitivePanel != null) list.addAll(primitivePanel.getWidgets());
         if (shapeDropdown != null) list.add(shapeDropdown);
         if (radiusSlider != null) list.add(radiusSlider);
         if (colorButton != null) list.add(colorButton);

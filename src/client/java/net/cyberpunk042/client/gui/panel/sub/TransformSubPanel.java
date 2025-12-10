@@ -1,7 +1,7 @@
 package net.cyberpunk042.client.gui.panel.sub;
 
 import net.cyberpunk042.client.gui.panel.AbstractPanel;
-import net.cyberpunk042.client.gui.state.GuiState;
+import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.GuiWidgets;
 import net.cyberpunk042.client.gui.widget.ExpandableSection;
@@ -84,7 +84,7 @@ public class TransformSubPanel extends AbstractPanel {
     private CyclingButtonWidget<FacingMode> facingDropdown;
     private CyclingButtonWidget<BillboardMode> billboardDropdown;
     
-    public TransformSubPanel(Screen parent, GuiState state, int startY) {
+    public TransformSubPanel(Screen parent, FieldEditState state, int startY) {
         super(parent, state);
         this.startY = startY;
         Logging.GUI.topic("panel").debug("TransformSubPanel created");

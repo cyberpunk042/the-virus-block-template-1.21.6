@@ -1,8 +1,10 @@
 package net.cyberpunk042.client.visual.render;
 
+import net.cyberpunk042.client.visual.animation.AnimationApplier;
 import net.cyberpunk042.client.visual.mesh.Mesh;
 import net.cyberpunk042.client.visual.mesh.PrimitiveType;
 import net.cyberpunk042.client.visual.mesh.Vertex;
+import net.cyberpunk042.visual.animation.WaveConfig;
 import net.minecraft.client.render.LightmapTextureManager;
 import net.minecraft.client.render.OverlayTexture;
 import net.minecraft.client.render.VertexConsumer;
@@ -33,6 +35,10 @@ public final class VertexEmitter {
     private int color = 0xFFFFFFFF;
     private int light = LightmapTextureManager.MAX_LIGHT_COORDINATE;
     private int overlay = OverlayTexture.DEFAULT_UV;
+    
+    // Wave animation support
+    private WaveConfig waveConfig = null;
+    private float waveTime = 0f;
     
     /**
      * Creates an emitter with the current matrix stack entry and consumer.
@@ -116,6 +122,28 @@ public final class VertexEmitter {
         return this;
     }
     
+    /**
+     * Sets wave animation configuration.
+     * When set, vertices will be displaced by wave animation during emission.
+     * 
+     * @param wave Wave configuration
+     * @param time Current time in ticks
+     * @return this emitter for chaining
+     */
+    public VertexEmitter wave(WaveConfig wave, float time) {
+        this.waveConfig = wave;
+        this.waveTime = time;
+        return this;
+    }
+    
+    /**
+     * Clears wave animation (no displacement).
+     */
+    public VertexEmitter noWave() {
+        this.waveConfig = null;
+        return this;
+    }
+    
     // =========================================================================
     // Mesh emission
     // =========================================================================
@@ -168,11 +196,27 @@ public final class VertexEmitter {
     // =========================================================================
     
     /**
-     * Emits a single vertex with full transform.
+     * Emits a single vertex with full transform and optional wave displacement.
+     * 
+     * <p>If wave animation is configured via {@link #wave(WaveConfig, float)},
+     * the vertex position will be displaced before transformation.</p>
      */
     public void emitVertex(Vertex vertex) {
+        float vx = vertex.x();
+        float vy = vertex.y();
+        float vz = vertex.z();
+        
+        // Apply wave displacement if configured
+        if (waveConfig != null && waveConfig.isActive()) {
+            float[] displaced = AnimationApplier.applyWaveToVertex(
+                waveConfig, vx, vy, vz, waveTime);
+            vx = displaced[0];
+            vy = displaced[1];
+            vz = displaced[2];
+        }
+        
         // Transform position
-        Vector4f pos = new Vector4f(vertex.x(), vertex.y(), vertex.z(), 1.0f);
+        Vector4f pos = new Vector4f(vx, vy, vz, 1.0f);
         pos.mul(positionMatrix);
         
         // Transform normal

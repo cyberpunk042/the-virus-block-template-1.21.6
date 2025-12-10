@@ -6,6 +6,8 @@ import org.joml.Vector3f;
 import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
 import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
@@ -29,9 +31,9 @@ import com.google.gson.JsonObject;
 public record SpinConfig(
     Axis axis,
     @Range(ValueRange.UNBOUNDED) float speed,
-    boolean oscillate,
-    @Range(ValueRange.DEGREES_FULL) float range,
-    @Nullable Vector3f customAxis
+    @JsonField(skipIfDefault = true) boolean oscillate,
+    @JsonField(skipIfDefault = true, defaultValue = "360") @Range(ValueRange.DEGREES_FULL) float range,
+    @JsonField(skipIfNull = true) @Nullable Vector3f customAxis
 ) {
     /** No spin (static). */
     public static final SpinConfig NONE = new SpinConfig(Axis.Y, 0, false, 360, null);
@@ -125,21 +127,10 @@ public record SpinConfig(
     
     /**
      * Serializes this spin config to JSON.
+     * Uses reflection-based serialization with @JsonField annotations.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("axis", axis.name());
-        json.addProperty("speed", speed);
-        if (oscillate) json.addProperty("oscillate", true);
-        if (range != 360) json.addProperty("range", range);
-        if (customAxis != null) {
-            JsonArray arr = new JsonArray();
-            arr.add(customAxis.x);
-            arr.add(customAxis.y);
-            arr.add(customAxis.z);
-            json.add("customAxis", arr);
-        }
-        return json;
+        return JsonSerializer.toJson(this);
     }
 
 }

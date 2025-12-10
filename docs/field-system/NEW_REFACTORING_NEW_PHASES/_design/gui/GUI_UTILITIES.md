@@ -42,7 +42,7 @@ net.cyberpunk042.client.gui/
 │   └── ...
 │
 └── state/
-    ├── GuiState.java
+    ├── FieldEditState.java
     └── EditorState.java
 ```
 
@@ -599,7 +599,7 @@ private void safeUpdate(String field, Runnable update) {
 public class QuickPanel extends AbstractPanel {
     
     @Override
-    public void init(GuiState state, int x, int y, int width) {
+    public void init(FieldEditState state, int x, int y, int width) {
         GuiLayout layout = GuiLayout.create(x + GuiConstants.MARGIN, y, width - 2 * GuiConstants.MARGIN);
         
         // Shape type dropdown

@@ -122,8 +122,8 @@ public final class FieldSystemInit {
                 FieldNetworking.syncDefinitionsTo(player);
                 
                 // Then sync any active field instances
-                if ((ServerWorld) player.getWorld() != null) {
-                    FieldManager manager = FieldManager.get((ServerWorld) player.getWorld());
+                if (player.getWorld() != null) {
+                    FieldManager manager = FieldManager.get(player.getWorld());
                     if (manager != null) {
                         FieldNetworking.syncAllTo(player, manager.all());
                     }

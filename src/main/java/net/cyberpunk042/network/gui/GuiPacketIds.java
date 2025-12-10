@@ -14,6 +14,7 @@ public final class GuiPacketIds {
     public static final Identifier PROFILE_SYNC_S2C = id("profile_sync_s2c");
     public static final Identifier DEBUG_FIELD_S2C = id("debug_field_s2c");
     public static final Identifier SERVER_PROFILES_S2C = id("server_profiles");
+    public static final Identifier FIELD_EDIT_UPDATE_S2C = id("field_edit_update"); // Command→Client sync
     
     // Client -> Server
     public static final Identifier PROFILE_SAVE_C2S = id("profile_save");

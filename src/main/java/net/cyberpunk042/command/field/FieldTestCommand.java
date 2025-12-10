@@ -36,51 +36,35 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Debug/test commands for field definitions with LIVE editing.
+ * Debug/power-user commands for field testing (NOT synced with GUI).
+ * 
+ * <p>For GUI-synced editing, use {@code /field edit} instead.</p>
  * 
  * <h2>Command Structure</h2>
  * <pre>
- * /fieldtest spawn <id>              - Spawn field definition
+ * /fieldtest spawn <id>              - Spawn field definition (server-side)
  * /fieldtest clear                   - Clear test field
  * /fieldtest list [filter]           - List definitions
  * /fieldtest info <id>               - Show definition details
  * /fieldtest cycle                   - Cycle through definitions
  * /fieldtest reload                  - Reload all definitions
- * 
- * /fieldtest edit shape.radius <v>   - Edit shape radius
- * /fieldtest edit shape.latSteps <v> - Edit latitude steps
- * /fieldtest edit shape.lonSteps <v> - Edit longitude steps  
- * /fieldtest edit shape.algorithm <v>- Edit tessellation algorithm
- * /fieldtest edit shape.$ref <ref>   - Load shape from $ref
- * 
- * /fieldtest edit transform.anchor <v>  - Edit anchor position
- * /fieldtest edit transform.scale <v>   - Edit scale
- * /fieldtest edit transform.$ref <ref>  - Load transform from $ref
- * 
- * /fieldtest edit fill.mode <v>      - Edit fill mode (solid/wireframe/cage)
- * /fieldtest edit fill.$ref <ref>    - Load fill from $ref
- * 
- * /fieldtest edit visibility.mask <v>- Edit visibility mask type
- * /fieldtest edit visibility.$ref <ref> - Load visibility from $ref
- * 
- * /fieldtest edit appearance.color <v>  - Edit color
- * /fieldtest edit appearance.alpha <v>  - Edit alpha
- * /fieldtest edit appearance.glow <v>   - Edit glow
- * /fieldtest edit appearance.$ref <ref> - Load appearance from $ref
- * 
- * /fieldtest edit animation.spin <v>    - Edit spin speed
- * /fieldtest edit animation.$ref <ref>  - Load animation from $ref
- * 
- * /fieldtest edit layer <idx>        - Select layer to edit
- * /fieldtest edit reset              - Reset all edit values
- * /fieldtest edit apply              - Apply changes
- * /fieldtest edit status             - Show current edit values
+ * /fieldtest status                  - Show current state values
  * 
  * /fieldtest vertex <pattern>        - Set vertex pattern
  * /fieldtest shuffle next|prev|jump  - Explore shuffle patterns
- * /fieldtest follow snap|smooth|glide- Set follow mode
- * /fieldtest predict on|off|...      - Configure prediction
+ * /fieldtest follow snap|smooth|glide- Set follow mode (server field)
+ * /fieldtest predict on|off|...      - Configure prediction (server field)
+ * 
+ * /fieldtest save <name>             - Save current state as profile
+ * /fieldtest load <name>             - Load saved profile
+ * /fieldtest saved                   - List saved profiles
+ * /fieldtest delete <name>           - Delete saved profile
  * </pre>
+ * 
+ * <p><b>NOTE:</b> /fieldtest uses its own static state, separate from GUI.
+ * Use {@code /field edit} for commands that sync with FieldEditState.</p>
+ * 
+ * @see FieldEditSubcommand for GUI-synced editing
  */
 public final class FieldTestCommand {
 
@@ -310,8 +294,8 @@ public final class FieldTestCommand {
         cmd.then(buildReloadCommand());
         cmd.then(buildStatusCommand());
         
-        // Edit commands (dot-literal syntax)
-        cmd.then(buildEditCommands());
+        // NOTE: Edit commands moved to /field edit (FieldEditSubcommand)
+        // /fieldtest now only has debug-only features
         
         // Pattern commands
         cmd.then(buildVertexCommand());
@@ -329,298 +313,18 @@ public final class FieldTestCommand {
         
         dispatcher.register(cmd);
         rebuildProfileOrder();
-        Logging.COMMANDS.info("Registered /fieldtest with dot-literal edit syntax");
+        Logging.COMMANDS.info("Registered /fieldtest (debug commands, use /field edit for GUI-synced editing)");
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
-    // EDIT COMMANDS - DOT-LITERAL SYNTAX
+    // NOTE: Edit commands moved to /field edit (FieldEditSubcommand)
+    // The following is kept for debugging the static server-side field only.
+    // For GUI-synced editing, use /field edit instead.
     // ═══════════════════════════════════════════════════════════════════════════
     
-    private static LiteralArgumentBuilder<ServerCommandSource> buildEditCommands() {
-        var edit = CommandManager.literal("edit");
-        
-        // ─────────────────────────────────────────────────────────────────────────
-        // SHAPE: /fieldtest edit shape.<param>
-        // ─────────────────────────────────────────────────────────────────────────
-        var shape = CommandManager.literal("shape");
-        
-        shape.then(CommandManager.literal("radius")
-            .then(CommandManager.argument("value", FloatArgumentType.floatArg(0.1f, 64.0f))
-                .executes(ctx -> {
-                    shapeRadius = FloatArgumentType.getFloat(ctx, "value");
-                    return editSuccess(ctx.getSource(), "shape.radius", shapeRadius);
-                })));
-        
-        shape.then(CommandManager.literal("latSteps")
-            .then(CommandManager.argument("value", IntegerArgumentType.integer(4, 512))
-                .executes(ctx -> {
-                    shapeLatSteps = IntegerArgumentType.getInteger(ctx, "value");
-                    return editSuccess(ctx.getSource(), "shape.latSteps", shapeLatSteps);
-                })));
-        
-        shape.then(CommandManager.literal("lonSteps")
-            .then(CommandManager.argument("value", IntegerArgumentType.integer(8, 1024))
-                .executes(ctx -> {
-                    shapeLonSteps = IntegerArgumentType.getInteger(ctx, "value");
-                    return editSuccess(ctx.getSource(), "shape.lonSteps", shapeLonSteps);
-                })));
-        
-        shape.then(CommandManager.literal("algorithm")
-            .then(CommandManager.argument("value", StringArgumentType.word())
-                .suggests(ALGORITHM_SUGGESTIONS)
-                .executes(ctx -> {
-                    shapeAlgorithm = StringArgumentType.getString(ctx, "value");
-                    return editSuccess(ctx.getSource(), "shape.algorithm", shapeAlgorithm);
-                })));
-        
-        shape.then(CommandManager.literal("$ref")
-            .then(CommandManager.argument("ref", StringArgumentType.greedyString())
-                .suggests(SHAPE_REF)
-                .executes(ctx -> loadRef(ctx.getSource(), "shape", StringArgumentType.getString(ctx, "ref")))));
-        
-        edit.then(shape);
-        
-        // ─────────────────────────────────────────────────────────────────────────
-        // TRANSFORM: /fieldtest edit transform.<param>
-        // ─────────────────────────────────────────────────────────────────────────
-        var transform = CommandManager.literal("transform");
-        
-        transform.then(CommandManager.literal("anchor")
-            .then(CommandManager.argument("value", StringArgumentType.word())
-                .suggests(ANCHOR_SUGGESTIONS)
-                .executes(ctx -> {
-                    String name = StringArgumentType.getString(ctx, "value");
-                    try {
-                        transformAnchor = Anchor.valueOf(name.toUpperCase());
-                        return editSuccess(ctx.getSource(), "transform.anchor", transformAnchor.name().toLowerCase());
-                    } catch (IllegalArgumentException e) {
-                        CommandFeedback.error(ctx.getSource(), "Unknown anchor: " + name);
-                        return 0;
-                    }
-                })));
-        
-        transform.then(CommandManager.literal("scale")
-            .then(CommandManager.argument("value", FloatArgumentType.floatArg(0.1f, 10.0f))
-                .executes(ctx -> {
-                    transformScale = FloatArgumentType.getFloat(ctx, "value");
-                    return editSuccess(ctx.getSource(), "transform.scale", transformScale);
-                })));
-        
-        transform.then(CommandManager.literal("offset.x")
-            .then(CommandManager.argument("value", FloatArgumentType.floatArg(-64f, 64f))
-                .executes(ctx -> {
-                    transformOffsetX = FloatArgumentType.getFloat(ctx, "value");
-                    return editSuccess(ctx.getSource(), "transform.offset.x", transformOffsetX);
-                })));
-        
-        transform.then(CommandManager.literal("offset.y")
-            .then(CommandManager.argument("value", FloatArgumentType.floatArg(-64f, 64f))
-                .executes(ctx -> {
-                    transformOffsetY = FloatArgumentType.getFloat(ctx, "value");
-                    return editSuccess(ctx.getSource(), "transform.offset.y", transformOffsetY);
-                })));
-        
-        transform.then(CommandManager.literal("offset.z")
-            .then(CommandManager.argument("value", FloatArgumentType.floatArg(-64f, 64f))
-                .executes(ctx -> {
-                    transformOffsetZ = FloatArgumentType.getFloat(ctx, "value");
-                    return editSuccess(ctx.getSource(), "transform.offset.z", transformOffsetZ);
-                })));
-        
-        transform.then(CommandManager.literal("$ref")
-            .then(CommandManager.argument("ref", StringArgumentType.greedyString())
-                .suggests(TRANSFORM_REF)
-                .executes(ctx -> loadRef(ctx.getSource(), "transform", StringArgumentType.getString(ctx, "ref")))));
-        
-        edit.then(transform);
-        
-        // ─────────────────────────────────────────────────────────────────────────
-        // FILL: /fieldtest edit fill.<param>
-        // ─────────────────────────────────────────────────────────────────────────
-        var fill = CommandManager.literal("fill");
-        
-        fill.then(CommandManager.literal("mode")
-            .then(CommandManager.argument("value", StringArgumentType.word())
-                .suggests(FILL_MODE_SUGGESTIONS)
-                .executes(ctx -> {
-                    fillMode = FillMode.fromId(StringArgumentType.getString(ctx, "value"));
-                    return editSuccess(ctx.getSource(), "fill.mode", fillMode.name().toLowerCase());
-                })));
-        
-        fill.then(CommandManager.literal("wireThickness")
-            .then(CommandManager.argument("value", FloatArgumentType.floatArg(0.5f, 10f))
-                .executes(ctx -> {
-                    fillWireThickness = FloatArgumentType.getFloat(ctx, "value");
-                    return editSuccess(ctx.getSource(), "fill.wireThickness", fillWireThickness);
-                })));
-        
-        fill.then(CommandManager.literal("doubleSided")
-            .then(CommandManager.literal("true").executes(ctx -> {
-                fillDoubleSided = true;
-                return editSuccess(ctx.getSource(), "fill.doubleSided", true);
-            }))
-            .then(CommandManager.literal("false").executes(ctx -> {
-                fillDoubleSided = false;
-                return editSuccess(ctx.getSource(), "fill.doubleSided", false);
-            })));
-        
-        fill.then(CommandManager.literal("$ref")
-            .then(CommandManager.argument("ref", StringArgumentType.greedyString())
-                .suggests(FILL_REF)
-                .executes(ctx -> loadRef(ctx.getSource(), "fill", StringArgumentType.getString(ctx, "ref")))));
-        
-        edit.then(fill);
-        
-        // ─────────────────────────────────────────────────────────────────────────
-        // VISIBILITY: /fieldtest edit visibility.<param>
-        // ─────────────────────────────────────────────────────────────────────────
-        var visibility = CommandManager.literal("visibility");
-        
-        visibility.then(CommandManager.literal("mask")
-            .then(CommandManager.argument("value", StringArgumentType.word())
-                .suggests(MASK_TYPE_SUGGESTIONS)
-                .executes(ctx -> {
-                    visibilityMask = MaskType.fromId(StringArgumentType.getString(ctx, "value"));
-                    return editSuccess(ctx.getSource(), "visibility.mask", visibilityMask.name().toLowerCase());
-                })));
-        
-        visibility.then(CommandManager.literal("count")
-            .then(CommandManager.argument("value", IntegerArgumentType.integer(1, 64))
-                .executes(ctx -> {
-                    visibilityCount = IntegerArgumentType.getInteger(ctx, "value");
-                    return editSuccess(ctx.getSource(), "visibility.count", visibilityCount);
-                })));
-        
-        visibility.then(CommandManager.literal("thickness")
-            .then(CommandManager.argument("value", FloatArgumentType.floatArg(0f, 1f))
-                .executes(ctx -> {
-                    visibilityThickness = FloatArgumentType.getFloat(ctx, "value");
-                    return editSuccess(ctx.getSource(), "visibility.thickness", visibilityThickness);
-                })));
-        
-        visibility.then(CommandManager.literal("$ref")
-            .then(CommandManager.argument("ref", StringArgumentType.greedyString())
-                .suggests(VISIBILITY_REF)
-                .executes(ctx -> loadRef(ctx.getSource(), "visibility", StringArgumentType.getString(ctx, "ref")))));
-        
-        edit.then(visibility);
-        
-        // ─────────────────────────────────────────────────────────────────────────
-        // APPEARANCE: /fieldtest edit appearance.<param>
-        // ─────────────────────────────────────────────────────────────────────────
-        var appearance = CommandManager.literal("appearance");
-        
-        appearance.then(CommandManager.literal("color")
-            .then(CommandManager.argument("value", StringArgumentType.greedyString())
-                .suggests(COLOR_SUGGESTIONS)
-                .executes(ctx -> {
-                    appearanceColor = StringArgumentType.getString(ctx, "value");
-                    return editSuccess(ctx.getSource(), "appearance.color", appearanceColor);
-                })));
-        
-        appearance.then(CommandManager.literal("alpha")
-            .then(CommandManager.argument("value", FloatArgumentType.floatArg(0f, 1f))
-                .executes(ctx -> {
-                    appearanceAlpha = FloatArgumentType.getFloat(ctx, "value");
-                    return editSuccess(ctx.getSource(), "appearance.alpha", appearanceAlpha);
-                })));
-        
-        appearance.then(CommandManager.literal("glow")
-            .then(CommandManager.argument("value", FloatArgumentType.floatArg(0f, 1f))
-                .executes(ctx -> {
-                    appearanceGlow = FloatArgumentType.getFloat(ctx, "value");
-                    return editSuccess(ctx.getSource(), "appearance.glow", appearanceGlow);
-                })));
-        
-        appearance.then(CommandManager.literal("$ref")
-            .then(CommandManager.argument("ref", StringArgumentType.greedyString())
-                .suggests(APPEARANCE_REF)
-                .executes(ctx -> loadRef(ctx.getSource(), "appearance", StringArgumentType.getString(ctx, "ref")))));
-        
-        edit.then(appearance);
-        
-        // ─────────────────────────────────────────────────────────────────────────
-        // ANIMATION: /fieldtest edit animation.<param>
-        // ─────────────────────────────────────────────────────────────────────────
-        var animation = CommandManager.literal("animation");
-        
-        animation.then(CommandManager.literal("spin")
-            .then(CommandManager.argument("value", FloatArgumentType.floatArg(-1f, 1f))
-                .executes(ctx -> {
-                    animationSpin = FloatArgumentType.getFloat(ctx, "value");
-                    return editSuccess(ctx.getSource(), "animation.spin", animationSpin);
-                })));
-        
-        animation.then(CommandManager.literal("phase")
-            .then(CommandManager.argument("value", FloatArgumentType.floatArg(0f, 1f))
-                .executes(ctx -> {
-                    animationPhase = FloatArgumentType.getFloat(ctx, "value");
-                    return editSuccess(ctx.getSource(), "animation.phase", animationPhase);
-                })));
-        
-        animation.then(CommandManager.literal("$ref")
-            .then(CommandManager.argument("ref", StringArgumentType.greedyString())
-                .suggests(ANIMATION_REF)
-                .executes(ctx -> loadRef(ctx.getSource(), "animation", StringArgumentType.getString(ctx, "ref")))));
-        
-        edit.then(animation);
-        
-        // ─────────────────────────────────────────────────────────────────────────
-        // LAYER & ACTIONS
-        // ─────────────────────────────────────────────────────────────────────────
-        edit.then(CommandManager.literal("layer")
-            .then(CommandManager.argument("index", IntegerArgumentType.integer(0, 10))
-                .executes(ctx -> {
-                    currentLayerIndex = IntegerArgumentType.getInteger(ctx, "index");
-                    CommandFeedback.highlight(ctx.getSource(), "Now editing layer " + currentLayerIndex);
-                    return 1;
-                })));
-        
-        edit.then(CommandManager.literal("reset")
-            .executes(ctx -> {
-                resetEditValues();
-                CommandFeedback.success(ctx.getSource(), "All edit values reset to defaults");
-                return 1;
-            }));
-        
-        edit.then(CommandManager.literal("apply")
-            .executes(ctx -> {
-                if (currentProfile == null) {
-                    CommandFeedback.error(ctx.getSource(), "No test field spawned");
-                    return 0;
-                }
-                syncToClients(ctx.getSource());
-                CommandFeedback.success(ctx.getSource(), "Changes applied to test field");
-                return 1;
-            }));
-        
-        edit.then(CommandManager.literal("status")
-            .executes(ctx -> showEditStatus(ctx.getSource())));
-        
-        return edit;
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // EDIT HELPERS
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    private static int editSuccess(ServerCommandSource source, String param, Object value) {
-        Logging.RENDER.topic("fieldtest").debug("Edit {} → {}", param, value);
-        CommandFeedback.valueSet(source, param, String.valueOf(value));
-        syncToClients(source);
-        return 1;
-    }
-    
-    private static int loadRef(ServerCommandSource source, String category, String ref) {
-        Logging.RENDER.topic("fieldtest").info("Loading {} ref: {}", category, ref);
-        CommandFeedback.info(source, category + " ref loaded: " + ref);
-        // TODO: Parse and apply the ref
-        syncToClients(source);
-        return 1;
-    }
-    
+    @SuppressWarnings("unused") // Kept for reference/debugging
     private static int showEditStatus(ServerCommandSource source) {
-        ReportBuilder.create("Edit Parameters")
+        ReportBuilder.create("FieldTest Static State (Debug)")
             .section("Shape", s -> s
                 .kv("radius", shapeRadius + " blocks")
                 .kv("latSteps", shapeLatSteps)
@@ -697,7 +401,7 @@ public final class FieldTestCommand {
     private static int handleSpawn(ServerCommandSource source, String id) {
         // Clear previous
         if (currentTestFieldId != -1 && source.getEntity() instanceof ServerPlayerEntity player) {
-            FieldManager.get((ServerWorld) player.getWorld()).remove(currentTestFieldId);
+            FieldManager.get(player.getWorld()).remove(currentTestFieldId);
             currentTestFieldId = -1;
         }
         
@@ -726,7 +430,7 @@ public final class FieldTestCommand {
         // Spawn
         if (source.getEntity() instanceof ServerPlayerEntity player) {
             Vec3d pos = player.getPos().add(0, 1.0, 0);
-            var instance = FieldManager.get((ServerWorld) player.getWorld())
+            var instance = FieldManager.get(player.getWorld())
                 .spawnAt(Identifier.of("the-virus-block", def.id()), pos, shapeRadius * transformScale, -1);
             if (instance != null) {
                 currentTestFieldId = instance.id();
@@ -741,7 +445,7 @@ public final class FieldTestCommand {
         return CommandManager.literal("clear")
             .executes(ctx -> {
                 if (currentTestFieldId != -1 && ctx.getSource().getEntity() instanceof ServerPlayerEntity player) {
-                    FieldManager.get((ServerWorld) player.getWorld()).remove(currentTestFieldId);
+                    FieldManager.get(player.getWorld()).remove(currentTestFieldId);
                     currentTestFieldId = -1;
                 }
                 currentProfile = null;
@@ -1099,7 +803,7 @@ public final class FieldTestCommand {
         if (currentTestFieldId == -1) return;
         if (!(source.getEntity() instanceof ServerPlayerEntity player)) return;
         
-        var world = (ServerWorld) player.getWorld();
+        var world = player.getWorld();
         var manager = FieldManager.get(world);
         var instance = manager.getInstance(currentTestFieldId);
         

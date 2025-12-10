@@ -850,6 +850,14 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 ---
 
+### New TODO: GUI Presets
+| ID | Task | Status | Notes |
+|----|------|--------|-------|
+| P2-PRESET-01 | Implement preset registry covering shape, fill, visibility, arrangement, animation, beam, follow/prediction | ⬜ | Client-side preset maps per category; includes defaults |
+| P2-PRESET-02 | Wire preset dropdowns into panels with “Custom” state on edits (Shape, Fill, Visibility, Arrangement, Animation, Beam, Follow/Prediction) | ⬜ | Apply to GuiState; dropdown shows presets + Custom; no separate reset button |
+
+---
+
 ## Status Legend
 
 | Symbol | Meaning |

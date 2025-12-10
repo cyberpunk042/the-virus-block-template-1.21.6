@@ -82,6 +82,91 @@ public record SimplePrimitive(
             arrangement, appearance, newAnimation, link);
     }
     
+    // =========================================================================
+    // Serialization
+    // =========================================================================
+    
+    /**
+     * Parses SimplePrimitive from JSON.
+     * Note: For full parsing with $ref resolution, use FieldLoader.
+     */
+    public static SimplePrimitive fromJson(JsonObject json) {
+        String id = json.has("id") ? json.get("id").getAsString() : "primitive";
+        String type = json.has("type") ? json.get("type").getAsString() : "sphere";
+        
+        // Shape - needs type-specific parsing
+        Shape shape = null;
+        if (json.has("shape") && json.get("shape").isJsonObject()) {
+            JsonObject shapeJson = json.getAsJsonObject("shape");
+            shape = parseShape(type, shapeJson);
+        }
+        if (shape == null) {
+            shape = net.cyberpunk042.visual.shape.SphereShape.builder().radius(1.0f).latSteps(32).lonSteps(64).build();
+        }
+        
+        Transform transform = json.has("transform")
+            ? Transform.fromJson(json.getAsJsonObject("transform"))
+            : Transform.IDENTITY;
+        
+        FillConfig fill = json.has("fill")
+            ? FillConfig.fromJson(json.get("fill"))
+            : FillConfig.SOLID;
+        
+        VisibilityMask visibility = json.has("visibility")
+            ? VisibilityMask.fromJson(json.get("visibility"))
+            : VisibilityMask.FULL;
+        
+        ArrangementConfig arrangement = json.has("arrangement")
+            ? ArrangementConfig.fromJson(json.get("arrangement"))
+            : ArrangementConfig.DEFAULT;
+        
+        Appearance appearance = json.has("appearance")
+            ? Appearance.fromJson(json.getAsJsonObject("appearance"))
+            : Appearance.DEFAULT;
+        
+        Animation animation = json.has("animation")
+            ? Animation.fromJson(json.getAsJsonObject("animation"))
+            : Animation.NONE;
+        
+        PrimitiveLink link = json.has("link")
+            ? PrimitiveLink.fromJson(json.getAsJsonObject("link"))
+            : PrimitiveLink.NONE;
+        
+        return new SimplePrimitive(id, type, shape, transform, fill, visibility, arrangement, appearance, animation, link);
+    }
+    
+    private static Shape parseShape(String type, JsonObject json) {
+        return switch (type.toLowerCase()) {
+            case "sphere" -> net.cyberpunk042.visual.shape.SphereShape.fromJson(json);
+            case "ring" -> net.cyberpunk042.visual.shape.RingShape.builder()
+                .innerRadius(json.has("innerRadius") ? json.get("innerRadius").getAsFloat() : 0.8f)
+                .outerRadius(json.has("outerRadius") ? json.get("outerRadius").getAsFloat() : 1.0f)
+                .segments(json.has("segments") ? json.get("segments").getAsInt() : 32)
+                .build();
+            case "disc" -> net.cyberpunk042.visual.shape.DiscShape.builder()
+                .radius(json.has("radius") ? json.get("radius").getAsFloat() : 1.0f)
+                .segments(json.has("segments") ? json.get("segments").getAsInt() : 32)
+                .build();
+            case "prism" -> net.cyberpunk042.visual.shape.PrismShape.builder()
+                .sides(json.has("sides") ? json.get("sides").getAsInt() : 6)
+                .radius(json.has("radius") ? json.get("radius").getAsFloat() : 1.0f)
+                .height(json.has("height") ? json.get("height").getAsFloat() : 2.0f)
+                .build();
+            case "cylinder" -> net.cyberpunk042.visual.shape.CylinderShape.builder()
+                .radius(json.has("radius") ? json.get("radius").getAsFloat() : 1.0f)
+                .height(json.has("height") ? json.get("height").getAsFloat() : 2.0f)
+                .segments(json.has("segments") ? json.get("segments").getAsInt() : 32)
+                .build();
+            case "polyhedron" -> net.cyberpunk042.visual.shape.PolyhedronShape.builder()
+                .polyType(json.has("polyType") 
+                    ? net.cyberpunk042.visual.shape.PolyType.valueOf(json.get("polyType").getAsString().toUpperCase())
+                    : net.cyberpunk042.visual.shape.PolyType.ICOSAHEDRON)
+                .radius(json.has("radius") ? json.get("radius").getAsFloat() : 1.0f)
+                .build();
+            default -> net.cyberpunk042.visual.shape.SphereShape.builder().radius(1.0f).latSteps(32).lonSteps(64).build();
+        };
+    }
+
     /**
      * Serializes this primitive to JSON.
      */

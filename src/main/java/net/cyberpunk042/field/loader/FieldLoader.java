@@ -253,6 +253,17 @@ public final class FieldLoader {
     }
     
     /**
+     * Static convenience method to parse a FieldDefinition from JSON.
+     * Creates a temporary FieldLoader instance for parsing with $ref resolution.
+     * 
+     * @param json the JSON object to parse
+     * @return parsed FieldDefinition
+     */
+    public static FieldDefinition fromJson(JsonObject json) {
+        return new FieldLoader().parseDefinition(json);
+    }
+    
+    /**
      * Writes a field definition to a file.
      * 
      * @param definition the definition to write

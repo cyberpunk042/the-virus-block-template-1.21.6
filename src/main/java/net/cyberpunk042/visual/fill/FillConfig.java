@@ -111,6 +111,52 @@ public record FillConfig(
     }
     
     // =========================================================================
+    // Serialization
+    // =========================================================================
+    
+    /**
+     * Parses FillConfig from JSON.
+     */
+    public static FillConfig fromJson(com.google.gson.JsonElement json) {
+        // String shorthand: "fill": "WIREFRAME"
+        if (json.isJsonPrimitive()) {
+            String mode = json.getAsString().toUpperCase();
+            return switch (mode) {
+                case "SOLID" -> SOLID;
+                case "WIREFRAME" -> WIREFRAME;
+                case "CAGE" -> SPHERE_CAGE;
+                case "POINTS" -> new FillConfig(FillMode.POINTS, 1.0f, false, true, false, null);
+                default -> SOLID;
+            };
+        }
+        
+        // Full object
+        JsonObject obj = json.getAsJsonObject();
+        Builder builder = builder();
+        
+        if (obj.has("mode")) {
+            try {
+                builder.mode(FillMode.valueOf(obj.get("mode").getAsString().toUpperCase()));
+            } catch (Exception ignored) {}
+        }
+        if (obj.has("wireThickness")) {
+            builder.wireThickness(obj.get("wireThickness").getAsFloat());
+        }
+        if (obj.has("doubleSided")) {
+            builder.doubleSided(obj.get("doubleSided").getAsBoolean());
+        }
+        if (obj.has("depthTest")) {
+            builder.depthTest(obj.get("depthTest").getAsBoolean());
+        }
+        if (obj.has("depthWrite")) {
+            builder.depthWrite(obj.get("depthWrite").getAsBoolean());
+        }
+        // Note: cage parsing would need type info from context
+        
+        return builder.build();
+    }
+    
+    // =========================================================================
     // Builder
     // =========================================================================
     

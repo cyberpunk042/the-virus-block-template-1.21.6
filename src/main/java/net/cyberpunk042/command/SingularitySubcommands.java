@@ -340,7 +340,7 @@ public final class SingularitySubcommands {
             CommandFeedback.error(source, "Unknown sync profile: " + profileId);
             return 0;
         }
-        ServerWorld world = (ServerWorld) target.getWorld();
+        ServerWorld world = target.getWorld();
         VirusWorldState state = VirusWorldState.get(world);
         state.presentationCoord().setCollapseProfile(target, profile);
         CommandFeedback.successBroadcast(source, 
@@ -352,7 +352,7 @@ public final class SingularitySubcommands {
     }
     
     private static int reportCollapseProfile(ServerCommandSource source, ServerPlayerEntity target) {
-        ServerWorld world = (ServerWorld) target.getWorld();
+        ServerWorld world = target.getWorld();
         VirusWorldState state = VirusWorldState.get(world);
         CollapseSyncProfile profile = state.presentationCoord().getCollapseProfile(target);
         CommandFeedback.info(source, target.getName().getString() + " => " + profile.id());

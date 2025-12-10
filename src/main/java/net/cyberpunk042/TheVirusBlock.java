@@ -277,7 +277,7 @@ public class TheVirusBlock implements ModInitializer {
 		if (handler.syncId != payload.syncId()) {
 			return;
 		}
-		ServerWorld world = (ServerWorld) player.getWorld();
+		ServerWorld world = player.getWorld();
 		VirusWorldState state = VirusWorldState.get(world);
 		if (!state.infectionState().infected()) {
 			player.sendMessage(Text.translatable("message.the-virus-block.purification_totem.inactive"), true);
@@ -309,7 +309,7 @@ public class TheVirusBlock implements ModInitializer {
 		if (handler.syncId != payload.syncId()) {
 			return;
 		}
-		ServerWorld world = (ServerWorld) player.getWorld();
+		ServerWorld world = player.getWorld();
 		if (world.getGameRules().getBoolean(VIRUS_DIFFICULTY_LOCKED) && !player.hasPermissionLevel(2)) {
 			player.sendMessage(Text.translatable("message.the-virus-block.difficulty.locked"), true);
 			player.closeHandledScreen();
@@ -325,7 +325,7 @@ public class TheVirusBlock implements ModInitializer {
 	}
 
 	private static void handlePlayerJoin(ServerPlayerEntity player) {
-		ServerWorld world = (ServerWorld) player.getWorld();
+		ServerWorld world = player.getWorld();
 		VirusWorldState state = VirusWorldState.get(world);
 		warnIfInfected(player, state);
 		state.shieldFieldService().sendSnapshots(player);
@@ -352,7 +352,7 @@ public class TheVirusBlock implements ModInitializer {
 		if (player.getCommandTags().contains(STARTER_TOTEM_TAG)) {
 			return;
 		}
-		ServerWorld world = (ServerWorld) player.getWorld();
+		ServerWorld world = player.getWorld();
 		VirusDifficulty difficulty = VirusWorldState.get(world).tiers().difficulty();
 		if (difficulty != VirusDifficulty.EASY && difficulty != VirusDifficulty.MEDIUM) {
 			return;
@@ -366,7 +366,7 @@ public class TheVirusBlock implements ModInitializer {
 	}
 
 	private static void maybePromptDifficulty(ServerPlayerEntity player) {
-		ServerWorld world = (ServerWorld) player.getWorld();
+		ServerWorld world = player.getWorld();
 		VirusWorldState state = VirusWorldState.get(world);
 		if (state.tiers().hasShownDifficultyPrompt()) {
 			return;
@@ -401,7 +401,7 @@ public class TheVirusBlock implements ModInitializer {
 	}
 
 	private static void ensureFastFlight(ServerPlayerEntity player) {
-		ServerWorld world = (ServerWorld) player.getWorld();
+		ServerWorld world = player.getWorld();
 		if (!world.getGameRules().getBoolean(VIRUS_ALLOW_FAST_FLIGHT)) {
 			return;
 		}

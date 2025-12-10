@@ -39,34 +39,38 @@ public record VisibilityMask(
     @Range(ValueRange.STEPS) int count,
     @Range(ValueRange.POSITIVE) float thickness,
     
-    // Phase 2 fields (future)
+    // Phase 2 fields
     @Range(ValueRange.NORMALIZED) float offset,
     boolean invert,
     @Range(ValueRange.NORMALIZED) float feather,
     boolean animate,
     @Range(ValueRange.POSITIVE) float animSpeed,
     
-    // Gradient options (future)
+    // Gradient options
     @Nullable String direction,
     float falloff,
     float gradientStart,
-    float gradientEnd
+    float gradientEnd,
+    
+    // Radial options
+    @Range(ValueRange.NORMALIZED) float centerX,
+    @Range(ValueRange.NORMALIZED) float centerY
 ) {
     /** Full visibility (no masking). */
     public static final VisibilityMask FULL = new VisibilityMask(
-        MaskType.FULL, 1, 1.0f, 0, false, 0, false, 0, null, 0, 0, 1);
+        MaskType.FULL, 1, 1.0f, 0, false, 0, false, 0, null, 0, 0, 1, 0.5f, 0.5f);
     
     /** Default band mask (4 bands, 50% thickness). */
     public static final VisibilityMask BANDS = new VisibilityMask(
-        MaskType.BANDS, 4, 0.5f, 0, false, 0, false, 0, null, 0, 0, 1);
+        MaskType.BANDS, 4, 0.5f, 0, false, 0, false, 0, null, 0, 0, 1, 0.5f, 0.5f);
     
     /** Default stripe mask (8 stripes, 50% thickness). */
     public static final VisibilityMask STRIPES = new VisibilityMask(
-        MaskType.STRIPES, 8, 0.5f, 0, false, 0, false, 0, null, 0, 0, 1);
+        MaskType.STRIPES, 8, 0.5f, 0, false, 0, false, 0, null, 0, 0, 1, 0.5f, 0.5f);
     
     /** Default checker mask (4x4 grid). */
     public static final VisibilityMask CHECKER = new VisibilityMask(
-        MaskType.CHECKER, 4, 0.5f, 0, false, 0, false, 0, null, 0, 0, 1);
+        MaskType.CHECKER, 4, 0.5f, 0, false, 0, false, 0, null, 0, 0, 1, 0.5f, 0.5f);
     
     // =========================================================================
     // Factory Methods
@@ -140,8 +144,13 @@ public record VisibilityMask(
             }
             
             case RADIAL -> {
-                // Radial segments based on u (angle)
-                float segmentPos = (adjustedU * count) % 1.0f;
+                // Radial pattern from center point
+                float dx = adjustedU - centerX;
+                float dy = adjustedV - centerY;
+                float dist = (float) Math.sqrt(dx * dx + dy * dy);
+                float angle = (float) Math.atan2(dy, dx);
+                float normalizedAngle = (angle + (float) Math.PI) / (2 * (float) Math.PI);
+                float segmentPos = (normalizedAngle * count) % 1.0f;
                 yield segmentPos < thickness;
             }
             
@@ -161,6 +170,45 @@ public record VisibilityMask(
     // Builder
     // =========================================================================
     
+    // =========================================================================
+    // Serialization
+    // =========================================================================
+    
+    /**
+     * Parses VisibilityMask from JSON.
+     */
+    public static VisibilityMask fromJson(com.google.gson.JsonElement json) {
+        // String shorthand: "visibility": "BANDS"
+        if (json.isJsonPrimitive()) {
+            try {
+                MaskType mask = MaskType.valueOf(json.getAsString().toUpperCase());
+                return builder().mask(mask).build();
+            } catch (Exception e) {
+                return FULL;
+            }
+        }
+        
+        // Full object
+        JsonObject obj = json.getAsJsonObject();
+        Builder builder = builder();
+        
+        if (obj.has("mask")) {
+            try {
+                builder.mask(MaskType.valueOf(obj.get("mask").getAsString().toUpperCase()));
+            } catch (Exception ignored) {}
+        }
+        if (obj.has("count")) builder.count(obj.get("count").getAsInt());
+        if (obj.has("thickness")) builder.thickness(obj.get("thickness").getAsFloat());
+        if (obj.has("offset")) builder.offset(obj.get("offset").getAsFloat());
+        if (obj.has("invert")) builder.invert(obj.get("invert").getAsBoolean());
+        if (obj.has("animate")) builder.animate(obj.get("animate").getAsBoolean());
+        if (obj.has("animSpeed")) builder.animSpeed(obj.get("animSpeed").getAsFloat());
+        if (obj.has("centerX")) builder.centerX(obj.get("centerX").getAsFloat());
+        if (obj.has("centerY")) builder.centerY(obj.get("centerY").getAsFloat());
+        
+        return builder.build();
+    }
+
     public static Builder builder() { return new Builder(); }
     /**
      * Serializes this visibility mask to JSON.
@@ -179,6 +227,8 @@ public record VisibilityMask(
         if (falloff != 0) json.addProperty("falloff", falloff);
         if (gradientStart != 0) json.addProperty("gradientStart", gradientStart);
         if (gradientEnd != 1) json.addProperty("gradientEnd", gradientEnd);
+        if (centerX != 0.5f) json.addProperty("centerX", centerX);
+        if (centerY != 0.5f) json.addProperty("centerY", centerY);
         return json;
     }
 
@@ -197,6 +247,8 @@ public record VisibilityMask(
         private float falloff = 0;
         private float gradientStart = 0;
         private float gradientEnd = 1;
+        private @Range(ValueRange.NORMALIZED) float centerX = 0.5f;
+        private @Range(ValueRange.NORMALIZED) float centerY = 0.5f;
         
         public Builder mask(MaskType m) { this.mask = m; return this; }
         public Builder count(int c) { this.count = c; return this; }
@@ -210,10 +262,13 @@ public record VisibilityMask(
         public Builder falloff(float f) { this.falloff = f; return this; }
         public Builder gradientStart(float s) { this.gradientStart = s; return this; }
         public Builder gradientEnd(float e) { this.gradientEnd = e; return this; }
+        public Builder centerX(float x) { this.centerX = x; return this; }
+        public Builder centerY(float y) { this.centerY = y; return this; }
         
         public VisibilityMask build() {
             return new VisibilityMask(mask, count, thickness, offset, invert, 
-                feather, animate, animSpeed, direction, falloff, gradientStart, gradientEnd);
+                feather, animate, animSpeed, direction, falloff, gradientStart, gradientEnd,
+                centerX, centerY);
         }
     }
 }

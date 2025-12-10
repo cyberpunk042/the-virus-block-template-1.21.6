@@ -1,9 +1,11 @@
 package net.cyberpunk042.client.field.render;
 
+import net.cyberpunk042.client.visual.animation.AnimationApplier;
 import net.cyberpunk042.client.visual.mesh.Mesh;
 import net.cyberpunk042.client.visual.mesh.Vertex;
 import net.cyberpunk042.client.visual.render.VertexEmitter;
 import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.visual.animation.Animation;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import net.cyberpunk042.visual.appearance.Appearance;
@@ -51,18 +53,23 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
             return;
         }
         
-        // === PHASE 2: Resolve Color ===
-        int color = resolveColor(primitive, resolver, overrides);
+        // === PHASE 2: Resolve Color (includes animation effects) ===
+        int color = resolveColor(primitive, resolver, overrides, time);
         
-        // === PHASE 3: Emit Based on Fill Mode ===
+        // === PHASE 3: Get Wave Config for Vertex Displacement ===
+        Animation animation = primitive.animation();
+        net.cyberpunk042.visual.animation.WaveConfig waveConfig = 
+            (animation != null && animation.hasWave()) ? animation.wave() : null;
+        
+        // === PHASE 4: Emit Based on Fill Mode ===
         FillConfig fill = primitive.fill();
         FillMode mode = fill != null ? fill.mode() : FillMode.SOLID;
         
         switch (mode) {
-            case SOLID -> emitSolid(matrices, consumer, mesh, color, light);
-            case WIREFRAME -> emitWireframe(matrices, consumer, mesh, color, light, fill);
-            case CAGE -> emitCage(matrices, consumer, mesh, color, light, fill, primitive);
-            case POINTS -> emitPoints(matrices, consumer, mesh, color, light);
+            case SOLID -> emitSolid(matrices, consumer, mesh, color, light, waveConfig, time);
+            case WIREFRAME -> emitWireframe(matrices, consumer, mesh, color, light, fill, waveConfig, time);
+            case CAGE -> emitCage(matrices, consumer, mesh, color, light, fill, primitive, waveConfig, time);
+            case POINTS -> emitPoints(matrices, consumer, mesh, color, light, waveConfig, time);
         }
         
         Logging.FIELD.topic("render").trace(
@@ -87,36 +94,61 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
     // =========================================================================
     
     /**
-     * Resolves the render color from appearance and overrides.
+     * Resolves the render color from appearance, animation, and overrides.
+     * 
+     * <p>Color resolution priority:
+     * <ol>
+     *   <li>Override color (from RenderOverrides)</li>
+     *   <li>Animation color cycle (if active)</li>
+     *   <li>Appearance color reference (resolved via ColorResolver)</li>
+     *   <li>Direct hex color in appearance</li>
+     *   <li>Default white</li>
+     * </ol>
      */
-    protected int resolveColor(Primitive primitive, ColorResolver resolver, RenderOverrides overrides) {
-        // Check for color override
+    protected int resolveColor(Primitive primitive, ColorResolver resolver, RenderOverrides overrides, float time) {
+        // Check for color override first
         if (overrides != null && overrides.colorOverride() != null) {
             return overrides.colorOverride();
         }
         
-        Appearance appearance = primitive.appearance();
-        if (appearance == null) {
-            return 0xFFFFFFFF; // Default white
-        }
-        
-        // Resolve color reference (e.g., "primary" → actual color)
-        String colorRef = appearance.color();
         int baseColor;
         
-        if (colorRef != null && resolver != null) {
-            baseColor = resolver.resolve(colorRef);
-        } else if (colorRef != null && colorRef.startsWith("#")) {
-            // Direct hex color
-            baseColor = parseHexColor(colorRef);
-        } else if (colorRef != null && colorRef.startsWith("0x")) {
-            baseColor = Integer.parseUnsignedInt(colorRef.substring(2), 16);
+        // Check for animation color cycle - uses ColorHelper.lerp for smooth blending
+        Animation animation = primitive.animation();
+        if (animation != null && animation.hasColorCycle()) {
+            baseColor = AnimationApplier.getColorCycle(animation.colorCycle(), time);
         } else {
-            baseColor = 0xFFFFFFFF;
+            // Normal color resolution from appearance
+            Appearance appearance = primitive.appearance();
+            if (appearance == null) {
+                return 0xFFFFFFFF; // Default white
+            }
+            
+            // Resolve color reference (e.g., "primary" → actual color)
+            String colorRef = appearance.color();
+            
+            if (colorRef != null && resolver != null) {
+                baseColor = resolver.resolve(colorRef);
+            } else if (colorRef != null && colorRef.startsWith("#")) {
+                // Direct hex color
+                baseColor = parseHexColor(colorRef);
+            } else if (colorRef != null && colorRef.startsWith("0x")) {
+                baseColor = Integer.parseUnsignedInt(colorRef.substring(2), 16);
+            } else {
+                baseColor = 0xFFFFFFFF;
+            }
         }
         
         // Apply alpha from appearance (AlphaRange - use max value)
-        float alpha = appearance.alpha() != null ? appearance.alpha().max() : 1.0f;
+        Appearance appearance = primitive.appearance();
+        float alpha = (appearance != null && appearance.alpha() != null) 
+            ? appearance.alpha().max() : 1.0f;
+        
+        // Apply alpha pulse animation
+        if (animation != null && animation.hasAlphaPulse()) {
+            alpha *= AnimationApplier.getAlphaPulse(animation.alphaPulse(), time);
+        }
+        
         if (overrides != null) {
             alpha *= overrides.alphaMultiplier();
         }
@@ -124,6 +156,14 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
         // Combine base color with alpha
         int a = (int) (alpha * 255) & 0xFF;
         return (baseColor & 0x00FFFFFF) | (a << 24);
+    }
+    
+    /**
+     * @deprecated Use {@link #resolveColor(Primitive, ColorResolver, RenderOverrides, float)} instead
+     */
+    @Deprecated
+    protected int resolveColor(Primitive primitive, ColorResolver resolver, RenderOverrides overrides) {
+        return resolveColor(primitive, resolver, overrides, 0f);
     }
     
     /**
@@ -152,22 +192,38 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
     // =========================================================================
     
     /**
-     * Emits mesh as solid triangles/quads.
+     * Emits mesh as solid triangles/quads with optional wave animation.
+     * 
+     * @param matrices Transform stack
+     * @param consumer Vertex output
+     * @param mesh Source mesh
+     * @param color ARGB color
+     * @param light Light level
+     * @param waveConfig Wave animation config (null for no wave)
+     * @param time Current time for wave animation
      */
     protected void emitSolid(
             MatrixStack matrices,
             VertexConsumer consumer,
             Mesh mesh,
             int color,
-            int light) {
+            int light,
+            net.cyberpunk042.visual.animation.WaveConfig waveConfig,
+            float time) {
         
         VertexEmitter emitter = new VertexEmitter(matrices, consumer);
         emitter.color(color).light(light);
+        
+        // Apply wave animation if configured
+        if (waveConfig != null && waveConfig.isActive()) {
+            emitter.wave(waveConfig, time);
+        }
+        
         emitter.emit(mesh);
     }
     
     /**
-     * Emits mesh as wireframe lines.
+     * Emits mesh as wireframe lines with optional wave animation.
      */
     protected void emitWireframe(
             MatrixStack matrices,
@@ -175,11 +231,21 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
             Mesh mesh,
             int color,
             int light,
-            FillConfig fill) {
+            FillConfig fill,
+            net.cyberpunk042.visual.animation.WaveConfig waveConfig,
+            float time) {
         
         float thickness = fill != null ? fill.wireThickness() : 1.0f;
-        VertexEmitter.emitWireframe(
-            matrices.peek(), consumer, mesh, color, thickness, light);
+        
+        // For wireframe with wave, we need instance-based emitter
+        if (waveConfig != null && waveConfig.isActive()) {
+            VertexEmitter emitter = new VertexEmitter(matrices, consumer);
+            emitter.color(color).light(light).wave(waveConfig, time);
+            emitter.emitWireframe(mesh, thickness);
+        } else {
+            VertexEmitter.emitWireframe(
+                matrices.peek(), consumer, mesh, color, thickness, light);
+        }
     }
     
     /**
@@ -193,15 +259,17 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
             int color,
             int light,
             FillConfig fill,
-            Primitive primitive) {
+            Primitive primitive,
+            net.cyberpunk042.visual.animation.WaveConfig waveConfig,
+            float time) {
         
         // Default: same as wireframe
         // Subclasses can override for shape-specific cage rendering
-        emitWireframe(matrices, consumer, mesh, color, light, fill);
+        emitWireframe(matrices, consumer, mesh, color, light, fill, waveConfig, time);
     }
     
     /**
-     * Emits mesh vertices as points using tiny billboarded quads.
+     * Emits mesh vertices as points using tiny billboarded quads with optional wave animation.
      * 
      * <p>Minecraft/OpenGL doesn't support GL_POINTS natively for our use case,
      * so we fake it with tiny camera-facing quads (2 triangles each).
@@ -211,19 +279,8 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
      * @param mesh Source mesh (only vertices used)
      * @param color ARGB color
      * @param light Light value
-     * @param pointSize Size of each point quad (default 0.02)
-     */
-    protected void emitPoints(
-            MatrixStack matrices,
-            VertexConsumer consumer,
-            Mesh mesh,
-            int color,
-            int light) {
-        emitPoints(matrices, consumer, mesh, color, light, 0.02f);
-    }
-    
-    /**
-     * Emits mesh vertices as points with configurable size.
+     * @param waveConfig Wave animation config (null for no wave)
+     * @param time Current time for wave animation
      */
     protected void emitPoints(
             MatrixStack matrices,
@@ -231,7 +288,23 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
             Mesh mesh,
             int color,
             int light,
-            float pointSize) {
+            net.cyberpunk042.visual.animation.WaveConfig waveConfig,
+            float time) {
+        emitPoints(matrices, consumer, mesh, color, light, 0.02f, waveConfig, time);
+    }
+    
+    /**
+     * Emits mesh vertices as points with configurable size and optional wave animation.
+     */
+    protected void emitPoints(
+            MatrixStack matrices,
+            VertexConsumer consumer,
+            Mesh mesh,
+            int color,
+            int light,
+            float pointSize,
+            net.cyberpunk042.visual.animation.WaveConfig waveConfig,
+            float time) {
         
         if (mesh.vertices().isEmpty()) return;
         
@@ -245,12 +318,21 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
         int b = color & 0xFF;
         
         float half = pointSize / 2f;
+        boolean hasWave = waveConfig != null && waveConfig.isActive();
         
         // For each vertex, emit a tiny billboarded quad
         for (Vertex v : mesh.vertices()) {
             float x = v.x();
             float y = v.y();
             float z = v.z();
+            
+            // Apply wave displacement if configured
+            if (hasWave) {
+                float[] displaced = AnimationApplier.applyWaveToVertex(waveConfig, x, y, z, time);
+                x = displaced[0];
+                y = displaced[1];
+                z = displaced[2];
+            }
             
             // Create a camera-facing quad (billboard)
             // Using XY plane offset - will be approximately billboarded for most views

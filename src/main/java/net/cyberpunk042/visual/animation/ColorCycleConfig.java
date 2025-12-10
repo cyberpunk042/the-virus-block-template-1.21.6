@@ -3,6 +3,8 @@ package net.cyberpunk042.visual.animation;
 import com.google.gson.JsonObject;
 import org.jetbrains.annotations.Nullable;
 import java.util.List;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
 import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
 
@@ -21,9 +23,9 @@ import net.cyberpunk042.visual.validation.ValueRange;
  * @see Animation
  */
 public record ColorCycleConfig(
-    @Nullable List<String> colors,
+    @JsonField(skipIfEmpty = true) @Nullable List<String> colors,
     @Range(ValueRange.POSITIVE) float speed,
-    boolean blend
+    @JsonField(skipIfDefault = true, defaultValue = "true") boolean blend
 ) {
     /**
      * Parses ColorCycleConfig from JSON.
@@ -88,17 +90,7 @@ public record ColorCycleConfig(
      * Serializes this color cycle config to JSON.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        if (colors != null && !colors.isEmpty()) {
-            com.google.gson.JsonArray colorsArr = new com.google.gson.JsonArray();
-            for (String color : colors) {
-                colorsArr.add(color);
-            }
-            json.add("colors", colorsArr);
-        }
-        json.addProperty("speed", speed);
-        if (!blend) json.addProperty("blend", false);
-        return json;
+        return JsonSerializer.toJson(this);
     }
     
     // =========================================================================

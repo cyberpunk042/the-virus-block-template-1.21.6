@@ -1,6 +1,6 @@
 package net.cyberpunk042.client.gui.panel;
 
-import net.cyberpunk042.client.gui.state.GuiState;
+import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.GuiWidgets;
 import net.cyberpunk042.client.gui.widget.ConfirmDialog;
@@ -9,6 +9,8 @@ import net.cyberpunk042.log.Logging;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.client.gui.widget.CyclingButtonWidget;
+import net.cyberpunk042.client.gui.widget.LabeledSlider;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,7 +26,7 @@ import java.util.List;
  *   <li>Reorder layers (move up/down)</li>
  * </ul>
  * 
- * @see GuiState#getSelectedLayerIndex()
+ * @see FieldEditState#getSelectedLayerIndex()
  */
 public class LayerPanel extends AbstractPanel {
     
@@ -40,10 +42,22 @@ public class LayerPanel extends AbstractPanel {
     private ButtonWidget moveUpBtn;
     private ButtonWidget moveDownBtn;
     
+    // G-LAYER: Layer settings
+    private CyclingButtonWidget<BlendMode> blendModeDropdown;
+    private LabeledSlider alphaSlider;
+    
+    public enum BlendMode {
+        NORMAL("Normal"), ADD("Additive"), MULTIPLY("Multiply"), SCREEN("Screen");
+        private final String label;
+        BlendMode(String label) { this.label = label; }
+        @Override public String toString() { return label; }
+    }
+    
     // Layout
     private int startY;
+    private Runnable onLayerChanged;
     
-    public LayerPanel(Screen parent, GuiState state, int startY) {
+    public LayerPanel(Screen parent, FieldEditState state, int startY) {
         super(parent, state);
         this.startY = startY;
         Logging.GUI.topic("panel").debug("LayerPanel created");
@@ -84,9 +98,42 @@ public class LayerPanel extends AbstractPanel {
         moveUpBtn = GuiWidgets.button(x + (smallBtn + 2) * 3, y, smallBtn, "▲", "Move layer up", this::moveLayerUp);
         moveDownBtn = GuiWidgets.button(x + (smallBtn + 2) * 4, y, smallBtn, "▼", "Move layer down", this::moveLayerDown);
         
+        y += buttonSize + GuiConstants.PADDING;
+        
+        // G-LAYER: Blend mode and alpha
+        int halfW = (panelWidth - 2 * GuiConstants.PADDING - 4) / 2;
+        blendModeDropdown = GuiWidgets.enumDropdown(
+            x, y, halfW, "Blend", BlendMode.class, BlendMode.NORMAL,
+            "Layer blend mode",
+            v -> state.setLayerBlendMode(state.getSelectedLayerIndex(), v.name())
+        );
+        updateBlendModeDropdown();
+        
+        alphaSlider = LabeledSlider.builder("Alpha")
+            .position(x + halfW + 4, y).width(halfW)
+            .range(0f, 1f).initial(state.getLayerAlpha(state.getSelectedLayerIndex())).format("%.2f")
+            .onChange(v -> state.setLayerAlpha(state.getSelectedLayerIndex(), v))
+            .build();
+        
         updateButtonStates();
         
         Logging.GUI.topic("panel").debug("LayerPanel initialized");
+    }
+    
+    private void updateBlendModeDropdown() {
+        if (blendModeDropdown != null) {
+            try {
+                blendModeDropdown.setValue(BlendMode.valueOf(state.getLayerBlendMode(state.getSelectedLayerIndex())));
+            } catch (IllegalArgumentException ignored) {
+                blendModeDropdown.setValue(BlendMode.NORMAL);
+            }
+        }
+    }
+    
+    private void updateAlphaSlider() {
+        if (alphaSlider != null) {
+            alphaSlider.setValue(state.getLayerAlpha(state.getSelectedLayerIndex()));
+        }
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -97,9 +144,11 @@ public class LayerPanel extends AbstractPanel {
         int current = state.getSelectedLayerIndex();
         if (current > 0) {
             state.setSelectedLayerIndex(current - 1);
+            refreshLayerControls();
             updateLayerIndicator();
             updateButtonStates();
             Logging.GUI.topic("layer").debug("Selected layer: {}", current - 1);
+            notifyLayerChanged();
         }
     }
     
@@ -108,9 +157,11 @@ public class LayerPanel extends AbstractPanel {
         int total = state.getLayerCount();
         if (current < total - 1) {
             state.setSelectedLayerIndex(current + 1);
+            refreshLayerControls();
             updateLayerIndicator();
             updateButtonStates();
             Logging.GUI.topic("layer").debug("Selected layer: {}", current + 1);
+            notifyLayerChanged();
         }
     }
     
@@ -122,10 +173,12 @@ public class LayerPanel extends AbstractPanel {
         int newIndex = state.addLayer();
         if (newIndex >= 0) {
             state.setSelectedLayerIndex(newIndex);
+            refreshLayerControls();
             updateLayerIndicator();
             updateButtonStates();
             ToastNotification.success("Layer added");
             Logging.GUI.topic("layer").info("Added layer at index {}", newIndex);
+            notifyLayerChanged();
         } else {
             ToastNotification.warning("Max layers reached");
         }
@@ -154,10 +207,12 @@ public class LayerPanel extends AbstractPanel {
             if (state.getSelectedLayerIndex() >= state.getLayerCount()) {
                 state.setSelectedLayerIndex(state.getLayerCount() - 1);
             }
+            refreshLayerControls();
             updateLayerIndicator();
             updateButtonStates();
             ToastNotification.info("Layer removed");
             Logging.GUI.topic("layer").info("Removed layer {}", removed);
+            notifyLayerChanged();
         }
     }
     
@@ -184,9 +239,11 @@ public class LayerPanel extends AbstractPanel {
         int index = state.getSelectedLayerIndex();
         if (index > 0 && state.swapLayers(index, index - 1)) {
             state.setSelectedLayerIndex(index - 1);
+            refreshLayerControls();
             updateLayerIndicator();
             updateButtonStates();
             Logging.GUI.topic("layer").debug("Moved layer {} up", index);
+            notifyLayerChanged();
         }
     }
     
@@ -194,9 +251,11 @@ public class LayerPanel extends AbstractPanel {
         int index = state.getSelectedLayerIndex();
         if (index < state.getLayerCount() - 1 && state.swapLayers(index, index + 1)) {
             state.setSelectedLayerIndex(index + 1);
+            refreshLayerControls();
             updateLayerIndicator();
             updateButtonStates();
             Logging.GUI.topic("layer").debug("Moved layer {} down", index);
+            notifyLayerChanged();
         }
     }
     
@@ -227,6 +286,16 @@ public class LayerPanel extends AbstractPanel {
             visibilityBtn.setMessage(net.minecraft.text.Text.literal(getVisibilityIcon()));
         }
     }
+
+    public void setOnLayerChanged(Runnable onLayerChanged) {
+        this.onLayerChanged = onLayerChanged;
+    }
+
+    private void notifyLayerChanged() {
+        if (onLayerChanged != null) {
+            onLayerChanged.run();
+        }
+    }
     
     @Override
     public void tick() {
@@ -254,6 +323,8 @@ public class LayerPanel extends AbstractPanel {
         if (visibilityBtn != null) visibilityBtn.render(context, mouseX, mouseY, delta);
         if (moveUpBtn != null) moveUpBtn.render(context, mouseX, mouseY, delta);
         if (moveDownBtn != null) moveDownBtn.render(context, mouseX, mouseY, delta);
+        if (blendModeDropdown != null) blendModeDropdown.render(context, mouseX, mouseY, delta);
+        if (alphaSlider != null) alphaSlider.render(context, mouseX, mouseY, delta);
     }
     
     /**
@@ -269,13 +340,23 @@ public class LayerPanel extends AbstractPanel {
         if (visibilityBtn != null) list.add(visibilityBtn);
         if (moveUpBtn != null) list.add(moveUpBtn);
         if (moveDownBtn != null) list.add(moveDownBtn);
+        if (blendModeDropdown != null) list.add(blendModeDropdown);
+        if (alphaSlider != null) list.add(alphaSlider);
         return list;
+    }
+    
+    /**
+     * Called when layer selection changes to update blend mode/alpha controls.
+     */
+    public void refreshLayerControls() {
+        updateBlendModeDropdown();
+        updateAlphaSlider();
     }
     
     /**
      * Gets the total height of this panel.
      */
     public int getHeight() {
-        return (GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING) * 2 + 12; // header
+        return (GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING) * 3 + 12; // header + 3 rows
     }
 }

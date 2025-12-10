@@ -65,7 +65,7 @@ public final class VirusDifficultyCommand {
     }
 
     public static boolean openMenuFor(ServerPlayerEntity player) {
-        ServerWorld world = (ServerWorld) player.getWorld();
+        ServerWorld world = player.getWorld();
         boolean locked = world.getGameRules().getBoolean(TheVirusBlock.VIRUS_DIFFICULTY_LOCKED);
         if (locked && !player.hasPermissionLevel(2)) {
             player.sendMessage(Text.translatable("message.the-virus-block.difficulty.locked"), true);

@@ -1,7 +1,7 @@
 # Complete Parameter Inventory
 
 > **Purpose:** Every configurable parameter at every level  
-> **Status:** ✅ Updated - verified against code (Dec 8, 2024)  
+> **Status:** ✅ Updated - verified against code (Dec 9, 2024)  
 > **Created:** December 7, 2024
 
 ---
@@ -36,8 +36,8 @@
 | `tilt` | float | 0.0 | ✅ | Global tilt angle |
 | `swirl` | float | 0.0 | ✅ | Swirl effect strength |
 | `pulsing` | float | 0.0 | ⚠️ | Global pulse (verify used) |
-| `bobbing` | float | 0.0 | ❌ | Vertical bob animation |
-| `breathing` | float | 0.0 | ❌ | Scale breathing effect |
+| `bobbing` | float | 0.0 | ✅ | Vertical bob animation |
+| `breathing` | float | 0.0 | ✅ | Scale breathing effect |
 
 ### Prediction Block (Personal Fields)
 
@@ -57,9 +57,9 @@
 | `innerRadius` | float | 0.05 | ✅ | Inner beam radius |
 | `outerRadius` | float | 0.1 | ✅ | Outer beam radius |
 | `color` | string | "@beam" | ✅ | Beam color |
-| `height` | float | auto | ❌ | Beam height (currently auto) |
-| `glow` | float | 0.5 | ❌ | Beam glow intensity |
-| `pulse` | float | 0.0 | ❌ | Beam pulse animation |
+| `height` | float | 3.0 | ✅ | Beam height |
+| `glow` | float | 0.5 | ✅ | Beam glow intensity |
+| `pulse` | object | null | ✅ | Beam pulse config |
 
 ### Follow Mode (Personal Fields)
 
@@ -67,7 +67,7 @@
 |-----------|------|---------|--------|-------|
 | `followMode.enabled` | boolean | true | ✅ | false = static field |
 | `followMode.mode` | enum | SMOOTH | ✅ | SNAP, SMOOTH, GLIDE |
-| `followMode.playerOverride` | boolean | true | ❌ | Player can change in GUI |
+| `followMode.playerOverride` | boolean | true | ✅ | Player can change in GUI |
 
 ---
 
@@ -83,10 +83,10 @@
 | `tilt` | float | 0.0 | ✅ | Layer tilt angle |
 | `pulse` | float | 0.0 | ✅ | Layer pulse |
 | `phaseOffset` | float | 0.0 | ✅ | Animation phase offset |
-| `rotation` | Vec3 | (0,0,0) | ❌ | Static rotation (for mirror layers) |
+| `rotation` | Vec3 | (0,0,0) | ✅ | Static rotation (via Transform) |
 | `visible` | boolean | true | ✅ | Layer visibility toggle |
 | `blendMode` | enum | NORMAL | ✅ | NORMAL, ADD (Phase 1); MULTIPLY, SCREEN (Phase 2, custom shaders) |
-| `order` | int | auto | ❌ | Render order |
+| `order` | int | auto | ✅ | Render order |
 
 ---
 
@@ -122,7 +122,7 @@
 | `algorithm` | enum | LAT_LON | - | ✅ | LAT_LON, TYPE_A, TYPE_E |
 | `lonStart` | float | 0.0 | 0-1 | ✅ | Start longitude (partial sphere) |
 | `lonEnd` | float | 1.0 | 0-1 | ✅ | End longitude |
-| `subdivisions` | int | 0 | 0-5 | ❌ | Icosphere subdivisions (for TYPE_E) |
+| `subdivisions` | int | 0 | 0-5 | ✅ | Icosphere subdivisions (for TYPE_E) |
 | `uvScale` | Vec2 | (1,1) | - | 🔮 | UV texture scaling |
 
 ### 4.2 Ring Shape
@@ -133,10 +133,10 @@
 | `outerRadius` | float | 1.0 | 0-∞ | ✅ | Outer ring radius |
 | `segments` | int | 64 | 3-1024 | ✅ | Segment count |
 | `y` | float | 0.0 | -∞-∞ | ✅ | Y position |
-| `arcStart` | float | 0.0 | 0-360 | ❌ | Arc start angle (degrees) |
-| `arcEnd` | float | 360.0 | 0-360 | ❌ | Arc end angle |
-| `height` | float | 0.0 | 0-∞ | ❌ | Ring height (3D ring) |
-| `twist` | float | 0.0 | -∞-∞ | ❌ | Twist along arc |
+| `arcStart` | float | 0.0 | 0-360 | ✅ | Arc start angle (degrees) |
+| `arcEnd` | float | 360.0 | 0-360 | ✅ | Arc end angle |
+| `height` | float | 0.0 | 0-∞ | ✅ | Ring height (3D ring) |
+| `twist` | float | 0.0 | -∞-∞ | ✅ | Twist along arc |
 
 ### 4.3 Disc Shape
 
@@ -145,10 +145,10 @@
 | `radius` | float | 1.0 | 0.01-∞ | ✅ | Disc radius |
 | `segments` | int | 64 | 3-1024 | ✅ | Segment count |
 | `y` | float | 0.0 | -∞-∞ | ✅ | Y position |
-| `arcStart` | float | 0.0 | 0-360 | ❌ | Arc start (pac-man) |
-| `arcEnd` | float | 360.0 | 0-360 | ❌ | Arc end |
-| `innerRadius` | float | 0.0 | 0-∞ | ❌ | Inner cutout (makes ring-like) |
-| `rings` | int | 1 | 1-100 | ❌ | Concentric ring divisions |
+| `arcStart` | float | 0.0 | 0-360 | ✅ | Arc start (pac-man) |
+| `arcEnd` | float | 360.0 | 0-360 | ✅ | Arc end |
+| `innerRadius` | float | 0.0 | 0-∞ | ✅ | Inner cutout (makes ring-like) |
+| `rings` | int | 1 | 1-100 | ✅ | Concentric ring divisions |
 
 ### 4.4 Prism Shape
 
@@ -157,11 +157,11 @@
 | `sides` | int | 6 | 3-64 | ✅ | Number of sides |
 | `radius` | float | 1.0 | 0.01-∞ | ✅ | Prism radius |
 | `height` | float | 1.0 | 0.01-∞ | ✅ | Prism height |
-| `topRadius` | float | same | 0-∞ | ❌ | Top radius (for tapered) |
-| `twist` | float | 0.0 | -360-360 | ❌ | Twist along height |
-| `heightSegments` | int | 1 | 1-100 | ❌ | Vertical divisions |
-| `capTop` | boolean | true | - | ❌ | Render top cap |
-| `capBottom` | boolean | true | - | ❌ | Render bottom cap |
+| `topRadius` | float | same | 0-∞ | ✅ | Top radius (for tapered) |
+| `twist` | float | 0.0 | -360-360 | ✅ | Twist along height |
+| `heightSegments` | int | 1 | 1-100 | ✅ | Vertical divisions |
+| `capTop` | boolean | true | - | ✅ | Render top cap |
+| `capBottom` | boolean | true | - | ✅ | Render bottom cap |
 
 ### 4.5 Polyhedron Shape
 
@@ -169,7 +169,7 @@
 |-----------|------|---------|-------|--------|-------|
 | `polyType` | enum | CUBE | - | ✅ | CUBE, OCTAHEDRON, ICOSAHEDRON, DODECAHEDRON, TETRAHEDRON |
 | `radius` | float | 1.0 | 0.01-∞ | ✅ | Circumscribed radius |
-| `subdivisions` | int | 0 | 0-5 | ❌ | Subdivision level |
+| `subdivisions` | int | 0 | 0-5 | ✅ | Subdivision level |
 | `dualMode` | boolean | false | - | 🔮 | Show dual polyhedron |
 
 ### 4.6 Cylinder Shape (replaces Beam)
@@ -179,12 +179,12 @@
 | `radius` | float | 0.5 | 0.01-∞ | ✅ | Cylinder radius |
 | `height` | float | 10.0 | 0.01-∞ | ✅ | Cylinder height |
 | `segments` | int | 16 | 3-128 | ✅ | Radial segments |
-| `topRadius` | float | same | 0-∞ | ❌ | Top radius (cone-like) |
-| `heightSegments` | int | 1 | 1-100 | ❌ | Height divisions |
-| `capTop` | boolean | true | - | ❌ | Render top cap |
-| `capBottom` | boolean | false | - | ❌ | Render bottom cap |
-| `openEnded` | boolean | true | - | ❌ | No caps (tube) |
-| `arc` | float | 360 | 0-360 | ❌ | Partial cylinder |
+| `topRadius` | float | same | 0-∞ | ✅ | Top radius (cone-like) |
+| `heightSegments` | int | 1 | 1-100 | ✅ | Height divisions |
+| `capTop` | boolean | true | - | ✅ | Render top cap |
+| `capBottom` | boolean | false | - | ✅ | Render bottom cap |
+| `openEnded` | boolean | true | - | ✅ | No caps (tube) |
+| `arc` | float | 360 | 0-360 | ✅ | Partial cylinder |
 
 ### 4.7 Torus Shape (FUTURE)
 
@@ -205,8 +205,8 @@
 | `radiusTop` | float | 0.0 | 0-∞ | ❌ | Top radius (0=point) |
 | `height` | float | 1.0 | 0.01-∞ | ❌ | Cone height |
 | `segments` | int | 32 | 3-128 | ❌ | Radial segments |
-| `heightSegments` | int | 1 | 1-100 | ❌ | Height divisions |
-| `capBottom` | boolean | true | - | ❌ | Render bottom cap |
+| `heightSegments` | int | 1 | 1-100 | ✅ | Height divisions |
+| `capBottom` | boolean | true | - | ✅ | Render bottom cap |
 | `arc` | float | 360 | 0-360 | ❌ | Partial cone |
 
 ### 4.9 Helix Shape (FUTURE)
@@ -290,7 +290,7 @@
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `pointSize` | float | 2.0 | ❌ | Point size |
+| `pointSize` | float | 2.0 | ✅ | Point size |
 | `pointShape` | enum | CIRCLE | 🔮 | CIRCLE, SQUARE, STAR |
 
 ---
@@ -328,8 +328,8 @@
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `centerX` | float | 0.5 | ❌ 📎 | Center X (0-1) |
-| `centerY` | float | 0.5 | ❌ 📎 | Center Y (0-1) |
+| `centerX` | float | 0.5 | ✅ | Center X (0-1) |
+| `centerY` | float | 0.5 | ✅ | Center Y (0-1) |
 | `falloff` | enum | LINEAR | ✅ | LINEAR, EASE, SMOOTH |
 
 ---
@@ -344,12 +344,12 @@
 ### 8.2 Multi-Part Form
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `arrangement.default` | string | "filled_1" | ❌ | Default pattern for all parts |
-| `arrangement.caps` | string | null | ❌ | Pattern for cap surfaces |
-| `arrangement.sides` | string | null | ❌ | Pattern for side surfaces |
-| `arrangement.edges` | string | null | ❌ | Pattern for edge lines |
-| `arrangement.poles` | string | null | ❌ | Pattern for sphere poles |
-| `arrangement.equator` | string | null | ❌ | Pattern for sphere equator |
+| `arrangement.default` | string | "filled_1" | ✅ | Default pattern for all parts |
+| `arrangement.caps` | string | null | ✅ | Pattern for cap surfaces |
+| `arrangement.sides` | string | null | ✅ | Pattern for side surfaces |
+| `arrangement.edges` | string | null | ✅ | Pattern for edge lines |
+| `arrangement.poles` | string | null | ✅ | Pattern for sphere poles |
+| `arrangement.equator` | string | null | ✅ | Pattern for sphere equator |
 
 ### 8.3 Shuffle (Debug)
 | Parameter | Type | Default | Status | Notes |
@@ -404,9 +404,9 @@
 | `pulse` | object | null | ⚠️ | Scale pulsing |
 | `phase` | float | 0.0 | ✅ | Animation phase offset |
 | `alphaPulse` | object | null | ⚠️ | Alpha pulsing |
-| `colorCycle` | object | null | ❌ | Color animation |
-| `wobble` | object | null | ❌ | Random movement |
-| `wave` | object | null | ❌ | Wave deformation |
+| `colorCycle` | object | null | ✅ | Color animation |
+| `wobble` | object | null | ✅ | Random movement |
+| `wave` | object | null | ✅ | Wave deformation |
 
 ### Spin Config
 
@@ -436,21 +436,21 @@
 | `max` | float | 1.0 | ⚠️ | Maximum alpha |
 | `waveform` | enum | SINE | ✅ | SINE, SQUARE, TRIANGLE_WAVE, SAWTOOTH |
 
-### Color Cycle Config (FUTURE)
+### Color Cycle Config
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `colors` | List<string> | [] | ❌ | Colors to cycle through |
-| `speed` | float | 1.0 | ❌ | Cycle speed |
-| `blend` | boolean | true | ❌ | Smooth blend vs instant |
+| `colors` | List<string> | [] | ✅ | Colors to cycle through |
+| `speed` | float | 1.0 | ✅ | Cycle speed |
+| `blend` | boolean | true | ✅ | Smooth blend vs instant |
 
-### Wobble Config (FUTURE)
+### Wobble Config
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `amplitude` | Vec3 | (0.1,0.1,0.1) | ❌ | Wobble amount per axis |
-| `speed` | float | 1.0 | ❌ | Wobble speed |
-| `randomize` | boolean | true | ❌ | Randomize movement |
+| `amplitude` | Vec3 | (0.1,0.1,0.1) | ✅ | Wobble amount per axis |
+| `speed` | float | 1.0 | ✅ | Wobble speed |
+| `randomize` | boolean | true | ✅ | Randomize movement |
 
 ---
 
@@ -458,7 +458,7 @@
 
 | Parameter | Type | Default | Status | Notes |
 |-----------|------|---------|--------|-------|
-| `id` | string | null | ❌ | Primitive identifier for linking |
+| `id` | string | required | ✅ | Primitive identifier for linking |
 | `link.radiusMatch` | string | null | ✅
 | `link.radiusOffset` | float | 0.0 | ✅
 | `link.follow` | string | null | ✅
@@ -595,27 +595,29 @@
 
 | Level | Implemented | Missing | Future |
 |-------|-------------|---------|--------|
-| Field Definition | 16 | 5 | 0 |
-| Layer | 8 | 4 | 0 |
+| Field Definition | 21 | 0 | 0 |
+| Layer | 12 | 0 | 0 |
 | Transform | 18 | 0 | 0 |
-| Fill | 9 | 0 | 2 |
-| Visibility | 12 | 0 | 0 |
-| Arrangement | 3 | 7 | 0 |
+| Fill | 10 | 0 | 1 |
+| Visibility | 14 | 0 | 0 |
+| Arrangement | 10 | 0 | 0 |
 | Appearance | 9 | 0 | 0 |
-| Animation | 12 | 0 | 4 |
+| Animation | 19 | 0 | 0 |
 | Primitive Linking | 7 | 0 | 0 |
 | **Shapes** | | | |
-| - Sphere | 6 | 3 | 1 |
-| - Ring | 4 | 4 | 0 |
-| - Disc | 3 | 4 | 0 |
-| - Prism | 3 | 5 | 0 |
-| - Polyhedron | 2 | 1 | 1 |
-| - Cylinder | 3 | 6 | 0 |
+| - Sphere | 9 | 0 | 1 |
+| - Ring | 8 | 0 | 0 |
+| - Disc | 7 | 0 | 0 |
+| - Prism | 8 | 0 | 0 |
+| - Polyhedron | 3 | 0 | 1 |
+| - Cylinder | 9 | 0 | 0 |
 | - Torus | 0 | 6 | 1 |
 | - Cone | 0 | 7 | 0 |
 | - Helix | 0 | 8 | 0 |
-| **TOTAL** | ~150 | ~5 | ~9 |
+| **TOTAL** | ~164 | ~21 | ~4 |
 
+> Note: Torus, Cone, and Helix are planned future shapes (Phase 4).
+> Missing count reflects only these future shape parameters.
 ---
 
 ## 14. Priority Implementation Order

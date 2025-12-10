@@ -1,7 +1,10 @@
 package net.cyberpunk042.client.network;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import net.cyberpunk042.client.gui.screen.FieldCustomizerScreen;
-import net.cyberpunk042.client.gui.state.GuiState;
+import net.cyberpunk042.client.gui.state.FieldEditState;
+import net.cyberpunk042.client.gui.state.FieldEditStateHolder;
 import net.cyberpunk042.client.gui.widget.ToastNotification;
 import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.network.gui.*;
@@ -29,7 +32,7 @@ public final class GuiClientHandlers {
                 Logging.GUI.topic("network").info("Received GUI open: profile={}, debug={}", 
                     payload.profileName(), payload.debugUnlocked());
                 
-                GuiState state = new GuiState();
+                FieldEditState state = new FieldEditState();
                 state.setCurrentProfileName(payload.profileName());
                 state.setDebugUnlocked(payload.debugUnlocked());
                 
@@ -69,6 +72,196 @@ public final class GuiClientHandlers {
             });
         });
         
+        // Handle field edit updates from /field commands
+        ClientPlayNetworking.registerGlobalReceiver(FieldEditUpdateS2CPayload.ID, (payload, context) -> {
+            context.client().execute(() -> {
+                Logging.GUI.topic("network").debug("Received edit update: type={}", payload.updateType());
+                applyFieldEditUpdate(payload);
+            });
+        });
+        
         Logging.GUI.topic("network").info("GUI client handlers registered");
+    }
+    
+    /**
+     * Applies a field edit update from server command to client state.
+     */
+    private static void applyFieldEditUpdate(FieldEditUpdateS2CPayload payload) {
+        FieldEditState state = FieldEditStateHolder.getOrCreate();
+        String type = payload.updateType();
+        
+        try {
+            JsonObject json = JsonParser.parseString(payload.jsonData()).getAsJsonObject();
+            
+            switch (type) {
+                case "RESET" -> {
+                    FieldEditStateHolder.reset();
+                    ToastNotification.info("Field state reset");
+                }
+                case "TEST_FIELD" -> {
+                    String action = json.has("action") ? json.get("action").getAsString() : "";
+                    switch (action) {
+                        case "spawn" -> FieldEditStateHolder.spawnTestField();
+                        case "despawn" -> FieldEditStateHolder.despawnTestField();
+                        case "toggle" -> FieldEditStateHolder.toggleTestField();
+                    }
+                }
+                case "SHAPE_TYPE" -> {
+                    if (json.has("type")) state.setShapeType(json.get("type").getAsString());
+                }
+                case "SHAPE" -> applyShapeUpdate(state, json);
+                case "TRANSFORM" -> applyTransformUpdate(state, json);
+                case "ORBIT" -> applyOrbitUpdate(state, json);
+                case "FILL" -> applyFillUpdate(state, json);
+                case "VISIBILITY" -> applyVisibilityUpdate(state, json);
+                case "APPEARANCE" -> applyAppearanceUpdate(state, json);
+                case "ANIMATION" -> applyAnimationUpdate(state, json);
+                case "FOLLOW" -> {
+                    if (json.has("mode")) {
+                        try {
+                            state.setFollowMode(net.cyberpunk042.field.instance.FollowMode.fromId(json.get("mode").getAsString()));
+                        } catch (Exception ignored) {}
+                    }
+                }
+                case "PREDICTION" -> applyPredictionUpdate(state, json);
+                
+                // $ref loading - resolve fragment and apply
+                case "SHAPE_REF" -> applyFragmentRef(state, "shape", json);
+                case "FILL_REF" -> applyFragmentRef(state, "fill", json);
+                case "VISIBILITY_REF" -> applyFragmentRef(state, "visibility", json);
+                case "APPEARANCE_REF" -> applyFragmentRef(state, "appearance", json);
+                case "ANIMATION_REF" -> applyFragmentRef(state, "animation", json);
+                case "TRANSFORM_REF" -> applyFragmentRef(state, "transform", json);
+                
+                default -> Logging.GUI.topic("network").warn("Unknown edit update type: {}", type);
+            }
+        } catch (Exception e) {
+            Logging.GUI.topic("network").error("Failed to apply edit update: {}", e.getMessage());
+        }
+    }
+    
+    private static void applyShapeUpdate(FieldEditState state, JsonObject json) {
+        FieldEditState.ProfileSnapshot snapshot = state.getProfileSnapshot();
+        
+        if (json.has("radius")) {
+            float newVal = json.get("radius").getAsFloat();
+            state.setRadius(newVal);
+            showProfileContext("radius", newVal, snapshot.radius);
+        }
+        if (json.has("latSteps")) {
+            int newVal = json.get("latSteps").getAsInt();
+            state.setSphereLatSteps(newVal);
+            showProfileContext("latSteps", newVal, snapshot.latSteps);
+        }
+        if (json.has("lonSteps")) {
+            int newVal = json.get("lonSteps").getAsInt();
+            state.setSphereLonSteps(newVal);
+            showProfileContext("lonSteps", newVal, snapshot.lonSteps);
+        }
+        if (json.has("algorithm")) state.setSphereAlgorithm(json.get("algorithm").getAsString());
+    }
+    
+    /**
+     * Shows profile context if value differs from profile snapshot.
+     */
+    private static void showProfileContext(String param, Number newVal, Number profileVal) {
+        if (!newVal.equals(profileVal)) {
+            ToastNotification.info("Profile value: " + profileVal);
+        }
+    }
+    
+    private static void applyTransformUpdate(FieldEditState state, JsonObject json) {
+        if (json.has("anchor")) state.setAnchor(json.get("anchor").getAsString());
+        if (json.has("scale")) state.setScale(json.get("scale").getAsFloat());
+        
+        // Handle offset (individual or combined)
+        float ox = json.has("offsetX") ? json.get("offsetX").getAsFloat() : state.getOffsetX();
+        float oy = json.has("offsetY") ? json.get("offsetY").getAsFloat() : state.getOffsetY();
+        float oz = json.has("offsetZ") ? json.get("offsetZ").getAsFloat() : state.getOffsetZ();
+        if (json.has("offsetX") || json.has("offsetY") || json.has("offsetZ")) {
+            state.setOffset(ox, oy, oz);
+        }
+        
+        // Handle rotation (individual or combined)
+        float rx = json.has("rotationX") ? json.get("rotationX").getAsFloat() : state.getRotationX();
+        float ry = json.has("rotationY") ? json.get("rotationY").getAsFloat() : state.getRotationY();
+        float rz = json.has("rotationZ") ? json.get("rotationZ").getAsFloat() : state.getRotationZ();
+        if (json.has("rotationX") || json.has("rotationY") || json.has("rotationZ")) {
+            state.setRotation(rx, ry, rz);
+        }
+    }
+    
+    private static void applyOrbitUpdate(FieldEditState state, JsonObject json) {
+        if (json.has("enabled")) state.setOrbitEnabled(json.get("enabled").getAsBoolean());
+        if (json.has("radius")) state.setOrbitRadius(json.get("radius").getAsFloat());
+        if (json.has("speed")) state.setOrbitSpeed(json.get("speed").getAsFloat());
+        if (json.has("axis")) state.setOrbitAxis(json.get("axis").getAsString());
+        if (json.has("phase")) state.setOrbitPhase(json.get("phase").getAsFloat());
+    }
+    
+    private static void applyFillUpdate(FieldEditState state, JsonObject json) {
+        if (json.has("mode")) state.setFillMode(net.cyberpunk042.visual.fill.FillMode.fromId(json.get("mode").getAsString()));
+        if (json.has("wireThickness")) state.setWireThickness(json.get("wireThickness").getAsFloat());
+        if (json.has("doubleSided")) state.setDoubleSided(json.get("doubleSided").getAsBoolean());
+    }
+    
+    private static void applyVisibilityUpdate(FieldEditState state, JsonObject json) {
+        FieldEditState.ProfileSnapshot snapshot = state.getProfileSnapshot();
+        
+        if (json.has("mask")) state.setMaskType(json.get("mask").getAsString());
+        if (json.has("maskType")) state.setMaskType(json.get("maskType").getAsString());
+        if (json.has("count")) {
+            int newVal = json.get("count").getAsInt();
+            state.setMaskCount(newVal);
+            showProfileContext("maskCount", newVal, snapshot.maskCount);
+        }
+        if (json.has("maskCount")) {
+            int newVal = json.get("maskCount").getAsInt();
+            state.setMaskCount(newVal);
+            showProfileContext("maskCount", newVal, snapshot.maskCount);
+        }
+        if (json.has("thickness")) state.setMaskThickness(json.get("thickness").getAsFloat());
+    }
+    
+    private static void applyAppearanceUpdate(FieldEditState state, JsonObject json) {
+        if (json.has("color")) state.setColor(json.get("color").getAsInt());
+        if (json.has("alpha")) state.setAlpha(json.get("alpha").getAsFloat());
+        if (json.has("glow")) state.setGlow(json.get("glow").getAsFloat());
+        if (json.has("emissive")) state.setEmissive(json.get("emissive").getAsFloat());
+    }
+    
+    private static void applyAnimationUpdate(FieldEditState state, JsonObject json) {
+        if (json.has("spinEnabled")) state.setSpinEnabled(json.get("spinEnabled").getAsBoolean());
+        if (json.has("spinSpeed")) state.setSpinSpeed(json.get("spinSpeed").getAsFloat());
+        if (json.has("pulseEnabled")) state.setPulseEnabled(json.get("pulseEnabled").getAsBoolean());
+    }
+    
+    private static void applyPredictionUpdate(FieldEditState state, JsonObject json) {
+        if (json.has("enabled")) state.setPredictionEnabled(json.get("enabled").getAsBoolean());
+        if (json.has("leadTicks")) state.setPredictionLeadTicks(json.get("leadTicks").getAsInt());
+        if (json.has("maxDistance")) state.setPredictionMaxDistance(json.get("maxDistance").getAsFloat());
+    }
+    
+    /**
+     * Loads a fragment from $ref and applies it to state.
+     * Uses FragmentRegistry to resolve and apply the reference.
+     */
+    private static void applyFragmentRef(FieldEditState state, String category, JsonObject json) {
+        if (!json.has("$ref")) {
+            Logging.GUI.topic("network").warn("Fragment ref missing $ref field");
+            return;
+        }
+        
+        String ref = json.get("$ref").getAsString();
+        Logging.GUI.topic("network").debug("Loading fragment ref: {} for {}", ref, category);
+        
+        try {
+            // Use FragmentRegistry to apply the fragment
+            net.cyberpunk042.client.gui.util.FragmentRegistry.applyFragment(state, category, ref);
+            ToastNotification.success("Loaded: " + ref);
+        } catch (Exception e) {
+            Logging.GUI.topic("network").error("Failed to load fragment {}: {}", ref, e.getMessage());
+            ToastNotification.error("Failed to load: " + ref);
+        }
     }
 }

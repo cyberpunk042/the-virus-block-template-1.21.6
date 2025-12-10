@@ -80,7 +80,7 @@
 │                                                                             │
 │  STATE MANAGEMENT                                                          │
 │  ────────────────                                                          │
-│  • GuiState - Original/working definition, dirty flag                      │
+│  • FieldEditState - Original/working definition, dirty flag                      │
 │  • EditorState - Layer/primitive selection                                 │
 │  • UndoManager - Undo/redo stack                                           │
 │  • Screen owns state, widgets use callbacks                                │
@@ -208,7 +208,7 @@ START GUI TODO
 ### Phase 1: Foundation & Utilities (Batches 1-4)
 | Category | Focus | Key Documents |
 |----------|-------|---------------|
-| Core classes | Screen, GuiState, UndoManager | GUI_CLASS_DIAGRAM §2 |
+| Core classes | Screen, FieldEditState, UndoManager | GUI_CLASS_DIAGRAM §2 |
 | Utilities | GuiWidgets, GuiConstants, GuiLayout | GUI_UTILITIES §3-5 |
 | Custom widgets | LabeledSlider, Vec3Editor, ColorButton | GUI_CLASS_DIAGRAM §6 |
 | DEBUG FIELD | Spawn, despawn, notification | GUI_ARCHITECTURE §3 |

@@ -1,7 +1,8 @@
 # GUI Architecture
 
-> **Status:** Draft v1  
+> **Status:** Implementation Complete (Phase 1-6)  
 > **Created:** December 8, 2024  
+> **Updated:** December 9, 2024 (Added category system)  
 > **Purpose:** Define the architectural foundation for the Field Customizer GUI
 
 ---
@@ -41,6 +42,145 @@
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+### 1.2 Terminology
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              TERMINOLOGY                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  PROFILE                                                                    │
+│  ───────                                                                    │
+│  Complete field definition. Loading a profile REPLACES all settings.       │
+│  Stored in: field_profiles/ (local) or provided by server (remote)         │
+│                                                                             │
+│  PRESET                                                                     │
+│  ──────                                                                     │
+│  Multi-scope partial merge. Can add layers, modify multiple categories.    │
+│  MERGES into current state (doesn't replace everything).                   │
+│  Stored in: field_presets/                                                 │
+│  Example: "Ethereal Glow" sets appearance.glow + animation.alphaPulse      │
+│                                                                             │
+│  FRAGMENT                                                                   │
+│  ────────                                                                   │
+│  Single-scope $ref target. Only affects ONE category.                      │
+│  Stored in: field_shapes/, field_fills/, field_masks/, etc.                │
+│  Example: "Thin Wire" fill fragment only sets fill properties              │
+│                                                                             │
+│  HIERARCHY:                                                                 │
+│  ──────────                                                                 │
+│    Profile  ─────►  Complete replacement (all layers, all settings)        │
+│       │                                                                     │
+│    Preset   ─────►  Partial merge (multiple scopes, can add structure)     │
+│       │                                                                     │
+│    Fragment ─────►  Single scope ($ref target for shape/fill/animation)    │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+
+### 1.3 Category System
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          CATEGORY SYSTEM                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  PRESET CATEGORIES (for two-tier dropdown)                                  │
+│  ─────────────────────────────────────────                                  │
+│                                                                             │
+│    ADDITIVE     │ Add elements (rings, layers, beams)                       │
+│    STYLE        │ Visual style changes (wireframe, glow)                    │
+│    ANIMATION    │ Motion effects (spin, pulse, wobble)                      │
+│    EFFECT       │ Composite presets (combat ready, stealth)                 │
+│    PERFORMANCE  │ Detail level changes (low/high poly)                      │
+│                                                                             │
+│  PROFILE CATEGORIES (for filtering)                                         │
+│  ──────────────────────────────────                                         │
+│                                                                             │
+│    COMBAT       │ Battle-focused configurations                             │
+│    UTILITY      │ Functional/practical setups                               │
+│    DECORATIVE   │ Pure visual/aesthetic                                     │
+│    EXPERIMENTAL │ Testing/work-in-progress                                  │
+│                                                                             │
+│  PROFILE SOURCES (determines editability)                                   │
+│  ────────────────────────────────────────                                   │
+│                                                                             │
+│    BUNDLED      │ Shipped with mod      │ Read-only                         │
+│    LOCAL        │ User-created          │ Editable                          │
+│    SERVER       │ From server           │ Read-only                         │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 1.4 Folder Structure
+
+```
+config/the-virus-block/
+├── field_presets/
+│   ├── additive/
+│   │   ├── add_inner_ring.json
+│   │   ├── add_outer_ring.json
+│   │   └── add_halo.json
+│   ├── style/
+│   │   ├── wireframe.json
+│   │   └── solid_glow.json
+│   ├── animation/
+│   │   ├── slow_spin.json
+│   │   └── pulse_beat.json
+│   ├── effect/
+│   │   ├── combat_ready.json
+│   │   └── stealth_mode.json
+│   └── performance/
+│       ├── low_detail.json
+│       └── high_detail.json
+│
+├── field_profiles/
+│   └── local/                    ← User-created profiles
+│       └── my_shield.json
+│
+└── field_*/                      ← Fragments (existing)
+    ├── field_shapes/
+    ├── field_fills/
+    └── ...
+```
+
+### 1.5 JSON Metadata
+
+**Preset JSON:**
+```json
+{
+  "name": "Add Inner Ring",
+  "category": "additive",
+  "description": "Adds a glowing ring inside the main shape",
+  "hint": "Great for layered shields",
+  "merge": {
+    "layers[0].primitives": [
+      {
+        "$append": true,
+        "id": "inner_ring",
+        "type": "ring",
+        "shape": { "innerRadius": 0.75, "outerRadius": 0.8 }
+      }
+    ]
+  }
+}
+```
+
+**Profile JSON:**
+```json
+{
+  "id": "my_combat_shield",
+  "name": "My Combat Shield",
+  "type": "SHIELD",
+  "category": "combat",
+  "tags": ["animated", "glow", "multilayer"],
+  "description": "Red pulsing shield for PvP",
+  "layers": [...]
+}
+```
+
 
 ---
 
@@ -323,7 +463,7 @@ Some operations are command-only (not in GUI):
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                      GuiState (Client-Side)                         │   │
+│  │                      FieldEditState (Client-Side)                         │   │
 │  ├─────────────────────────────────────────────────────────────────────┤   │
 │  │ originalDefinition: FieldDefinition  ← Loaded from server/file      │   │
 │  │ workingDefinition: FieldDefinition   ← Current edits (mutable)      │   │
@@ -489,69 +629,231 @@ maxProfileNameLength = 32
 
 ## 9. Implementation Phases
 
-### Phase 1: Foundation (F200-F210)
-- [ ] `GuiState` class
-- [ ] `FieldCustomizerScreen` skeleton
-- [ ] Preview renderer
-- [ ] Network packets
-- [ ] Command registration
+> **Progress:** Phase 1-6 Complete  
+> **Last Updated:** December 9, 2024
 
-### Phase 2: Quick Customize (F211-F225)
-- [ ] Shape dropdown
-- [ ] Color picker
-- [ ] Alpha slider
-- [ ] Fill mode dropdown
-- [ ] Spin speed slider
-- [ ] Apply button
+### Phase 1: Foundation (F200-F210) ✅ COMPLETE
+- [x] `FieldEditState` class (renamed from FieldEditState)
+- [x] `FieldCustomizerScreen` skeleton
+- [x] Preview renderer (`PreviewPanel`)
+- [x] Network packets (`FieldGuiOpenC2SPayload`, `FieldUpdateC2SPayload`, `DebugFieldC2SPayload`, etc.)
+- [x] Command registration (`/field customize`)
 
-### Phase 3: Profile System (F226-F235)
-- [ ] Local profile storage
-- [ ] Save/Load buttons
-- [ ] Profile dropdown
-- [ ] Server defaults request
-- [ ] Import/Export
+### Phase 2: Quick Customize (F211-F225) ✅ COMPLETE
+- [x] Shape dropdown (`BasicPanel`)
+- [x] Color picker (`ColorPicker` widget)
+- [x] Alpha slider
+- [x] Fill mode dropdown
+- [x] Spin speed slider
+- [x] Apply button
 
-### Phase 4: Advanced Customize (F236-F255)
-- [ ] Expandable sections
-- [ ] Full shape parameters
-- [ ] Visibility masks
-- [ ] Pattern selector
-- [ ] Layer navigation
-- [ ] Primitive linking
+### Phase 3: Profile System (F226-F235) ✅ COMPLETE
+- [x] Local profile storage (`ProfileManager`)
+- [x] Save/Load buttons (`ProfilesPanel`)
+- [x] Profile dropdown with server/local separation
+- [x] Server defaults display (read-only, Save As to copy)
+- [x] Import/Export JSON buttons
+- [x] Revert to last saved
+- [x] Category preset summary display
+- [x] Global bottom bar (profile select + Save + Revert, hidden on Profiles tab)
 
-### Phase 5: Debug Menu (F256-F270)
-- [ ] Permission check
-- [ ] Bindings panel
-- [ ] Triggers panel
-- [ ] Lifecycle panel
-- [ ] Raw JSON viewer
+### Phase 4: Advanced Customize (F236-F255) ✅ COMPLETE
+- [x] Expandable sections (`AdvancedPanel`)
+- [x] Full shape parameters (`ShapeSubPanel`)
+- [x] Visibility masks (`VisibilitySubPanel`)
+- [x] Pattern selector (`ArrangementSubPanel`)
+- [x] Primitive linking (`LinkingSubPanel`)
+- [x] Layer navigation (`LayerPanel`)
+- [x] Primitive management (`PrimitivePanel`)
 
-### Phase 6: Polish (F271-F280)
-- [ ] Undo/Redo
-- [ ] Live/Manual toggle
-- [ ] Animated preview
-- [ ] Keyboard shortcuts
-- [ ] Tooltips
+### Phase 5: Debug Menu (F256-F270) ✅ COMPLETE
+- [x] Permission check
+- [x] Bindings panel (`BindingsSubPanel`)
+- [x] Triggers panel (`TriggerSubPanel`)
+- [x] Lifecycle panel (`LifecycleSubPanel`)
+- [x] Beam panel (`BeamSubPanel`)
+- [ ] Raw JSON viewer (deferred)
 
----
-
-## 10. Open Questions
-
-1. **Preset system?** Should we have quick-apply presets like "Combat", "Stealth", "Healing"?
-2. **Color themes?** Should the GUI match the field's color theme?
-3. **Multi-field?** Can a player have multiple fields? Edit which one?
-4. **Copy layer?** Duplicate layer with all primitives?
-5. **Template system?** Server-provided starting points beyond "defaults"?
-
----
-
-## 11. Related Documents
-
-- [GUI_DESIGN.md](./GUI_DESIGN.md) - Visual mockups and layouts
-- [GUI_CLASS_DIAGRAM.md](./GUI_CLASS_DIAGRAM.md) - Class structure (TODO)
-- [GUI_COMPONENTS.md](./GUI_COMPONENTS.md) - Widget inventory (TODO)
+### Phase 6: Polish (F271-F280) ✅ COMPLETE
+- [x] Undo/Redo (`UndoManager` class implemented)
+- [x] Tooltips (via `GuiWidgets` factory methods)
+- [x] Preset system (`PresetRegistry` for shape/fill/visibility/etc.)
+- [ ] Live/Manual toggle (deferred - always live for now)
+- [ ] Animated preview (deferred)
+- [ ] Keyboard shortcuts (not planned)
 
 ---
 
-*Draft v1 - Awaiting review and iteration*
+## 10. Open Questions → Decisions Made
+
+| Question | Decision | Implementation |
+|----------|----------|----------------|
+| **Preset system?** | ✅ Yes - for prediction settings | `PredictionSubPanel` has OFF/LOW/MEDIUM/HIGH/CUSTOM presets |
+| **Color themes?** | 🟡 Deferred | Using `GuiConstants` for consistent theming; field color themes TBD |
+| **Multi-field?** | ✅ Single DEBUG FIELD | One debug field per GUI session; despawns on close |
+| **Copy layer?** | ❌ Not yet | `LayerPanel` skeleton exists but not fully wired |
+| **Template system?** | 🟡 Planned | Server defaults architecture exists, not implemented |
+
+### Resolved Questions (December 9, 2024)
+
+| Question | Decision |
+|----------|----------|
+| **PrimitivePanel?** | ✅ Implemented - manages primitives within a layer |
+| **BeamSubPanel?** | ✅ Implemented - in Debug panel with presets |
+| **PerformancePanel?** | 🟡 Deferred - performance hints inline on sliders instead |
+| **ThemePicker widget?** | ❌ Skipped - using ColorPicker with theme refs |
+| **Global bottom bar?** | ✅ Implemented - profile select + Save + Revert, hidden on Profiles tab |
+| **Server profiles?** | ✅ Read-only in list, Save As creates local copy |
+
+---
+
+## 11. Command/GUI Unification
+
+> **Status:** Planned  
+> **Purpose:** Unified editing between `/field` commands and GUI
+
+### 11.1 Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    SHARED STATE: FieldEditState                      │
+│  (shape, fill, transform, animation, bindings, layers, etc.)        │
+└───────────────────────────────┬─────────────────────────────────────┘
+                                │
+        ┌───────────────────────┼───────────────────────┐
+        │                       │                       │
+        ▼                       ▼                       ▼
+   GUI Panels            /field commands         Test Field
+   (direct edit)         (packets → edit)        (live preview)
+                                                 follows player
+```
+
+### 11.2 Command Split
+
+**`/field` commands** - Unified with FieldEditState:
+```
+/field customize           - Open GUI
+/field customize <profile> - Open GUI with profile
+
+/field shape <type>        - Set shape type
+/field shape radius <v>    - Set radius
+/field transform ...       - Transform parameters
+/field fill ...            - Fill parameters
+/field visibility ...      - Visibility parameters
+/field appearance ...      - Appearance parameters
+/field animation ...       - Animation parameters
+/field modifier ...        - Field modifiers (bobbing, breathing)
+/field orbit ...           - Orbit parameters
+/field layer ...           - Layer management
+/field primitive ...       - Primitive management
+/field binding ...         - Property bindings
+/field beam ...            - Beam configuration
+/field follow ...          - Follow mode
+/field prediction ...      - Prediction settings
+/field fragment ...        - Apply single-scope fragment
+/field preset apply ...    - Apply multi-scope preset
+/field profile ...         - Profile management
+/field test spawn/despawn  - Test field control
+/field reset               - Reset to defaults
+/field status              - Show current state
+```
+
+**`/fieldtest` commands** - Debug only (NOT in GUI):
+```
+/fieldtest shuffle type <quad|segment|sector|edge|triangle>
+/fieldtest shuffle next/prev/jump <idx>
+/fieldtest vertex <pattern>
+/fieldtest list [filter]
+/fieldtest info <id>
+/fieldtest cycle
+/fieldtest spawn <id>     - Spawn from registry (bypasses FieldEditState)
+/fieldtest reload
+```
+
+### 11.3 Sync Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                            CLIENT                                    │
+│                                                                      │
+│  ┌──────────────────┐      ┌─────────────────┐                      │
+│  │  FieldEditState  │◄────►│ Test Field      │ (client-side only)   │
+│  │  (editing state) │      │ Preview Renderer│                      │
+│  └────────┬─────────┘      └─────────────────┘                      │
+│           │                         ▲                                │
+│           │ direct edit             │ reads state                    │
+│           ▼                         │ (debounced 50-100ms)           │
+│  ┌──────────────────┐               │                               │
+│  │ FieldCustomizer  │───────────────┘                               │
+│  │     Screen       │                                                │
+│  └──────────────────┘                                                │
+│           │                                                          │
+│           │ C2S packets (profile save, apply to field)              │
+└───────────┼──────────────────────────────────────────────────────────┘
+            │
+            ▼
+┌───────────┼──────────────────────────────────────────────────────────┐
+│           │                  SERVER                                   │
+│           ▼                                                          │
+│  ┌──────────────────┐      ┌─────────────────┐                      │
+│  │ /field commands  │─────►│ FieldGuiUpdate  │──► S2C to client     │
+│  │                  │      │    S2CPayload   │  (updates EditState) │
+│  └──────────────────┘      └─────────────────┘                      │
+│                                                                      │
+│  ┌──────────────────┐      ┌─────────────────┐                      │
+│  │ Profile Storage  │◄────►│  FieldRegistry  │                      │
+│  │ (save/load)      │      │  (definitions)  │                      │
+│  └──────────────────┘      └─────────────────┘                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### 11.4 Test Field System
+
+**Test Field is CLIENT-SIDE** - just a renderer reading FieldEditState, not a server FieldManager instance.
+
+| Feature | Description |
+|---------|-------------|
+| **Spawn** | `/field test spawn` or GUI button in Debug tab |
+| **Despawn** | `/field test despawn` or GUI button |
+| **Sync** | Reads FieldEditState with debounce (50-100ms) to avoid performance issues |
+| **Position** | Follows local player (client-side only) |
+| **Purpose** | Live preview of current configuration |
+
+**Key Points:**
+1. Test field does NOT go through FieldManager
+2. GUI slider drags trigger debounced re-render
+3. `/field` commands send S2C packet → client updates FieldEditState → test field re-renders
+4. Profile save/apply sends C2S packet to server for persistence
+
+### 11.5 Debounce Strategy
+
+```java
+// In TestFieldRenderer or FieldEditState
+private long lastUpdateTime = 0;
+private static final long DEBOUNCE_MS = 50;
+
+void onFieldEditStateChanged() {
+    long now = System.currentTimeMillis();
+    if (now - lastUpdateTime > DEBOUNCE_MS) {
+        rebuildTestField();
+        lastUpdateTime = now;
+    } else {
+        // Schedule rebuild for later
+        scheduleRebuild(DEBOUNCE_MS);
+    }
+}
+```
+
+---
+
+## 12. Related Documents
+
+- [GUI_DESIGN.md](./GUI_DESIGN.md) - Visual mockups and layouts (original design)
+- [GUI_CLASS_DIAGRAM.md](./GUI_CLASS_DIAGRAM.md) - **Source of truth** for class structure ✅
+- [GUI_COMPONENTS.md](./GUI_COMPONENTS.md) - Widget inventory (not created - see CLASS_DIAGRAM)
+- Preset System: Presets are applied per category (shape, fill, visibility, arrangement, animation, beam, follow/prediction); dropdowns show presets + Custom; no separate reset button.
+
+---
+
+*Updated December 9, 2024 - Added Command/GUI Unification architecture*
 

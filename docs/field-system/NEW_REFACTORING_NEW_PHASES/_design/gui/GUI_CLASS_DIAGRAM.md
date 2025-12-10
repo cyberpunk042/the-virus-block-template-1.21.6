@@ -1,7 +1,8 @@
 # GUI Class Diagram
 
-> **Status:** Draft v1  
+> **Status:** Implementation Complete  
 > **Created:** December 8, 2024  
+> **Updated:** December 9, 2024 (Added category system)  
 > **Purpose:** Define all classes needed for the Field Customizer GUI  
 > **Reference:** [03_PARAMETERS.md](../03_PARAMETERS.md) for field coverage
 
@@ -15,7 +16,7 @@ net.cyberpunk042.client.gui/
 │   └── FieldCustomizerScreen.java       # Main GUI screen
 │
 ├── state/
-│   ├── GuiState.java                    # Full GUI state container
+│   ├── FieldEditState.java                    # Full GUI state container
 │   ├── EditorState.java                 # Current editing context
 │   └── UndoManager.java                 # Undo/redo stack
 │
@@ -25,7 +26,7 @@ net.cyberpunk042.client.gui/
 │   ├── DebugPanel.java                  # Level 3: Debug Menu
 │   ├── LayerPanel.java                  # Layer navigation
 │   ├── PrimitivePanel.java              # Primitive editing
-│   ├── ProfilePanel.java                # Profile management
+│   ├── ProfilesPanel.java               # Profile management
 │   └── sub/
 │       ├── ShapeSubPanel.java           # Shape parameters
 │       ├── AppearanceSubPanel.java      # Color, alpha, glow
@@ -36,8 +37,9 @@ net.cyberpunk042.client.gui/
 │       ├── FillSubPanel.java            # Fill mode config
 │       ├── LinkingSubPanel.java         # Primitive linking
 │       ├── BindingsSubPanel.java        # Debug: Bindings
-│       ├── TriggersSubPanel.java        # Debug: Triggers
+│       ├── TriggerSubPanel.java         # Debug: Triggers
 │       ├── LifecycleSubPanel.java       # Debug: Lifecycle
+│       ├── BeamSubPanel.java            # Debug: Central beam
 │       ├── PredictionSubPanel.java      # Prediction settings
 │       └── FollowModeSubPanel.java      # Follow mode settings
 │
@@ -51,6 +53,14 @@ net.cyberpunk042.client.gui/
 │   ├── ExpandableSection.java           # Collapsible section
 │   ├── TooltipWrapper.java              # Adds tooltip to any widget
 │   └── ActionButton.java                # Styled button
+│
+├── util/
+│   ├── GuiWidgets.java                  # Widget factory methods
+│   ├── GuiAnimations.java               # Animation utilities (fade, lerp)
+│   ├── GuiLayout.java                   # Layout helpers (positioning)
+│   ├── GuiConstants.java                # Theme constants (colors, sizes)
+│   ├── FragmentRegistry.java            # Single-scope fragments (shape/fill/visibility/etc.)
+│   └── PresetRegistry.java              # Multi-scope presets (load from field_presets/)
 │
 ├── profile/
 │   ├── ProfileManager.java              # Load/save/list profiles
@@ -78,7 +88,7 @@ net.cyberpunk042.client.gui/
 │                        extends Screen                                        │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ Fields:                                                                     │
-│   - state: GuiState                                                         │
+│   - state: FieldEditState                                                         │
 │   - quickPanel: QuickPanel                                                  │
 │   - advancedPanel: AdvancedPanel                                            │
 │   - debugPanel: DebugPanel (nullable)                                       │
@@ -110,11 +120,11 @@ TabType enum:
   QUICK, ADVANCED, DEBUG, PROFILES
 ```
 
-### 2.2 GuiState
+### 2.2 FieldEditState
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              GuiState                                        │
+│                              FieldEditState                                        │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ Fields:                                                                     │
 │   - originalDefinition: FieldDefinition     # Loaded from server/file       │
@@ -123,6 +133,7 @@ TabType enum:
 │   - isDirty: boolean                        # Has unsaved changes           │
 │   - autoSaveEnabled: boolean                # Auto-save checkbox            │
 │   - currentProfileName: String              # Loaded profile name           │
+│   - isCurrentProfileServer: boolean         # True if loaded from server    │
 │   - editorState: EditorState                # Selection context             │
 │   - debugMenuUnlocked: boolean              # Level 3 access                │
 │   - expandedSections: Set<String>           # Open panels                   │
@@ -140,6 +151,9 @@ TabType enum:
 │   + isDebugUnlocked(): boolean                                              │
 │   + getSelectedLayer(): LayerDefinition                                     │
 │   + getSelectedPrimitive(): Primitive                                       │
+│   + getCurrentProfileName(): String                                         │
+│   + isCurrentProfileServer(): boolean                                       │
+│   + setCurrentProfile(String name, boolean isServer)                        │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -228,7 +242,7 @@ TabType enum:
 │                                                                             │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ Methods:                                                                    │
-│   + init(GuiState)                                                          │
+│   + init(FieldEditState)                                                          │
 │   + render(DrawContext)                                                     │
 │   + onShapeTypeChanged(ShapeType)                                           │
 │   + onColorChanged(int)                                                     │
@@ -267,7 +281,7 @@ TabType enum:
 │   - expandedSections: Set<String>                                           │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ Methods:                                                                    │
-│   + init(GuiState)                                                          │
+│   + init(FieldEditState)                                                          │
 │   + render(DrawContext)                                                     │
 │   + toggleSection(String)                                                   │
 │   + collapseAll()                                                           │
@@ -284,12 +298,12 @@ TabType enum:
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ Contains debug-only sub-panels:                                             │
 │                                                                             │
-│   ▸ Bindings              → BindingsSubPanel                                │
-│   ▸ Triggers              → TriggersSubPanel                                │
-│   ▸ Lifecycle             → LifecycleSubPanel                               │
-│   ▸ Beam Config           → BeamSubPanel                                    │
-│   ▸ Raw JSON              → JsonViewerPanel                                 │
-│   ▸ Performance           → PerformancePanel                                │
+│   ▸ Bindings              → BindingsSubPanel     ✅ Implemented             │
+│   ▸ Triggers              → TriggerSubPanel      ✅ Implemented             │
+│   ▸ Lifecycle             → LifecycleSubPanel    ✅ Implemented             │
+│   ▸ Beam Config           → BeamSubPanel         ✅ Implemented             │
+│   ▸ Raw JSON              → JsonViewerPanel      ⏳ Deferred                │
+│   ▸ Performance           → PerformancePanel     ⏳ Deferred (inline hints) │
 │                                                                             │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ Requires:                                                                   │
@@ -336,34 +350,64 @@ TabType enum:
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 3.5 ProfilePanel
+### 3.5 ProfilesPanel
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                            ProfilePanel                                      │
+│                            ProfilesPanel                                     │
 ├─────────────────────────────────────────────────────────────────────────────┤
+│ Records:                                                                    │
+│   ProfileEntry(String name, boolean isServer)                               │
+│                                                                             │
 │ UI:                                                                         │
-│   ┌──────────────────────────────────────┐                                  │
-│   │  Profile: [sphere_mesh     ▼]        │                                  │
-│   ├──────────────────────────────────────┤                                  │
-│   │  [💾 Save] [📂 Load] [📝 Rename]      │                                  │
-│   │  [🗑 Delete] [📤 Export] [📥 Import]  │                                  │
-│   ├──────────────────────────────────────┤                                  │
-│   │  Server Defaults:                    │                                  │
-│   │  [basic_sphere] [combat_mesh] ...    │                                  │
-│   └──────────────────────────────────────┘                                  │
-│   [ ] Auto-save changes                                                     │
+│   ┌───────────────────────────────────────────────────────────────────────┐ │
+│   │ Profiles (select list)        │ Category Presets (read-only)          │ │
+│   │                               │                                       │ │
+│   │  ● my_shield_v2   (local)     │  Shape:       Sphere Default          │ │
+│   │  ○ radar_pulse    (local)     │  Visibility:  Bands                   │ │
+│   │  ○ cage_wire      (local)     │  Arrangement: Wavey                   │ │
+│   │  ○ shield_default (server)    │  Fill:        Wireframe               │ │
+│   │  ○ aura_heal      (server)    │  Animation:   Spin Slow               │ │
+│   │                               │  Beam:        None                    │ │
+│   │                               │  Follow:      Smooth                  │ │
+│   │                               │  Prediction:  Medium                  │ │
+│   │                               │  (If no match → CUSTOM)               │ │
+│   │                                                                       │ │
+│   │  Name: [ my_shield_v2              ]                                  │ │
+│   │  Source: Local                                                        │ │
+│   ├───────────────────────────────────────────────────────────────────────┤ │
+│   │ Actions (Profiles tab only):                                          │ │
+│   │  Load   Save   Save As…   Revert   Rename   Duplicate   Delete        │ │
+│   │  Import JSON   Export JSON   Set Default                              │ │
+│   │                                                                       │ │
+│   │ Status: ● Unsaved changes (local)                                     │ │
+│   └───────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│ Behavior:                                                                   │
+│   - Local selected: Save enabled when dirty; Revert restores last saved    │
+│   - Server selected: Save disabled; Save As creates local copy             │
+│                                                                             │
+│ Global Bottom Bar (non-Profile tabs only):                                  │
+│   [ Profile: (dropdown) ] [ SAVE ] [ REVERT ]                               │
+│   - Hidden on Profiles tab                                                  │
+│   - Save As behavior when server profile loaded                             │
+│                                                                             │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ Methods:                                                                    │
-│   + loadProfile(String)                                                     │
-│   + saveProfile(String)                                                     │
-│   + deleteProfile(String)                                                   │
-│   + renameProfile(String, String)                                           │
-│   + exportProfile(Path)                                                     │
-│   + importProfile(Path)                                                     │
-│   + loadServerDefault(String)                                               │
-│   + refreshProfileList()                                                    │
-│   + refreshServerDefaults()                                                 │
+│   + loadProfile()                                                           │
+│   + saveProfile()                                                           │
+│   + saveProfileAs()                                                         │
+│   + revertProfile()                                                         │
+│   + deleteProfile()                                                         │
+│   + renameProfile()                                                         │
+│   + duplicateProfile()                                                      │
+│   + importJson()                                                            │
+│   + exportJson()                                                            │
+│   + setAsDefault()                                                          │
+│   + isServerSelected(): boolean                                             │
+│   + getSelectedProfile(): ProfileEntry                                      │
+│   + updateButtonStates()                                                    │
+│   + renderCategoryPresets(DrawContext)                                      │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -736,6 +780,34 @@ TabType enum:
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+### 5.4 BeamSubPanel
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          BeamSubPanel                                        │
+│                          (Debug: Central Beam)                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ PRESETS:                                                                    │
+│   • preset: EnumDropdown (DEFAULT, SUBTLE, INTENSE, PULSING, CUSTOM)        │
+│                                                                             │
+│ BASIC:                                                                      │
+│   • enabled: Toggle                                                         │
+│   • innerRadius: LabeledSlider (0.0-1.0)                                    │
+│   • outerRadius: LabeledSlider (0.1-2.0)                                    │
+│   • height: LabeledSlider (0.1-10.0)                                        │
+│   • glow: LabeledSlider (0.0-1.0)                                           │
+│   • color: ColorButton                                                      │
+│                                                                             │
+│ PULSE:                                                                      │
+│   • pulseEnabled: Toggle                                                    │
+│   • pulseScale: LabeledSlider (0.0-1.0)                                     │
+│   • pulseSpeed: LabeledSlider (0.1-5.0)                                     │
+│   • pulseWaveform: EnumDropdown (SINE, SQUARE, TRIANGLE, SAWTOOTH)          │
+│   • pulseMin: LabeledSlider (0.0-1.0)                                       │
+│   • pulseMax: LabeledSlider (0.5-2.0)                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## 6. Widget Classes
@@ -1009,13 +1081,25 @@ public enum PredictionPreset {
 | Category | Count | Classes |
 |----------|-------|---------|
 | Screen | 1 | FieldCustomizerScreen |
-| State | 3 | GuiState, EditorState, UndoManager |
-| Panels | 6 | Quick, Advanced, Debug, Layer, Primitive, Profile |
-| Sub-Panels | 13 | Shape, Appearance, Animation, Transform, Visibility, Arrangement, Fill, Linking, Prediction, FollowMode, Bindings, Triggers, Lifecycle |
-| Widgets | 7 | LabeledSlider, RangeSlider, EnumDropdown, ColorButton, Vec3Editor, ExpandableSection, TooltipWrapper, ActionButton |
+| State | 3 | FieldEditState, EditorState, UndoManager |
+| Panels | 6 | Quick, Advanced, Debug, Layer, Primitive, Profiles |
+| Sub-Panels | 14 | Shape, Appearance, Animation, Transform, Visibility, Arrangement, Fill, Linking, Prediction, FollowMode, Bindings, Triggers, Lifecycle, **Beam** |
+| Widgets | 9 | LabeledSlider, RangeSlider, EnumDropdown, ColorButton, Vec3Editor, ExpandableSection, TooltipWrapper, ActionButton, ColorPicker |
+| **Utilities** | **5** | **GuiWidgets, GuiAnimations, GuiLayout, GuiConstants, PresetRegistry** |
 | Network | 6 | Packets |
 | Profile | 3 | Profile, ProfileManager, ProfileValidator |
-| **Total** | **~40** | |
+| **Total** | **~50** | (+3 enums, updated Profile, PresetRegistry, BottomActionBar, ProfilesPanel) |
+
+---
+
+## 10.1 Shared Utility Classes
+
+These utilities live outside the GUI package but are used by it:
+
+| Class | Package | Purpose |
+|-------|---------|---------|
+| `FieldMath` | `visual.util` | Math utilities (lerp, smoothStep, catmullRom, etc.) |
+| `FieldColor` | `visual.util` | Color manipulation (lerp, mix, withAlpha, etc.) |
 
 ---
 
@@ -1023,7 +1107,7 @@ public enum PredictionPreset {
 
 ```
 FieldCustomizerScreen
-    ├── GuiState
+    ├── FieldEditState
     │   ├── EditorState
     │   ├── UndoManager
     │   └── FieldDefinition (from field system)
@@ -1064,6 +1148,229 @@ FieldCustomizerScreen
 - [03_PARAMETERS.md](../03_PARAMETERS.md) - Parameter reference
 
 ---
+
+
+---
+
+## 13. Category & Organization Enums
+
+### 13.1 PresetCategory
+
+```java
+/**
+ * Categories for organizing presets in the GUI.
+ * Used for two-tier dropdown: [Category ▼] [Preset ▼]
+ */
+public enum PresetCategory {
+    ADDITIVE("Additive", "Add elements to field"),      // Add rings, layers, etc.
+    STYLE("Style", "Visual style changes"),             // Wireframe, solid, etc.
+    ANIMATION("Animation", "Motion effects"),           // Spin, pulse, etc.
+    EFFECT("Effect", "Composite effects"),              // Combat ready, stealth, etc.
+    PERFORMANCE("Performance", "Detail level changes"); // Low/high detail
+
+    private final String displayName;
+    private final String description;
+    
+    public String getDisplayName() { return displayName; }
+    public String getDescription() { return description; }
+}
+```
+
+### 13.2 ProfileCategory
+
+```java
+/**
+ * Categories for organizing profiles in the GUI.
+ * Used for filtering in Profiles tab.
+ */
+public enum ProfileCategory {
+    COMBAT("Combat", "For battle situations"),
+    UTILITY("Utility", "Functional/practical"),
+    DECORATIVE("Decorative", "Visual only"),
+    EXPERIMENTAL("Experimental", "Testing/WIP");
+
+    private final String displayName;
+    private final String description;
+    
+    public String getDisplayName() { return displayName; }
+    public String getDescription() { return description; }
+}
+```
+
+### 13.3 ProfileSource
+
+```java
+/**
+ * Source/origin of a profile.
+ * Determines editability and storage location.
+ */
+public enum ProfileSource {
+    BUNDLED("Bundled", false),   // Shipped with mod, read-only
+    LOCAL("Local", true),        // User-created, editable
+    SERVER("Server", false);     // From server, read-only
+
+    private final String displayName;
+    private final boolean editable;
+    
+    public String getDisplayName() { return displayName; }
+    public boolean isEditable() { return editable; }
+}
+```
+
+---
+
+## 14. Updated Profile Record
+
+```java
+public record Profile(
+    int version,                  // Schema version
+    String name,                  // Profile name
+    String description,           // User description
+    FieldType type,               // Functional type (SHIELD, PERSONAL, etc.)
+    ProfileCategory category,     // Organizational category
+    List<String> tags,            // Additional tags for filtering
+    ProfileSource source,         // Where it came from
+    Instant created,              // Creation timestamp
+    Instant modified,             // Last modified
+    FieldDefinition definition
+) {
+    public static Profile fromJson(JsonObject json);
+    public JsonObject toJson();
+    
+    /** Display format: "Profile Name (category)" */
+    public String getDisplayName() {
+        return name + " (" + category.getDisplayName().toLowerCase() + ")";
+    }
+}
+```
+
+---
+
+## 15. Updated PresetRegistry
+
+```java
+/**
+ * Registry for multi-scope presets organized by category.
+ * Loads from: config/the-virus-block/field_presets/{category}/
+ */
+public class PresetRegistry {
+    
+    private static final Map<PresetCategory, List<PresetEntry>> presetsByCategory = new EnumMap<>();
+    
+    public record PresetEntry(
+        String id,
+        String name,
+        String description,
+        PresetCategory category,
+        JsonObject mergeData
+    ) {}
+    
+    /** Load all presets from disk, organized by category folders */
+    public static void loadAll();
+    
+    /** Get all categories that have presets */
+    public static List<PresetCategory> getCategories();
+    
+    /** Get presets for a specific category */
+    public static List<PresetEntry> getPresets(PresetCategory category);
+    
+    /** Apply a preset to the current state (merges, doesn't replace) */
+    public static void applyPreset(FieldEditState state, String presetId);
+    
+    /** Get affected categories for confirmation dialog */
+    public static List<String> getAffectedCategories(String presetId);
+}
+```
+
+---
+
+## 16. Updated BottomActionBar
+
+```java
+/**
+ * Global bottom action bar (hidden on Profiles tab).
+ * Now includes two-tier preset selection.
+ */
+public class BottomActionBar {
+    
+    // Preset selection (two-tier)
+    private CyclingButtonWidget<PresetCategory> presetCategoryDropdown;
+    private CyclingButtonWidget<String> presetDropdown;
+    
+    // Profile selection
+    private CyclingButtonWidget<String> profileDropdown;
+    private ButtonWidget saveButton;
+    private ButtonWidget revertButton;
+    
+    /** Update preset dropdown when category changes */
+    private void onPresetCategoryChanged(PresetCategory category);
+    
+    /** Show confirmation dialog when preset selected */
+    private void onPresetSelected(String presetId);
+    
+    /** Update button states based on dirty status */
+    private void updateButtonStates();
+}
+```
+
+**Bottom Action Bar Layout:**
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ PRESETS                           │ PROFILE                            │
+│ [Additive ▼] [Add Inner Ring ▼]   │ [My Shield (combat) ▼] [SAVE][REV] │
+│  ↑ Category    ↑ Preset           │  ↑ Name (category)                 │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 17. Updated ProfilesPanel
+
+```java
+/**
+ * Full profile management panel with filtering.
+ */
+public class ProfilesPanel {
+    
+    // Filters
+    private CyclingButtonWidget<ProfileSource> sourceFilter;    // All, Bundled, Local, Server
+    private CyclingButtonWidget<ProfileCategory> categoryFilter; // All, Combat, Utility, etc.
+    private TextFieldWidget searchField;
+    
+    // Profile list
+    private List<Profile> allProfiles;
+    private List<Profile> filteredProfiles;
+    private int selectedIndex;
+    
+    /** Apply filters and update visible list */
+    private void applyFilters();
+    
+    /** Render profile entry with format: "Name (category)" */
+    private void renderProfileEntry(Profile profile, int y, boolean selected);
+    
+    /** Get icon for source (🔒 for read-only, ✎ for editable) */
+    private String getSourceIcon(ProfileSource source);
+}
+```
+
+**Profiles Panel Layout:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Source: [All      ▼]    Category: [All      ▼]    [🔍 ______]  │
+├─────────────────────────────────────────────────────────────────┤
+│ ── BUNDLED ──                                                   │
+│   ○ Default Shield (utility)                                    │
+│   ○ Showcase Animated (decorative)                              │
+│ ── LOCAL ──                                                     │
+│   ● My Combat Shield (combat) ✎                                 │
+│   ○ Test Wireframe (experimental) ✎                             │
+│ ── SERVER ──                                                    │
+│   ○ Server Default (utility) 🔒                                 │
+├─────────────────────────────────────────────────────────────────┤
+│ [Load] [Save] [Save As] [Rename] [Duplicate] [Delete] [Export]  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 
 *Draft v1 - Maps to 03_PARAMETERS.md v5.1*
 

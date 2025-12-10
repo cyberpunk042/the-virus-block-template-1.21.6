@@ -4,7 +4,7 @@ import net.cyberpunk042.log.Logging;
 
 /**
  * Tracks current selection in the editor.
- * Separate from GuiState to keep selection logic isolated.
+ * Separate from FieldEditState to keep selection logic isolated.
  */
 public class EditorState {
     

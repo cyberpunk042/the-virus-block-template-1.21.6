@@ -6,10 +6,13 @@ import net.cyberpunk042.visual.animation.PulseConfig;
 import net.cyberpunk042.visual.animation.WobbleConfig;
 import net.cyberpunk042.visual.animation.WaveConfig;
 import net.cyberpunk042.visual.animation.AlphaPulseConfig;
+import net.cyberpunk042.visual.animation.ColorCycleConfig;
 import net.cyberpunk042.visual.animation.Waveform;
 
 import net.cyberpunk042.log.Logging;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.ColorHelper;
+import net.minecraft.util.math.MathHelper;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
@@ -78,14 +81,15 @@ public final class AnimationApplier {
     
     /**
      * Applies spin rotation.
+     * Uses {@link MathHelper#sin} for fast lookup-table based sine in oscillation mode.
      */
     public static void applySpin(MatrixStack matrices, SpinConfig spin, float time) {
         if (spin == null || !spin.isActive()) return;
         
         float angle;
         if (spin.oscillate()) {
-            // Oscillate within range
-            float progress = (float) Math.sin(time * spin.speed());
+            // Oscillate within range - MathHelper.sin is a fast lookup table
+            float progress = MathHelper.sin(time * spin.speed());
             angle = progress * spin.range() / 2;
         } else {
             // Continuous rotation
@@ -128,6 +132,7 @@ public final class AnimationApplier {
     
     /**
      * Applies wobble offset.
+     * Uses {@link MathHelper#sin} for fast lookup-table based sine.
      */
     public static void applyWobble(MatrixStack matrices, WobbleConfig wobble, float time) {
         if (wobble == null || !wobble.isActive()) return;
@@ -135,10 +140,10 @@ public final class AnimationApplier {
         Vector3f amplitude = wobble.amplitude();
         if (amplitude == null) return;
         
-        // Generate pseudo-random wobble
-        float wobbleX = (float) Math.sin(time * wobble.speed() * 1.0) * amplitude.x;
-        float wobbleY = (float) Math.sin(time * wobble.speed() * 1.3) * amplitude.y;
-        float wobbleZ = (float) Math.sin(time * wobble.speed() * 0.7) * amplitude.z;
+        // Generate pseudo-random wobble using MathHelper.sin (fast lookup table)
+        float wobbleX = MathHelper.sin(time * wobble.speed() * 1.0f) * amplitude.x;
+        float wobbleY = MathHelper.sin(time * wobble.speed() * 1.3f) * amplitude.y;
+        float wobbleZ = MathHelper.sin(time * wobble.speed() * 0.7f) * amplitude.z;
         
         matrices.translate(wobbleX, wobbleY, wobbleZ);
         Logging.ANIMATION.topic("wobble").trace("Wobble: ({}, {}, {})", wobbleX, wobbleY, wobbleZ);
@@ -164,6 +169,150 @@ public final class AnimationApplier {
         // Use Waveform.evaluate() for clean calculation (returns 0-1)
         float normalizedWave = alphaPulse.waveform().evaluate(time * alphaPulse.speed());
         
-        return alphaPulse.min() + normalizedWave * (alphaPulse.max() - alphaPulse.min());
+        // Use MathHelper.lerp for smooth interpolation
+        return MathHelper.lerp(normalizedWave, alphaPulse.min(), alphaPulse.max());
+    }
+    
+    // =========================================================================
+    // Color Cycle
+    // =========================================================================
+    
+    /**
+     * Calculates color cycle value (doesn't affect matrix).
+     * Uses {@link ColorHelper#lerp} for smooth color blending.
+     * 
+     * <p>This implements smooth cycling through multiple colors:
+     * <ul>
+     *   <li>With blend=true: smoothly interpolates between adjacent colors</li>
+     *   <li>With blend=false: hard cuts between colors</li>
+     * </ul>
+     * 
+     * @param colorCycle The color cycle config
+     * @param time Current time in ticks
+     * @return ARGB color value
+     */
+    public static int getColorCycle(ColorCycleConfig colorCycle, float time) {
+        if (colorCycle == null || !colorCycle.isActive()) {
+            return 0xFFFFFFFF; // Default white
+        }
+        
+        java.util.List<String> colors = colorCycle.colors();
+        if (colors == null || colors.isEmpty()) {
+            return 0xFFFFFFFF;
+        }
+        
+        int colorCount = colors.size();
+        
+        // Calculate position in cycle (0 to colorCount)
+        float cyclePos = (time * colorCycle.speed() * 0.05f) % colorCount;
+        if (cyclePos < 0) cyclePos += colorCount;
+        
+        int index1 = (int) cyclePos;
+        int index2 = (index1 + 1) % colorCount;
+        
+        int color1 = parseHexColor(colors.get(index1));
+        int color2 = parseHexColor(colors.get(index2));
+        
+        if (colorCycle.blend()) {
+            // Smooth blend using ColorHelper.lerp (Minecraft native)
+            float blendFactor = cyclePos - index1;
+            return ColorHelper.lerp(blendFactor, color1, color2);
+        } else {
+            // Hard cut
+            return color1;
+        }
+    }
+    
+    /**
+     * Parses a hex color string (#RRGGBB or #AARRGGBB).
+     */
+    private static int parseHexColor(String hex) {
+        if (hex == null || hex.isEmpty()) return 0xFFFFFFFF;
+        
+        String cleaned = hex.startsWith("#") ? hex.substring(1) : hex;
+        try {
+            if (cleaned.length() == 6) {
+                // RGB only, add full alpha
+                return 0xFF000000 | Integer.parseUnsignedInt(cleaned, 16);
+            } else if (cleaned.length() == 8) {
+                // ARGB
+                return Integer.parseUnsignedInt(cleaned, 16);
+            }
+        } catch (NumberFormatException e) {
+            Logging.ANIMATION.topic("color").warn("Invalid hex color: {}", hex);
+        }
+        return 0xFFFFFFFF;
+    }
+    
+    // =========================================================================
+    // Wave Displacement
+    // =========================================================================
+    
+    /**
+     * Calculates wave displacement for a vertex position.
+     * 
+     * <p>Wave animation creates a sinusoidal surface deformation based on
+     * vertex position and time. Uses {@link MathHelper#sin} for fast calculation.</p>
+     * 
+     * <p>The wave travels across the surface perpendicular to the direction axis:
+     * <ul>
+     *   <li>Direction Y: wave travels along XZ plane, displaces in Y</li>
+     *   <li>Direction X: wave travels along YZ plane, displaces in X</li>
+     *   <li>Direction Z: wave travels along XY plane, displaces in Z</li>
+     * </ul>
+     * 
+     * @param wave The wave configuration
+     * @param x Vertex X position
+     * @param y Vertex Y position
+     * @param z Vertex Z position
+     * @param time Current time in ticks
+     * @return Displacement vector [dx, dy, dz]
+     */
+    public static float[] getWaveDisplacement(WaveConfig wave, float x, float y, float z, float time) {
+        if (wave == null || !wave.isActive()) {
+            return new float[] {0, 0, 0};
+        }
+        
+        float amplitude = wave.amplitude();
+        float frequency = wave.frequency();
+        
+        // Calculate wave phase based on position perpendicular to direction
+        float phase;
+        switch (wave.direction()) {
+            case X -> phase = (y + z) * frequency + time * 0.1f;
+            case Y -> phase = (x + z) * frequency + time * 0.1f;
+            case Z -> phase = (x + y) * frequency + time * 0.1f;
+            default -> phase = (x + z) * frequency + time * 0.1f;
+        }
+        
+        // Calculate displacement using MathHelper.sin (fast lookup table)
+        float displacement = MathHelper.sin(phase) * amplitude;
+        
+        // Apply displacement along the direction axis
+        return switch (wave.direction()) {
+            case X -> new float[] {displacement, 0, 0};
+            case Y -> new float[] {0, displacement, 0};
+            case Z -> new float[] {0, 0, displacement};
+            default -> new float[] {0, displacement, 0};
+        };
+    }
+    
+    /**
+     * Applies wave displacement to a vertex position, returning new coordinates.
+     * 
+     * @param wave The wave configuration
+     * @param x Original X
+     * @param y Original Y
+     * @param z Original Z
+     * @param time Current time
+     * @return New position [x, y, z] with wave applied
+     */
+    public static float[] applyWaveToVertex(WaveConfig wave, float x, float y, float z, float time) {
+        float[] displacement = getWaveDisplacement(wave, x, y, z, time);
+        return new float[] {
+            x + displacement[0],
+            y + displacement[1],
+            z + displacement[2]
+        };
     }
 }

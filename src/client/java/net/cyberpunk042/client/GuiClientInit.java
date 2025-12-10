@@ -1,5 +1,6 @@
 package net.cyberpunk042.client;
 
+import net.cyberpunk042.client.gui.render.TestFieldRenderer;
 import net.cyberpunk042.client.network.GuiClientHandlers;
 import net.cyberpunk042.log.Logging;
 import net.fabricmc.api.ClientModInitializer;
@@ -39,8 +40,8 @@ public class GuiClientInit implements ClientModInitializer {
         // G144: Initialize profile storage
         // ProfileStorage.init();
         
-        // G145: Register debug field renderer
-        // DebugFieldRenderer.register();
+        // G145: Register test field renderer (client-side preview)
+        TestFieldRenderer.init();
         
         Logging.GUI.topic("init").info("GUI client initialized");
     }

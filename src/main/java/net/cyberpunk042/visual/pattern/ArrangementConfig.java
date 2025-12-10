@@ -110,6 +110,9 @@ public record ArrangementConfig(
     
     /**
      * Resolves the pattern for a part to an actual VertexPattern.
+     * <p><b>Warning:</b> Does not validate CellType compatibility.
+     * Use {@link #resolvePattern(String, CellType)} for validated resolution.</p>
+     * 
      * @param partName The part name
      * @return The VertexPattern for that part
      */
@@ -118,10 +121,54 @@ public record ArrangementConfig(
         return VertexPattern.fromString(patternName);
     }
     
+    /**
+     * Resolves the pattern for a part with CellType validation.
+     * <p>If the pattern's CellType doesn't match the expected type,
+     * logs an error to chat and returns null (caller should skip rendering).</p>
+     * 
+     * @param partName The part name
+     * @param expectedCellType The CellType the shape expects
+     * @return The VertexPattern, or null if incompatible
+     * @see VertexPattern#resolveForCellType(String, CellType)
+     */
+    public VertexPattern resolvePattern(String partName, CellType expectedCellType) {
+        String patternName = getPattern(partName);
+        return VertexPattern.resolveForCellType(patternName, expectedCellType);
+    }
+    
     // =========================================================================
     // Builder
     // =========================================================================
     
+    // =========================================================================
+    // Serialization
+    // =========================================================================
+    
+    /**
+     * Parses ArrangementConfig from JSON.
+     */
+    public static ArrangementConfig fromJson(com.google.gson.JsonElement json) {
+        // String shorthand: "arrangement": "wave_1"
+        if (json.isJsonPrimitive()) {
+            return builder().defaultPattern(json.getAsString()).build();
+        }
+        
+        // Full object
+        JsonObject obj = json.getAsJsonObject();
+        Builder builder = builder();
+        
+        if (obj.has("default")) {
+            builder.defaultPattern(obj.get("default").getAsString());
+        }
+        if (obj.has("defaultPattern")) {
+            builder.defaultPattern(obj.get("defaultPattern").getAsString());
+        }
+        // Note: Per-pattern configs would need PatternConfig.fromJson()
+        // For now, patterns are parsed via defaultPattern only
+        
+        return builder.build();
+    }
+
     public static Builder builder() { return new Builder(); }
     /**
      * Serializes this arrangement config to JSON.

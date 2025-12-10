@@ -42,7 +42,7 @@ public final class VirusTierBossBar {
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
 			SKY_TINT.removeByte(handler.player.getUuid());
 			ServerPlayNetworking.send(handler.player, new SkyTintPayload(false, false));
-			ServerWorld world = (ServerWorld) handler.player.getWorld();
+			ServerWorld world = handler.player.getWorld();
 			VirusWorldState state = VirusWorldState.get(world);
 			ServerPlayNetworking.send(handler.player, new DifficultySyncPayload(state.tiers().difficulty()));
 		});

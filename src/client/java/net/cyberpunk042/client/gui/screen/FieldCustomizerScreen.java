@@ -1,9 +1,12 @@
 package net.cyberpunk042.client.gui.screen;
 
 import net.cyberpunk042.client.gui.panel.*;
-import net.cyberpunk042.client.gui.state.GuiState;
+import net.cyberpunk042.field.profile.Profile;
+import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
+import net.cyberpunk042.client.gui.widget.BottomActionBar;
 import net.cyberpunk042.client.gui.widget.ToastNotification;
+import net.cyberpunk042.client.profile.ProfileManager;
 import net.cyberpunk042.log.Logging;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -23,7 +26,7 @@ import net.minecraft.text.Text;
  */
 public class FieldCustomizerScreen extends Screen {
     
-    private final GuiState state;
+    private final FieldEditState state;
     private TabType currentTab = TabType.QUICK;
     
     // Tab buttons
@@ -41,11 +44,14 @@ public class FieldCustomizerScreen extends Screen {
     // Close button
     private ButtonWidget closeBtn;
     
+    // Global bottom action bar (hidden on Profiles tab)
+    private BottomActionBar bottomBar;
+    
     public FieldCustomizerScreen() {
-        this(new GuiState());
+        this(new FieldEditState());
     }
     
-    public FieldCustomizerScreen(GuiState state) {
+    public FieldCustomizerScreen(FieldEditState state) {
         super(Text.literal("Field Customizer"));
         this.state = state;
         Logging.GUI.topic("screen").info("FieldCustomizerScreen created");
@@ -97,13 +103,41 @@ public class FieldCustomizerScreen extends Screen {
             .dimensions(width - 24, 4, 20, 20)
             .build());
         
-        // G114: Update tab button states
+        // G114: Initialize bottom action bar
+        bottomBar = new BottomActionBar(
+            state,
+            this::onBottomBarSave,
+            this::onBottomBarRevert,
+            this::onBottomBarProfileChanged
+        );
+        bottomBar.init(width, height);
+        
+        // G115: Update tab button states
         updateTabButtons();
         
-        // G115: Register current panel widgets
+        // G116: Register current panel widgets
         registerPanelWidgets();
         
         Logging.GUI.topic("screen").debug("FieldCustomizerScreen initialized");
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // BOTTOM BAR CALLBACKS
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    private void onBottomBarSave(String profileName) {
+        // TODO: Actually persist profile to storage
+        Logging.GUI.topic("screen").info("Bottom bar save: {}", profileName);
+    }
+    
+    private void onBottomBarRevert(String profileName) {
+        // TODO: Reload profile from storage
+        Logging.GUI.topic("screen").info("Bottom bar revert: {}", profileName);
+    }
+    
+    private void onBottomBarProfileChanged() {
+        // Refresh panels when profile changes
+        Logging.GUI.topic("screen").debug("Profile changed via bottom bar");
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -120,6 +154,11 @@ public class FieldCustomizerScreen extends Screen {
         currentTab = tab;
         updateTabButtons();
         clearAndRegisterWidgets();
+        
+        // Hide bottom bar on Profiles tab (it has its own richer UI)
+        if (bottomBar != null) {
+            bottomBar.setVisible(tab != TabType.PROFILES);
+        }
         
         Logging.GUI.topic("screen").debug("Switched to tab: {}", tab);
     }
@@ -150,6 +189,13 @@ public class FieldCustomizerScreen extends Screen {
         addDrawableChild(debugTabBtn);
         addDrawableChild(profilesTabBtn);
         addDrawableChild(closeBtn);
+        
+        // Register bottom bar widgets (if visible)
+        if (bottomBar != null && bottomBar.isVisible()) {
+            for (var widget : bottomBar.getWidgets()) {
+                addDrawableChild(widget);
+            }
+        }
         
         // Register current panel widgets
         registerPanelWidgets();
@@ -216,8 +262,13 @@ public class FieldCustomizerScreen extends Screen {
         // Render widgets (tab buttons, etc.)
         super.render(context, mouseX, mouseY, delta);
         
-        // Dirty indicator
-        if (state.isDirty()) {
+        // Render bottom action bar (unless on Profiles tab)
+        if (bottomBar != null && bottomBar.isVisible()) {
+            bottomBar.render(context, mouseX, mouseY, delta);
+        }
+        
+        // Dirty indicator (in tab bar, only if bottom bar hidden)
+        if (state.isDirty() && (bottomBar == null || !bottomBar.isVisible())) {
             context.drawText(textRenderer, "●", width - 40, 8, GuiConstants.WARNING, false);
         }
         
@@ -235,6 +286,7 @@ public class FieldCustomizerScreen extends Screen {
             case ADVANCED -> { if (advancedPanel != null) return advancedPanel.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount); }
             case DEBUG -> { if (debugPanel != null) return debugPanel.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount); }
             case PROFILES -> { if (profilesPanel != null) return profilesPanel.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount); }
+            default -> { /* QUICK tab doesn't need scroll handling */ }
         }
         return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }

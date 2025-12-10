@@ -8,6 +8,111 @@
 
 ---
 
+### New TODO: Preset System (cross-panels)
+| ID | Task | Status | Notes |
+|----|------|--------|-------|
+| G-PRESET-01 | ~~Implement preset registry~~ → Now split: FragmentRegistry (single-scope) + PresetRegistry (multi-scope) | ✅ | Refactored Dec 9: Preset→Fragment rename |
+| G-PRESET-02 | ~~Wire preset dropdowns into panels~~ → Fragment dropdowns in sub-panels + Preset dropdown in BottomActionBar | ✅ | Multi-scope presets load from field_presets/ |
+| G-PRESET-03 | Create example presets: Ethereal Glow, Tech Grid, Shield Ring, Danger Pulse, Stealth Fade | ✅ | config/the-virus-block/field_presets/ |
+
+---
+
+### New TODO: Command/GUI Unification (Architecture Refactor)
+> **Ref:** [GUI_ARCHITECTURE.md §11](./GUI_ARCHITECTURE.md#11-commandgui-unification)
+
+| ID | Task | Status | Priority | Notes |
+|----|------|--------|----------|-------|
+| G-CMD-01 | Create `FieldGuiUpdateS2CPayload` for command→client sync | ⬜ | High | Server commands update client FieldEditState |
+| G-CMD-02 | Refactor `/field` commands to send S2C packets (not static state) | ⬜ | High | Remove static fields from FieldCommand |
+| G-CMD-03 | Split `/fieldtest` - move FieldEditState-linked commands to `/field` | ⬜ | High | See architecture doc for split |
+| G-CMD-04 | Keep `/fieldtest` for debug-only: shuffle, vertex, cycle, spawn-from-registry | ⬜ | Medium | Power-user features |
+| G-CMD-05 | Create `TestFieldRenderer` (client-side preview field) | ⬜ | High | Reads FieldEditState, follows player |
+| G-CMD-06 | Add test field spawn/despawn button to Debug tab | ⬜ | Medium | GUI control for test field |
+| G-CMD-07 | Implement debounce in FieldEditState for test field updates | ⬜ | Medium | 50-100ms debounce |
+| G-CMD-08 | Add `/field test spawn/despawn/toggle` commands | ⬜ | Medium | Command control for test field |
+| G-CMD-09 | Add `/field status` command (show current FieldEditState summary) | ⬜ | Low | Debug aid |
+| G-CMD-10 | Add `/field reset` command (reset FieldEditState to defaults) | ⬜ | Low | Utility |
+
+---
+
+### New TODO: /field Command Coverage
+> Complete list of `/field` commands needed
+
+| ID | Task | Status | Priority | Notes |
+|----|------|--------|----------|-------|
+| G-FCMD-01 | `/field shape <type>` and all shape params | ⬜ | High | radius, latSteps, etc. |
+| G-FCMD-02 | `/field transform` params (anchor, scale, offset, rotation) | ⬜ | High | |
+| G-FCMD-03 | `/field orbit` params (enabled, radius, speed, axis, phase) | ⬜ | Medium | |
+| G-FCMD-04 | `/field fill` params (mode, wireThickness, doubleSided) | ⬜ | High | |
+| G-FCMD-05 | `/field visibility` params (mask, count, thickness, etc.) | ⬜ | Medium | |
+| G-FCMD-06 | `/field appearance` params (color, alpha, glow, emissive) | ⬜ | High | |
+| G-FCMD-07 | `/field animation` params (spin, pulse, alphaFade) | ⬜ | Medium | |
+| G-FCMD-08 | `/field modifier` params (bobbing, breathing, colorCycle, wobble, wave) | ⬜ | Low | |
+| G-FCMD-09 | `/field layer` management (select, add, remove, blend, alpha) | ⬜ | Medium | |
+| G-FCMD-10 | `/field primitive` management (select, add, remove) | ⬜ | Medium | |
+| G-FCMD-11 | `/field binding` management (add, remove, clear) | ⬜ | Low | |
+| G-FCMD-12 | `/field beam` params (enabled, radius, height, etc.) | ⬜ | Low | |
+| G-FCMD-13 | `/field follow` and `/field prediction` | ⬜ | Medium | |
+| G-FCMD-14 | `/field fragment <category> <name>` | ⬜ | Low | Apply single-scope |
+| G-FCMD-15 | `/field preset apply <name>` | ⬜ | Low | Apply multi-scope |
+| G-FCMD-16 | `/field profile load/save/list` | ⬜ | Medium | Profile management |
+
+---
+
+### New TODO: Remaining Shape Parameters (from SHAPE_MATRIX.md §2-6)
+> **Ref:** [../../04_SHAPE_MATRIX.md](../../04_SHAPE_MATRIX.md) §2-6
+
+| ID | Task | Status | Priority | Notes |
+|----|------|--------|----------|-------|
+| G-SHAPE-01 | Ring: `arcStart`, `arcEnd` sliders (0-360°) | ⬜ | Medium | Partial arc support |
+| G-SHAPE-02 | Ring: `height` slider for 3D tube mode | ⬜ | Medium | Transform flat ring to tube |
+| G-SHAPE-03 | Ring: `twist` slider (-360 to 360°) | ⬜ | Low | Möbius-like effect |
+| G-SHAPE-04 | Disc: `arcStart`, `arcEnd` sliders (Pac-Man) | ⬜ | Medium | Partial disc |
+| G-SHAPE-05 | Disc: `innerRadius` slider (annulus) | ⬜ | Medium | Ring-like disc |
+| G-SHAPE-06 | Disc: `rings` slider (concentric divisions) | ⬜ | Low | Multiple rings |
+| G-SHAPE-07 | Prism: `topRadius` slider (taper/pyramid) | ⬜ | Medium | Cone-like prism |
+| G-SHAPE-08 | Prism: `twist` slider | ⬜ | Low | Twisted prism |
+| G-SHAPE-09 | Prism: `capTop`, `capBottom` toggles | ⬜ | Low | Cap control |
+| G-SHAPE-10 | Cylinder: `arc` slider (partial cylinder) | ⬜ | Medium | Half-pipe etc. |
+| G-SHAPE-11 | Cylinder: `topRadius` slider (cone-like) | ⬜ | Medium | Tapered cylinder |
+| G-SHAPE-12 | Cylinder: `capTop`, `capBottom`, `openEnded` toggles | ⬜ | Low | Cap/tube control |
+| G-SHAPE-13 | Polyhedron: `subdivisions` slider (0-5) | ⬜ | Low | Smoothing |
+
+---
+
+### New TODO: Transform Orbit System (from SHAPE_MATRIX.md §10)
+> **Ref:** [../../04_SHAPE_MATRIX.md](../../04_SHAPE_MATRIX.md) §10
+
+| ID | Task | Status | Priority | Notes |
+|----|------|--------|----------|-------|
+| G-ORBIT-01 | `orbit.enabled` toggle | ⬜ | Low | Enable orbit mode |
+| G-ORBIT-02 | `orbit.radius` slider | ⬜ | Low | Orbit distance |
+| G-ORBIT-03 | `orbit.speed` slider | ⬜ | Low | Rotation speed |
+| G-ORBIT-04 | `orbit.axis` dropdown (X, Y, Z) | ⬜ | Low | Orbit plane |
+| G-ORBIT-05 | `orbit.phase` slider (0-1) | ⬜ | Low | Starting position |
+
+---
+
+### New TODO: Layer Advanced Options (from SHAPE_MATRIX.md §15)
+> **Ref:** [../../04_SHAPE_MATRIX.md](../../04_SHAPE_MATRIX.md) §15
+
+| ID | Task | Status | Priority | Notes |
+|----|------|--------|----------|-------|
+| G-LAYER-01 | `blendMode` dropdown (NORMAL, ADD, MULTIPLY, SCREEN) | ⬜ | Low | Layer blending |
+| G-LAYER-02 | `order` slider (render order) | ⬜ | Low | Manual ordering |
+
+---
+
+### New TODO: Field Modifiers (from SHAPE_MATRIX.md §16)
+> **Ref:** [../../04_SHAPE_MATRIX.md](../../04_SHAPE_MATRIX.md) §16
+
+| ID | Task | Status | Priority | Notes |
+|----|------|--------|----------|-------|
+| G-MOD-01 | `modifiers.bobbing` slider | ⬜ | Low | Vertical oscillation |
+| G-MOD-02 | `modifiers.breathing` slider | ⬜ | Low | Scale breathing |
+
+---
+
 ## How to Use
 
 ### Option A: One Task at a Time
@@ -35,14 +140,13 @@ G01 → G01-CHK → G02 → G02-CHK → ...
 
 | Status | Count |
 |--------|-------|
-| ✅ Done | 36 |
+| ✅ Done | 120+ |
 | 🔄 In Progress | 0 |
-| ⬜ Pending | 103 |
+| ⬜ Pending | ~50 (includes new shape params) |
 
-> **Batches 1-2:** ✅ Complete (G09-G10 manual)  
-> **Batches 3-12:** ⬜ Pending  
-> **Start:** Batch 1 (Foundation)  
-> **End:** Batch 12 (Final Polish)
+> **Batches 1-14:** ✅ Mostly Complete  
+> **New Tasks:** Shape params, Orbit, Layer blend, Field modifiers  
+> **Preset System:** ✅ Complete (G-PRESET-01/02/03) - Refactored to Fragment + Preset terminology
 
 ---
 
@@ -59,7 +163,7 @@ G01 → G01-CHK → G02 → G02-CHK → ...
 |----|------|--------|---------|
 | G01 | `FieldCustomizerScreen extends Screen` - basic structure, close on ESC | ✅ | screen |
 | G01-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ✅ | - |
-| G02 | `GuiState` class - originalDefinition, workingDefinition, isDirty | ✅ | state |
+| G02 | `FieldEditState` class - originalDefinition, workingDefinition, isDirty | ✅ | state |
 | G02-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ✅ | - |
 | G03 | `EditorState` class - selectedLayerIndex, selectedPrimitiveIndex | ✅ | state |
 | G03-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ✅ | - |
@@ -150,7 +254,7 @@ G01 → G01-CHK → G02 → G02-CHK → ...
 
 | ID | Task | Status | Package |
 |----|------|--------|---------|
-| G31 | `ExpandableSection` - state persistence to GuiState | ⬜ | widget |
+| G31 | `ExpandableSection` - state persistence to FieldEditState | ⬜ | widget |
 | G31-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ⬜ | - |
 | G32 | `ConfirmDialog` utility - reusable yes/no dialog | ⬜ | widget |
 | G32-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ⬜ | - |
@@ -228,7 +332,7 @@ G01 → G01-CHK → G02 → G02-CHK → ...
 | G55-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ✅ | - |
 | G56 | Layer reorder [▲][▼] buttons | ✅ | panel |
 | G56-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ✅ | - |
-| G57 | Connect Quick Panel widgets to GuiState | ✅ | panel |
+| G57 | Connect Quick Panel widgets to FieldEditState | ✅ | panel |
 | G57-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ✅ | - |
 | G58 | Live apply changes to DEBUG FIELD | ✅ | panel |
 | G58-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ✅ | - |

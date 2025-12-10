@@ -1,9 +1,10 @@
 package net.cyberpunk042.field;
 
 import com.google.gson.JsonObject;
-import com.google.gson.JsonArray;
 
 import net.cyberpunk042.field.primitive.Primitive;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
 import net.cyberpunk042.visual.animation.Animation;
 import net.cyberpunk042.visual.layer.BlendMode;
 import net.cyberpunk042.visual.transform.Transform;
@@ -41,8 +42,8 @@ import java.util.List;
 public record FieldLayer(
     String id,
     List<Primitive> primitives,
-    Transform transform,
-    Animation animation,
+    @JsonField(skipIfEqualsConstant = "IDENTITY") Transform transform,
+    @JsonField(skipIfEqualsConstant = "NONE") Animation animation,
     float alpha,
     boolean visible,
     BlendMode blendMode
@@ -72,6 +73,41 @@ public record FieldLayer(
     /**
      * Builder for complex layers.
      */
+    // =========================================================================
+    // Serialization
+    // =========================================================================
+    
+    /**
+     * Parses FieldLayer from JSON.
+     * Delegates to FieldLoader for full parsing with $ref resolution.
+     */
+    public static FieldLayer fromJson(JsonObject json) {
+        String id = json.has("id") ? json.get("id").getAsString() : "layer";
+        boolean visible = !json.has("visible") || json.get("visible").getAsBoolean();
+        float alpha = json.has("alpha") ? json.get("alpha").getAsFloat() : 1.0f;
+        
+        BlendMode blendMode = BlendMode.NORMAL;
+        if (json.has("blendMode")) {
+            try {
+                blendMode = BlendMode.valueOf(json.get("blendMode").getAsString().toUpperCase());
+            } catch (Exception ignored) {}
+        }
+        
+        Transform transform = json.has("transform") 
+            ? Transform.fromJson(json.getAsJsonObject("transform"))
+            : Transform.IDENTITY;
+        
+        Animation animation = json.has("animation")
+            ? Animation.fromJson(json.getAsJsonObject("animation"))
+            : Animation.NONE;
+        
+        // Note: primitives require FieldLoader for full parsing with $ref
+        // For direct fromJson, we create empty list - use FieldLoader.parseDefinition() for full parsing
+        java.util.List<Primitive> primitives = java.util.Collections.emptyList();
+        
+        return new FieldLayer(id, primitives, transform, animation, alpha, visible, blendMode);
+    }
+
     public static Builder builder(String id) {
         return new Builder(id);
     }
@@ -79,38 +115,7 @@ public record FieldLayer(
      * Serializes this layer to JSON.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("id", id);
-        json.addProperty("alpha", alpha);
-        json.addProperty("visible", visible);
-        json.addProperty("blendMode", blendMode.name());
-        
-        // Serialize primitives
-        JsonArray primitivesArray = new JsonArray();
-        for (Primitive primitive : primitives) {
-            if (primitive instanceof net.cyberpunk042.field.loader.SimplePrimitive simple) {
-                primitivesArray.add(simple.toJson());
-            } else {
-                // For other Primitive implementations, create basic JSON
-                JsonObject primJson = new JsonObject();
-                primJson.addProperty("id", primitive.id());
-                primJson.addProperty("type", primitive.type());
-                primitivesArray.add(primJson);
-            }
-        }
-        json.add("primitives", primitivesArray);
-        
-        // Serialize transform
-        if (transform != null && transform != Transform.IDENTITY) {
-            json.add("transform", transform.toJson());
-        }
-        
-        // Serialize animation
-        if (animation != null && animation != Animation.NONE) {
-            json.add("animation", animation.toJson());
-        }
-        
-        return json;
+        return JsonSerializer.toJson(this);
     }
 
 

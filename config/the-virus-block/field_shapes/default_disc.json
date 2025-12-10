@@ -1,0 +1,10 @@
+{
+  "name": "Default",
+  "description": "Standard flat disc",
+  "type": "disc",
+  "radius": 3.0,
+  "segments": 96,
+  "y": 0.0,
+  "innerRadius": 0.0
+}
+

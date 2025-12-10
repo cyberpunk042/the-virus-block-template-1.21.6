@@ -1,7 +1,7 @@
 package net.cyberpunk042.client.gui.panel;
 
 import net.cyberpunk042.client.gui.panel.sub.*;
-import net.cyberpunk042.client.gui.state.GuiState;
+import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.log.Logging;
 import net.minecraft.client.gui.DrawContext;
@@ -27,17 +27,22 @@ public class AdvancedPanel extends AbstractPanel {
     private ShapeSubPanel shapeSubPanel;
     private AppearanceSubPanel appearanceSubPanel;
     private AnimationSubPanel animationSubPanel;
+    private ModifiersSubPanel modifiersSubPanel;
     private TransformSubPanel transformSubPanel;
+    private OrbitSubPanel orbitSubPanel;
     private VisibilitySubPanel visibilitySubPanel;
     private ArrangementSubPanel arrangementSubPanel;
     private FillSubPanel fillSubPanel;
+    private LinkingSubPanel linkingSubPanel;
+    private PredictionSubPanel predictionSubPanel;
+    private FollowModeSubPanel followModeSubPanel;
     
     // Scroll state
     private int scrollOffset = 0;
     private int contentHeight = 0;
     private static final int SCROLL_SPEED = 10;
     
-    public AdvancedPanel(Screen parent, GuiState state) {
+    public AdvancedPanel(Screen parent, FieldEditState state) {
         super(parent, state);
         Logging.GUI.topic("panel").debug("AdvancedPanel created");
     }
@@ -64,10 +69,20 @@ public class AdvancedPanel extends AbstractPanel {
         animationSubPanel.init(width, height);
         contentY += animationSubPanel.getHeight() + GuiConstants.SECTION_SPACING;
         
+        // Modifiers & Animation Extras (bobbing, breathing, colorCycle, wobble, wave)
+        modifiersSubPanel = new ModifiersSubPanel(parent, state);
+        modifiersSubPanel.init(width, height);
+        contentY += modifiersSubPanel.getContentHeight() + GuiConstants.SECTION_SPACING;
+        
         // Transform (anchor, offset, rotation, scale)
         transformSubPanel = new TransformSubPanel(parent, state, contentY);
         transformSubPanel.init(width, height);
         contentY += transformSubPanel.getHeight() + GuiConstants.SECTION_SPACING;
+        
+        // Orbit (orbital motion around anchor)
+        orbitSubPanel = new OrbitSubPanel(parent, state);
+        orbitSubPanel.init(width, height);
+        contentY += orbitSubPanel.getContentHeight() + GuiConstants.SECTION_SPACING;
         
         // Visibility (masks)
         visibilitySubPanel = new VisibilitySubPanel(parent, state, contentY);
@@ -84,9 +99,21 @@ public class AdvancedPanel extends AbstractPanel {
         fillSubPanel.init(width, height);
         contentY += fillSubPanel.getHeight() + GuiConstants.SECTION_SPACING;
         
+        // Linking (primitive linking)
+        linkingSubPanel = new LinkingSubPanel(state, 0, contentY, width);
+        contentY += linkingSubPanel.getHeight() + GuiConstants.SECTION_SPACING;
+        
+        // Prediction (movement prediction settings)
+        predictionSubPanel = new PredictionSubPanel(state, 0, contentY, width);
+        contentY += predictionSubPanel.getHeight() + GuiConstants.SECTION_SPACING;
+        
+        // Follow Mode (how field follows player)
+        followModeSubPanel = new FollowModeSubPanel(state, 0, contentY, width);
+        contentY += followModeSubPanel.getHeight() + GuiConstants.SECTION_SPACING;
+        
         contentHeight = contentY;
         
-        Logging.GUI.topic("panel").debug("AdvancedPanel initialized with 7 sub-panels, height: {}", contentHeight);
+        Logging.GUI.topic("panel").debug("AdvancedPanel initialized with 10 sub-panels, height: {}", contentHeight);
     }
     
     @Override
@@ -98,6 +125,7 @@ public class AdvancedPanel extends AbstractPanel {
         if (visibilitySubPanel != null) visibilitySubPanel.tick();
         if (arrangementSubPanel != null) arrangementSubPanel.tick();
         if (fillSubPanel != null) fillSubPanel.tick();
+        // linkingSubPanel, predictionSubPanel, followModeSubPanel don't need tick
     }
     
     @Override
@@ -112,10 +140,17 @@ public class AdvancedPanel extends AbstractPanel {
         renderSubPanel(shapeSubPanel, context, mouseX, mouseY, delta);
         renderSubPanel(appearanceSubPanel, context, mouseX, mouseY, delta);
         renderSubPanel(animationSubPanel, context, mouseX, mouseY, delta);
+        renderSubPanel(modifiersSubPanel, context, mouseX, mouseY, delta);
         renderSubPanel(transformSubPanel, context, mouseX, mouseY, delta);
+        renderSubPanel(orbitSubPanel, context, mouseX, mouseY, delta);
         renderSubPanel(visibilitySubPanel, context, mouseX, mouseY, delta);
         renderSubPanel(arrangementSubPanel, context, mouseX, mouseY, delta);
         renderSubPanel(fillSubPanel, context, mouseX, mouseY, delta);
+        
+        // New-style sub-panels render themselves differently
+        if (linkingSubPanel != null) linkingSubPanel.render(context, mouseX, mouseY + scrollOffset, delta);
+        if (predictionSubPanel != null) predictionSubPanel.render(context, mouseX, mouseY + scrollOffset, delta);
+        if (followModeSubPanel != null) followModeSubPanel.render(context, mouseX, mouseY + scrollOffset, delta);
         
         context.disableScissor();
         

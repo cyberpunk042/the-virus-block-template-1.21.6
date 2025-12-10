@@ -2,7 +2,8 @@
 
 > **Purpose:** Every possible customization parameter for every shape and type  
 > **Status:** Comprehensive inventory  
-> **Date:** December 7, 2024
+> **Date:** December 7, 2024  
+> **Last Updated:** December 9, 2024 - Animation features complete
 
 ---
 
@@ -14,6 +15,43 @@
 | 📋 | Documented but not implemented |
 | ❓ | Potential addition (not documented) |
 | 🔮 | Future phase |
+
+---
+
+## 0. Shape/CellType/Pattern Compatibility Matrix
+
+> **IMPORTANT:** Not all patterns work with all shapes. The GUI filters patterns by CellType.
+
+### Shape → CellType Mapping
+
+| Shape | Primary CellType | Parts |
+|-------|-----------------|-------|
+| **Sphere** | QUAD | main, poles, equator, hemisphereTop, hemisphereBottom |
+| **Ring** | SEGMENT | main |
+| **Disc** | SECTOR | main |
+| **Prism** | QUAD | sides (QUAD), caps (SECTOR) |
+| **Cylinder** | QUAD | sides (QUAD), caps (SECTOR) |
+| **Polyhedron** | QUAD or TRIANGLE | Depends on polyType |
+
+### CellType → Compatible Patterns
+
+| CellType | Compatible Patterns | Example Use |
+|----------|---------------------|-------------|
+| **QUAD** | filled_1, triangle_1-4, wave_1, tooth_1, parallelogram_1-2, stripe_1 | Sphere lat/lon cells, Prism sides |
+| **SEGMENT** | full, alternating, sparse, quarter, zigzag, dashed | Ring segments |
+| **SECTOR** | full, half, quarters, pinwheel, trisector, spiral, crosshair | Disc wedges, caps |
+| **EDGE** | full, latitude, longitude, sparse, minimal, dashed, grid | Wireframe edges |
+| **TRIANGLE** | full, alternating, inverted, sparse, fan, radial | Icosphere faces |
+
+### ⚠️ Incompatible Combinations (Will Log Error)
+
+| Shape | Incompatible Patterns | Reason |
+|-------|----------------------|--------|
+| Ring | QUAD patterns (filled_1, etc.) | Ring uses SEGMENT cells |
+| Disc | QUAD/SEGMENT patterns | Disc uses SECTOR cells |
+| Sphere | SECTOR/SEGMENT patterns | Sphere uses QUAD cells |
+
+> **Runtime:** `PatternResolver` validates and logs mismatches
 
 ---
 
@@ -247,21 +285,23 @@
 | **Core** |
 | `mode` | enum | SOLID | ✅ | SOLID, WIREFRAME, CAGE, POINTS |
 | `wireThickness` | float | 1.0 | ✅ | Line thickness |
-| **Proposed** |
-| `doubleSided` | boolean | false | 📋 | Render both sides |
-| `depthTest` | boolean | true | 📋 | Depth testing |
-| `depthWrite` | boolean | true | 📋 | Write to depth |
-| **Cage-Specific** |
-| `cage.latitudeCount` | int | 8 | 📋 | Latitude lines |
-| `cage.longitudeCount` | int | 16 | 📋 | Longitude lines |
-| `cage.showEquator` | boolean | true | 📋 | Highlight equator |
-| `cage.showPoles` | boolean | true | 📋 | Highlight poles |
+| **Render Options** |
+| `doubleSided` | boolean | false | ✅ | Render both sides |
+| `depthTest` | boolean | true | ✅ | Depth testing |
+| `depthWrite` | boolean | false | ✅ | Write to depth |
+| **Cage-Specific (SphereCageOptions)** |
+| `cage.lineWidth` | float | 1.0 | ✅ | Line width |
+| `cage.latitudeCount` | int | 8 | ✅ | Latitude lines |
+| `cage.longitudeCount` | int | 16 | ✅ | Longitude lines |
+| `cage.showEquator` | boolean | true | ✅ | Highlight equator |
+| `cage.showPoles` | boolean | true | ✅ | Highlight poles |
+| `cage.showEdges` | boolean | true | ✅ | Show edge lines |
 | **Wireframe-Specific (Potential)** |
 | `dashPattern` | array | - | ❓ | [on, off] lengths |
 | `dashOffset` | float | 0 | ❓ | Dash start offset |
 | **Points-Specific** |
-| `pointSize` | float | 2.0 | 🔮 | Point size |
-| `pointShape` | enum | CIRCLE | 🔮 | CIRCLE, SQUARE, STAR |
+| `pointSize` | float | 0.02 | ✅ | Point size (billboarded quads) |
+| `pointShape` | enum | SQUARE | 🔮 | CIRCLE, SQUARE, STAR |
 
 ---
 
@@ -321,23 +361,41 @@
 |-----------|------|---------|--------|-------|
 | **Core (Implemented)** |
 | `spin` | float | 0 | ✅ | Rotation speed |
-| `spinAxis` | enum | Y | ✅ | X, Y, Z |
+| `spinAxis` | enum | Y | ✅ | X, Y, Z, CUSTOM |
 | `pulse` | float | 0 | ✅ | Scale pulse speed |
 | `pulseAmount` | float | 0 | ✅ | Scale pulse amplitude |
 | `phase` | float | 0 | ✅ | Animation phase offset |
 | `alphaPulse` | float | 0 | ✅ | Alpha pulse speed |
 | `alphaPulseAmount` | float | 0 | ✅ | Alpha pulse amplitude |
-| **Proposed SpinConfig** |
-| `spin.oscillate` | boolean | false | 📋 | Back-and-forth |
-| `spin.range` | float | 360 | 📋 | Oscillation range |
-| **Proposed PulseConfig** |
-| `pulse.waveform` | enum | SINE | 📋 | SINE, SQUARE, TRIANGLE_WAVE, SAWTOOTH |
-| `pulse.min` | float | 0.9 | 📋 | Minimum scale |
-| `pulse.max` | float | 1.1 | 📋 | Maximum scale |
-| **Future** |
-| `colorCycle` | object | null | 🔮 | Color animation |
-| `wobble` | object | null | 🔮 | Random movement |
-| `wave` | object | null | 🔮 | Wave deformation |
+| **SpinConfig (Implemented)** |
+| `spin.axis` | enum | Y | ✅ | X, Y, Z, CUSTOM |
+| `spin.speed` | float | 0.02 | ✅ | Rotation speed |
+| `spin.oscillate` | boolean | false | ✅ | Back-and-forth mode |
+| `spin.range` | float | 360 | ✅ | Oscillation range |
+| `spin.customAxis` | Vec3 | null | ✅ | Custom rotation axis |
+| **PulseConfig (Implemented)** |
+| `pulse.waveform` | enum | SINE | ✅ | SINE, SQUARE, TRIANGLE_WAVE, SAWTOOTH |
+| `pulse.speed` | float | 1.0 | ✅ | Pulse speed |
+| `pulse.min` | float | 0.9 | ✅ | Minimum scale |
+| `pulse.max` | float | 1.1 | ✅ | Maximum scale |
+| **AlphaPulseConfig (Implemented)** |
+| `alphaPulse.waveform` | enum | SINE | ✅ | SINE, SQUARE, TRIANGLE_WAVE, SAWTOOTH |
+| `alphaPulse.speed` | float | 1.0 | ✅ | Pulse speed |
+| `alphaPulse.min` | float | 0.5 | ✅ | Minimum alpha |
+| `alphaPulse.max` | float | 1.0 | ✅ | Maximum alpha |
+| **ColorCycleConfig (Implemented)** |
+| `colorCycle.colors` | array | null | ✅ | List of hex colors ["#FF0000", "#00FF00"] |
+| `colorCycle.speed` | float | 1.0 | ✅ | Cycle speed |
+| `colorCycle.blend` | boolean | true | ✅ | Smooth blend vs hard cut |
+| **WobbleConfig (Implemented)** |
+| `wobble.amplitude` | Vec3 | (0.1,0.05,0.1) | ✅ | Wobble amplitude per axis |
+| `wobble.speed` | float | 1.0 | ✅ | Wobble speed |
+| **WaveConfig (Implemented)** |
+| `wave.amplitude` | float | 0.1 | ✅ | Wave displacement amount |
+| `wave.frequency` | float | 2.0 | ✅ | Wave frequency |
+| `wave.direction` | enum | Y | ✅ | X, Y, Z - displacement axis |
+
+> **Note:** All animation uses `MathHelper.sin()` (fast lookup table) and `ColorHelper.lerp()` for performance.
 
 ---
 
@@ -400,32 +458,56 @@
 
 ---
 
-## 17. Summary: Implementation Priority
+## 17. Summary: Implementation Status
 
-### Phase 1 (Core)
-- All ✅ parameters (already implemented)
-- All 📋 Appearance parameters (per user Q3)
-- Transform: `anchor`, `facing`, `billboard`
-- Fill: cage-specific options
-- Visibility: `offset`, `invert`, `animate`
-- TrianglePattern
+### ✅ COMPLETE (December 2024)
 
-### Phase 2 (Polish)
-- GUI development
-- Transform: orbit system
-- Animation: waveform, oscillate
-- Layer: visible, blendMode, order
+| Category | Items |
+|----------|-------|
+| **All Core Shapes** | Sphere, Ring, Disc, Prism, Cylinder, Polyhedron |
+| **Fill Modes** | SOLID, WIREFRAME, CAGE (with SphereCageOptions), POINTS |
+| **Animation** | Spin, Pulse, AlphaPulse, ColorCycle, Wobble, Wave |
+| **Transform** | Offset, Rotation, Scale, Anchor, Facing, Billboard |
+| **Visibility** | FULL, BANDS, STRIPES, CHECKER, RADIAL, GRADIENT + offset/invert/feather |
+| **Appearance** | Color, Alpha, Glow, Emissive, Saturation |
+| **Prediction** | Enable, LeadTicks, MaxDistance, LookAhead, VerticalBoost |
+| **Follow Mode** | SNAP, SMOOTH, GLIDE |
+| **Beam** | Enable, Inner/Outer radius, Color, Height, Glow, Pulse |
 
-### Phase 3 (Advanced)
-- Primitive linking
-- Wire dash patterns
-- Band direction control
+### 📋 REMAINING (Phase 2-3)
 
-### Phase 4 (New Shapes)
-- Torus, Cone, Helix
-- All 🔮 parameters
+| Priority | Category | Items |
+|----------|----------|-------|
+| **Medium** | Shape: Ring | `arcStart`, `arcEnd`, `height` (3D tube) |
+| **Medium** | Shape: Disc | `arcStart`, `arcEnd`, `innerRadius` |
+| **Medium** | Shape: Cylinder | `arc` (partial), `topRadius` (taper) |
+| **Low** | Transform | `orbit` system |
+| **Low** | Fill | `dashPattern` for wireframe |
+| **Low** | Shape: Prism/Cylinder | `twist`, `heightSegments`, `capTop/capBottom` |
+
+### 🔮 FUTURE (Phase 4+)
+
+| Category | Items |
+|----------|-------|
+| **New Shapes** | Torus, Cone, Helix |
+| **Fill** | `pointShape` (CIRCLE, STAR variants) |
+| **Advanced** | Fresnel, Metallicness, Roughness |
 
 ---
 
-*Complete parameter matrix - shows exactly what's implemented vs planned.*
+## 18. Minecraft Native Utilities Used
+
+> Performance optimizations using Minecraft's built-in utilities
+
+| Utility | Usage | Performance Benefit |
+|---------|-------|---------------------|
+| `MathHelper.sin()` | Waveform, Spin, Wobble, Wave | Fast lookup table vs Math.sin() |
+| `MathHelper.cos()` | Sphere cage rendering | Fast lookup table |
+| `MathHelper.lerp()` | Alpha interpolation | Optimized linear interp |
+| `MathHelper.floor()` | Waveform normalization | Integer conversion |
+| `ColorHelper.lerp()` | ColorCycle blending | Per-channel color interp |
+
+---
+
+*Complete parameter matrix - updated December 9, 2024*
 

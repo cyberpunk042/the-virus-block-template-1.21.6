@@ -30,11 +30,15 @@ public final class DiscRenderer extends AbstractPrimitiveRenderer {
             return null;
         }
         
-        // Get pattern from arrangement config
+        // Get pattern from arrangement config with CellType validation
         VertexPattern pattern = null;
         ArrangementConfig arrangement = primitive.arrangement();
         if (arrangement != null) {
-            pattern = arrangement.resolvePattern("surface");
+            // Validate pattern is compatible with disc's SECTOR cells
+            pattern = arrangement.resolvePattern("surface", shape.primaryCellType());
+            if (pattern == null) {
+                return null; // Mismatch logged to chat
+            }
         }
         
         // Get visibility mask

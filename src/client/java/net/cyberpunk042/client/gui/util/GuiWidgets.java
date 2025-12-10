@@ -6,6 +6,7 @@ import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.widget.*;
 import net.minecraft.text.Text;
 
+import java.util.List;
 import java.util.function.Consumer;
 
 /**
@@ -130,6 +131,36 @@ public final class GuiWidgets {
     
     private static <E extends Enum<E>> String formatEnumName(E val) {
         return val.name().toLowerCase().replace("_", " ");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // STRING DROPDOWN
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Create a simple string dropdown selector.
+     */
+    public static CyclingButtonWidget<String> stringDropdown(
+            int x, int y, int width,
+            String label, List<String> values, String initial, String tooltip,
+            Consumer<String> onChange) {
+        
+        Logging.GUI.topic("widget").trace("Creating string dropdown: {} = {}", label, initial);
+        
+        String safeInitial = (initial != null && values.contains(initial) && !values.isEmpty())
+                ? initial
+                : (values.isEmpty() ? "" : values.get(0));
+        
+        // Explicit type parameter to avoid Object inference
+        return CyclingButtonWidget.<String>builder(val ->
+                    Text.literal(label + ": " + val))
+            .values(values)
+            .initially(safeInitial)
+            .tooltip(val -> Tooltip.of(Text.literal(tooltip)))
+            .build(x, y, width, GuiConstants.WIDGET_HEIGHT, Text.literal(label), (btn, val) -> {
+                Logging.GUI.topic("dropdown").trace("{} → {}", label, val);
+                onChange.accept(val);
+            });
     }
     
     // ═══════════════════════════════════════════════════════════════════════════

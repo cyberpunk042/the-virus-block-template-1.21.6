@@ -19,7 +19,7 @@ public final class GuiPacketSender {
      */
     public static void saveProfile(String name, String json) {
         Logging.GUI.topic("network").debug("Sending profile save: {}", name);
-        ClientPlayNetworking.send(new ProfileSaveC2SPayload(name, json));
+        ClientPlayNetworking.send(ProfileSaveC2SPayload.applyToShield(name, json));
     }
     
     /**

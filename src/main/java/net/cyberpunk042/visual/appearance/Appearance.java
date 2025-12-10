@@ -93,6 +93,38 @@ public record Appearance(
     // Builder
     // =========================================================================
     
+    // =========================================================================
+    // Serialization
+    // =========================================================================
+    
+    /**
+     * Parses Appearance from JSON.
+     */
+    public static Appearance fromJson(JsonObject json) {
+        Builder builder = builder();
+        
+        if (json.has("color")) {
+            builder.color(json.get("color").getAsString());
+        }
+        if (json.has("alpha")) {
+            com.google.gson.JsonElement alphaEl = json.get("alpha");
+            if (alphaEl.isJsonPrimitive()) {
+                builder.alpha(AlphaRange.of(alphaEl.getAsFloat()));
+            } else if (alphaEl.isJsonObject()) {
+                JsonObject alphaObj = alphaEl.getAsJsonObject();
+                float min = alphaObj.has("min") ? alphaObj.get("min").getAsFloat() : 1.0f;
+                float max = alphaObj.has("max") ? alphaObj.get("max").getAsFloat() : min;
+                builder.alpha(AlphaRange.of(min, max));
+            }
+        }
+        if (json.has("glow")) builder.glow(json.get("glow").getAsFloat());
+        if (json.has("emissive")) builder.emissive(json.get("emissive").getAsFloat());
+        if (json.has("saturation")) builder.saturation(json.get("saturation").getAsFloat());
+        // Note: PatternConfig is handled separately via ArrangementConfig
+        
+        return builder.build();
+    }
+
     public static Builder builder() { return new Builder(); }
     /**
      * Serializes this appearance to JSON.

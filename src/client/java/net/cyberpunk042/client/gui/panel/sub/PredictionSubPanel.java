@@ -1,0 +1,272 @@
+package net.cyberpunk042.client.gui.panel.sub;
+
+import net.cyberpunk042.client.gui.state.FieldEditState;
+import net.cyberpunk042.client.gui.util.GuiConstants;
+import net.cyberpunk042.client.gui.util.GuiLayout;
+import net.cyberpunk042.client.gui.widget.LabeledSlider;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.widget.ClickableWidget;
+import net.minecraft.client.gui.widget.CyclingButtonWidget;
+import net.minecraft.text.Text;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Sub-panel for movement prediction settings.
+ * Controls how the field anticipates player movement.
+ * 
+ * Features:
+ * - Preset selector (OFF, LOW, MEDIUM, HIGH, CUSTOM)
+ * - Custom mode exposes all parameters:
+ *   - enabled: Toggle prediction on/off
+ *   - leadTicks: How many ticks ahead to predict (1-10)
+ *   - maxDistance: Maximum prediction distance (1-50)
+ *   - lookAhead: How much to weight velocity (0-1)
+ *   - verticalBoost: Extra vertical compensation (0-2)
+ * 
+ * @see <a href="GUI_CLASS_DIAGRAM.md §4.9">PredictionSubPanel specification</a>
+ */
+public class PredictionSubPanel {
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ENUMS
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /** Prediction presets for quick configuration. */
+    public enum PredictionPreset {
+        OFF("Off", false, 0, 0f, 0f, 0f),
+        LOW("Low", true, 1, 4f, 0.2f, 0f),
+        MEDIUM("Medium", true, 2, 8f, 0.5f, 0f),
+        HIGH("High", true, 3, 12f, 0.8f, 0f),
+        CUSTOM("Custom", true, 2, 8f, 0.5f, 0f);
+        
+        private final String displayName;
+        public final boolean enabled;
+        public final int leadTicks;
+        public final float maxDistance;
+        public final float lookAhead;
+        public final float verticalBoost;
+        
+        PredictionPreset(String displayName, boolean enabled, int leadTicks, 
+                         float maxDistance, float lookAhead, float verticalBoost) {
+            this.displayName = displayName;
+            this.enabled = enabled;
+            this.leadTicks = leadTicks;
+            this.maxDistance = maxDistance;
+            this.lookAhead = lookAhead;
+            this.verticalBoost = verticalBoost;
+        }
+        
+        public String getDisplayName() { return displayName; }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // FIELDS
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    private final FieldEditState state;
+    private final List<ClickableWidget> widgets = new ArrayList<>();
+    private final GuiLayout layout;
+    
+    // Widgets
+    private CyclingButtonWidget<PredictionPreset> presetButton;
+    private CyclingButtonWidget<Boolean> enabledButton;
+    private LabeledSlider leadTicksSlider;
+    private LabeledSlider maxDistanceSlider;
+    private LabeledSlider lookAheadSlider;
+    private LabeledSlider verticalBoostSlider;
+    
+    // State
+    private PredictionPreset currentFragment = PredictionPreset.MEDIUM;
+    private boolean applyingFragment = false;
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CONSTRUCTOR
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Creates a new PredictionSubPanel.
+     * 
+     * @param state The GUI state to bind to
+     * @param x Starting X position
+     * @param y Starting Y position
+     * @param width Panel width
+     */
+    public PredictionSubPanel(FieldEditState state, int x, int y, int width) {
+        this.state = state;
+        this.layout = new GuiLayout(x, y, GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING, width);
+        initWidgets();
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // INITIALIZATION
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    private void initWidgets() {
+        int controlWidth = layout.getPanelWidth() - GuiConstants.PADDING * 2;
+        
+        // ─────────────────────────────────────────────────────────────────────────
+        // Preset Selector - quick presets for common configurations
+        // ─────────────────────────────────────────────────────────────────────────
+        presetButton = CyclingButtonWidget.<PredictionPreset>builder(p -> Text.literal(p.getDisplayName()))
+            .values(PredictionPreset.values())
+            .initially(currentFragment)
+            .build(
+                layout.getStartX() + GuiConstants.PADDING,
+                layout.getStartY(),
+                controlWidth,
+                GuiConstants.ELEMENT_HEIGHT,
+                Text.literal("Preset"),
+                (button, value) -> applyPreset(value)
+            );
+        widgets.add(presetButton);
+        layout.nextRow();
+        
+        // ─────────────────────────────────────────────────────────────────────────
+        // Enabled Toggle - master on/off for prediction
+        // ─────────────────────────────────────────────────────────────────────────
+        enabledButton = CyclingButtonWidget.<Boolean>builder(v -> Text.literal(v ? "Enabled" : "Disabled"))
+            .values(List.of(false, true))
+            .initially(state.isPredictionEnabled())
+            .build(
+                layout.getStartX() + GuiConstants.PADDING,
+                layout.getStartY(),
+                controlWidth,
+                GuiConstants.ELEMENT_HEIGHT,
+                Text.literal("Prediction"),
+                (button, value) -> onUserChange(() -> state.setPredictionEnabled(value))
+            );
+        widgets.add(enabledButton);
+        layout.nextRow();
+        
+        // ─────────────────────────────────────────────────────────────────────────
+        // Lead Ticks - how many game ticks ahead to predict
+        // ─────────────────────────────────────────────────────────────────────────
+        leadTicksSlider = new LabeledSlider(
+            layout.getStartX() + GuiConstants.PADDING,
+            layout.getStartY(),
+            controlWidth,
+            "Lead Ticks",
+            1f, 10f,
+            (float) state.getPredictionLeadTicks(),
+            "%d", 1f,
+            v -> onUserChange(() -> state.setPredictionLeadTicks(v.intValue()))
+        );
+        widgets.add(leadTicksSlider);
+        layout.nextRow();
+        
+        // ─────────────────────────────────────────────────────────────────────────
+        // Max Distance - maximum prediction distance in blocks
+        // ─────────────────────────────────────────────────────────────────────────
+        maxDistanceSlider = new LabeledSlider(
+            layout.getStartX() + GuiConstants.PADDING,
+            layout.getStartY(),
+            controlWidth,
+            "Max Distance",
+            1f, 50f,
+            state.getPredictionMaxDistance(),
+            "%.1f", null,
+            v -> onUserChange(() -> state.setPredictionMaxDistance(v))
+        );
+        widgets.add(maxDistanceSlider);
+        layout.nextRow();
+        
+        // ─────────────────────────────────────────────────────────────────────────
+        // Look Ahead - velocity weighting factor (0 = position only, 1 = full velocity)
+        // ─────────────────────────────────────────────────────────────────────────
+        lookAheadSlider = new LabeledSlider(
+            layout.getStartX() + GuiConstants.PADDING,
+            layout.getStartY(),
+            controlWidth,
+            "Look Ahead",
+            0f, 1f,
+            state.getPredictionLookAhead(),
+            "%.2f", null,
+            v -> onUserChange(() -> state.setPredictionLookAhead(v))
+        );
+        widgets.add(lookAheadSlider);
+        layout.nextRow();
+        
+        // ─────────────────────────────────────────────────────────────────────────
+        // Vertical Boost - extra compensation for vertical movement (jumping, falling)
+        // ─────────────────────────────────────────────────────────────────────────
+        verticalBoostSlider = new LabeledSlider(
+            layout.getStartX() + GuiConstants.PADDING,
+            layout.getStartY(),
+            controlWidth,
+            "Vertical Boost",
+            0f, 2f,
+            state.getPredictionVerticalBoost(),
+            "%.2f", null,
+            v -> onUserChange(() -> state.setPredictionVerticalBoost(v))
+        );
+        widgets.add(verticalBoostSlider);
+        layout.nextRow();
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PRESET APPLICATION
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Applies a prediction preset, updating all controls and state.
+     * CUSTOM preset does not change values, just enables manual editing.
+     */
+    private void applyPreset(PredictionPreset preset) {
+        applyingFragment = true;
+        currentFragment = preset;
+        if (preset != PredictionPreset.CUSTOM) {
+            state.setPredictionEnabled(preset.enabled);
+            state.setPredictionLeadTicks(preset.leadTicks);
+            state.setPredictionMaxDistance(preset.maxDistance);
+            state.setPredictionLookAhead(preset.lookAhead);
+            state.setPredictionVerticalBoost(preset.verticalBoost);
+        }
+        boolean isCustom = (preset == PredictionPreset.CUSTOM);
+        enabledButton.active = isCustom || preset == PredictionPreset.OFF;
+        leadTicksSlider.active = isCustom;
+        maxDistanceSlider.active = isCustom;
+        lookAheadSlider.active = isCustom;
+        verticalBoostSlider.active = isCustom;
+        syncFromState();
+        applyingFragment = false;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PUBLIC API
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /** Returns all widgets for registration with the parent screen. */
+    public List<ClickableWidget> getWidgets() {
+        return widgets;
+    }
+    
+    /** Renders the sub-panel. */
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        // Widgets render themselves when registered with the screen
+    }
+    
+    /** Returns the total height of this sub-panel. */
+    public int getHeight() {
+        return layout.getCurrentY() - layout.getStartY();
+    }
+
+    private void syncFromState() {
+        if (enabledButton != null) enabledButton.setValue(state.isPredictionEnabled());
+        if (leadTicksSlider != null) leadTicksSlider.setValue(state.getPredictionLeadTicks());
+        if (maxDistanceSlider != null) maxDistanceSlider.setValue(state.getPredictionMaxDistance());
+        if (lookAheadSlider != null) lookAheadSlider.setValue(state.getPredictionLookAhead());
+        if (verticalBoostSlider != null) verticalBoostSlider.setValue(state.getPredictionVerticalBoost());
+        if (presetButton != null) presetButton.setValue(currentFragment);
+    }
+
+    private void onUserChange(Runnable r) {
+        r.run();
+        if (!applyingFragment) {
+            currentFragment = PredictionPreset.CUSTOM;
+            if (presetButton != null) presetButton.setValue(currentFragment);
+        }
+    }
+}
+

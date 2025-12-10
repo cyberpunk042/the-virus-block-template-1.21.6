@@ -79,6 +79,17 @@ public record FieldDefinition(
 ) {
     
     /**
+     * Parses a FieldDefinition from JSON.
+     * Delegates to FieldLoader for full parsing with $ref resolution and defaults.
+     * 
+     * @param json the JSON object to parse
+     * @return parsed FieldDefinition
+     */
+    public static FieldDefinition fromJson(JsonObject json) {
+        return net.cyberpunk042.field.loader.FieldLoader.fromJson(json);
+    }
+    
+    /**
      * Creates an empty definition.
      */
     public static FieldDefinition empty(String id) {

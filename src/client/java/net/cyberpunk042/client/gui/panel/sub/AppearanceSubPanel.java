@@ -1,7 +1,7 @@
 package net.cyberpunk042.client.gui.panel.sub;
 
 import net.cyberpunk042.client.gui.panel.AbstractPanel;
-import net.cyberpunk042.client.gui.state.GuiState;
+import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.widget.ColorButton;
 import net.cyberpunk042.client.gui.widget.ExpandableSection;
@@ -45,7 +45,7 @@ public class AppearanceSubPanel extends AbstractPanel {
     private ColorButton primaryColorBtn;
     private ColorButton secondaryColorBtn;
     
-    public AppearanceSubPanel(Screen parent, GuiState state, int startY) {
+    public AppearanceSubPanel(Screen parent, FieldEditState state, int startY) {
         super(parent, state);
         this.startY = startY;
         Logging.GUI.topic("panel").debug("AppearanceSubPanel created");

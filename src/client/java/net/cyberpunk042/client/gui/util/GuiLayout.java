@@ -8,6 +8,7 @@ public class GuiLayout {
     private int startX;
     private int startY;
     private int rowHeight;
+    private int panelWidth;
     private int currentX;
     private int currentY;
     
@@ -15,6 +16,17 @@ public class GuiLayout {
         this.startX = startX;
         this.startY = startY;
         this.rowHeight = rowHeight;
+        this.panelWidth = 200; // default width
+        this.currentX = startX;
+        this.currentY = startY;
+    }
+    
+    /** Constructor with panel width for sub-panels. */
+    public GuiLayout(int startX, int startY, int rowHeight, int panelWidth) {
+        this.startX = startX;
+        this.startY = startY;
+        this.rowHeight = rowHeight;
+        this.panelWidth = panelWidth;
         this.currentX = startX;
         this.currentY = startY;
     }
@@ -37,6 +49,12 @@ public class GuiLayout {
     public int getX() { return currentX; }
     public int getY() { return currentY; }
     public int getCurrentY() { return currentY; }
+    
+    // Aliases for sub-panel consistency
+    public int getStartX() { return startX; }
+    public int getStartY() { return startY; }
+    public int getPanelWidth() { return panelWidth; }
+    public void setPanelWidth(int width) { this.panelWidth = width; }
     
     public int nextRow() {
         int y = currentY;

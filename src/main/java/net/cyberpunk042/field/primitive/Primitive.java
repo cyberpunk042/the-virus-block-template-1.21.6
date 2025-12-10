@@ -1,5 +1,6 @@
 package net.cyberpunk042.field.primitive;
 
+import com.google.gson.JsonObject;
 import net.cyberpunk042.visual.animation.Animation;
 import net.cyberpunk042.visual.appearance.Appearance;
 import net.cyberpunk042.visual.fill.FillConfig;
@@ -134,4 +135,10 @@ public interface Primitive {
     default float getRadius() {
         return shape().getRadius();
     }
+    
+    /**
+     * Serializes this primitive to JSON.
+     * @return JsonObject representation
+     */
+    JsonObject toJson();
 }

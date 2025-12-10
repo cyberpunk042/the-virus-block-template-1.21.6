@@ -1,6 +1,6 @@
 package net.cyberpunk042.client.gui.panel;
 
-import net.cyberpunk042.client.gui.state.GuiState;
+import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 
@@ -10,12 +10,12 @@ import net.minecraft.client.gui.screen.Screen;
 public abstract class AbstractPanel {
     
     protected final Screen parent;
-    protected final GuiState state;
+    protected final FieldEditState state;
     protected int panelWidth;
     protected int panelHeight;
     protected int scrollOffset = 0;
     
-    protected AbstractPanel(Screen parent, GuiState state) {
+    protected AbstractPanel(Screen parent, FieldEditState state) {
         this.parent = parent;
         this.state = state;
     }

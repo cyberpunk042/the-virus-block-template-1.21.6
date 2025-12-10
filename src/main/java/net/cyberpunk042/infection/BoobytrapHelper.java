@@ -206,7 +206,7 @@ public final class BoobytrapHelper {
 	}
 
 	public static void debugList(ServerPlayerEntity player, int radius) {
-		ServerWorld world = (ServerWorld) player.getWorld();
+		ServerWorld world = player.getWorld();
 		BlockPos origin = player.getBlockPos();
 		BlockPos.Mutable mutable = new BlockPos.Mutable();
 		int found = 0;

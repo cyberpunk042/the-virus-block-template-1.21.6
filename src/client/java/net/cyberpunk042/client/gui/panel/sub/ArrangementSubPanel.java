@@ -1,10 +1,11 @@
 package net.cyberpunk042.client.gui.panel.sub;
 
 import net.cyberpunk042.client.gui.panel.AbstractPanel;
-import net.cyberpunk042.client.gui.state.GuiState;
+import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.GuiWidgets;
 import net.cyberpunk042.client.gui.widget.ExpandableSection;
+import net.cyberpunk042.client.gui.util.FragmentRegistry;
 import net.cyberpunk042.log.Logging;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -27,6 +28,9 @@ public class ArrangementSubPanel extends AbstractPanel {
     private ExpandableSection section;
     private int startY;
     private final List<net.minecraft.client.gui.widget.ClickableWidget> widgets = new ArrayList<>();
+    private CyclingButtonWidget<String> fragmentDropdown;
+    private boolean applyingFragment = false;
+    private String currentFragment = "Default";
     
     /** Quad patterns (for filled shapes). */
     public enum QuadPattern {
@@ -73,7 +77,7 @@ public class ArrangementSubPanel extends AbstractPanel {
     private CyclingButtonWidget<SectorPattern> sectorDropdown;
     private CyclingButtonWidget<Boolean> multiPartToggle;
     
-    public ArrangementSubPanel(Screen parent, GuiState state, int startY) {
+    public ArrangementSubPanel(Screen parent, FieldEditState state, int startY) {
         super(parent, state);
         this.startY = startY;
         Logging.GUI.topic("panel").debug("ArrangementSubPanel created");
@@ -94,40 +98,52 @@ public class ArrangementSubPanel extends AbstractPanel {
         int x = GuiConstants.PADDING;
         int y = section.getContentY();
         int w = width - GuiConstants.PADDING * 2;
+
+        // Preset dropdown
+        fragmentDropdown = CyclingButtonWidget.<String>builder(net.minecraft.text.Text::literal)
+            .values(FragmentRegistry.listArrangementFragments())
+            .initially(currentFragment)
+            .build(
+                x, y, w, GuiConstants.WIDGET_HEIGHT,
+                net.minecraft.text.Text.literal("Preset"),
+                (btn, val) -> applyPreset(val)
+            );
+        widgets.add(fragmentDropdown);
+        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
         // Quad pattern
         quadDropdown = GuiWidgets.enumDropdown(x, y, w, "Quad Pattern", QuadPattern.class, QuadPattern.FILLED,
-            "Pattern for filled quads", v -> {
+            "Pattern for filled quads", v -> onUserChange(() -> {
                 state.setQuadPattern(v.name());
                 Logging.GUI.topic("arrangement").debug("Quad: {}", v);
-            });
+            }));
         widgets.add(quadDropdown);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
         // Segment pattern
         segmentDropdown = GuiWidgets.enumDropdown(x, y, w, "Line Pattern", SegmentPattern.class, SegmentPattern.FULL,
-            "Pattern for line segments", v -> {
+            "Pattern for line segments", v -> onUserChange(() -> {
                 state.setSegmentPattern(v.name());
                 Logging.GUI.topic("arrangement").debug("Segment: {}", v);
-            });
+            }));
         widgets.add(segmentDropdown);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
         // Sector pattern
         sectorDropdown = GuiWidgets.enumDropdown(x, y, w, "Sector Pattern", SectorPattern.class, SectorPattern.FULL,
-            "Pattern for pie sectors", v -> {
+            "Pattern for pie sectors", v -> onUserChange(() -> {
                 state.setSectorPattern(v.name());
                 Logging.GUI.topic("arrangement").debug("Sector: {}", v);
-            });
+            }));
         widgets.add(sectorDropdown);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
         // Multi-part toggle
         multiPartToggle = GuiWidgets.toggle(x, y, w, "Multi-Part", false,
-            "Enable per-region patterns (caps, sides, poles)", v -> {
+            "Enable per-region patterns (caps, sides, poles)", v -> onUserChange(() -> {
                 state.setMultiPartArrangement(v);
                 Logging.GUI.topic("arrangement").debug("Multi-part: {}", v);
-            });
+            }));
         widgets.add(multiPartToggle);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
@@ -152,5 +168,38 @@ public class ArrangementSubPanel extends AbstractPanel {
         all.add(section.getHeaderButton());
         all.addAll(widgets);
         return all;
+    }
+
+    private void onUserChange(Runnable r) {
+        r.run();
+        if (!applyingFragment) {
+            currentFragment = "Custom";
+            if (fragmentDropdown != null) fragmentDropdown.setValue("Custom");
+        }
+    }
+
+    private void applyPreset(String name) {
+        if ("Custom".equalsIgnoreCase(name)) {
+            currentFragment = "Custom";
+            return;
+        }
+        applyingFragment = true;
+        currentFragment = name;
+        FragmentRegistry.applyArrangementFragment(state, name);
+        syncFromState();
+        applyingFragment = false;
+    }
+
+    private void syncFromState() {
+        if (quadDropdown != null) {
+            try { quadDropdown.setValue(QuadPattern.valueOf(state.getQuadPattern())); } catch (IllegalArgumentException ignored) {}
+        }
+        if (segmentDropdown != null) {
+            try { segmentDropdown.setValue(SegmentPattern.valueOf(state.getSegmentPattern())); } catch (IllegalArgumentException ignored) {}
+        }
+        if (sectorDropdown != null) {
+            try { sectorDropdown.setValue(SectorPattern.valueOf(state.getSectorPattern())); } catch (IllegalArgumentException ignored) {}
+        }
+        if (multiPartToggle != null) multiPartToggle.setValue(state.isMultiPartArrangement());
     }
 }

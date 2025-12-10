@@ -22,6 +22,12 @@ import com.google.gson.JsonObject;
  *   <li><b>swirlStrength</b>: Surface distortion/swirl effect</li>
  * </ul>
  * 
+ * <h2>Animation Modifiers</h2>
+ * <ul>
+ *   <li><b>bobbing</b>: Vertical oscillation strength (0-1)</li>
+ *   <li><b>breathing</b>: Scale breathing strength (0-1)</li>
+ * </ul>
+ * 
  * <h2>Flags</h2>
  * <ul>
  *   <li><b>inverted</b>: Inverts push/pull effects</li>
@@ -50,6 +56,10 @@ public record Modifiers(
     float tiltMultiplier,
     float swirlStrength,
     
+    // Animation modifiers
+    float bobbing,    // Vertical oscillation strength (0-1)
+    float breathing,  // Scale breathing strength (0-1)
+    
     // Flags
     boolean inverted,
     boolean pulsing
@@ -61,6 +71,7 @@ public record Modifiers(
     public static final Modifiers DEFAULT = new Modifiers(
         1.0f, 1.0f, 1.0f, 1.0f,  // multipliers
         1.0f, 0.0f, 0.0f,         // visual
+        0.0f, 0.0f,               // animation (bobbing, breathing)
         false, false              // flags
     );
     
@@ -140,6 +151,13 @@ public record Modifiers(
         return visualScale != 1.0f || tiltMultiplier != 0.0f || swirlStrength != 0.0f;
     }
     
+    /**
+     * Checks if any animation modifiers are active.
+     */
+    public boolean hasAnimationModifiers() {
+        return bobbing != 0.0f || breathing != 0.0f;
+    }
+    
     // ─────────────────────────────────────────────────────────────────────────
     // Combining
     // ─────────────────────────────────────────────────────────────────────────
@@ -156,6 +174,8 @@ public record Modifiers(
             visualScale * other.visualScale,
             tiltMultiplier + other.tiltMultiplier,
             swirlStrength + other.swirlStrength,
+            Math.max(bobbing, other.bobbing),      // Use stronger animation
+            Math.max(breathing, other.breathing),  // Use stronger animation
             inverted ^ other.inverted,  // XOR for inversion
             pulsing || other.pulsing
         );
@@ -176,6 +196,8 @@ public record Modifiers(
         if (visualScale != 1.0f) json.addProperty("visualScale", visualScale);
         if (tiltMultiplier != 0.0f) json.addProperty("tilt", tiltMultiplier);
         if (swirlStrength != 0.0f) json.addProperty("swirl", swirlStrength);
+        if (bobbing != 0.0f) json.addProperty("bobbing", bobbing);
+        if (breathing != 0.0f) json.addProperty("breathing", breathing);
         if (inverted) json.addProperty("inverted", true);
         if (pulsing) json.addProperty("pulsing", true);
         
@@ -191,14 +213,17 @@ public record Modifiers(
             .visualScale(json.has("visualScale") ? json.get("visualScale").getAsFloat() : 1.0f)
             .tiltMultiplier(json.has("tilt") ? json.get("tilt").getAsFloat() : 0.0f)
             .swirlStrength(json.has("swirl") ? json.get("swirl").getAsFloat() : 0.0f)
+            .bobbing(json.has("bobbing") ? json.get("bobbing").getAsFloat() : 0.0f)
+            .breathing(json.has("breathing") ? json.get("breathing").getAsFloat() : 0.0f)
             .inverted(json.has("inverted") && json.get("inverted").getAsBoolean())
             .pulsing(json.has("pulsing") && json.get("pulsing").getAsBoolean())
             .build();
         
-        if (mods.hasVisualModifiers()) {
+        if (mods.hasVisualModifiers() || mods.hasAnimationModifiers()) {
             Logging.REGISTRY.topic("modifiers").debug(
-                "Parsed modifiers with visuals: scale={:.2f}, tilt={:.2f}, swirl={:.2f}",
-                mods.visualScale(), mods.tiltMultiplier(), mods.swirlStrength());
+                "Parsed modifiers: scale={:.2f}, tilt={:.2f}, swirl={:.2f}, bobbing={:.2f}, breathing={:.2f}",
+                mods.visualScale(), mods.tiltMultiplier(), mods.swirlStrength(), 
+                mods.bobbing(), mods.breathing());
         }
         
         return mods;
@@ -216,6 +241,8 @@ public record Modifiers(
         private float visualScale = 1.0f;
         private float tiltMultiplier = 0.0f;
         private float swirlStrength = 0.0f;
+        private float bobbing = 0.0f;
+        private float breathing = 0.0f;
         private boolean inverted = false;
         private boolean pulsing = false;
         
@@ -226,6 +253,8 @@ public record Modifiers(
         public Builder visualScale(float v) { this.visualScale = v; return this; }
         public Builder tiltMultiplier(float v) { this.tiltMultiplier = v; return this; }
         public Builder swirlStrength(float v) { this.swirlStrength = v; return this; }
+        public Builder bobbing(float v) { this.bobbing = v; return this; }
+        public Builder breathing(float v) { this.breathing = v; return this; }
         public Builder inverted(boolean v) { this.inverted = v; return this; }
         public Builder pulsing(boolean v) { this.pulsing = v; return this; }
         
@@ -233,6 +262,7 @@ public record Modifiers(
             return new Modifiers(
                 radiusMultiplier, strengthMultiplier, alphaMultiplier, spinMultiplier,
                 visualScale, tiltMultiplier, swirlStrength,
+                bobbing, breathing,
                 inverted, pulsing
             );
         }

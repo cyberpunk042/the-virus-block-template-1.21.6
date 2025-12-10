@@ -3,6 +3,8 @@ package net.cyberpunk042.visual.animation;
 import com.google.gson.JsonObject;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3f;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
 import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
 
@@ -21,9 +23,9 @@ import net.cyberpunk042.visual.validation.ValueRange;
  * @see Animation
  */
 public record WobbleConfig(
-    @Nullable Vector3f amplitude,
+    @JsonField(skipIfNull = true) @Nullable Vector3f amplitude,
     @Range(ValueRange.POSITIVE) float speed,
-    boolean randomize
+    @JsonField(skipIfDefault = true, defaultValue = "true") boolean randomize
 ) {
     /**
      * Parses WobbleConfig from JSON.
@@ -88,17 +90,7 @@ public record WobbleConfig(
      * Serializes this wobble config to JSON.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        if (amplitude != null) {
-            com.google.gson.JsonArray ampArr = new com.google.gson.JsonArray();
-            ampArr.add(amplitude.x);
-            ampArr.add(amplitude.y);
-            ampArr.add(amplitude.z);
-            json.add("amplitude", ampArr);
-        }
-        json.addProperty("speed", speed);
-        if (!randomize) json.addProperty("randomize", false);
-        return json;
+        return JsonSerializer.toJson(this);
     }
     
     // =========================================================================

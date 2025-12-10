@@ -1,0 +1,7 @@
+{
+  "name": "Smooth",
+  "description": "Interpolated smooth following",
+  "enabled": true,
+  "mode": "SMOOTH"
+}
+

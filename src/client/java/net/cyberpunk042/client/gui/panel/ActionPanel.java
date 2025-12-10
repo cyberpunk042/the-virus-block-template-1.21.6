@@ -1,6 +1,6 @@
 package net.cyberpunk042.client.gui.panel;
 
-import net.cyberpunk042.client.gui.state.GuiState;
+import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.GuiWidgets;
 import net.cyberpunk042.client.gui.widget.ToastNotification;
@@ -17,7 +17,7 @@ import java.util.List;
  * G57-G60: Action buttons for Quick Panel.
  * 
  * <ul>
- *   <li>G57: Connect widgets to GuiState</li>
+ *   <li>G57: Connect widgets to FieldEditState</li>
  *   <li>G58: Live apply to DEBUG FIELD</li>
  *   <li>G59: "Apply to My Shield" button</li>
  *   <li>G60: Auto-save checkbox</li>
@@ -32,7 +32,7 @@ public class ActionPanel extends AbstractPanel {
     
     private int startY;
     
-    public ActionPanel(Screen parent, GuiState state, int startY) {
+    public ActionPanel(Screen parent, FieldEditState state, int startY) {
         super(parent, state);
         this.startY = startY;
         Logging.GUI.topic("panel").debug("ActionPanel created");
