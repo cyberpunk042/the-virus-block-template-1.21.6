@@ -3,6 +3,8 @@ package net.cyberpunk042.visual.animation;
 import com.google.gson.JsonObject;
 import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Configuration for surface wave/ripple animation (FUTURE).
@@ -23,7 +25,7 @@ public record WaveConfig(
     @Range(ValueRange.POSITIVE) float amplitude,
     @Range(ValueRange.POSITIVE) float frequency,
     Axis direction
-) {
+){
     /**
      * Parses WaveConfig from JSON.
      * 
@@ -83,11 +85,7 @@ public record WaveConfig(
      * Serializes this wave config to JSON.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("amplitude", amplitude);
-        json.addProperty("frequency", frequency);
-        json.addProperty("direction", direction.name());
-        return json;
+        return JsonSerializer.toJson(this);
     }
     
     // =========================================================================
@@ -95,6 +93,13 @@ public record WaveConfig(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .amplitude(amplitude)
+            .frequency(frequency)
+            .direction(direction);
+    }
     
     public static class Builder {
         private @Range(ValueRange.POSITIVE) float amplitude = 0.1f;

@@ -5,6 +5,9 @@ import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
 import net.cyberpunk042.log.Logging;
 import com.google.gson.JsonObject;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Configuration for orbital/circular motion around an anchor point.
@@ -30,8 +33,8 @@ public record OrbitConfig(
     @Range(ValueRange.RADIUS) float radius,
     @Range(ValueRange.UNBOUNDED) float speed,
     net.cyberpunk042.visual.animation.Axis axis,
-    @Range(ValueRange.NORMALIZED) float phase
-) {
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true) float phase
+){
     /** Disabled orbit (static position). */
     public static final OrbitConfig NONE = new OrbitConfig(false, 0, 0, 
         net.cyberpunk042.visual.animation.Axis.Y, 0);
@@ -60,6 +63,15 @@ public record OrbitConfig(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .enabled(enabled)
+            .radius(radius)
+            .speed(speed)
+            .axis(axis)
+            .phase(phase);
+    }
     
     public static class Builder {
         private boolean enabled = true;
@@ -114,13 +126,7 @@ public record OrbitConfig(
      * Serializes this orbit config to JSON.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("enabled", enabled);
-        json.addProperty("radius", radius);
-        json.addProperty("speed", speed);
-        json.addProperty("axis", axis.name());
-        if (phase != 0) json.addProperty("phase", phase);
-        return json;
+        return JsonSerializer.toJson(this);
     }
 
 }

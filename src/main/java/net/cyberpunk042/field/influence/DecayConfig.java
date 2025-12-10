@@ -3,6 +3,9 @@ package net.cyberpunk042.field.influence;
 import com.google.gson.JsonObject;
 import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Configuration for gradual decay of field properties over time.
@@ -20,9 +23,9 @@ import net.cyberpunk042.visual.validation.ValueRange;
  * @see LifecycleConfig
  */
 public record DecayConfig(
-    @Range(ValueRange.POSITIVE) float rate,
-    @Range(ValueRange.ALPHA) float min
-) {
+    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "0.95") float rate,
+    @Range(ValueRange.ALPHA) @JsonField(skipIfDefault = true, defaultValue = "0.1") float min
+){
     /** No decay (constant value). */
     public static final DecayConfig NONE = new DecayConfig(1.0f, 1.0f);
     
@@ -42,10 +45,7 @@ public record DecayConfig(
      * Serializes this decay config to JSON.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        if (rate != DEFAULT.rate) json.addProperty("rate", rate);
-        if (min != DEFAULT.min) json.addProperty("min", min);
-        return json;
+        return JsonSerializer.toJson(this);
     }
     
     /** Whether decay is active. */

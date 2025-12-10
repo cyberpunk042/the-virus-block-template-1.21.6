@@ -3,6 +3,9 @@ package net.cyberpunk042.visual.pattern;
 import com.google.gson.JsonObject;
 
 import org.jetbrains.annotations.Nullable;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Configuration for vertex arrangement patterns, supporting multi-part shapes.
@@ -35,33 +38,28 @@ import org.jetbrains.annotations.Nullable;
 public record ArrangementConfig(
     // Default for all parts
     String defaultPattern,
-    
     // Sphere parts
-    @Nullable String main,
-    @Nullable String poles,
-    @Nullable String equator,
-    @Nullable String hemisphereTop,
-    @Nullable String hemisphereBottom,
-    
+    @Nullable @JsonField(skipIfNull = true) String main,
+    @Nullable @JsonField(skipIfNull = true) String poles,
+    @Nullable @JsonField(skipIfNull = true) String equator,
+    @Nullable @JsonField(skipIfNull = true) String hemisphereTop,
+    @Nullable @JsonField(skipIfNull = true) String hemisphereBottom,
     // Ring parts
-    @Nullable String surface,
-    @Nullable String innerEdge,
-    @Nullable String outerEdge,
-    
-    // Disc parts
+    @Nullable @JsonField(skipIfNull = true) String surface,
+    @Nullable @JsonField(skipIfNull = true) String innerEdge,
+    @Nullable @JsonField(skipIfNull = true) String outerEdge,
+    @JsonField(skipIfNull = true) // Disc parts
     String discEdge,
-    
     // Prism/Cylinder parts
-    @Nullable String sides,
-    @Nullable String capTop,
-    @Nullable String capBottom,
-    String prismEdges,
-    
+    @Nullable @JsonField(skipIfNull = true) String sides,
+    @Nullable @JsonField(skipIfNull = true) String capTop,
+    @Nullable @JsonField(skipIfNull = true) String capBottom,
+    @JsonField(skipIfNull = true) String prismEdges,
     // Polyhedron parts
-    @Nullable String faces,
-    String polyEdges,
-    @Nullable String vertices
-) {
+    @Nullable @JsonField(skipIfNull = true) String faces,
+    @JsonField(skipIfNull = true) String polyEdges,
+    @Nullable @JsonField(skipIfNull = true) String vertices
+){
     /** Default arrangement (filled_1 for all parts). */
     public static final ArrangementConfig DEFAULT = of("filled_1");
     
@@ -170,34 +168,32 @@ public record ArrangementConfig(
     }
 
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .defaultPattern(defaultPattern)
+            .main(main)
+            .poles(poles)
+            .equator(equator)
+            .hemisphereTop(hemisphereTop)
+            .hemisphereBottom(hemisphereBottom)
+            .surface(surface)
+            .innerEdge(innerEdge)
+            .outerEdge(outerEdge)
+            .discEdge(discEdge)
+            .sides(sides)
+            .capTop(capTop)
+            .capBottom(capBottom)
+            .prismEdges(prismEdges)
+            .faces(faces)
+            .polyEdges(polyEdges)
+            .vertices(vertices);
+    }
     /**
      * Serializes this arrangement config to JSON.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("default", defaultPattern);
-        // Sphere parts
-        if (main != null) json.addProperty("main", main);
-        if (poles != null) json.addProperty("poles", poles);
-        if (equator != null) json.addProperty("equator", equator);
-        if (hemisphereTop != null) json.addProperty("hemisphereTop", hemisphereTop);
-        if (hemisphereBottom != null) json.addProperty("hemisphereBottom", hemisphereBottom);
-        // Ring parts
-        if (surface != null) json.addProperty("surface", surface);
-        if (innerEdge != null) json.addProperty("innerEdge", innerEdge);
-        if (outerEdge != null) json.addProperty("outerEdge", outerEdge);
-        // Disc parts
-        if (discEdge != null) json.addProperty("discEdge", discEdge);
-        // Prism/Cylinder parts
-        if (sides != null) json.addProperty("sides", sides);
-        if (capTop != null) json.addProperty("capTop", capTop);
-        if (capBottom != null) json.addProperty("capBottom", capBottom);
-        if (prismEdges != null) json.addProperty("prismEdges", prismEdges);
-        // Polyhedron parts
-        if (faces != null) json.addProperty("faces", faces);
-        if (polyEdges != null) json.addProperty("polyEdges", polyEdges);
-        if (vertices != null) json.addProperty("vertices", vertices);
-        return json;
+        return JsonSerializer.toJson(this);
     }
 
 

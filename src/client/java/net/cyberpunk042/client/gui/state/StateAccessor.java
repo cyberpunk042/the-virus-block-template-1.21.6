@@ -1,0 +1,286 @@
+package net.cyberpunk042.client.gui.state;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
+import net.cyberpunk042.log.Logging;
+
+import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Consumer;
+
+/**
+ * Reflection-based state accessor for FieldEditState.
+ * Eliminates repetitive getter/setter boilerplate.
+ * 
+ * <p>Usage:</p>
+ * <pre>
+ * // Get by type (when only one field of that type exists)
+ * Transform t = StateAccessor.get(state, Transform.class);
+ * 
+ * // Get by name
+ * SphereShape s = StateAccessor.get(state, "sphere", SphereShape.class);
+ * 
+ * // Set (automatically finds field by type or value's class)
+ * StateAccessor.set(state, newTransform);
+ * 
+ * // Set by name
+ * StateAccessor.set(state, "sphere", newSphere);
+ * </pre>
+ */
+public final class StateAccessor {
+    
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    
+    // Cache field metadata per class
+    private static final Map<Class<?>, Map<String, Field>> FIELD_CACHE = new HashMap<>();
+    
+    private StateAccessor() {}
+    
+    /**
+     * Get a @StateField by its type.
+     * Only works if there's exactly one field of that type.
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T get(Object state, Class<T> type) {
+        for (Field field : getStateFields(state.getClass()).values()) {
+            if (type.isAssignableFrom(field.getType())) {
+                try {
+                    field.setAccessible(true);
+                    return (T) field.get(state);
+                } catch (IllegalAccessException e) {
+                    throw new RuntimeException("Cannot access field: " + field.getName(), e);
+                }
+            }
+        }
+        throw new IllegalArgumentException("No @StateField of type: " + type.getSimpleName());
+    }
+    
+    /**
+     * Get a @StateField by name.
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T get(Object state, String name, Class<T> type) {
+        Field field = getStateFields(state.getClass()).get(name);
+        if (field == null) {
+            throw new IllegalArgumentException("No @StateField named: " + name);
+        }
+        try {
+            field.setAccessible(true);
+            return (T) field.get(state);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Cannot access field: " + name, e);
+        }
+    }
+    
+    /**
+     * Set a @StateField by matching the value's type.
+     * Returns true if field was found and set.
+     */
+    public static boolean set(Object state, Object value) {
+        if (value == null) return false;
+        
+        Class<?> valueType = value.getClass();
+        for (Field field : getStateFields(state.getClass()).values()) {
+            if (field.getType().isAssignableFrom(valueType)) {
+                try {
+                    field.setAccessible(true);
+                    field.set(state, value);
+                    return true;
+                } catch (IllegalAccessException e) {
+                    throw new RuntimeException("Cannot set field: " + field.getName(), e);
+                }
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Set a @StateField by name, or a nested property using dot notation.
+     * 
+     * <p>Examples:</p>
+     * <pre>
+     * set(state, "radius", 5.0f);           // Direct field
+     * set(state, "spin.speed", 0.5f);       // Record property (uses toBuilder)
+     * set(state, "beam.pulse.speed", 1.0f); // Nested record property
+     * </pre>
+     */
+    public static void set(Object state, String path, Object value) {
+        if (path.contains(".")) {
+            setNestedProperty(state, path, value);
+        } else {
+            setDirectField(state, path, value);
+        }
+    }
+    
+    private static void setDirectField(Object state, String name, Object value) {
+        Field field = getStateFields(state.getClass()).get(name);
+        if (field == null) {
+            throw new IllegalArgumentException("No @StateField named: " + name);
+        }
+        try {
+            field.setAccessible(true);
+            field.set(state, value);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Cannot set field: " + name, e);
+        }
+    }
+    
+    /**
+     * Set a nested property using dot notation.
+     * Handles toBuilder()/build() chain automatically via reflection.
+     */
+    private static void setNestedProperty(Object state, String path, Object value) {
+        String[] parts = path.split("\\.", 2);
+        String fieldName = parts[0];
+        String remaining = parts[1];
+        
+        // Get the current record value
+        Field field = getStateFields(state.getClass()).get(fieldName);
+        if (field == null) {
+            throw new IllegalArgumentException("No @StateField named: " + fieldName);
+        }
+        
+        try {
+            field.setAccessible(true);
+            Object record = field.get(state);
+            
+            // Update the record (handles nested paths recursively)
+            Object updated = updateRecordProperty(record, remaining, value);
+            
+            // Set the updated record back
+            field.set(state, updated);
+        } catch (Exception e) {
+            throw new RuntimeException("Cannot set nested property: " + path, e);
+        }
+    }
+    
+    /**
+     * Update a property on a record using toBuilder pattern.
+     * Supports nested paths like "pulse.speed" for records containing other records.
+     */
+    private static Object updateRecordProperty(Object record, String path, Object value) {
+        try {
+            // Get the builder
+            var toBuilderMethod = record.getClass().getMethod("toBuilder");
+            Object builder = toBuilderMethod.invoke(record);
+            
+            if (path.contains(".")) {
+                // Nested property: "pulse.speed" -> update pulse record, then set on builder
+                String[] parts = path.split("\\.", 2);
+                String propertyName = parts[0];
+                String remaining = parts[1];
+                
+                // Get current nested record from the outer record
+                var getter = record.getClass().getMethod(propertyName);
+                Object nestedRecord = getter.invoke(record);
+                
+                // Recursively update the nested record
+                Object updatedNested = updateRecordProperty(nestedRecord, remaining, value);
+                
+                // Set updated nested record on builder
+                var builderSetter = findBuilderMethod(builder.getClass(), propertyName);
+                builderSetter.invoke(builder, updatedNested);
+            } else {
+                // Direct property: find and call builder method
+                var builderSetter = findBuilderMethod(builder.getClass(), path);
+                builderSetter.invoke(builder, value);
+            }
+            
+            // Build and return
+            var buildMethod = builder.getClass().getMethod("build");
+            return buildMethod.invoke(builder);
+        } catch (Exception e) {
+            throw new RuntimeException("Cannot update record property: " + path + " on " + record.getClass().getSimpleName(), e);
+        }
+    }
+    
+    /**
+     * Find a builder method by name (handles primitive type matching).
+     */
+    private static java.lang.reflect.Method findBuilderMethod(Class<?> builderClass, String name) {
+        for (var method : builderClass.getMethods()) {
+            if (method.getName().equals(name) && method.getParameterCount() == 1) {
+                return method;
+            }
+        }
+        throw new IllegalArgumentException("No builder method: " + name + " on " + builderClass.getSimpleName());
+    }
+    
+    /**
+     * Serialize all @StateField fields to JSON.
+     */
+    public static JsonObject toJson(Object state) {
+        JsonObject json = new JsonObject();
+        for (Map.Entry<String, Field> entry : getStateFields(state.getClass()).entrySet()) {
+            try {
+                entry.getValue().setAccessible(true);
+                Object value = entry.getValue().get(state);
+                if (value != null) {
+                    // Use Gson to convert the value to JsonElement
+                    json.add(entry.getKey(), GSON.toJsonTree(value));
+                }
+            } catch (IllegalAccessException e) {
+                Logging.GUI.topic("state").warn("Cannot serialize field: {}", entry.getKey());
+            }
+        }
+        return json;
+    }
+    
+    /**
+     * Deserialize JSON into @StateField fields.
+     */
+    public static void fromJson(Object state, JsonObject json) {
+        for (Map.Entry<String, Field> entry : getStateFields(state.getClass()).entrySet()) {
+            String name = entry.getKey();
+            Field field = entry.getValue();
+            
+            if (json.has(name)) {
+                try {
+                    field.setAccessible(true);
+                    Object value = GSON.fromJson(json.get(name), field.getType());
+                    field.set(state, value);
+                } catch (Exception e) {
+                    Logging.GUI.topic("state").warn("Cannot deserialize field {}: {}", name, e.getMessage());
+                }
+            }
+        }
+    }
+    
+    /**
+     * Apply a modifier function to a field and set the result.
+     * Useful for immutable records with toBuilder().
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> void update(Object state, String name, java.util.function.Function<T, T> modifier) {
+        T current = get(state, name, (Class<T>) Object.class);
+        T updated = modifier.apply(current);
+        set(state, name, updated);
+    }
+    
+    /**
+     * Get all @StateField fields for a class (cached).
+     */
+    private static Map<String, Field> getStateFields(Class<?> clazz) {
+        return FIELD_CACHE.computeIfAbsent(clazz, c -> {
+            Map<String, Field> fields = new HashMap<>();
+            for (Field field : c.getDeclaredFields()) {
+                StateField annotation = field.getAnnotation(StateField.class);
+                if (annotation != null) {
+                    String name = annotation.name().isEmpty() ? field.getName() : annotation.name();
+                    fields.put(name, field);
+                }
+            }
+            return fields;
+        });
+    }
+    
+    /**
+     * Get all field names.
+     */
+    public static Iterable<String> getFieldNames(Object state) {
+        return getStateFields(state.getClass()).keySet();
+    }
+}
+

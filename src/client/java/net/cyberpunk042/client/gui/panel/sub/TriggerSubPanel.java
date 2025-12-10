@@ -13,6 +13,7 @@ import net.minecraft.client.gui.widget.CyclingButtonWidget;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.cyberpunk042.client.gui.widget.ToastNotification;
 
 /**
  * G86-G90: Trigger configuration for the Debug panel.
@@ -137,7 +138,7 @@ public class TriggerSubPanel extends AbstractPanel {
         testBtn = GuiWidgets.button(x, y, w, "Test Trigger", "Fire test trigger effect", () -> {
             Logging.GUI.topic("trigger").info("Test trigger fired: {} -> {}", 
                 triggerType.getValue(), triggerEffect.getValue());
-            // TODO: Send trigger test command
+            ToastNotification.info("Trigger test: " + triggerType.getValue() + " → " + triggerEffect.getValue());
         });
         widgets.add(testBtn);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;

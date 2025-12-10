@@ -3,6 +3,8 @@ import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
 import net.cyberpunk042.log.Logging;
 import com.google.gson.JsonObject;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Configuration for alpha (transparency) pulsing animation.
@@ -24,7 +26,7 @@ public record AlphaPulseConfig(
     @Range(ValueRange.ALPHA) float min,
     @Range(ValueRange.ALPHA) float max,
     Waveform waveform
-) {
+){
     /** No alpha pulsing (static alpha). */
     public static final AlphaPulseConfig NONE = new AlphaPulseConfig(0, 1, 1, Waveform.SINE);
     
@@ -63,6 +65,14 @@ public record AlphaPulseConfig(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .speed(speed)
+            .min(min)
+            .max(max)
+            .waveform(waveform);
+    }
     
     public static class Builder {
         private @Range(ValueRange.POSITIVE) float speed = 1.0f;
@@ -112,12 +122,7 @@ public record AlphaPulseConfig(
      * Serializes this alpha pulse config to JSON.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("speed", speed);
-        json.addProperty("min", min);
-        json.addProperty("max", max);
-        json.addProperty("waveform", waveform.name());
-        return json;
+        return JsonSerializer.toJson(this);
     }
 
 }

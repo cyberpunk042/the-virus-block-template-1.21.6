@@ -4,6 +4,7 @@ import net.cyberpunk042.log.Logging;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import org.jetbrains.annotations.Nullable;
+import net.cyberpunk042.client.network.GuiPacketSender;
 
 /**
  * Client-side singleton holder for FieldEditState.
@@ -96,7 +97,7 @@ public final class FieldEditStateHolder {
         // Ensure state exists
         getOrCreate();
         Logging.GUI.topic("state").info("Test field spawned");
-        // TODO: Notify TestFieldRenderer to start rendering
+        GuiPacketSender.spawnDebugField(getOrCreate().toStateJson());
     }
     
     /**
@@ -105,7 +106,7 @@ public final class FieldEditStateHolder {
     public static void despawnTestField() {
         testFieldActive = false;
         Logging.GUI.topic("state").info("Test field despawned");
-        // TODO: Notify TestFieldRenderer to stop rendering
+        GuiPacketSender.despawnDebugField();
     }
     
     /**

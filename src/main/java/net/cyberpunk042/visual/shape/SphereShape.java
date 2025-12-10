@@ -8,6 +8,9 @@ import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
 import net.cyberpunk042.log.Logging;
 import com.google.gson.JsonObject;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Sphere shape with configurable tessellation.
@@ -48,12 +51,12 @@ public record SphereShape(
     @Range(ValueRange.RADIUS) float radius,
     @Range(ValueRange.STEPS) int latSteps,
     @Range(ValueRange.STEPS) int lonSteps,
-    @Range(ValueRange.NORMALIZED) float latStart,
-    @Range(ValueRange.NORMALIZED) float latEnd,
-    @Range(ValueRange.NORMALIZED) float lonStart,
-    @Range(ValueRange.NORMALIZED) float lonEnd,
-    SphereAlgorithm algorithm
-) implements Shape {
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true) float latStart,
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "1") float latEnd,
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true) float lonStart,
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "1") float lonEnd,
+    @JsonField(skipIfEqualsConstant = "LAT_LON") SphereAlgorithm algorithm
+)implements Shape {
     public static final String DEFAULT_ALGORITHM = "uv";
 
     
@@ -174,17 +177,7 @@ public record SphereShape(
     
     @Override
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("type", "sphere");
-        json.addProperty("radius", radius);
-        json.addProperty("latSteps", latSteps);
-        json.addProperty("lonSteps", lonSteps);
-        if (latStart != 0) json.addProperty("latStart", latStart);
-        if (latEnd != 1) json.addProperty("latEnd", latEnd);
-        if (lonStart != 0) json.addProperty("lonStart", lonStart);
-        if (lonEnd != 1) json.addProperty("lonEnd", lonEnd);
-        if (algorithm != SphereAlgorithm.LAT_LON) json.addProperty("algorithm", algorithm.name());
-        return json;
+        return JsonSerializer.toJson(this);
     }
 
     // =========================================================================
@@ -192,6 +185,18 @@ public record SphereShape(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this shape's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .radius(radius)
+            .latSteps(latSteps)
+            .lonSteps(lonSteps)
+            .latStart(latStart)
+            .latEnd(latEnd)
+            .lonStart(lonStart)
+            .lonEnd(lonEnd)
+            .algorithm(algorithm);
+    }
     
     public static class Builder {
         private @Range(ValueRange.RADIUS) float radius = 1.0f;

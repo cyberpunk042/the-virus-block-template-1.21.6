@@ -12,6 +12,7 @@ import net.minecraft.client.gui.widget.CyclingButtonWidget;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.cyberpunk042.client.network.GuiPacketSender;
 
 /**
  * G57-G60: Action buttons for Quick Panel.
@@ -88,10 +89,10 @@ public class ActionPanel extends AbstractPanel {
         state.setLivePreviewEnabled(enabled);
         if (enabled) {
             ToastNotification.info("Live preview enabled");
-            // TODO: Spawn/update DEBUG field
+            GuiPacketSender.spawnDebugField(state.toStateJson());
         } else {
             ToastNotification.info("Live preview disabled");
-            // TODO: Despawn DEBUG field
+            GuiPacketSender.despawnDebugField();
         }
         Logging.GUI.topic("action").debug("Live preview: {}", enabled);
     }
@@ -101,7 +102,8 @@ public class ActionPanel extends AbstractPanel {
     // ═══════════════════════════════════════════════════════════════════════════
     
     private void applyToShield() {
-        // TODO: Send packet to server to update player's shield
+        // Apply current settings to the player's active shield
+        GuiPacketSender.updateDebugField(state.toStateJson());
         state.clearDirty();
         ToastNotification.success("Applied to shield!");
         Logging.GUI.topic("action").info("Applied settings to shield");
@@ -124,7 +126,7 @@ public class ActionPanel extends AbstractPanel {
     // ═══════════════════════════════════════════════════════════════════════════
     
     private void resetChanges() {
-        // TODO: Reset state to original
+        state.restoreFromSnapshot();
         state.clearDirty();
         ToastNotification.info("Reset to original");
         Logging.GUI.topic("action").info("Reset changes");

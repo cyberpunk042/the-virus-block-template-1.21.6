@@ -98,6 +98,14 @@ public record WobbleConfig(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .amplitude(amplitude)
+            .amplitude(amplitude)
+            .speed(speed)
+            .randomize(randomize);
+    }
     
     public static class Builder {
         private Vector3f amplitude = new Vector3f(0.1f, 0.05f, 0.1f);

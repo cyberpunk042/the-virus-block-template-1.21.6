@@ -3,6 +3,8 @@ package net.cyberpunk042.field.instance;
 import com.google.gson.JsonObject;
 import net.cyberpunk042.log.Logging;
 import org.jetbrains.annotations.Nullable;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Configuration for how a personal field follows its owner.
@@ -25,7 +27,7 @@ public record FollowModeConfig(
     boolean enabled,
     FollowMode mode,
     boolean playerOverride
-) {
+){
     /** Static field (doesn't follow player). */
     public static final FollowModeConfig STATIC = new FollowModeConfig(false, FollowMode.SNAP, false);
     
@@ -84,15 +86,18 @@ public record FollowModeConfig(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .enabled(enabled)
+            .mode(mode)
+            .playerOverride(playerOverride);
+    }
     /**
      * Serializes this follow mode config to JSON.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("enabled", enabled);
-        json.addProperty("mode", mode.id());
-        json.addProperty("playerOverride", playerOverride);
-        return json;
+        return JsonSerializer.toJson(this);
     }
 
 

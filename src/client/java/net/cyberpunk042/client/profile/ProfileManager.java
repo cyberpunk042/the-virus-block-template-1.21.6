@@ -141,6 +141,31 @@ public class ProfileManager {
     }
     
     /**
+     * Set available server profile names (creates placeholder profiles).
+     * Full profile data is fetched when user selects one.
+     */
+    public void setServerProfileNames(List<String> names) {
+        serverProfiles.clear();
+        for (String name : names) {
+            Profile placeholder = Profile.builder()
+                .id("server:" + name)
+                .name(name)
+                .description("Server profile - select to load")
+                .source(ProfileSource.SERVER)
+                .build();
+            serverProfiles.add(placeholder);
+        }
+        
+        // Refresh all profiles list
+        if (loaded) {
+            allProfiles.removeIf(p -> p.source() == ProfileSource.SERVER);
+            allProfiles.addAll(serverProfiles);
+        }
+        
+        TheVirusBlock.LOGGER.info("Set {} server profile names", names.size());
+    }
+    
+    /**
      * Get all profiles (unfiltered).
      */
     public List<Profile> getAllProfiles() {

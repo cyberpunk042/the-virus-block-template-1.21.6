@@ -62,7 +62,7 @@ public final class JsonSerializer {
      * Gson TypeAdapter for JOML Vector3f.
      * Serializes as [x, y, z] array, deserializes from same format.
      */
-    private static class Vector3fAdapter implements JsonSerializer<Vector3f>, JsonDeserializer<Vector3f> {
+    private static class Vector3fAdapter implements com.google.gson.JsonSerializer<Vector3f>, JsonDeserializer<Vector3f> {
         @Override
         public JsonElement serialize(Vector3f src, Type typeOfSrc, JsonSerializationContext context) {
             if (src == null) return JsonNull.INSTANCE;

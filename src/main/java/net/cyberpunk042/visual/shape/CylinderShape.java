@@ -8,6 +8,9 @@ import org.joml.Vector3f;
 import java.util.Map;
 import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Cylinder/tube shape (also used for beams).
@@ -42,12 +45,12 @@ public record CylinderShape(
     @Range(ValueRange.RADIUS) float radius,
     @Range(ValueRange.POSITIVE_NONZERO) float height,
     @Range(ValueRange.STEPS) int segments,
-    @Range(ValueRange.POSITIVE) float topRadius,
-    @Range(ValueRange.STEPS) int heightSegments,
-    boolean capTop,
-    boolean capBottom,
-    @Range(ValueRange.DEGREES) float arc
-) implements Shape {
+    @Range(ValueRange.POSITIVE) @JsonField(skipIfEqualsField = "radius") float topRadius,
+    @Range(ValueRange.STEPS) @JsonField(skipIfDefault = true, defaultValue = "1") int heightSegments,
+    @JsonField(skipIfDefault = true, defaultValue = "true") boolean capTop,
+    @JsonField(skipIfDefault = true) boolean capBottom,
+    @Range(ValueRange.DEGREES) @JsonField(skipIfDefault = true, defaultValue = "360") float arc
+)implements Shape {
     
     /** Default cylinder (both caps). */
     public static CylinderShape defaults() { return DEFAULT; }
@@ -141,17 +144,7 @@ public record CylinderShape(
     
     @Override
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("type", "cylinder");
-        json.addProperty("radius", radius);
-        json.addProperty("height", height);
-        json.addProperty("segments", segments);
-        if (topRadius != radius) json.addProperty("topRadius", topRadius);
-        if (heightSegments != 1) json.addProperty("heightSegments", heightSegments);
-        if (!capTop) json.addProperty("capTop", false);
-        if (capBottom) json.addProperty("capBottom", true);
-        if (arc != 360) json.addProperty("arc", arc);
-        return json;
+        return JsonSerializer.toJson(this);
     }
 
     // =========================================================================
@@ -159,6 +152,18 @@ public record CylinderShape(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this shape's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .radius(radius)
+            .height(height)
+            .segments(segments)
+            .topRadius(topRadius)
+            .heightSegments(heightSegments)
+            .capTop(capTop)
+            .capBottom(capBottom)
+            .arc(arc);
+    }
     
     public static class Builder {
         private @Range(ValueRange.RADIUS) float radius = 0.5f;

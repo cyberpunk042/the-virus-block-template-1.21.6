@@ -3,6 +3,9 @@ package net.cyberpunk042.field.influence;
 import com.google.gson.JsonObject;
 import net.cyberpunk042.log.Logging;
 import org.jetbrains.annotations.Nullable;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Configuration for a single event trigger.
@@ -32,11 +35,11 @@ public record TriggerConfig(
     FieldEvent event,
     TriggerEffect effect,
     int duration,
-    @Nullable String color,
-    float scale,
-    float amplitude,
-    float intensity
-) {
+    @Nullable @JsonField(skipIfNull = true) String color,
+    @JsonField(skipIfDefault = true, defaultValue = "1.0") float scale,
+    @JsonField(skipIfDefault = true, defaultValue = "0.1") float amplitude,
+    @JsonField(skipIfDefault = true, defaultValue = "1.0") float intensity
+){
     /** Default trigger (damage flash). */
     public static final TriggerConfig DEFAULT = new TriggerConfig(
         FieldEvent.PLAYER_DAMAGE, TriggerEffect.FLASH, 6, "#FF0000", 1.0f, 0.1f, 1.0f);
@@ -84,27 +87,22 @@ public record TriggerConfig(
      * Builder pattern.
      */
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .event(event)
+            .effect(effect)
+            .duration(duration)
+            .color(color)
+            .scale(scale)
+            .amplitude(amplitude)
+            .intensity(intensity);
+    }
     /**
      * Serializes this trigger config to JSON.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("event", event.name().toLowerCase());
-        json.addProperty("effect", effect.name().toLowerCase());
-        json.addProperty("duration", duration);
-        if (color != null) {
-            json.addProperty("color", color);
-        }
-        if (scale != 1.0f) {
-            json.addProperty("scale", scale);
-        }
-        if (amplitude != 0.1f) {
-            json.addProperty("amplitude", amplitude);
-        }
-        if (intensity != 1.0f) {
-            json.addProperty("intensity", intensity);
-        }
-        return json;
+        return JsonSerializer.toJson(this);
     }
 
 

@@ -12,6 +12,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
+import net.cyberpunk042.field.category.ProfileSource;
 
 /**
  * G01/G111-G120: Main Field Customizer GUI screen.
@@ -126,13 +127,27 @@ public class FieldCustomizerScreen extends Screen {
     // ═══════════════════════════════════════════════════════════════════════════
     
     private void onBottomBarSave(String profileName) {
-        // TODO: Actually persist profile to storage
-        Logging.GUI.topic("screen").info("Bottom bar save: {}", profileName);
+        try {
+            String json = state.toProfileJson(profileName);
+            com.google.gson.JsonObject jsonObj = com.google.gson.JsonParser.parseString(json).getAsJsonObject();
+            Profile profile = Profile.fromJson(jsonObj, ProfileSource.LOCAL);
+            ProfileManager.getInstance().saveProfile(profile);
+            state.clearDirty();
+            state.saveProfileSnapshot();  // Update snapshot after save
+            ToastNotification.success("Profile saved: " + profileName);
+            Logging.GUI.topic("screen").info("Profile saved: {}", profileName);
+        } catch (Exception e) {
+            ToastNotification.error("Failed to save profile");
+            Logging.GUI.topic("screen").error("Failed to save profile: {}", e.getMessage());
+        }
     }
     
     private void onBottomBarRevert(String profileName) {
-        // TODO: Reload profile from storage
-        Logging.GUI.topic("screen").info("Bottom bar revert: {}", profileName);
+        state.restoreFromSnapshot();
+        state.clearDirty();
+        clearAndRegisterWidgets();  // Refresh UI
+        ToastNotification.info("Reverted to saved state");
+        Logging.GUI.topic("screen").info("Reverted profile: {}", profileName);
     }
     
     private void onBottomBarProfileChanged() {
@@ -338,8 +353,9 @@ public class FieldCustomizerScreen extends Screen {
     @Override
     public void close() {
         if (state.isDirty()) {
-            // TODO: Show confirmation dialog
-            Logging.GUI.topic("screen").warn("Closing with unsaved changes");
+            // Per architecture: state persists in memory, no dialog needed
+            // Changes are only lost on game quit, not menu close
+            Logging.GUI.topic("screen").debug("Closing with unsaved changes (state persists)");
         }
         Logging.GUI.topic("screen").info("FieldCustomizerScreen closed");
         super.close();

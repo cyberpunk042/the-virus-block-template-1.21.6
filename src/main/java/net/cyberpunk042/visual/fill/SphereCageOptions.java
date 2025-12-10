@@ -58,6 +58,16 @@ public record SphereCageOptions(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .lineWidth(lineWidth)
+            .showEdges(showEdges)
+            .latitudeCount(latitudeCount)
+            .longitudeCount(longitudeCount)
+            .showEquator(showEquator)
+            .showPoles(showPoles);
+    }
     
     public static class Builder {
         private float lineWidth = CageOptions.DEFAULT_LINE_WIDTH;

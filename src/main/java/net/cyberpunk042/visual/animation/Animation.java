@@ -5,6 +5,9 @@ import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
 import net.cyberpunk042.log.Logging;
 import com.google.gson.JsonObject;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Animation configuration for a primitive.
@@ -32,14 +35,14 @@ import com.google.gson.JsonObject;
  * @see WaveConfig
  */
 public record Animation(
-    SpinConfig spin,
-    PulseConfig pulse,
-    @Range(ValueRange.NORMALIZED) float phase,
-    AlphaPulseConfig alphaPulse,
-    @Nullable ColorCycleConfig colorCycle,
-    @Nullable WobbleConfig wobble,
-    @Nullable WaveConfig wave
-) {
+    @JsonField(skipUnless = "isActive") SpinConfig spin,
+    @JsonField(skipUnless = "isActive") PulseConfig pulse,
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfEqualsConstant = "0.0f") float phase,
+    @JsonField(skipUnless = "isActive") AlphaPulseConfig alphaPulse,
+    @Nullable @JsonField(skipUnless = "isActive") ColorCycleConfig colorCycle,
+    @Nullable @JsonField(skipUnless = "isActive") WobbleConfig wobble,
+    @Nullable @JsonField(skipUnless = "isActive") WaveConfig wave
+){
     /** No animation (static). */
     public static Animation none() { return NONE; }
     
@@ -177,6 +180,18 @@ public record Animation(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .spin(spin)
+            .spin(spin)
+            .pulse(pulse)
+            .phase(phase)
+            .alphaPulse(alphaPulse)
+            .colorCycle(colorCycle)
+            .wobble(wobble)
+            .wave(wave);
+    }
     
     public static class Builder {
         private SpinConfig spin = SpinConfig.NONE;
@@ -230,37 +245,7 @@ public record Animation(
      * Serializes this animation to JSON.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        
-        if (spin != null && spin.isActive()) {
-            json.add("spin", spin.toJson());
-        }
-        
-        if (pulse != null && pulse.isActive()) {
-            json.add("pulse", pulse.toJson());
-        }
-        
-        if (phase != 0.0f) {
-            json.addProperty("phase", phase);
-        }
-        
-        if (alphaPulse != null && alphaPulse.isActive()) {
-            json.add("alphaPulse", alphaPulse.toJson());
-        }
-        
-        if (colorCycle != null && colorCycle.isActive()) {
-            json.add("colorCycle", colorCycle.toJson());
-        }
-        
-        if (wobble != null && wobble.isActive()) {
-            json.add("wobble", wobble.toJson());
-        }
-        
-        if (wave != null && wave.isActive()) {
-            json.add("wave", wave.toJson());
-        }
-        
-        return json;
+        return JsonSerializer.toJson(this);
     }
 
 }

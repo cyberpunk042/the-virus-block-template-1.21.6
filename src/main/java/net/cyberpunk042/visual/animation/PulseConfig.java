@@ -3,6 +3,8 @@ import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
 import net.cyberpunk042.log.Logging;
 import com.google.gson.JsonObject;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Configuration for scale pulsing animation.
@@ -28,7 +30,7 @@ public record PulseConfig(
     Waveform waveform,
     @Range(ValueRange.POSITIVE) float min,
     @Range(ValueRange.POSITIVE) float max
-) {
+){
     /** No pulsing (static scale). */
     public static final PulseConfig NONE = new PulseConfig(0, 0, Waveform.SINE, 1, 1);
     
@@ -66,6 +68,15 @@ public record PulseConfig(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .scale(scale)
+            .speed(speed)
+            .waveform(waveform)
+            .min(min)
+            .max(max);
+    }
     
     public static class Builder {
         private @Range(ValueRange.POSITIVE) float scale = 0.1f;
@@ -119,13 +130,7 @@ public record PulseConfig(
      * Serializes this pulse config to JSON.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("scale", scale);
-        json.addProperty("speed", speed);
-        json.addProperty("waveform", waveform.name());
-        json.addProperty("min", min);
-        json.addProperty("max", max);
-        return json;
+        return JsonSerializer.toJson(this);
     }
 
 }

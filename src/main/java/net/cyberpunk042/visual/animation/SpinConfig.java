@@ -78,6 +78,15 @@ public record SpinConfig(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .axis(axis)
+            .speed(speed)
+            .oscillate(oscillate)
+            .range(range)
+            .customAxis(customAxis);
+    }
     
     public static class Builder {
         private Axis axis = Axis.Y;

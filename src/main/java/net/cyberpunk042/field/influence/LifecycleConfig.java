@@ -5,6 +5,9 @@ import net.cyberpunk042.field.instance.LifecycleState;
 import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Configuration for field spawn/despawn lifecycle animations.
@@ -36,8 +39,8 @@ public record LifecycleConfig(
     @Range(ValueRange.STEPS) int fadeOut,
     @Range(ValueRange.STEPS) int scaleIn,
     @Range(ValueRange.STEPS) int scaleOut,
-    DecayConfig decay
-) {
+    @JsonField(skipIfEqualsConstant = "DecayConfig.NONE", skipIfNull = true) DecayConfig decay
+){
     /** Instant spawn/despawn (no animation). */
     public static final LifecycleConfig INSTANT = new LifecycleConfig(0, 0, 0, 0, DecayConfig.NONE);
     
@@ -100,19 +103,20 @@ public record LifecycleConfig(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .fadeIn(fadeIn)
+            .fadeOut(fadeOut)
+            .scaleIn(scaleIn)
+            .scaleOut(scaleOut)
+            .decay(decay);
+    }
     /**
      * Serializes this lifecycle config to JSON.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("fadeIn", fadeIn);
-        json.addProperty("fadeOut", fadeOut);
-        json.addProperty("scaleIn", scaleIn);
-        json.addProperty("scaleOut", scaleOut);
-        if (decay != null && decay != DecayConfig.NONE) {
-            json.add("decay", decay.toJson());
-        }
-        return json;
+        return JsonSerializer.toJson(this);
     }
 
 

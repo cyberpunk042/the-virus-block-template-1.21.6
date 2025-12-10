@@ -4,6 +4,8 @@ import com.google.gson.JsonObject;
 
 import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Represents a range of alpha (transparency) values.
@@ -25,7 +27,7 @@ import net.cyberpunk042.visual.validation.ValueRange;
 public record AlphaRange(
     @Range(ValueRange.ALPHA) float min,
     @Range(ValueRange.ALPHA) float max
-) {
+){
     public static final AlphaRange FULL = new AlphaRange(1f, 1f);
 
     
@@ -60,10 +62,7 @@ public record AlphaRange(
      * Serializes this alpha range to JSON.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("min", min);
-        json.addProperty("max", max);
-        return json;
+        return JsonSerializer.toJson(this);
     }
     
     /** Whether this is a constant (min == max). */

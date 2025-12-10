@@ -5,6 +5,9 @@ import com.google.gson.JsonObject;
 import org.jetbrains.annotations.Nullable;
 import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Visual appearance configuration for a primitive.
@@ -31,16 +34,16 @@ import net.cyberpunk042.visual.validation.ValueRange;
  * @see net.cyberpunk042.visual.animation.Animation
  */
 public record Appearance(
-    String color,
-    AlphaRange alpha,
-    @Range(ValueRange.ALPHA) float glow,
+    @JsonField(skipIfNull = true) String color,
+    @JsonField(skipIfNull = true) AlphaRange alpha,
+    @Range(ValueRange.ALPHA) @JsonField(skipIfDefault = true) float glow,
     @Range(ValueRange.ALPHA) float emissive,
     @Range(ValueRange.ALPHA) float saturation,
     @Range(ValueRange.ALPHA) float brightness,
     @Range(ValueRange.DEGREES) float hueShift,
-    @Nullable String secondaryColor,
+    @Nullable @JsonField(skipIfNull = true) String secondaryColor,
     @Range(ValueRange.ALPHA) float colorBlend
-) {
+){
     /** Default appearance. */
     public static Appearance defaults() { return DEFAULT; }
     
@@ -126,16 +129,25 @@ public record Appearance(
     }
 
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .color(color)
+            .alpha(alpha)
+            .alpha(alpha)
+            .glow(glow)
+            .emissive(emissive)
+            .saturation(saturation)
+            .brightness(brightness)
+            .hueShift(hueShift)
+            .secondaryColor(secondaryColor)
+            .colorBlend(colorBlend);
+    }
     /**
      * Serializes this appearance to JSON.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        if (color != null) json.addProperty("color", color);
-        if (secondaryColor != null) json.addProperty("secondaryColor", secondaryColor);
-        if (alpha != null) json.add("alpha", alpha.toJson());
-        if (glow != 0) json.addProperty("glow", glow);
-        return json;
+        return JsonSerializer.toJson(this);
     }
 
 

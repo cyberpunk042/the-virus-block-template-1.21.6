@@ -5,6 +5,9 @@ import com.google.gson.JsonObject;
 import org.jetbrains.annotations.Nullable;
 import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Configuration for how a primitive's surface is rendered.
@@ -44,13 +47,13 @@ import net.cyberpunk042.visual.validation.ValueRange;
  * @see CageOptions
  */
 public record FillConfig(
-    FillMode mode,
-    @Range(ValueRange.POSITIVE_NONZERO) float wireThickness,
-    boolean doubleSided,
-    boolean depthTest,
-    boolean depthWrite,
-    @Nullable CageOptions cage
-) {
+    @JsonField(skipIfEqualsConstant = "SOLID") FillMode mode,
+    @Range(ValueRange.POSITIVE_NONZERO) @JsonField(skipIfDefault = true, defaultValue = "1.0") float wireThickness,
+    @JsonField(skipIfDefault = true) boolean doubleSided,
+    @JsonField(skipIfDefault = true, defaultValue = "true") boolean depthTest,
+    @JsonField(skipIfDefault = true) boolean depthWrite,
+    @Nullable @JsonField(skipIfNull = true) CageOptions cage
+){
     /** Default solid fill. */
     public static final FillConfig SOLID = new FillConfig(
         FillMode.SOLID, 1.0f, false, true, false, null);
@@ -161,23 +164,21 @@ public record FillConfig(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .mode(mode)
+            .wireThickness(wireThickness)
+            .doubleSided(doubleSided)
+            .depthTest(depthTest)
+            .depthWrite(depthWrite)
+            .cage(cage);
+    }
     /**
      * Serializes this fill config to JSON.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        if (mode != FillMode.SOLID) json.addProperty("mode", mode.name());
-        if (wireThickness != 1.0f) json.addProperty("wireThickness", wireThickness);
-        if (doubleSided) json.addProperty("doubleSided", true);
-        if (!depthTest) json.addProperty("depthTest", false);
-        if (depthWrite) json.addProperty("depthWrite", true);
-        if (cage != null) {
-            JsonObject cageJson = new JsonObject();
-            cageJson.addProperty("lineWidth", cage.lineWidth());
-            cageJson.addProperty("showEdges", cage.showEdges());
-            json.add("cage", cageJson);
-        }
-        return json;
+        return JsonSerializer.toJson(this);
     }
 
 

@@ -5,6 +5,9 @@ import net.cyberpunk042.field.effect.EffectType;
 
 import java.util.HashMap;
 import java.util.Map;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Configuration for a field effect.
@@ -27,12 +30,12 @@ import java.util.Map;
  * @see EffectType
  */
 public record FieldEffect(
-        EffectType type,
-        float strength,
-        float radius,
-        int cooldown,
-        Map<String, Object> params
-) {
+    EffectType type,
+    @JsonField(skipIfDefault = true, defaultValue = "1.0") float strength,
+    @JsonField(skipIfDefault = true) float radius,
+    @JsonField(skipIfDefault = true) int cooldown,
+    Map<String, Object> params
+){
     
     // ─────────────────────────────────────────────────────────────────────────────
     // Factory
@@ -140,12 +143,7 @@ public record FieldEffect(
     }
     
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("type", type.id());
-        if (strength != 1.0f) json.addProperty("strength", strength);
-        if (radius != 0) json.addProperty("radius", radius);
-        if (cooldown != 0) json.addProperty("cooldown", cooldown);
-        return json;
+        return JsonSerializer.toJson(this);
     }
     
     // ─────────────────────────────────────────────────────────────────────────────

@@ -8,6 +8,9 @@ import net.cyberpunk042.visual.pattern.SegmentPattern;
 import net.cyberpunk042.visual.pattern.SectorPattern;
 import net.cyberpunk042.visual.pattern.EdgePattern;
 import net.minecraft.util.math.MathHelper;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Configuration for surface patterns (bands, checker, etc.) and vertex patterns.
@@ -42,7 +45,12 @@ import net.minecraft.util.math.MathHelper;
  * @see Appearance
  * @see VertexPattern
  */
-public record PatternConfig(PatternType type, int count, float thickness, VertexPattern vertexPattern) {
+public record PatternConfig(
+    PatternType type,
+    int count,
+    float thickness,
+    @JsonField(skipIfEqualsConstant = "QuadPattern.DEFAULT") VertexPattern vertexPattern
+){
     
     /**
      * Pattern type enumeration.
@@ -219,18 +227,7 @@ public record PatternConfig(PatternType type, int count, float thickness, Vertex
     // =========================================================================
     
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("type", type.id());
-        if (count > 0) {
-            json.addProperty("count", count);
-        }
-        if (thickness > 0 && type == PatternType.BANDS) {
-            json.addProperty("thickness", thickness);
-        }
-        if (vertexPattern != QuadPattern.DEFAULT) {
-            json.addProperty("vertexPattern", vertexPattern.id());
-        }
-        return json;
+        return JsonSerializer.toJson(this);
     }
     
     public static PatternConfig fromJson(JsonObject json) {

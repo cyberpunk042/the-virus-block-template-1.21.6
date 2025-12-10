@@ -4,6 +4,8 @@ import com.google.gson.JsonObject;
 import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Configuration for movement prediction on personal fields.
@@ -30,7 +32,7 @@ public record PredictionConfig(
     @Range(ValueRange.POSITIVE) float maxDistance,
     @Range(ValueRange.POSITIVE) float lookAhead,
     @Range(ValueRange.POSITIVE) float verticalBoost
-) {
+){
     /** No prediction (raw position). */
     public static final PredictionConfig NONE = new PredictionConfig(false, 0, 0, 0, 0);
     
@@ -76,17 +78,20 @@ public record PredictionConfig(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .enabled(enabled)
+            .leadTicks(leadTicks)
+            .maxDistance(maxDistance)
+            .lookAhead(lookAhead)
+            .verticalBoost(verticalBoost);
+    }
     /**
      * Serializes this prediction config to JSON.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("enabled", enabled);
-        json.addProperty("leadTicks", leadTicks);
-        json.addProperty("maxDistance", maxDistance);
-        json.addProperty("lookAhead", lookAhead);
-        json.addProperty("verticalBoost", verticalBoost);
-        return json;
+        return JsonSerializer.toJson(this);
     }
 
 

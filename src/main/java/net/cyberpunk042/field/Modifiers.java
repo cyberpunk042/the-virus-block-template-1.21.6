@@ -3,6 +3,9 @@ package net.cyberpunk042.field;
 import net.cyberpunk042.log.Logging;
 
 import com.google.gson.JsonObject;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Modifiers that affect field behavior and appearance.
@@ -46,24 +49,24 @@ import com.google.gson.JsonObject;
  */
 public record Modifiers(
     // Multipliers
-    float radiusMultiplier,
-    float strengthMultiplier,
-    float alphaMultiplier,
-    float spinMultiplier,
-    
+    @JsonField(skipIfDefault = true, defaultValue = "1.0") float radiusMultiplier,
+    @JsonField(skipIfDefault = true, defaultValue = "1.0") float strengthMultiplier,
+    @JsonField(skipIfDefault = true, defaultValue = "1.0") float alphaMultiplier,
+    @JsonField(skipIfDefault = true, defaultValue = "1.0") float spinMultiplier,
     // Visual modifiers
-    float visualScale,
-    float tiltMultiplier,
-    float swirlStrength,
-    
+    @JsonField(skipIfDefault = true, defaultValue = "1.0") float visualScale,
+    @JsonField(skipIfDefault = true) float tiltMultiplier,
+    @JsonField(skipIfDefault = true) float swirlStrength,
     // Animation modifiers
-    float bobbing,    // Vertical oscillation strength (0-1)
-    float breathing,  // Scale breathing strength (0-1)
+    @JsonField(skipIfDefault = true) float bobbing,
+    // Vertical oscillation strength (0-1)
+    @JsonField(skipIfDefault = true) float breathing,
+    // Scale breathing strength (0-1)
     
     // Flags
-    boolean inverted,
-    boolean pulsing
-) {
+    @JsonField(skipIfDefault = true) boolean inverted,
+    @JsonField(skipIfDefault = true) boolean pulsing
+){
     
     /**
      * Default modifiers (no changes).
@@ -186,22 +189,7 @@ public record Modifiers(
     // ─────────────────────────────────────────────────────────────────────────
     
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        
-        // Only include non-default values
-        if (radiusMultiplier != 1.0f) json.addProperty("radius", radiusMultiplier);
-        if (strengthMultiplier != 1.0f) json.addProperty("strength", strengthMultiplier);
-        if (alphaMultiplier != 1.0f) json.addProperty("alpha", alphaMultiplier);
-        if (spinMultiplier != 1.0f) json.addProperty("spin", spinMultiplier);
-        if (visualScale != 1.0f) json.addProperty("visualScale", visualScale);
-        if (tiltMultiplier != 0.0f) json.addProperty("tilt", tiltMultiplier);
-        if (swirlStrength != 0.0f) json.addProperty("swirl", swirlStrength);
-        if (bobbing != 0.0f) json.addProperty("bobbing", bobbing);
-        if (breathing != 0.0f) json.addProperty("breathing", breathing);
-        if (inverted) json.addProperty("inverted", true);
-        if (pulsing) json.addProperty("pulsing", true);
-        
-        return json;
+        return JsonSerializer.toJson(this);
     }
     
     public static Modifiers fromJson(JsonObject json) {

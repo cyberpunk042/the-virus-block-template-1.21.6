@@ -10,6 +10,9 @@ import net.cyberpunk042.field.FieldType;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * A saved field profile with metadata.
@@ -26,8 +29,8 @@ public record Profile(
     ProfileSource source,
     Instant created,
     Instant modified,
-    FieldDefinition definition
-) {
+    @JsonField(skipIfNull = true) FieldDefinition definition
+){
     
     public static final int CURRENT_VERSION = 1;
     
@@ -118,28 +121,7 @@ public record Profile(
      * Convert to JSON for saving.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("version", version);
-        json.addProperty("id", id);
-        json.addProperty("name", name);
-        json.addProperty("description", description);
-        json.addProperty("type", type.name());
-        json.addProperty("category", category.getId());
-        
-        JsonArray tagsArray = new JsonArray();
-        if (tags != null) {
-            tags.forEach(tagsArray::add);
-        }
-        json.add("tags", tagsArray);
-        
-        json.addProperty("created", created.toString());
-        json.addProperty("modified", Instant.now().toString());
-        
-        if (definition != null) {
-            json.add("definition", definition.toJson());
-        }
-        
-        return json;
+        return JsonSerializer.toJson(this);
     }
     
     /**
@@ -187,6 +169,7 @@ public record Profile(
         private FieldType type = FieldType.SHIELD;
         private ProfileCategory category = ProfileCategory.UTILITY;
         private List<String> tags = new ArrayList<>();
+        private ProfileSource source = ProfileSource.LOCAL;
         private FieldDefinition definition;
         
         public Builder id(String id) { this.id = id; return this; }
@@ -196,12 +179,13 @@ public record Profile(
         public Builder category(ProfileCategory category) { this.category = category; return this; }
         public Builder tags(List<String> tags) { this.tags = tags; return this; }
         public Builder tag(String tag) { this.tags.add(tag); return this; }
+        public Builder source(ProfileSource source) { this.source = source; return this; }
         public Builder definition(FieldDefinition definition) { this.definition = definition; return this; }
         
         public Profile build() {
             return new Profile(
                 CURRENT_VERSION, id, name, description, type, category, tags,
-                ProfileSource.LOCAL, Instant.now(), Instant.now(), definition
+                source, Instant.now(), Instant.now(), definition
             );
         }
     }

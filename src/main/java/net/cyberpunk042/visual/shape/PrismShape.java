@@ -8,6 +8,9 @@ import org.joml.Vector3f;
 import java.util.Map;
 import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * N-sided prism shape (extruded polygon).
@@ -42,12 +45,12 @@ public record PrismShape(
     @Range(ValueRange.SIDES) int sides,
     @Range(ValueRange.RADIUS) float radius,
     @Range(ValueRange.POSITIVE_NONZERO) float height,
-    @Range(ValueRange.POSITIVE) float topRadius,
-    @Range(ValueRange.DEGREES_FULL) float twist,
-    @Range(ValueRange.STEPS) int heightSegments,
-    boolean capTop,
-    boolean capBottom
-) implements Shape {
+    @Range(ValueRange.POSITIVE) @JsonField(skipIfEqualsField = "radius") float topRadius,
+    @Range(ValueRange.DEGREES_FULL) @JsonField(skipIfDefault = true) float twist,
+    @Range(ValueRange.STEPS) @JsonField(skipIfDefault = true, defaultValue = "1") int heightSegments,
+    @JsonField(skipIfDefault = true, defaultValue = "true") boolean capTop,
+    @JsonField(skipIfDefault = true, defaultValue = "true") boolean capBottom
+)implements Shape {
     
     /** Default hexagonal prism. */
     public static final PrismShape DEFAULT = new PrismShape(
@@ -124,17 +127,7 @@ public record PrismShape(
     
     @Override
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("type", "prism");
-        json.addProperty("sides", sides);
-        json.addProperty("radius", radius);
-        json.addProperty("height", height);
-        if (topRadius != radius) json.addProperty("topRadius", topRadius);
-        if (twist != 0) json.addProperty("twist", twist);
-        if (heightSegments != 1) json.addProperty("heightSegments", heightSegments);
-        if (!capTop) json.addProperty("capTop", false);
-        if (!capBottom) json.addProperty("capBottom", false);
-        return json;
+        return JsonSerializer.toJson(this);
     }
 
     // =========================================================================
@@ -142,6 +135,18 @@ public record PrismShape(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this shape's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .sides(sides)
+            .radius(radius)
+            .height(height)
+            .topRadius(topRadius)
+            .twist(twist)
+            .heightSegments(heightSegments)
+            .capTop(capTop)
+            .capBottom(capBottom);
+    }
     
     public static class Builder {
         private @Range(ValueRange.SIDES) int sides = 6;

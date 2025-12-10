@@ -98,6 +98,14 @@ public record ColorCycleConfig(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .colors(colors)
+            .colors(colors)
+            .speed(speed)
+            .blend(blend);
+    }
     
     public static class Builder {
         private List<String> colors = null;

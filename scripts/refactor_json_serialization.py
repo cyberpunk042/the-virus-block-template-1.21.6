@@ -276,6 +276,14 @@ COND_ADD_TOJSON_CONSTANT_BLOCK_PATTERN = re.compile(
     re.MULTILINE | re.DOTALL
 )
 
+# Pattern: if (field != null && field != Type.CONSTANT) { json.add("key", field.toJson()); }
+# COMPOUND condition - needs BOTH skipIfNull AND skipIfEqualsConstant
+# Captures: field, Type.CONSTANT, json_key
+COND_ADD_TOJSON_NULL_AND_CONSTANT_PATTERN = re.compile(
+    r'if\s*\(\s*(\w+)\s*!=\s*null\s*&&\s*\1\s*!=\s*(\w+\.\w+)\s*\)\s*\{[^}]*json\.add\s*\(\s*"(\w+)"\s*,\s*\w+\.toJson\(\)',
+    re.MULTILINE | re.DOTALL
+)
+
 # Match record declaration - handles nested parentheses in annotations
 # Matches until ) followed by { or implements (the start of record body)
 RECORD_PATTERN = re.compile(r'public\s+record\s+(\w+)\s*\((.+?)\)\s*(?=\{|implements)', re.DOTALL)
@@ -604,6 +612,16 @@ def analyze_to_json_body(body: str, full_content: str, is_record: bool, record_m
         field_info = find_or_create_field(field_name, json_key)
         field_info.skip_if_equals_constant = constant
     
+    # Pattern: if (field != null && field != Type.CONSTANT) { json.add("key", field.toJson()); }
+    # COMPOUND condition - needs BOTH skipIfNull AND skipIfEqualsConstant
+    for match in COND_ADD_TOJSON_NULL_AND_CONSTANT_PATTERN.finditer(body):
+        field_name = match.group(1)
+        constant = match.group(2)  # e.g., "Transform.IDENTITY"
+        json_key = match.group(3)
+        field_info = find_or_create_field(field_name, json_key)
+        field_info.skip_if_null = True
+        field_info.skip_if_equals_constant = constant
+    
     return fields
 
 def extract_field_name(value_expr: str, json_key: str = None) -> str:
@@ -841,17 +859,21 @@ def generate_annotation(field: FieldInfo) -> Optional[str]:
     """Generate @JsonField annotation for a field if needed."""
     parts = []
     
-    # Field-to-field comparison - use skipIfEqualsField
+    # Field-to-field comparison - use skipIfEqualsField (exclusive)
     if field.compares_to_field:
         return f'@JsonField(skipIfEqualsField = "{field.compares_to_field}")'
     
-    # Method call condition - use skipUnless
+    # Method call condition - use skipUnless (exclusive)
     if field.skip_unless_method:
         return f'@JsonField(skipUnless = "{field.skip_unless_method}")'
     
-    # Static constant comparison - use skipIfEqualsConstant
+    # Static constant comparison - can be combined with skipIfNull
+    # BUT: if it's a literal value (like "1.0f") and skipIfDefault is also set, prefer skipIfDefault
     if field.skip_if_equals_constant:
-        return f'@JsonField(skipIfEqualsConstant = "{field.skip_if_equals_constant}")'
+        is_literal = re.match(r'^-?\d+(\.\d+)?[fFdDlL]?$', field.skip_if_equals_constant)
+        # Only add skipIfEqualsConstant if it's NOT a literal, or if skipIfDefault is not set
+        if not is_literal or not field.skip_if_default:
+            parts.append(f'skipIfEqualsConstant = "{field.skip_if_equals_constant}"')
     
     if field.skip_if_default:
         parts.append("skipIfDefault = true")
@@ -878,8 +900,13 @@ def generate_annotation_report(field: FieldInfo) -> str:
         return f'@JsonField(skipIfEqualsField = "{field.compares_to_field}")'
     if field.skip_unless_method:
         return f'@JsonField(skipUnless = "{field.skip_unless_method}")'
+    
+    # Handle compound conditions (both skipIfNull and skipIfEqualsConstant)
+    if field.skip_if_equals_constant and field.skip_if_null:
+        return f'@JsonField(skipIfNull = true, skipIfEqualsConstant = "{field.skip_if_equals_constant}")'
     if field.skip_if_equals_constant:
         return f'@JsonField(skipIfEqualsConstant = "{field.skip_if_equals_constant}")'
+    
     if field.skip_if_empty:
         return '@JsonField(skipIfEmpty = true)'
     if field.compares_to_constant:
@@ -940,6 +967,32 @@ def generate_refactored_content(refactor: FileRefactor, original_content: str) -
     
     return content
 
+def split_record_components(components_str: str) -> List[str]:
+    """Split record components by comma, respecting generic type brackets."""
+    components = []
+    current = []
+    depth = 0  # Track <> nesting depth
+    
+    for char in components_str:
+        if char == '<':
+            depth += 1
+            current.append(char)
+        elif char == '>':
+            depth -= 1
+            current.append(char)
+        elif char == ',' and depth == 0:
+            # Only split at top-level commas
+            components.append(''.join(current).strip())
+            current = []
+        else:
+            current.append(char)
+    
+    # Don't forget the last component
+    if current:
+        components.append(''.join(current).strip())
+    
+    return [c for c in components if c]
+
 def add_record_annotations(content: str, refactor: FileRefactor) -> str:
     """Add @JsonField annotations to record components."""
     record_match = RECORD_PATTERN.search(content)
@@ -948,28 +1001,30 @@ def add_record_annotations(content: str, refactor: FileRefactor) -> str:
     
     original_components = record_match.group(2)
     
-    # Parse and annotate each component
+    # Parse and annotate each component (respecting generic types)
     components = []
-    for line in original_components.split(','):
+    for line in split_record_components(original_components):
         line = line.strip()
         if not line:
             continue
         
         # Find which field this corresponds to
         for f in refactor.fields:
-            if f.name in line and not line.startswith('@JsonField'):
-                annotation = generate_annotation(f)
-                if annotation:
-                    # Check if there are existing annotations
-                    if '@' in line:
-                        # Insert before the type
-                        type_match = re.search(r'(\w+(?:<[^>]+>)?)\s+' + re.escape(f.name), line)
-                        if type_match:
-                            insert_pos = line.find(type_match.group(1))
-                            line = line[:insert_pos] + annotation + ' ' + line[insert_pos:]
-                    else:
-                        line = annotation + ' ' + line
-                break
+            # Match field declaration: type followed by field name at end of line
+            # Must NOT be preceded by // (comment)
+            field_decl_pattern = r'^([^/\n]*?)(\w+(?:<[^>]+>)?)\s+' + re.escape(f.name) + r'\s*$'
+            field_match = re.search(field_decl_pattern, line, re.MULTILINE)
+            
+            # Verify match is not inside a comment (check if // appears before the type)
+            if field_match and '@JsonField' not in line:
+                prefix = field_match.group(1)
+                if '//' not in prefix:  # Not a comment line
+                    annotation = generate_annotation(f)
+                    if annotation:
+                        # Insert annotation before the type
+                        insert_pos = field_match.start(2)
+                        line = line[:insert_pos] + annotation + ' ' + line[insert_pos:]
+                    break
         
         components.append(line)
     

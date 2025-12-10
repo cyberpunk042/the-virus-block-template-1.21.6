@@ -7,6 +7,9 @@ import net.cyberpunk042.visual.validation.ValueRange;
 import net.cyberpunk042.log.Logging;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonArray;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Complete spatial transform configuration for a primitive.
@@ -62,27 +65,23 @@ import com.google.gson.JsonArray;
  * @see OrbitConfig
  */
 public record Transform(
-    // Position
+    @JsonField(skipIfEqualsConstant = "Anchor.CENTER") // Position
     Anchor anchor,
-    @Nullable Vector3f offset,
-    
+    @Nullable @JsonField(skipIfNull = true) Vector3f offset,
     // Rotation
-    @Nullable Vector3f rotation,
-    boolean inheritRotation,
-    
+    @Nullable @JsonField(skipIfNull = true) Vector3f rotation,
+    @JsonField(skipIfDefault = true, defaultValue = "true") boolean inheritRotation,
     // Scale
-    @Range(ValueRange.SCALE) float scale,
-    @Nullable Vector3f scaleXYZ,
-    boolean scaleWithRadius,
-    
-    // Orientation
+    @Range(ValueRange.SCALE) @JsonField(skipIfEqualsConstant = "1.0f") float scale,
+    @Nullable @JsonField(skipIfNull = true) Vector3f scaleXYZ,
+    @JsonField(skipIfDefault = true) boolean scaleWithRadius,
+    @JsonField(skipIfEqualsConstant = "Facing.FIXED") // Orientation
     Facing facing,
-    UpVector up,
-    Billboard billboard,
-    
+    @JsonField(skipIfEqualsConstant = "UpVector.WORLD_UP") UpVector up,
+    @JsonField(skipIfEqualsConstant = "Billboard.NONE") Billboard billboard,
     // Dynamic
-    @Nullable OrbitConfig orbit
-) {
+    @Nullable @JsonField(skipIfNull = true) OrbitConfig orbit
+){
     // =========================================================================
     // Static Constants
     // =========================================================================
@@ -320,65 +319,7 @@ public record Transform(
      * Serializes this transform to JSON.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        
-        if (anchor != Anchor.CENTER) {
-            json.addProperty("anchor", anchor.name());
-        }
-        
-        if (offset != null) {
-            JsonArray offsetArr = new JsonArray();
-            offsetArr.add(offset.x);
-            offsetArr.add(offset.y);
-            offsetArr.add(offset.z);
-            json.add("offset", offsetArr);
-        }
-        
-        if (rotation != null) {
-            JsonArray rotArr = new JsonArray();
-            rotArr.add(rotation.x);
-            rotArr.add(rotation.y);
-            rotArr.add(rotation.z);
-            json.add("rotation", rotArr);
-        }
-        
-        if (!inheritRotation) {
-            json.addProperty("inheritRotation", false);
-        }
-        
-        if (scale != 1.0f) {
-            json.addProperty("scale", scale);
-        }
-        
-        if (scaleXYZ != null) {
-            JsonArray scaleArr = new JsonArray();
-            scaleArr.add(scaleXYZ.x);
-            scaleArr.add(scaleXYZ.y);
-            scaleArr.add(scaleXYZ.z);
-            json.add("scaleXYZ", scaleArr);
-        }
-        
-        if (scaleWithRadius) {
-            json.addProperty("scaleWithRadius", true);
-        }
-        
-        if (facing != Facing.FIXED) {
-            json.addProperty("facing", facing.name());
-        }
-        
-        if (up != UpVector.WORLD_UP) {
-            json.addProperty("up", up.name());
-        }
-        
-        if (billboard != Billboard.NONE) {
-            json.addProperty("billboard", billboard.name());
-        }
-        
-        if (orbit != null) {
-            json.add("orbit", orbit.toJson());
-        }
-        
-        return json;
+        return JsonSerializer.toJson(this);
     }
     
     // =========================================================================
@@ -386,6 +327,24 @@ public record Transform(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .anchor(anchor)
+            .offset(offset)
+            .offset(offset)
+            .rotation(rotation)
+            .rotation(rotation)
+            .inheritRotation(inheritRotation)
+            .scale(scale)
+            .scaleXYZ(scaleXYZ)
+            .scaleXYZ(scaleXYZ)
+            .scaleWithRadius(scaleWithRadius)
+            .facing(facing)
+            .up(up)
+            .billboard(billboard)
+            .orbit(orbit);
+    }
     
     public static class Builder {
         private Anchor anchor = Anchor.CENTER;

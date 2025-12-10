@@ -4,6 +4,9 @@ import com.google.gson.JsonObject;
 import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.visual.animation.Axis;
 import org.jetbrains.annotations.Nullable;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Links a primitive to another primitive for coordinated behavior.
@@ -31,13 +34,13 @@ import org.jetbrains.annotations.Nullable;
  * @see LinkResolver
  */
 public record PrimitiveLink(
-    @Nullable String radiusMatch,
-    float radiusOffset,
-    @Nullable String follow,
-    @Nullable Axis mirror,
-    float phaseOffset,
-    @Nullable String scaleWith
-) {
+    @Nullable @JsonField(skipIfNull = true) String radiusMatch,
+    @JsonField(skipIfDefault = true) float radiusOffset,
+    @Nullable @JsonField(skipIfNull = true) String follow,
+    @Nullable @JsonField(skipIfNull = true) Axis mirror,
+    @JsonField(skipIfDefault = true) float phaseOffset,
+    @Nullable @JsonField(skipIfNull = true) String scaleWith
+){
     
     /** No linking. */
     public static final PrimitiveLink NONE = new PrimitiveLink(null, 0, null, null, 0, null);
@@ -109,28 +112,7 @@ public record PrimitiveLink(
      * Serializes this link to JSON.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        
-        if (radiusMatch != null) {
-            json.addProperty("radiusMatch", radiusMatch);
-        }
-        if (radiusOffset != 0) {
-            json.addProperty("radiusOffset", radiusOffset);
-        }
-        if (follow != null) {
-            json.addProperty("follow", follow);
-        }
-        if (mirror != null) {
-            json.addProperty("mirror", mirror.name());
-        }
-        if (phaseOffset != 0) {
-            json.addProperty("phaseOffset", phaseOffset);
-        }
-        if (scaleWith != null) {
-            json.addProperty("scaleWith", scaleWith);
-        }
-        
-        return json;
+        return JsonSerializer.toJson(this);
     }
     
     // =========================================================================
@@ -138,6 +120,16 @@ public record PrimitiveLink(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .radiusMatch(radiusMatch)
+            .radiusOffset(radiusOffset)
+            .follow(follow)
+            .mirror(mirror)
+            .phaseOffset(phaseOffset)
+            .scaleWith(scaleWith);
+    }
     
     public static class Builder {
         private String radiusMatch = null;

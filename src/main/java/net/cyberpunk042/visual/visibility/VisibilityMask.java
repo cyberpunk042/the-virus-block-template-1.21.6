@@ -5,6 +5,9 @@ import com.google.gson.JsonObject;
 import org.jetbrains.annotations.Nullable;
 import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Controls which parts of a shape are visible.
@@ -34,28 +37,25 @@ import net.cyberpunk042.visual.validation.ValueRange;
  * @see MaskType
  */
 public record VisibilityMask(
-    // Phase 1 fields
+    @JsonField(skipIfEqualsConstant = "FULL") // Phase 1 fields
     MaskType mask,
-    @Range(ValueRange.STEPS) int count,
-    @Range(ValueRange.POSITIVE) float thickness,
-    
+    @Range(ValueRange.STEPS) @JsonField(skipIfDefault = true, defaultValue = "1") int count,
+    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "1.0") float thickness,
     // Phase 2 fields
-    @Range(ValueRange.NORMALIZED) float offset,
-    boolean invert,
-    @Range(ValueRange.NORMALIZED) float feather,
-    boolean animate,
-    @Range(ValueRange.POSITIVE) float animSpeed,
-    
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true) float offset,
+    @JsonField(skipIfDefault = true) boolean invert,
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true) float feather,
+    @JsonField(skipIfDefault = true) boolean animate,
+    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true) float animSpeed,
     // Gradient options
-    @Nullable String direction,
-    float falloff,
-    float gradientStart,
-    float gradientEnd,
-    
+    @Nullable @JsonField(skipIfNull = true) String direction,
+    @JsonField(skipIfDefault = true) float falloff,
+    @JsonField(skipIfDefault = true) float gradientStart,
+    @JsonField(skipIfDefault = true, defaultValue = "1") float gradientEnd,
     // Radial options
-    @Range(ValueRange.NORMALIZED) float centerX,
-    @Range(ValueRange.NORMALIZED) float centerY
-) {
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "0.5") float centerX,
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "0.5") float centerY
+){
     /** Full visibility (no masking). */
     public static final VisibilityMask FULL = new VisibilityMask(
         MaskType.FULL, 1, 1.0f, 0, false, 0, false, 0, null, 0, 0, 1, 0.5f, 0.5f);
@@ -210,26 +210,29 @@ public record VisibilityMask(
     }
 
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .mask(mask)
+            .count(count)
+            .thickness(thickness)
+            .offset(offset)
+            .invert(invert)
+            .feather(feather)
+            .animate(animate)
+            .animSpeed(animSpeed)
+            .direction(direction)
+            .falloff(falloff)
+            .gradientStart(gradientStart)
+            .gradientEnd(gradientEnd)
+            .centerX(centerX)
+            .centerY(centerY);
+    }
     /**
      * Serializes this visibility mask to JSON.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        if (mask != MaskType.FULL) json.addProperty("mask", mask.name());
-        if (count != FULL.count) json.addProperty("count", count);
-        if (thickness != FULL.thickness) json.addProperty("thickness", thickness);
-        if (offset != 0) json.addProperty("offset", offset);
-        if (invert) json.addProperty("invert", true);
-        if (feather != 0) json.addProperty("feather", feather);
-        if (animate) json.addProperty("animate", true);
-        if (animSpeed != 0) json.addProperty("animSpeed", animSpeed);
-        if (direction != null) json.addProperty("direction", direction);
-        if (falloff != 0) json.addProperty("falloff", falloff);
-        if (gradientStart != 0) json.addProperty("gradientStart", gradientStart);
-        if (gradientEnd != 1) json.addProperty("gradientEnd", gradientEnd);
-        if (centerX != 0.5f) json.addProperty("centerX", centerX);
-        if (centerY != 0.5f) json.addProperty("centerY", centerY);
-        return json;
+        return JsonSerializer.toJson(this);
     }
 
 

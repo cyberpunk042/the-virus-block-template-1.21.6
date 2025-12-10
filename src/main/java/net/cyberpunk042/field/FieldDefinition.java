@@ -12,6 +12,9 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Complete definition of a visual field.
@@ -67,16 +70,16 @@ public record FieldDefinition(
     String id,
     FieldType type,
     float baseRadius,
-    @Nullable String themeId,
+    @Nullable @JsonField(skipIfNull = true) String themeId,
     List<FieldLayer> layers,
-    @Nullable Modifiers modifiers,
-    @Nullable PredictionConfig prediction,
-    @Nullable BeamConfig beam,
-    @Nullable FollowModeConfig followMode,
-    Map<String, BindingConfig> bindings,
-    List<TriggerConfig> triggers,
-    @Nullable LifecycleConfig lifecycle
-) {
+    @Nullable @JsonField(skipIfNull = true) Modifiers modifiers,
+    @Nullable @JsonField(skipIfNull = true) PredictionConfig prediction,
+    @Nullable @JsonField(skipIfNull = true) BeamConfig beam,
+    @Nullable @JsonField(skipIfNull = true) FollowModeConfig followMode,
+    @JsonField(skipIfEmpty = true) Map<String, BindingConfig> bindings,
+    @JsonField(skipIfEmpty = true) List<TriggerConfig> triggers,
+    @Nullable @JsonField(skipIfNull = true) LifecycleConfig lifecycle
+){
     
     /**
      * Parses a FieldDefinition from JSON.
@@ -143,58 +146,7 @@ public record FieldDefinition(
      * @return JSON representation of this definition
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("id", id);
-        json.addProperty("type", type.name());
-        json.addProperty("baseRadius", baseRadius);
-        if (themeId != null) {
-            json.addProperty("themeId", themeId);
-        }
-        
-        // Serialize layers
-        JsonArray layersArray = new JsonArray();
-        for (FieldLayer layer : layers) {
-            layersArray.add(layer.toJson());
-        }
-        json.add("layers", layersArray);
-        
-        // Serialize optional fields
-        if (modifiers != null) {
-            json.add("modifiers", modifiers.toJson());
-        }
-        if (prediction != null) {
-            json.add("prediction", prediction.toJson());
-        }
-        if (beam != null) {
-            json.add("beam", beam.toJson());
-        }
-        if (followMode != null) {
-            json.add("followMode", followMode.toJson());
-        }
-        
-        // Serialize bindings
-        if (bindings != null && !bindings.isEmpty()) {
-            JsonObject bindingsObj = new JsonObject();
-            for (Map.Entry<String, BindingConfig> entry : bindings.entrySet()) {
-                bindingsObj.add(entry.getKey(), entry.getValue().toJson());
-            }
-            json.add("bindings", bindingsObj);
-        }
-        
-        // Serialize triggers
-        if (triggers != null && !triggers.isEmpty()) {
-            JsonArray triggersArray = new JsonArray();
-            for (TriggerConfig trigger : triggers) {
-                triggersArray.add(trigger.toJson());
-            }
-            json.add("triggers", triggersArray);
-        }
-        
-        if (lifecycle != null) {
-            json.add("lifecycle", lifecycle.toJson());
-        }
-        
-        return json;
+        return JsonSerializer.toJson(this);
     }
     
     /**

@@ -14,6 +14,8 @@ import net.minecraft.client.gui.widget.CyclingButtonWidget;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.cyberpunk042.client.network.GuiPacketSender;
+import net.cyberpunk042.client.gui.widget.ToastNotification;
 
 /**
  * G82-G85: Lifecycle state controls for the Debug panel.
@@ -111,20 +113,23 @@ public class LifecycleSubPanel extends AbstractPanel {
         int btnW = (w - GuiConstants.PADDING * 2) / 3;
         spawnBtn = GuiWidgets.button(x, y, btnW, "Spawn", "Force spawn field", () -> {
             Logging.GUI.topic("lifecycle").info("Force spawn triggered");
-            // TODO: Send spawn command
+            GuiPacketSender.spawnDebugField(state.toStateJson());
         });
         widgets.add(spawnBtn);
         
         despawnBtn = GuiWidgets.button(x + btnW + GuiConstants.PADDING, y, btnW, "Despawn", "Force despawn field", () -> {
             Logging.GUI.topic("lifecycle").info("Force despawn triggered");
-            // TODO: Send despawn command
+            GuiPacketSender.despawnDebugField();
         });
         widgets.add(despawnBtn);
         
         // G85: Reset button
         resetBtn = GuiWidgets.button(x + (btnW + GuiConstants.PADDING) * 2, y, btnW, "Reset", "Reset to defaults", () -> {
             Logging.GUI.topic("lifecycle").info("Lifecycle reset triggered");
-            // TODO: Reset lifecycle state
+            state.setLifecycleState("ACTIVE");
+            state.setFadeInTicks(0);
+            state.setFadeOutTicks(0);
+            ToastNotification.info("Lifecycle reset to defaults");
         });
         widgets.add(resetBtn);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;

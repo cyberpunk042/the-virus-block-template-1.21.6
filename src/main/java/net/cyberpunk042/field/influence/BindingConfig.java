@@ -3,6 +3,8 @@ package net.cyberpunk042.field.influence;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Configuration for a single property binding.
@@ -35,7 +37,7 @@ public record BindingConfig(
     float outputMin,
     float outputMax,
     InterpolationCurve curve
-) {
+){
     /** Default binding (pass-through). */
     public static final BindingConfig DEFAULT = new BindingConfig(
         "player.health_percent", 0, 1, 0, 1, InterpolationCurve.LINEAR);
@@ -114,19 +116,20 @@ public record BindingConfig(
      * Builder pattern.
      */
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .source(source)
+            .inputRange(inputMin, inputMax)
+            .outputRange(outputMin, outputMax)
+            .curve(curve);
+    }
     /**
      * Serializes this binding config to JSON.
      * Uses field names directly for auto-serialization compatibility.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("source", source);
-        json.addProperty("inputMin", inputMin);
-        json.addProperty("inputMax", inputMax);
-        json.addProperty("outputMin", outputMin);
-        json.addProperty("outputMax", outputMax);
-        json.addProperty("curve", curve.name().toLowerCase());
-        return json;
+        return JsonSerializer.toJson(this);
     }
 
 

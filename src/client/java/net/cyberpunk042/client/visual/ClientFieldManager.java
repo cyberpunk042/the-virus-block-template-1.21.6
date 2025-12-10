@@ -1,6 +1,7 @@
 package net.cyberpunk042.client.visual;
 
 import net.cyberpunk042.client.field.render.FieldRenderer;
+import net.cyberpunk042.client.field.render.RenderOverrides;
 
 import net.cyberpunk042.field.ClientFieldState;
 import net.cyberpunk042.field.FieldDefinition;
@@ -283,26 +284,27 @@ public final class ClientFieldManager {
         float alpha = state.effectiveAlpha();
         float time = worldTime + state.phase();
         
-        // Check for shuffle override
+        // Check for shuffle override and create RenderOverrides if needed
+        RenderOverrides overrides = null;
         if (state.hasShuffleOverride()) {
             // Reconstruct the pattern from shuffle type + index
             net.cyberpunk042.visual.pattern.VertexPattern pattern = reconstructPattern(
                 state.shuffleType(), state.shuffleIndex());
             
+            if (pattern != null) {
+                overrides = RenderOverrides.withPattern(pattern);
+            }
+            
             // DIAGNOSTIC: Log pattern override being applied
             if ((int) worldTime % 60 == 0) {
                 Logging.RENDER.topic("shuffle").info(
-                    "DIAG: Rendering with shuffle override: {}:{} -> {}", 
+                    "Rendering with shuffle override: {}:{} -> {}", 
                     state.shuffleType(), state.shuffleIndex(), 
                     pattern != null ? pattern.id() : "null");
             }
-            
-            // TODO: Replace with new renderer system
-            // For now, use basic render path
-            Logging.RENDER.topic("field").warn("Legacy renderer with overrides not yet implemented - using basic render");
         }
         
-        // Use new FieldRenderer
+        // Use new FieldRenderer with optional overrides
         FieldRenderer.render(
             matrices,
             consumers,
@@ -310,7 +312,8 @@ public final class ClientFieldManager {
             pos,
             state.scale(),
             time,
-            alpha
+            alpha,
+            overrides
         );
     }
     

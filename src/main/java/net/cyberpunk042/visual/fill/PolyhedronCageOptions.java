@@ -50,6 +50,14 @@ public record PolyhedronCageOptions(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .lineWidth(lineWidth)
+            .showEdges(showEdges)
+            .allEdges(allEdges)
+            .faceOutlines(faceOutlines);
+    }
     
     public static class Builder {
         private float lineWidth = CageOptions.DEFAULT_LINE_WIDTH;

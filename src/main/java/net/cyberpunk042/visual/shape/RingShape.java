@@ -8,6 +8,9 @@ import org.joml.Vector3f;
 import java.util.Map;
 import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Ring/torus shape - a band with inner and outer radius.
@@ -41,12 +44,12 @@ public record RingShape(
     @Range(ValueRange.RADIUS) float innerRadius,
     @Range(ValueRange.RADIUS) float outerRadius,
     @Range(ValueRange.STEPS) int segments,
-    @Range(ValueRange.UNBOUNDED) float y,
-    @Range(ValueRange.DEGREES) float arcStart,
-    @Range(ValueRange.DEGREES) float arcEnd,
-    @Range(ValueRange.POSITIVE) float height,
-    @Range(ValueRange.DEGREES_FULL) float twist
-) implements Shape {
+    @Range(ValueRange.UNBOUNDED) @JsonField(skipIfDefault = true) float y,
+    @Range(ValueRange.DEGREES) @JsonField(skipIfDefault = true) float arcStart,
+    @Range(ValueRange.DEGREES) @JsonField(skipIfDefault = true, defaultValue = "360") float arcEnd,
+    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true) float height,
+    @Range(ValueRange.DEGREES_FULL) @JsonField(skipIfDefault = true) float twist
+)implements Shape {
     
     /** Default ring (0.8 inner, 1.0 outer). */
     public static final RingShape DEFAULT = new RingShape(
@@ -112,17 +115,7 @@ public record RingShape(
     
     @Override
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("type", "ring");
-        json.addProperty("innerRadius", innerRadius);
-        json.addProperty("outerRadius", outerRadius);
-        json.addProperty("segments", segments);
-        if (y != 0) json.addProperty("y", y);
-        if (arcStart != 0) json.addProperty("arcStart", arcStart);
-        if (arcEnd != 360) json.addProperty("arcEnd", arcEnd);
-        if (height != 0) json.addProperty("height", height);
-        if (twist != 0) json.addProperty("twist", twist);
-        return json;
+        return JsonSerializer.toJson(this);
     }
 
     // =========================================================================
@@ -130,6 +123,19 @@ public record RingShape(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    
+    /** Create a builder pre-populated with this shape's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .innerRadius(innerRadius)
+            .outerRadius(outerRadius)
+            .segments(segments)
+            .y(y)
+            .arcStart(arcStart)
+            .arcEnd(arcEnd)
+            .height(height)
+            .twist(twist);
+    }
     
     public static class Builder {
         private @Range(ValueRange.RADIUS) float innerRadius = 0.8f;

@@ -7,6 +7,8 @@ import org.jetbrains.annotations.Nullable;
 import net.cyberpunk042.visual.animation.PulseConfig;
 import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Configuration for central beam effect on fields.
@@ -32,7 +34,7 @@ public record BeamConfig(
     @Range(ValueRange.POSITIVE) float height,
     @Range(ValueRange.ALPHA) float glow,
     @Nullable PulseConfig pulse
-) {
+){
 
     // === Static Constants ===
     public static final BeamConfig DISABLED = new BeamConfig(false, 0f, 0f, "@beam", 0f, 0f, null);
@@ -43,14 +45,7 @@ public record BeamConfig(
     }
     
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("enabled", enabled);
-        json.addProperty("innerRadius", innerRadius);
-        json.addProperty("outerRadius", outerRadius);
-        json.addProperty("color", color);
-        json.addProperty("height", height);
-        json.addProperty("glow", glow);
-        return json;
+        return JsonSerializer.toJson(this);
     }
 
     /** No beam. */
@@ -105,6 +100,17 @@ public record BeamConfig(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this record's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .enabled(enabled)
+            .innerRadius(innerRadius)
+            .outerRadius(outerRadius)
+            .color(color)
+            .height(height)
+            .glow(glow)
+            .pulse(pulse);
+    }
     
     public static class Builder {
         private boolean enabled = true;

@@ -10,6 +10,9 @@ import net.cyberpunk042.visual.pattern.ArrangementConfig;
 import net.cyberpunk042.visual.shape.Shape;
 import net.cyberpunk042.visual.transform.Transform;
 import net.cyberpunk042.visual.visibility.VisibilityMask;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Simple implementation of {@link Primitive} for JSON loading.
@@ -24,15 +27,15 @@ import net.cyberpunk042.visual.visibility.VisibilityMask;
 public record SimplePrimitive(
     String id,
     String type,
-    Shape shape,
-    Transform transform,
-    FillConfig fill,
-    VisibilityMask visibility,
-    ArrangementConfig arrangement,
-    Appearance appearance,
-    Animation animation,
-    PrimitiveLink link
-) implements Primitive {
+    @JsonField(skipIfNull = true) Shape shape,
+    @JsonField(skipIfEqualsConstant = "Transform.IDENTITY", skipIfNull = true) Transform transform,
+    @JsonField(skipIfEqualsConstant = "FillConfig.SOLID", skipIfNull = true) FillConfig fill,
+    @JsonField(skipIfEqualsConstant = "VisibilityMask.FULL", skipIfNull = true) VisibilityMask visibility,
+    @JsonField(skipIfEqualsConstant = "ArrangementConfig.DEFAULT", skipIfNull = true) ArrangementConfig arrangement,
+    @JsonField(skipIfEqualsConstant = "Appearance.DEFAULT", skipIfNull = true) Appearance appearance,
+    @JsonField(skipIfEqualsConstant = "Animation.NONE", skipIfNull = true) Animation animation,
+    @JsonField(skipIfEqualsConstant = "PrimitiveLink.NONE", skipIfNull = true) PrimitiveLink link
+)implements Primitive {
     
     /**
      * Creates a SimplePrimitive with default values for optional fields.
@@ -171,50 +174,6 @@ public record SimplePrimitive(
      * Serializes this primitive to JSON.
      */
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("id", id);
-        json.addProperty("type", type);
-        
-        // Serialize shape
-        if (shape != null) {
-            json.add("shape", shape.toJson());
-        }
-        
-        // Serialize transform
-        if (transform != null && transform != Transform.IDENTITY) {
-            json.add("transform", transform.toJson());
-        }
-        
-        // Serialize fill
-        if (fill != null && fill != FillConfig.SOLID) {
-            json.add("fill", fill.toJson());
-        }
-        
-        // Serialize visibility
-        if (visibility != null && visibility != VisibilityMask.FULL) {
-            json.add("visibility", visibility.toJson());
-        }
-        
-        // Serialize arrangement
-        if (arrangement != null && arrangement != ArrangementConfig.DEFAULT) {
-            json.add("arrangement", arrangement.toJson());
-        }
-        
-        // Serialize appearance
-        if (appearance != null && appearance != Appearance.DEFAULT) {
-            json.add("appearance", appearance.toJson());
-        }
-        
-        // Serialize animation
-        if (animation != null && animation != Animation.NONE) {
-            json.add("animation", animation.toJson());
-        }
-        
-        // Serialize link
-        if (link != null && link != PrimitiveLink.NONE) {
-            json.add("link", link.toJson());
-        }
-        
-        return json;
+        return JsonSerializer.toJson(this);
     }
 }

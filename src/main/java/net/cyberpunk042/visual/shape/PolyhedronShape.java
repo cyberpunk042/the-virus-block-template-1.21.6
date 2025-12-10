@@ -8,6 +8,9 @@ import org.joml.Vector3f;
 import java.util.Map;
 import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
+import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.util.json.JsonSerializer;
+
 
 /**
  * Platonic solid shapes (regular polyhedra).
@@ -34,8 +37,8 @@ import net.cyberpunk042.visual.validation.ValueRange;
 public record PolyhedronShape(
     PolyType polyType,
     @Range(ValueRange.RADIUS) float radius,
-    @Range(ValueRange.STEPS) int subdivisions
-) implements Shape {
+    @Range(ValueRange.STEPS) @JsonField(skipIfDefault = true) int subdivisions
+)implements Shape {
     
     /** Default icosahedron. */
     public static PolyhedronShape cube(float radius) { 
@@ -124,12 +127,7 @@ public record PolyhedronShape(
     
     @Override
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("type", "polyhedron");
-        json.addProperty("polyType", polyType.name());
-        json.addProperty("radius", radius);
-        if (subdivisions != 0) json.addProperty("subdivisions", subdivisions);
-        return json;
+        return JsonSerializer.toJson(this);
     }
 
     // =========================================================================
@@ -137,6 +135,13 @@ public record PolyhedronShape(
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
+    /** Create a builder pre-populated with this shape's values. */
+    public Builder toBuilder() {
+        return new Builder()
+            .polyType(polyType)
+            .radius(radius)
+            .subdivisions(subdivisions);
+    }
     
     public static class Builder {
         private PolyType polyType = PolyType.ICOSAHEDRON;
