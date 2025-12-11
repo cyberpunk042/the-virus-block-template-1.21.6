@@ -1,5 +1,8 @@
 package net.cyberpunk042.client.gui.panel.sub;
 
+import net.cyberpunk042.client.gui.panel.AbstractPanel;
+import net.minecraft.client.gui.screen.Screen;
+
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.GuiLayout;
@@ -28,15 +31,12 @@ import java.util.List;
  * 
  * @see <a href="GUI_CLASS_DIAGRAM.md §4.10">FollowModeSubPanel specification</a>
  */
-public class FollowModeSubPanel {
-    
+public class FollowModeSubPanel extends AbstractPanel {
     // ═══════════════════════════════════════════════════════════════════════════
     // FIELDS
     // ═══════════════════════════════════════════════════════════════════════════
     
-    private final FieldEditState state;
-    private final List<ClickableWidget> widgets = new ArrayList<>();
-    private final GuiLayout layout;
+    private GuiLayout layout;
     private CyclingButtonWidget<String> fragmentDropdown;
     private boolean applyingFragment = false;
     private String currentFragment = "Default";
@@ -57,9 +57,24 @@ public class FollowModeSubPanel {
      * @param y Starting Y position
      * @param width Panel width
      */
-    public FollowModeSubPanel(FieldEditState state, int x, int y, int width) {
-        this.state = state;
-        this.layout = new GuiLayout(x, y, GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING, width);
+    public FollowModeSubPanel(Screen parent, FieldEditState state, int startY) {
+        super(parent, state);
+        this.startY = startY;
+    }
+    
+    private int startY;
+    
+    @Override
+    public void init(int width, int height) {
+        this.panelWidth = width;
+        this.panelHeight = height;
+        widgets.clear();
+        
+        int x = net.cyberpunk042.client.gui.util.GuiConstants.PADDING;
+        int y = startY;
+        this.layout = new GuiLayout(x, y, net.cyberpunk042.client.gui.util.GuiConstants.WIDGET_HEIGHT + net.cyberpunk042.client.gui.util.GuiConstants.PADDING, width - net.cyberpunk042.client.gui.util.GuiConstants.PADDING * 2);
+        
+        // Original build logic...
         initWidgets();
     }
     
@@ -72,17 +87,13 @@ public class FollowModeSubPanel {
         int halfWidth = (controlWidth - GuiConstants.ELEMENT_SPACING) / 2;
 
         // Preset dropdown
-        fragmentDropdown = CyclingButtonWidget.<String>builder(Text::literal)
-            .values(FragmentRegistry.listFollowFragments())
+        List<String> followPresets = FragmentRegistry.listFollowFragments();
+
+        fragmentDropdown = CyclingButtonWidget.<String>builder(v -> Text.literal(v))
+            .values(followPresets)
             .initially(currentFragment)
-            .build(
-                layout.getStartX() + GuiConstants.PADDING,
-                layout.getStartY(),
-                controlWidth,
-                GuiConstants.ELEMENT_HEIGHT,
-                Text.literal("Preset"),
-                (btn, val) -> applyPreset(val)
-            );
+            .build(layout.getStartX() + GuiConstants.PADDING, layout.getY(), controlWidth,
+                GuiConstants.ELEMENT_HEIGHT, Text.literal("Variant"), (btn, val) -> applyPreset(val));
         widgets.add(fragmentDropdown);
         layout.nextRow();
         
@@ -93,16 +104,16 @@ public class FollowModeSubPanel {
         enabledButton = CyclingButtonWidget.<Boolean>builder(v -> 
                 Text.literal(v ? "Following Player" : "Static Position"))
             .values(List.of(false, true))
-            .initially(state.isFollowEnabled())
+            .initially(state.getBool("followEnabled"))
             .build(
                 layout.getStartX() + GuiConstants.PADDING,
-                layout.getStartY(),
+                layout.getY(),
                 halfWidth,
                 GuiConstants.ELEMENT_HEIGHT,
                 Text.literal("Follow"),
                 (button, value) -> {
                     onUserChange(() -> {
-                        state.setFollowEnabled(value);
+                        state.set("followEnabled", value);
                         // Disable mode selector when following is disabled
                         modeButton.active = value;
                     });
@@ -121,16 +132,16 @@ public class FollowModeSubPanel {
                 };
             })
             .values(FollowMode.values())
-            .initially(state.getFollowMode())
+            .initially(FollowMode.valueOf(state.getString("followMode")))
             .build(
                 layout.getStartX() + GuiConstants.PADDING + halfWidth + GuiConstants.ELEMENT_SPACING,
-                layout.getStartY(),
+                layout.getY(),
                 halfWidth,
                 GuiConstants.ELEMENT_HEIGHT,
                 Text.literal("Mode"),
-                (button, value) -> onUserChange(() -> state.setFollowMode(value))
+                (button, value) -> onUserChange(() -> state.set("followMode", value))
             );
-        modeButton.active = state.isFollowEnabled();
+        modeButton.active = state.getBool("followEnabled");
         widgets.add(modeButton);
         layout.nextRow();
         
@@ -152,8 +163,8 @@ public class FollowModeSubPanel {
      */
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         // Draw mode description below the controls
-        String description = getModeDescription(state.getFollowMode());
-        int descY = layout.getStartY() + GuiConstants.ELEMENT_HEIGHT + GuiConstants.ELEMENT_SPACING;
+        String description = getModeDescription(FollowMode.valueOf(state.getString("followMode")));
+        int descY = layout.getY() + GuiConstants.ELEMENT_HEIGHT + GuiConstants.ELEMENT_SPACING;
         
         context.drawTextWithShadow(
             net.minecraft.client.MinecraftClient.getInstance().textRenderer,
@@ -177,7 +188,7 @@ public class FollowModeSubPanel {
     
     /** Returns the total height of this sub-panel. */
     public int getHeight() {
-        return layout.getCurrentY() - layout.getStartY();
+        return layout.getCurrentY() - layout.getY();
     }
 
     private void onUserChange(Runnable r) {
@@ -201,9 +212,15 @@ public class FollowModeSubPanel {
     }
 
     private void syncFromState() {
-        if (enabledButton != null) enabledButton.setValue(state.isFollowEnabled());
-        if (modeButton != null) modeButton.setValue(state.getFollowMode());
-        modeButton.active = state.isFollowEnabled();
+        if (enabledButton != null) enabledButton.setValue(state.getBool("followEnabled"));
+        if (modeButton != null) modeButton.setValue(FollowMode.valueOf(state.getString("followMode")));
+        modeButton.active = state.getBool("followEnabled");
     }
+
+    @Override
+    public void tick() {
+        // No per-tick updates needed
+    }
+
 }
 

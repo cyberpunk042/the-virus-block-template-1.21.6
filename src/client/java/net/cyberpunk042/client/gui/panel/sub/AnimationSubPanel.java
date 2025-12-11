@@ -8,6 +8,10 @@ import net.cyberpunk042.client.gui.widget.ExpandableSection;
 import net.cyberpunk042.client.gui.widget.LabeledSlider;
 import net.cyberpunk042.client.gui.util.FragmentRegistry;
 import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.visual.animation.AlphaPulseConfig;
+import net.cyberpunk042.visual.animation.PulseConfig;
+import net.cyberpunk042.visual.animation.PulseMode;
+import net.cyberpunk042.visual.animation.SpinConfig;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
@@ -29,11 +33,7 @@ import java.util.List;
  */
 public class AnimationSubPanel extends AbstractPanel {
     
-    private ExpandableSection section;
-    private int startY;
-    
-    private final List<net.minecraft.client.gui.widget.ClickableWidget> widgets = new ArrayList<>();
-    private CyclingButtonWidget<String> fragmentDropdown;
+    private int startY;    private CyclingButtonWidget<String> fragmentDropdown;
     private boolean applyingFragment = false;
     private String currentFragment = "Default";
     
@@ -46,18 +46,6 @@ public class AnimationSubPanel extends AbstractPanel {
         
         private final String label;
         SpinAxis(String label) { this.label = label; }
-        @Override public String toString() { return label; }
-    }
-    
-    /** Pulse mode options. */
-    public enum PulseMode {
-        SCALE("Scale"),
-        ALPHA("Alpha"),
-        GLOW("Glow"),
-        COLOR("Color");
-        
-        private final String label;
-        PulseMode(String label) { this.label = label; }
         @Override public String toString() { return label; }
     }
     
@@ -89,141 +77,150 @@ public class AnimationSubPanel extends AbstractPanel {
         this.panelHeight = height;
         widgets.clear();
         
-        section = new ExpandableSection(
-            GuiConstants.PADDING, startY,
-            width - GuiConstants.PADDING * 2,
-            "Animation", false // Start collapsed
-        );
         
         int x = GuiConstants.PADDING;
-        int y = section.getContentY();
+        int y = startY + GuiConstants.PADDING;
         int w = width - GuiConstants.PADDING * 2;
         int halfW = (w - GuiConstants.PADDING) / 2;
 
         // Preset dropdown
-        fragmentDropdown = CyclingButtonWidget.<String>builder(net.minecraft.text.Text::literal)
-            .values(FragmentRegistry.listAnimationFragments())
+        List<String> animPresets = FragmentRegistry.listAnimationFragments();
+
+        fragmentDropdown = CyclingButtonWidget.<String>builder(v -> net.minecraft.text.Text.literal(v))
+            .values(animPresets)
             .initially(currentFragment)
-            .build(
-                x, y, w, GuiConstants.WIDGET_HEIGHT,
-                net.minecraft.text.Text.literal("Preset"),
-                (btn, val) -> applyPreset(val)
-            );
+            .build(x, y, w, GuiConstants.COMPACT_HEIGHT, net.minecraft.text.Text.literal("Variant"),
+                (btn, val) -> applyPreset(val));
         widgets.add(fragmentDropdown);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        y += GuiConstants.COMPACT_HEIGHT + GuiConstants.COMPACT_GAP;
         
         // ═══════════════════════════════════════════════════════════════════════
         // G76-G77: SPIN
         // ═══════════════════════════════════════════════════════════════════════
         
-        spinToggle = GuiWidgets.toggle(x, y, halfW, "Spin", state.isSpinEnabled(), "Enable rotation", enabled -> {
+        // Handle nullable spin config
+        SpinConfig spin = state.spin();
+        boolean spinActive = spin != null && spin.isActive();
+        float spinSpd = spin != null ? spin.speed() : 45f;
+        
+        spinToggle = GuiWidgets.compactToggle(x, y, halfW, "Spin", spinActive, "Enable rotation", enabled -> {
             onUserChange(() -> {
-                state.setSpinEnabled(enabled);
+                // Toggle by setting speed to 0 (off) or default (on)
+                if (!enabled) state.set("spin.speed", 0f);
+                else if (state.getFloat("spin.speed") == 0f) state.set("spin.speed", 45f);
                 updateSpinWidgets();
                 Logging.GUI.topic("animation").debug("Spin: {}", enabled);
             });
         });
         widgets.add(spinToggle);
         
-        spinAxis = GuiWidgets.enumDropdown(x + halfW + GuiConstants.PADDING, y, halfW, "Axis", SpinAxis.class, SpinAxis.Y, "Rotation axis", axis -> {
+        spinAxis = GuiWidgets.compactEnumDropdown(x + halfW + GuiConstants.PADDING, y, halfW, SpinAxis.class, SpinAxis.Y, "Rotation axis", axis -> {
             onUserChange(() -> {
-                state.setSpinAxis(axis.name());
+                state.set("spin.axis", axis.name());
                 Logging.GUI.topic("animation").trace("Spin axis: {}", axis);
             });
         });
         widgets.add(spinAxis);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        y += GuiConstants.COMPACT_HEIGHT + GuiConstants.COMPACT_GAP;
         
         spinSpeed = LabeledSlider.builder("Speed (°/s)")
-            .position(x, y).width(w)
-            .range(-360f, 360f).initial(state.getSpinSpeed()).format("%.0f")
+            .position(x, y).width(w).compact()
+            .range(-360f, 360f).initial(spinSpd).format("%.0f")
             .onChange(v -> onUserChange(() -> {
-                state.setSpinSpeed(v);
+                state.set("spin.speed", v);
                 Logging.GUI.topic("animation").trace("Spin speed: {}", v);
             }))
             .build();
         widgets.add(spinSpeed);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.SECTION_SPACING;
+        y += GuiConstants.COMPACT_HEIGHT + GuiConstants.PADDING;
         
         // ═══════════════════════════════════════════════════════════════════════
         // G78-G79: PULSE
         // ═══════════════════════════════════════════════════════════════════════
         
-        pulseToggle = GuiWidgets.toggle(x, y, halfW, "Pulse", state.isPulseEnabled(), "Enable pulsing", enabled -> {
+        // Handle nullable pulse config
+        PulseConfig pulse = state.pulse();
+        boolean pulseActive = pulse != null && pulse.isActive();
+        
+        pulseToggle = GuiWidgets.compactToggle(x, y, halfW, "Pulse", pulseActive, "Enable pulsing", enabled -> {
             onUserChange(() -> {
-                state.setPulseEnabled(enabled);
+                // Toggle by setting speed to 0 (off) or default (on)
+                if (!enabled) state.set("pulse.speed", 0f);
+                else if (state.getFloat("pulse.speed") == 0f) state.set("pulse.speed", 1f);
                 updatePulseWidgets();
                 Logging.GUI.topic("animation").debug("Pulse: {}", enabled);
             });
         });
         widgets.add(pulseToggle);
         
-        pulseMode = GuiWidgets.enumDropdown(x + halfW + GuiConstants.PADDING, y, halfW, "Mode", PulseMode.class, PulseMode.SCALE, "Pulse effect", mode -> {
+        pulseMode = GuiWidgets.compactEnumDropdown(x + halfW + GuiConstants.PADDING, y, halfW, PulseMode.class, PulseMode.SCALE, "Pulse effect", mode -> {
             onUserChange(() -> {
-                state.setPulseMode(mode.name());
+                state.set("pulse.mode", mode.name());
                 Logging.GUI.topic("animation").trace("Pulse mode: {}", mode);
             });
         });
         widgets.add(pulseMode);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        y += GuiConstants.COMPACT_HEIGHT + GuiConstants.COMPACT_GAP;
         
-        pulseFrequency = LabeledSlider.builder("Frequency (Hz)")
-            .position(x, y).width(halfW)
-            .range(0.1f, 5f).initial(state.getPulseFrequency()).format("%.1f")
+        pulseFrequency = LabeledSlider.builder("Freq (Hz)")
+            .position(x, y).width(halfW).compact()
+            .range(0.1f, 5f).initial(state.getFloat("pulse.speed")).format("%.1f")
             .onChange(v -> onUserChange(() -> {
-                state.setPulseFrequency(v);
+                state.set("pulse.speed", v);
                 Logging.GUI.topic("animation").trace("Pulse freq: {}", v);
             }))
             .build();
         widgets.add(pulseFrequency);
         
-        pulseAmplitude = LabeledSlider.builder("Amplitude")
-            .position(x + halfW + GuiConstants.PADDING, y).width(halfW)
-            .range(0f, 1f).initial(state.getPulseAmplitude()).format("%.2f")
+        pulseAmplitude = LabeledSlider.builder("Scale")
+            .position(x + halfW + GuiConstants.PADDING, y).width(halfW).compact()
+            .range(0f, 2f).initial(state.getFloat("pulse.scale")).format("%.2f")
             .onChange(v -> onUserChange(() -> {
-                state.setPulseAmplitude(v);
-                Logging.GUI.topic("animation").trace("Pulse amp: {}", v);
+                state.set("pulse.scale", v);
+                Logging.GUI.topic("animation").trace("Pulse scale: {}", v);
             }))
             .build();
         widgets.add(pulseAmplitude);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.SECTION_SPACING;
+        y += GuiConstants.COMPACT_HEIGHT + GuiConstants.PADDING;
         
         // ═══════════════════════════════════════════════════════════════════════
         // G80: ALPHA ANIMATION
         // ═══════════════════════════════════════════════════════════════════════
         
-        alphaFadeToggle = GuiWidgets.toggle(x, y, w, "Alpha Fade", state.isAlphaFadeEnabled(), "Enable alpha cycling", enabled -> {
+        alphaFadeToggle = GuiWidgets.compactToggle(x, y, w, "Alpha", state.alphaPulse().isActive(), "Enable alpha cycling", enabled -> {
             onUserChange(() -> {
-                state.setAlphaFadeEnabled(enabled);
+                // Toggle by setting speed to 0 (off) or default (on)
+                if (!enabled) state.set("alphaPulse.speed", 0f);
+                else if (state.getFloat("alphaPulse.speed") == 0f) state.set("alphaPulse.speed", 1f);
                 updateAlphaWidgets();
                 Logging.GUI.topic("animation").debug("Alpha fade: {}", enabled);
             });
         });
         widgets.add(alphaFadeToggle);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        y += GuiConstants.COMPACT_HEIGHT + GuiConstants.COMPACT_GAP;
         
-        alphaMin = LabeledSlider.builder("Min Alpha")
-            .position(x, y).width(halfW)
-            .range(0f, 1f).initial(state.getAlphaMin()).format("%.2f")
+        alphaMin = LabeledSlider.builder("Min")
+            .position(x, y).width(halfW).compact()
+            .range(0f, 1f).initial(state.getFloat("alphaPulse.min")).format("%.2f")
             .onChange(v -> onUserChange(() -> {
-                state.setAlphaMin(v);
+                state.set("alphaPulse.min", v);
                 Logging.GUI.topic("animation").trace("Alpha min: {}", v);
             }))
             .build();
         widgets.add(alphaMin);
         
-        alphaMax = LabeledSlider.builder("Max Alpha")
-            .position(x + halfW + GuiConstants.PADDING, y).width(halfW)
-            .range(0f, 1f).initial(state.getAlphaMax()).format("%.2f")
+        alphaMax = LabeledSlider.builder("Max")
+            .position(x + halfW + GuiConstants.PADDING, y).width(halfW).compact()
+            .range(0f, 1f).initial(state.getFloat("alphaPulse.max")).format("%.2f")
             .onChange(v -> onUserChange(() -> {
-                state.setAlphaMax(v);
+                state.set("alphaPulse.max", v);
                 Logging.GUI.topic("animation").trace("Alpha max: {}", v);
             }))
             .build();
         widgets.add(alphaMax);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
-        section.setContentHeight(y - section.getContentY());
+        contentHeight = y - startY + GuiConstants.PADDING;
         
         updateSpinWidgets();
         updatePulseWidgets();
@@ -233,20 +230,23 @@ public class AnimationSubPanel extends AbstractPanel {
     }
     
     private void updateSpinWidgets() {
-        boolean enabled = state.isSpinEnabled();
+        SpinConfig spin = state.spin();
+        boolean enabled = spin != null && spin.isActive();
         if (spinAxis != null) spinAxis.active = enabled;
         if (spinSpeed != null) spinSpeed.active = enabled;
     }
     
     private void updatePulseWidgets() {
-        boolean enabled = state.isPulseEnabled();
+        PulseConfig pulse = state.pulse();
+        boolean enabled = pulse != null && pulse.isActive();
         if (pulseMode != null) pulseMode.active = enabled;
         if (pulseFrequency != null) pulseFrequency.active = enabled;
         if (pulseAmplitude != null) pulseAmplitude.active = enabled;
     }
     
     private void updateAlphaWidgets() {
-        boolean enabled = state.isAlphaFadeEnabled();
+        AlphaPulseConfig alphaPulse = state.alphaPulse();
+        boolean enabled = alphaPulse != null && alphaPulse.isActive();
         if (alphaMin != null) alphaMin.active = enabled;
         if (alphaMax != null) alphaMax.active = enabled;
     }
@@ -256,22 +256,19 @@ public class AnimationSubPanel extends AbstractPanel {
     
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        section.render(context, net.minecraft.client.MinecraftClient.getInstance().textRenderer, mouseX, mouseY, delta);
-        
-        if (section.isExpanded()) {
-            for (var widget : widgets) {
-                widget.render(context, mouseX, mouseY, delta);
-            }
+        // Render widgets directly (no expandable section)
+        for (var widget : widgets) {
+            widget.render(context, mouseX, mouseY, delta);
         }
     }
     
     public int getHeight() {
-        return section.getTotalHeight();
+        return contentHeight;
     }
     
     public List<net.minecraft.client.gui.widget.ClickableWidget> getWidgets() {
         List<net.minecraft.client.gui.widget.ClickableWidget> all = new ArrayList<>();
-        all.add(section.getHeaderButton());
+        // No header button (direct content)
         all.addAll(widgets);
         return all;
     }
@@ -297,20 +294,24 @@ public class AnimationSubPanel extends AbstractPanel {
     }
 
     private void syncFromState() {
-        if (spinToggle != null) spinToggle.setValue(state.isSpinEnabled());
+        // Handle nullable configs
+        SpinConfig spin = state.spin();
+        PulseConfig pulse = state.pulse();
+        
+        if (spinToggle != null) spinToggle.setValue(spin != null && spin.isActive());
         if (spinAxis != null) {
-            try { spinAxis.setValue(SpinAxis.valueOf(state.getSpinAxis())); } catch (IllegalArgumentException ignored) {}
+            try { spinAxis.setValue(SpinAxis.valueOf(state.getString("spin.axis"))); } catch (IllegalArgumentException ignored) {}
         }
-        if (spinSpeed != null) spinSpeed.setValue(state.getSpinSpeed());
-        if (pulseToggle != null) pulseToggle.setValue(state.isPulseEnabled());
+        if (spinSpeed != null) spinSpeed.setValue(spin != null ? spin.speed() : 45f);
+        if (pulseToggle != null) pulseToggle.setValue(pulse != null && pulse.isActive());
         if (pulseMode != null) {
-            try { pulseMode.setValue(PulseMode.valueOf(state.getPulseMode())); } catch (IllegalArgumentException ignored) {}
+            try { pulseMode.setValue(pulse != null ? pulse.mode() : PulseMode.SCALE); } catch (Exception ignored) {}
         }
-        if (pulseFrequency != null) pulseFrequency.setValue(state.getPulseFrequency());
-        if (pulseAmplitude != null) pulseAmplitude.setValue(state.getPulseAmplitude());
-        if (alphaFadeToggle != null) alphaFadeToggle.setValue(state.isAlphaFadeEnabled());
-        if (alphaMin != null) alphaMin.setValue(state.getAlphaMin());
-        if (alphaMax != null) alphaMax.setValue(state.getAlphaMax());
+        if (pulseFrequency != null) pulseFrequency.setValue(pulse != null ? pulse.speed() : 1f);
+        if (pulseAmplitude != null) pulseAmplitude.setValue(pulse != null ? pulse.scale() : 0.1f);
+        if (alphaFadeToggle != null) alphaFadeToggle.setValue(state.alphaPulse().isActive());
+        if (alphaMin != null) alphaMin.setValue(state.getFloat("alphaPulse.min"));
+        if (alphaMax != null) alphaMax.setValue(state.getFloat("alphaPulse.max"));
         updateSpinWidgets();
         updatePulseWidgets();
         updateAlphaWidgets();

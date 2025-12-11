@@ -13,6 +13,7 @@ import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import java.util.ArrayList;
 import java.util.List;
 import net.cyberpunk042.client.network.GuiPacketSender;
+import net.cyberpunk042.client.gui.state.FieldEditStateHolder;
 
 /**
  * G57-G60: Action buttons for Quick Panel.
@@ -51,14 +52,14 @@ public class ActionPanel extends AbstractPanel {
         // G58: Live preview toggle
         livePreviewToggle = GuiWidgets.toggle(
             x, y, btnWidth,
-            "Live Preview", state.isLivePreviewEnabled(), "Apply changes in real-time",
+            "Live Preview", state.getBool("livePreviewEnabled"), "Apply changes in real-time",
             this::onLivePreviewChanged
         );
         
         // G60: Auto-save toggle
         autoSaveToggle = GuiWidgets.toggle(
             x + btnWidth + GuiConstants.PADDING, y, btnWidth,
-            "Auto-save", state.isAutoSaveEnabled(), "Save changes automatically",
+            "Auto-save", state.getBool("autoSaveEnabled"), "Save changes automatically",
             this::onAutoSaveChanged
         );
         
@@ -86,13 +87,15 @@ public class ActionPanel extends AbstractPanel {
     // ═══════════════════════════════════════════════════════════════════════════
     
     private void onLivePreviewChanged(boolean enabled) {
-        state.setLivePreviewEnabled(enabled);
+        state.set("livePreviewEnabled", enabled);
         if (enabled) {
             ToastNotification.info("Live preview enabled");
-            GuiPacketSender.spawnDebugField(state.toStateJson());
+            // Use FieldEditStateHolder to set active flag AND send packet
+            FieldEditStateHolder.spawnTestField();
         } else {
             ToastNotification.info("Live preview disabled");
-            GuiPacketSender.despawnDebugField();
+            // Use FieldEditStateHolder to clear active flag AND send packet
+            FieldEditStateHolder.despawnTestField();
         }
         Logging.GUI.topic("action").debug("Live preview: {}", enabled);
     }
@@ -114,7 +117,7 @@ public class ActionPanel extends AbstractPanel {
     // ═══════════════════════════════════════════════════════════════════════════
     
     private void onAutoSaveChanged(boolean enabled) {
-        state.setAutoSaveEnabled(enabled);
+        state.set("autoSaveEnabled", enabled);
         if (enabled) {
             ToastNotification.info("Auto-save enabled");
         }

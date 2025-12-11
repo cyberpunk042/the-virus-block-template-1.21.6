@@ -1,7 +1,0 @@
-{
-  "name": "Snap",
-  "description": "Instant position tracking",
-  "enabled": true,
-  "mode": "SNAP"
-}
-

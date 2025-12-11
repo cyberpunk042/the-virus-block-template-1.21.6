@@ -16,39 +16,51 @@ import org.joml.Vector3f;
  * @see Transform
  */
 public enum Anchor {
-    /** Player chest height (0, 1, 0) - DEFAULT */
-    CENTER(0, 1, 0),
+    /** Player chest/center height (0, 1, 0) - DEFAULT */
+    CENTER("Center", 0, 1, 0),
     
     /** Player feet level (0, 0, 0) */
-    FEET(0, 0, 0),
+    FEET("Feet", 0, 0, 0),
     
     /** Player head level (0, 2, 0) */
-    HEAD(0, 2, 0),
+    HEAD("Head", 0, 2, 0),
     
     /** Above player head (0, 3, 0) */
-    ABOVE(0, 3, 0),
+    ABOVE("Above Head", 0, 3, 0),
     
     /** Below feet / underground (0, -1, 0) */
-    BELOW(0, -1, 0),
+    BELOW("Below Feet", 0, -1, 0),
     
     /** In front of player (0, 1, 1) */
-    FRONT(0, 1, 1),
+    FRONT("Front", 0, 1, 1),
     
     /** Behind player (0, 1, -1) */
-    BACK(0, 1, -1),
+    BACK("Back", 0, 1, -1),
     
     /** Left side of player (-1, 1, 0) */
-    LEFT(-1, 1, 0),
+    LEFT("Left", -1, 1, 0),
     
     /** Right side of player (1, 1, 0) */
-    RIGHT(1, 1, 0);
+    RIGHT("Right", 1, 1, 0);
     
+    private final String label;
     private final float x, y, z;
     
-    Anchor(float x, float y, float z) {
+    Anchor(String label, float x, float y, float z) {
+        this.label = label;
         this.x = x;
         this.y = y;
         this.z = z;
+    }
+    
+    /** Display label for GUI */
+    public String label() {
+        return label;
+    }
+    
+    @Override
+    public String toString() {
+        return label;
     }
     
     /**

@@ -6,6 +6,10 @@ import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.GuiWidgets;
 import net.cyberpunk042.client.gui.widget.ExpandableSection;
 import net.cyberpunk042.client.gui.widget.LabeledSlider;
+import net.cyberpunk042.client.gui.widget.ToastNotification;
+import net.cyberpunk042.field.influence.FieldEvent;
+import net.cyberpunk042.field.influence.TriggerConfig;
+import net.cyberpunk042.field.influence.TriggerEffect;
 import net.cyberpunk042.log.Logging;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -13,14 +17,13 @@ import net.minecraft.client.gui.widget.CyclingButtonWidget;
 
 import java.util.ArrayList;
 import java.util.List;
-import net.cyberpunk042.client.gui.widget.ToastNotification;
 
 /**
  * G86-G90: Trigger configuration for the Debug panel.
  * 
  * <ul>
  *   <li>G86: Trigger type dropdown (DAMAGE, HEAL, DEATH, RESPAWN)</li>
- *   <li>G87: Trigger effect dropdown (FLASH, PULSE, SHAKE, COLOR_SHIFT)</li>
+ *   <li>G87: Trigger effect dropdown (FLASH, PULSE, SHAKE, GLOW, COLOR_SHIFT)</li>
  *   <li>G88: Effect intensity slider</li>
  *   <li>G89: Effect duration slider</li>
  *   <li>G90: Test trigger button</li>
@@ -28,40 +31,8 @@ import net.cyberpunk042.client.gui.widget.ToastNotification;
  */
 public class TriggerSubPanel extends AbstractPanel {
     
-    private ExpandableSection section;
-    private int startY;
-    
-    private final List<net.minecraft.client.gui.widget.ClickableWidget> widgets = new ArrayList<>();
-    
-    /** Trigger event types. */
-    public enum TriggerType {
-        DAMAGE("On Damage"),
-        HEAL("On Heal"),
-        DEATH("On Death"),
-        RESPAWN("On Respawn"),
-        COMBAT_ENTER("Combat Enter"),
-        COMBAT_EXIT("Combat Exit");
-        
-        private final String label;
-        TriggerType(String label) { this.label = label; }
-        @Override public String toString() { return label; }
-    }
-    
-    /** Trigger effect types. */
-    public enum TriggerEffect {
-        FLASH("Flash"),
-        PULSE("Pulse"),
-        SHAKE("Shake"),
-        COLOR_SHIFT("Color Shift"),
-        SCALE_BUMP("Scale Bump"),
-        ALPHA_FADE("Alpha Fade");
-        
-        private final String label;
-        TriggerEffect(String label) { this.label = label; }
-        @Override public String toString() { return label; }
-    }
-    
-    private CyclingButtonWidget<TriggerType> triggerType;
+    private int startY;    
+    private CyclingButtonWidget<FieldEvent> triggerType;
     private CyclingButtonWidget<TriggerEffect> triggerEffect;
     private LabeledSlider effectIntensity;
     private LabeledSlider effectDuration;
@@ -79,32 +50,27 @@ public class TriggerSubPanel extends AbstractPanel {
         this.panelHeight = height;
         widgets.clear();
         
-        section = new ExpandableSection(
-            GuiConstants.PADDING, startY,
-            width - GuiConstants.PADDING * 2,
-            "Triggers", false // Start collapsed
-        );
         
         int x = GuiConstants.PADDING;
-        int y = section.getContentY();
+        int y = startY + GuiConstants.PADDING;
         int w = width - GuiConstants.PADDING * 2;
         int halfW = (w - GuiConstants.PADDING) / 2;
         
-        // G86: Trigger type
+        // G86: Trigger type (using actual FieldEvent enum)
         triggerType = GuiWidgets.enumDropdown(
-            x, y, halfW, "Event", TriggerType.class, TriggerType.DAMAGE,
+            x, y, halfW, "Event", FieldEvent.class, FieldEvent.PLAYER_DAMAGE,
             "Trigger event type", t -> {
-                state.setTriggerType(t.name());
+                state.set("triggerType", t.name());
                 Logging.GUI.topic("trigger").debug("Trigger type: {}", t);
             }
         );
         widgets.add(triggerType);
         
-        // G87: Trigger effect
+        // G87: Trigger effect (using actual TriggerEffect enum)
         triggerEffect = GuiWidgets.enumDropdown(
             x + halfW + GuiConstants.PADDING, y, halfW, "Effect", TriggerEffect.class, TriggerEffect.FLASH,
             "Visual effect", e -> {
-                state.setTriggerEffect(e.name());
+                state.set("triggerEffect", e.name());
                 Logging.GUI.topic("trigger").debug("Trigger effect: {}", e);
             }
         );
@@ -114,9 +80,9 @@ public class TriggerSubPanel extends AbstractPanel {
         // G88: Effect intensity
         effectIntensity = LabeledSlider.builder("Intensity")
             .position(x, y).width(halfW)
-            .range(0f, 2f).initial(state.getTriggerIntensity()).format("%.2f")
+            .range(0f, 2f).initial(state.getFloat("triggerIntensity")).format("%.2f")
             .onChange(v -> {
-                state.setTriggerIntensity(v);
+                state.set("triggerIntensity", v);
                 Logging.GUI.topic("trigger").trace("Intensity: {}", v);
             })
             .build();
@@ -125,27 +91,49 @@ public class TriggerSubPanel extends AbstractPanel {
         // G89: Effect duration
         effectDuration = LabeledSlider.builder("Duration (ticks)")
             .position(x + halfW + GuiConstants.PADDING, y).width(halfW)
-            .range(1, 60).initial(state.getTriggerDuration()).format("%d").step(1)
+            .range(1, 60).initial(state.getFloat("triggerDuration")).format("%d").step(1)
             .onChange(v -> {
-                state.setTriggerDuration(v.intValue());
+                state.set("triggerDuration", v.intValue());
                 Logging.GUI.topic("trigger").trace("Duration: {}", v.intValue());
             })
             .build();
         widgets.add(effectDuration);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
-        // G90: Test button
-        testBtn = GuiWidgets.button(x, y, w, "Test Trigger", "Fire test trigger effect", () -> {
-            Logging.GUI.topic("trigger").info("Test trigger fired: {} -> {}", 
-                triggerType.getValue(), triggerEffect.getValue());
-            ToastNotification.info("Trigger test: " + triggerType.getValue() + " → " + triggerEffect.getValue());
-        });
+        // G90: Test button - fires the trigger on the preview field
+        testBtn = GuiWidgets.button(x, y, w, "Test Trigger", "Fire test trigger effect", this::fireTestTrigger);
         widgets.add(testBtn);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
-        section.setContentHeight(y - section.getContentY());
+        contentHeight = y - startY + GuiConstants.PADDING;
         
         Logging.GUI.topic("panel").debug("TriggerSubPanel initialized");
+    }
+    
+    /**
+     * Fires a test trigger on the preview field.
+     */
+    private void fireTestTrigger() {
+        FieldEvent event = triggerType.getValue();
+        TriggerEffect effect = triggerEffect.getValue();
+        float intensity = state.getFloat("triggerIntensity");
+        int duration = state.getInt("triggerDuration");
+        
+        // Create trigger config
+        TriggerConfig config = new TriggerConfig(
+            event, effect, duration,
+            null, // color (use default)
+            intensity, // scale
+            0.1f, // amplitude
+            intensity // intensity
+        );
+        
+        // Fire the trigger on the preview field via state
+        state.fireTestTrigger(config);
+        
+        Logging.GUI.topic("trigger").info("Test trigger fired: {} -> {} (intensity={}, duration={})", 
+            event, effect, intensity, duration);
+        ToastNotification.info("Trigger: " + effect + " (" + duration + " ticks)");
     }
     
     @Override
@@ -153,22 +141,19 @@ public class TriggerSubPanel extends AbstractPanel {
     
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        section.render(context, net.minecraft.client.MinecraftClient.getInstance().textRenderer, mouseX, mouseY, delta);
-        
-        if (section.isExpanded()) {
-            for (var widget : widgets) {
-                widget.render(context, mouseX, mouseY, delta);
-            }
+        // Render widgets directly (no expandable section)
+        for (var widget : widgets) {
+            widget.render(context, mouseX, mouseY, delta);
         }
     }
     
     public int getHeight() {
-        return section.getTotalHeight();
+        return contentHeight;
     }
     
     public List<net.minecraft.client.gui.widget.ClickableWidget> getWidgets() {
         List<net.minecraft.client.gui.widget.ClickableWidget> all = new ArrayList<>();
-        all.add(section.getHeaderButton());
+        // No header button (direct content)
         all.addAll(widgets);
         return all;
     }

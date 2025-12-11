@@ -77,32 +77,32 @@ public class QuickPanel extends AbstractPanel {
         List<String> shapeNames = new ArrayList<>(ShapeRegistry.names());
         shapeDropdown = CyclingButtonWidget.<String>builder(Text::literal)
             .values(shapeNames)
-            .initially(state.getShapeType())
+            .initially(state.getString("shapeType"))
             .tooltip(val -> Tooltip.of(Text.literal("Shape type")))
             .build(x, layout.nextRow(), widgetWidth, GuiConstants.WIDGET_HEIGHT, 
                    Text.literal("Shape"), (btn, val) -> onShapeChanged(val));
         
-        // G43: Radius
+        // G43: Radius - uses current shape's radius
         radiusSlider = LabeledSlider.builder("Radius")
             .position(x, layout.nextRow())
             .width(widgetWidth)
-            .range(0.1f, 10.0f)
-            .initial(state.getRadius())
+            .range(0.1f, 20.0f)
+            .initial(getShapeRadius(state.getString("shapeType")))
             .format("%.1f")
             .step(0.1f)
             .onChange(this::onRadiusChanged)
             .build();
         
-        // G44: Color
+        // G44: Color - uses primaryColor
         colorButton = ColorButton.create(x, layout.nextRow(), "Color", 
-            state.getColor(), this::onColorChanged);
+            state.getInt("appearance.primaryColor"), this::onColorChanged);
         
         // G45: Alpha
         alphaSlider = LabeledSlider.builder("Alpha")
             .position(x, layout.nextRow())
             .width(widgetWidth)
             .range(0.0f, 1.0f)
-            .initial(state.getAlpha())
+            .initial(state.getFloat("appearance.alpha"))
             .format("%.2f")
             .onChange(this::onAlphaChanged)
             .build();
@@ -110,7 +110,7 @@ public class QuickPanel extends AbstractPanel {
         // G46: Fill mode (fixed order: label, enumClass, initial, tooltip, onChange)
         fillDropdown = GuiWidgets.enumDropdown(
             x, layout.nextRow(), widgetWidth,
-            "Fill", FillMode.class, state.getFillMode(), "Fill mode",
+            "Fill", FillMode.class, FillMode.valueOf(state.getString("fill.mode")), "Fill mode",
             this::onFillChanged
         );
         
@@ -119,7 +119,7 @@ public class QuickPanel extends AbstractPanel {
             .position(x, layout.nextRow())
             .width(widgetWidth)
             .range(-0.5f, 0.5f)
-            .initial(state.getSpinSpeed())
+            .initial(state.getFloat("spin.speed"))
             .format("%.2f")
             .onChange(this::onSpinChanged)
             .build();
@@ -127,14 +127,14 @@ public class QuickPanel extends AbstractPanel {
         // G48: Follow mode
         followDropdown = GuiWidgets.enumDropdown(
             x, layout.nextRow(), widgetWidth,
-            "Follow", FollowMode.class, state.getFollowMode(), "Follow mode",
+            "Follow", FollowMode.class, FollowMode.valueOf(state.getString("followMode")), "Follow mode",
             this::onFollowChanged
         );
         
         // G49: Prediction toggle (fixed order: label, initial, tooltip, onChange)
         predictionToggle = GuiWidgets.toggle(
             x, layout.nextRow(), widgetWidth,
-            "Prediction", state.isPredictionEnabled(), "Enable prediction",
+            "Prediction", state.getBool("predictionEnabled"), "Enable prediction",
             this::onPredictionToggled
         );
         
@@ -148,14 +148,44 @@ public class QuickPanel extends AbstractPanel {
         Logging.GUI.topic("panel").debug("QuickPanel initialized");
     }
     
-    private void onShapeChanged(String type) { state.setShapeType(type); }
-    private void onRadiusChanged(float v) { state.setRadius(v); }
-    private void onColorChanged(int c) { state.setColor(c); }
-    private void onAlphaChanged(float v) { state.setAlpha(v); }
-    private void onFillChanged(FillMode m) { state.setFillMode(m); }
-    private void onSpinChanged(float v) { state.setSpinSpeed(v); }
-    private void onFollowChanged(FollowMode m) { state.setFollowMode(m); }
-    private void onPredictionToggled(boolean e) { state.setPredictionEnabled(e); }
+    private void onShapeChanged(String type) { 
+        state.set("shapeType", type);
+        // Update radius slider to show the new shape's radius
+        if (radiusSlider != null) {
+            radiusSlider.setValue(getShapeRadius(type));
+        }
+    }
+    
+    private void onRadiusChanged(float v) { 
+        // Set the radius on the current shape
+        String shapeType = state.getString("shapeType").toLowerCase();
+        switch (shapeType) {
+            case "sphere" -> state.set("sphere.radius", v);
+            case "disc" -> state.set("disc.radius", v);
+            case "cylinder" -> state.set("cylinder.radius", v);
+            case "prism" -> state.set("prism.radius", v);
+            case "ring" -> state.set("ring.outerRadius", v); // Ring uses outerRadius as main radius
+            default -> state.set("sphere.radius", v);
+        }
+    }
+    
+    private float getShapeRadius(String shapeType) {
+        return switch (shapeType.toLowerCase()) {
+            case "sphere" -> state.getFloat("sphere.radius");
+            case "disc" -> state.getFloat("disc.radius");
+            case "cylinder" -> state.getFloat("cylinder.radius");
+            case "prism" -> state.getFloat("prism.radius");
+            case "ring" -> state.getFloat("ring.outerRadius");
+            default -> state.getFloat("sphere.radius");
+        };
+    }
+    
+    private void onColorChanged(int c) { state.set("appearance.primaryColor", c); }
+    private void onAlphaChanged(float v) { state.set("appearance.alpha", v); }
+    private void onFillChanged(FillMode m) { state.set("fill.mode", m); }
+    private void onSpinChanged(float v) { state.set("spin.speed", v); }
+    private void onFollowChanged(FollowMode m) { state.set("followMode", m); }
+    private void onPredictionToggled(boolean e) { state.set("predictionEnabled", e); }
     private void onPresetChanged(PredictionPreset p) { /* TODO */ }
     
     @Override

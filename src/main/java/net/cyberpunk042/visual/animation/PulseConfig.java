@@ -29,13 +29,14 @@ public record PulseConfig(
     @Range(ValueRange.POSITIVE) float speed,
     Waveform waveform,
     @Range(ValueRange.POSITIVE) float min,
-    @Range(ValueRange.POSITIVE) float max
+    @Range(ValueRange.POSITIVE) float max,
+    PulseMode mode
 ){
     /** No pulsing (static scale). */
-    public static final PulseConfig NONE = new PulseConfig(0, 0, Waveform.SINE, 1, 1);
+    public static final PulseConfig NONE = new PulseConfig(0, 0, Waveform.SINE, 1, 1, PulseMode.SCALE);
     
     /** Default gentle pulse. */
-    public static final PulseConfig DEFAULT = new PulseConfig(0.1f, 1.0f, Waveform.SINE, 0.9f, 1.1f);
+    public static final PulseConfig DEFAULT = new PulseConfig(0.1f, 1.0f, Waveform.SINE, 0.9f, 1.1f, PulseMode.SCALE);
     
     /**
      * Creates a simple sine pulse.
@@ -43,7 +44,7 @@ public record PulseConfig(
      * @param speed Pulse speed
      */
     public static PulseConfig sine(float amplitude, @Range(ValueRange.POSITIVE) float speed) {
-        return new PulseConfig(amplitude, speed, Waveform.SINE, 1 - amplitude, 1 + amplitude);
+        return new PulseConfig(amplitude, speed, Waveform.SINE, 1 - amplitude, 1 + amplitude, PulseMode.SCALE);
     }
     
     /** Whether this pulse is active. */
@@ -75,7 +76,8 @@ public record PulseConfig(
             .speed(speed)
             .waveform(waveform)
             .min(min)
-            .max(max);
+            .max(max)
+            .mode(mode);
     }
     
     public static class Builder {
@@ -84,15 +86,17 @@ public record PulseConfig(
         private Waveform waveform = Waveform.SINE;
         private @Range(ValueRange.POSITIVE) float min = 0.9f;
         private @Range(ValueRange.POSITIVE) float max = 1.1f;
+        private PulseMode mode = PulseMode.SCALE;
         
         public Builder scale(float s) { this.scale = s; return this; }
         public Builder speed(float s) { this.speed = s; return this; }
         public Builder waveform(Waveform w) { this.waveform = w; return this; }
         public Builder min(float m) { this.min = m; return this; }
         public Builder max(float m) { this.max = m; return this; }
+        public Builder mode(PulseMode m) { this.mode = m; return this; }
         
         public PulseConfig build() {
-            return new PulseConfig(scale, speed, waveform, min, max);
+            return new PulseConfig(scale, speed, waveform, min, max, mode);
         }
     }
 
@@ -121,8 +125,13 @@ public record PulseConfig(
         float min = json.has("min") ? json.get("min").getAsFloat() : 0.8f;
         float max = json.has("max") ? json.get("max").getAsFloat() : 1.2f;
         
-        PulseConfig result = new PulseConfig(scale, speed, waveform, min, max);
-        Logging.FIELD.topic("parse").trace("Parsed PulseConfig: scale={}, speed={}, waveform={}", scale, speed, waveform);
+        PulseMode mode = PulseMode.SCALE;
+        if (json.has("mode")) {
+            mode = PulseMode.fromString(json.get("mode").getAsString());
+        }
+        
+        PulseConfig result = new PulseConfig(scale, speed, waveform, min, max, mode);
+        Logging.FIELD.topic("parse").trace("Parsed PulseConfig: scale={}, speed={}, mode={}", scale, speed, mode);
         return result;
     }
     

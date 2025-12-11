@@ -26,10 +26,7 @@ import java.util.List;
  *   <li>Phase - Starting phase offset (0-360°)</li>
  * </ul>
  */
-public class OrbitSubPanel extends AbstractPanel {
-
-    private final List<net.minecraft.client.gui.widget.ClickableWidget> widgets = new ArrayList<>();
-    private int startY;
+public class OrbitSubPanel extends AbstractPanel {    private int startY;
     
     private CheckboxWidget enabledCheckbox;
     private LabeledSlider radiusSlider;
@@ -62,23 +59,23 @@ public class OrbitSubPanel extends AbstractPanel {
         // Section header drawn in render()
         currentY += 14;
         
-        enabledCheckbox = GuiWidgets.checkbox(sliderX, currentY, "Enable Orbit", state.isOrbitEnabled(),
-            "Shape orbits around anchor point", textRenderer, v -> state.setOrbitEnabled(v));
+        enabledCheckbox = GuiWidgets.checkbox(sliderX, currentY, "Enable Orbit", state.getBool("orbit.enabled"),
+            "Shape orbits around anchor point", textRenderer, v -> state.set("orbit.enabled", v));
         widgets.add(enabledCheckbox);
         currentY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
         radiusSlider = LabeledSlider.builder("Radius")
             .position(sliderX, currentY).width(w)
-            .range(0.1f, 20f).initial(state.getOrbitRadius()).format("%.1f")
-            .onChange(v -> state.setOrbitRadius(v))
+            .range(0.1f, 20f).initial(state.getFloat("orbit.radius")).format("%.1f")
+            .onChange(v -> state.set("orbit.radius", v))
             .build();
         widgets.add(radiusSlider);
         currentY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
         speedSlider = LabeledSlider.builder("Speed")
             .position(sliderX, currentY).width(w)
-            .range(-5f, 5f).initial(state.getOrbitSpeed()).format("%.2f rot/s")
-            .onChange(v -> state.setOrbitSpeed(v))
+            .range(-5f, 5f).initial(state.getFloat("orbit.speed")).format("%.2f rot/s")
+            .onChange(v -> state.set("orbit.speed", v))
             .build();
         widgets.add(speedSlider);
         currentY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
@@ -86,18 +83,18 @@ public class OrbitSubPanel extends AbstractPanel {
         axisDropdown = GuiWidgets.enumDropdown(
             sliderX, currentY, w, "Axis", OrbitAxis.class, OrbitAxis.Y,
             "Orbit rotation axis",
-            v -> state.setOrbitAxis(v.name())
+            v -> state.set("orbit.axis", v.name())
         );
         try {
-            axisDropdown.setValue(OrbitAxis.valueOf(state.getOrbitAxis()));
+            axisDropdown.setValue(OrbitAxis.valueOf(state.getString("orbit.axis")));
         } catch (IllegalArgumentException ignored) {}
         widgets.add(axisDropdown);
         currentY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
         phaseSlider = LabeledSlider.builder("Phase")
             .position(sliderX, currentY).width(w)
-            .range(0f, 360f).initial(state.getOrbitPhase()).format("%.0f°")
-            .onChange(v -> state.setOrbitPhase(v))
+            .range(0f, 360f).initial(state.getFloat("orbit.phase")).format("%.0f°")
+            .onChange(v -> state.set("orbit.phase", v))
             .build();
         widgets.add(phaseSlider);
     }

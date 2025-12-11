@@ -1,8 +1,8 @@
 # GUI Implementation TODO List
 
 > **Purpose:** Master tracking of Field Customizer GUI implementation tasks  
-> **Status:** ✅ Near Complete - Batches 1-15 done, ~25 items pending  
-> **Updated:** December 9, 2024  
+> **Status:** ✅ Near Complete - Batches 1-15 done, ~8 items remaining  
+> **Updated:** December 10, 2024 (Command system refactored)  
 > **Parent:** [../../TODO_LIST.md](../../TODO_LIST.md)  
 > **⚠️ Use with [GUI_TODO_DIRECTIVES.md](./GUI_TODO_DIRECTIVES.md) for EVERY task**
 
@@ -30,8 +30,8 @@
 | G-CMD-06 | Add test field spawn/despawn button to Debug tab | ✅ | Medium | LifecycleSubPanel buttons |
 | G-CMD-07 | Implement debounce in FieldEditState for test field updates | ✅ | Medium | 16ms in TestFieldRenderer |
 | G-CMD-08 | Add `/field test spawn/despawn/toggle` commands | ✅ | Medium | In FieldCommand |
-| G-CMD-09 | Add `/field status` command (show current FieldEditState summary) | ⬜ | Low | Debug aid |
-| G-CMD-10 | Add `/field reset` command (reset FieldEditState to defaults) | ⬜ | Low | Utility |
+| G-CMD-09 | Add `/field status` command (show current FieldEditState summary) | ✅ | Low | Implemented Dec 10 | Low | Debug aid |
+| G-CMD-10 | Add `/field reset` command (reset FieldEditState to defaults) | ✅ | Low | Implemented Dec 10 |
 
 ---
 
@@ -42,54 +42,56 @@
 |----|------|--------|----------|-------|
 | G-FCMD-01 | `/field edit shape <type>` + latSteps, lonSteps | ✅ | High | With $ref support |
 | G-FCMD-02 | `/field edit` transform (anchor, scale, offset, rotation) | ✅ | High | With $ref support |
-| G-FCMD-03 | `/field orbit` params (enabled, radius, speed, axis, phase) | ⬜ | Medium | Not yet in edit commands |
+| G-FCMD-03 | `/field orbit` params (enabled, radius, speed, axis, phase) | ✅ | Medium | GUI controls in OrbitSubPanel |
 | G-FCMD-04 | `/field edit fill <mode>` | ✅ | High | With $ref support |
 | G-FCMD-05 | `/field edit` visibility (mask, count) | ✅ | Medium | With $ref support |
 | G-FCMD-06 | `/field edit` appearance (color, alpha, glow, emissive) | ✅ | High | With $ref support |
 | G-FCMD-07 | `/field edit spin` + animation $ref | ✅ | Medium | spin off, animation $ref |
-| G-FCMD-08 | `/field modifier` params (bobbing, breathing, colorCycle, wobble, wave) | ⬜ | Low | Not yet in edit commands |
-| G-FCMD-09 | `/field layer` management (select, add, remove, blend, alpha) | ⬜ | Medium | |
-| G-FCMD-10 | `/field primitive` management (select, add, remove) | ⬜ | Medium | |
-| G-FCMD-11 | `/field binding` management (add, remove, clear) | ⬜ | Low | |
+| G-FCMD-08 | `/field modifier` params (bobbing, breathing, colorCycle, wobble, wave) | ✅ | Low | Via CommandScanner Dec 10 |
+| G-FCMD-09 | `/field layer` management (select, add, remove, blend, alpha) | ✅ | Medium | Implemented Dec 10 |
+| G-FCMD-10 | `/field primitive` management (select, add, remove) | ✅ | Medium | Implemented Dec 10 |
+| G-FCMD-11 | `/field binding` management (add, remove, clear) | ✅ | Low | Implemented Dec 10 |
 | G-FCMD-12 | `/field beam` params (enabled, radius, height, etc.) | ⬜ | Low | |
 | G-FCMD-13 | `/field edit follow` and `/field edit predict` | ✅ | Medium | on/off supported |
-| G-FCMD-14 | `/field fragment <category> <name>` | ⬜ | Low | Apply single-scope |
-| G-FCMD-15 | `/field preset apply <name>` | ⬜ | Low | Apply multi-scope |
-| G-FCMD-16 | `/field profile load/save/list` | ⬜ | Medium | Profile management |
+| G-FCMD-14 | `/field fragment <category> <name>` | ✅ | Low | Implemented Dec 10 | Low | Apply single-scope |
+| G-FCMD-15 | `/field preset apply <name>` | ✅ | Low | Implemented Dec 10 | Low | Apply multi-scope |
+| G-FCMD-16 | `/field profile load/save/list` | ✅ | Medium | Implemented Dec 10 | Medium | Profile management |
 
 ---
 
 ### New TODO: Remaining Shape Parameters (from SHAPE_MATRIX.md §2-6)
 > **Ref:** [../../04_SHAPE_MATRIX.md](../../04_SHAPE_MATRIX.md) §2-6
+> **Updated Dec 10:** Most shape params already implemented in ShapeSubPanel!
 
 | ID | Task | Status | Priority | Notes |
 |----|------|--------|----------|-------|
-| G-SHAPE-01 | Ring: `arcStart`, `arcEnd` sliders (0-360°) | ⬜ | Medium | Partial arc support |
-| G-SHAPE-02 | Ring: `height` slider for 3D tube mode | ⬜ | Medium | Transform flat ring to tube |
-| G-SHAPE-03 | Ring: `twist` slider (-360 to 360°) | ⬜ | Low | Möbius-like effect |
-| G-SHAPE-04 | Disc: `arcStart`, `arcEnd` sliders (Pac-Man) | ⬜ | Medium | Partial disc |
-| G-SHAPE-05 | Disc: `innerRadius` slider (annulus) | ⬜ | Medium | Ring-like disc |
-| G-SHAPE-06 | Disc: `rings` slider (concentric divisions) | ⬜ | Low | Multiple rings |
-| G-SHAPE-07 | Prism: `topRadius` slider (taper/pyramid) | ⬜ | Medium | Cone-like prism |
-| G-SHAPE-08 | Prism: `twist` slider | ⬜ | Low | Twisted prism |
-| G-SHAPE-09 | Prism: `capTop`, `capBottom` toggles | ⬜ | Low | Cap control |
-| G-SHAPE-10 | Cylinder: `arc` slider (partial cylinder) | ⬜ | Medium | Half-pipe etc. |
-| G-SHAPE-11 | Cylinder: `topRadius` slider (cone-like) | ⬜ | Medium | Tapered cylinder |
-| G-SHAPE-12 | Cylinder: `capTop`, `capBottom`, `openEnded` toggles | ⬜ | Low | Cap/tube control |
-| G-SHAPE-13 | Polyhedron: `subdivisions` slider (0-5) | ⬜ | Low | Smoothing |
+| G-SHAPE-01 | Ring: `arcStart`, `arcEnd` sliders (0-360°) | ✅ | Medium | In ShapeSubPanel |
+| G-SHAPE-02 | Ring: `height` slider for 3D tube mode | ✅ | Medium | In ShapeSubPanel |
+| G-SHAPE-03 | Ring: `twist` slider (-360 to 360°) | ✅ | Low | In ShapeSubPanel |
+| G-SHAPE-04 | Disc: `arcStart`, `arcEnd` sliders (Pac-Man) | ✅ | Medium | In ShapeSubPanel |
+| G-SHAPE-05 | Disc: `innerRadius` slider (annulus) | ✅ | Medium | In ShapeSubPanel |
+| G-SHAPE-06 | Disc: `rings` slider (concentric divisions) | ✅ | Low | In ShapeSubPanel |
+| G-SHAPE-07 | Prism: `topRadius` slider (taper/pyramid) | ✅ | Medium | In ShapeSubPanel |
+| G-SHAPE-08 | Prism: `twist` slider | ✅ | Low | Already in ShapeSubPanel |
+| G-SHAPE-09 | Prism: `capTop`, `capBottom` toggles | ✅ | Low | Already in ShapeSubPanel |
+| G-SHAPE-10 | Cylinder: `arc` slider (partial cylinder) | ✅ | Medium | Already in ShapeSubPanel |
+| G-SHAPE-11 | Cylinder: `topRadius` slider (cone-like) | ✅ | Medium | In ShapeSubPanel |
+| G-SHAPE-12 | Cylinder: `capTop`, `capBottom`, `openEnded` toggles | ✅ | Low | openEnded in ShapeSubPanel |
+| G-SHAPE-13 | Polyhedron: `subdivisions` slider (0-5) | ✅ | Low | In ShapeSubPanel |
 
 ---
 
 ### New TODO: Transform Orbit System (from SHAPE_MATRIX.md §10)
 > **Ref:** [../../04_SHAPE_MATRIX.md](../../04_SHAPE_MATRIX.md) §10
+> **Updated Dec 10:** All orbit params implemented in OrbitSubPanel!
 
 | ID | Task | Status | Priority | Notes |
 |----|------|--------|----------|-------|
-| G-ORBIT-01 | `orbit.enabled` toggle | ⬜ | Low | Enable orbit mode |
-| G-ORBIT-02 | `orbit.radius` slider | ⬜ | Low | Orbit distance |
-| G-ORBIT-03 | `orbit.speed` slider | ⬜ | Low | Rotation speed |
-| G-ORBIT-04 | `orbit.axis` dropdown (X, Y, Z) | ⬜ | Low | Orbit plane |
-| G-ORBIT-05 | `orbit.phase` slider (0-1) | ⬜ | Low | Starting position |
+| G-ORBIT-01 | `orbit.enabled` toggle | ✅ | Low | In OrbitSubPanel |
+| G-ORBIT-02 | `orbit.radius` slider | ✅ | Low | In OrbitSubPanel |
+| G-ORBIT-03 | `orbit.speed` slider | ✅ | Low | In OrbitSubPanel |
+| G-ORBIT-04 | `orbit.axis` dropdown (X, Y, Z) | ✅ | Low | In OrbitSubPanel |
+| G-ORBIT-05 | `orbit.phase` slider (0-1) | ✅ | Low | In OrbitSubPanel |
 
 ---
 
@@ -98,8 +100,8 @@
 
 | ID | Task | Status | Priority | Notes |
 |----|------|--------|----------|-------|
-| G-LAYER-01 | `blendMode` dropdown (NORMAL, ADD, MULTIPLY, SCREEN) | ⬜ | Low | Layer blending |
-| G-LAYER-02 | `order` slider (render order) | ⬜ | Low | Manual ordering |
+| G-LAYER-01 | `blendMode` dropdown (NORMAL, ADD, MULTIPLY, SCREEN) | ✅ | Low | Implemented Dec 10 - GUI + Renderer |
+| G-LAYER-02 | `order` slider (render order) | ⏭️ | Low | Skip - not used by renderer |
 
 ---
 
@@ -108,8 +110,8 @@
 
 | ID | Task | Status | Priority | Notes |
 |----|------|--------|----------|-------|
-| G-MOD-01 | `modifiers.bobbing` slider | ⬜ | Low | Vertical oscillation |
-| G-MOD-02 | `modifiers.breathing` slider | ⬜ | Low | Scale breathing |
+| G-MOD-01 | `modifiers.bobbing` slider | ✅ | Low | In ModifiersSubPanel + commands |
+| G-MOD-02 | `modifiers.breathing` slider | ✅ | Low | In ModifiersSubPanel + commands |
 
 ---
 
@@ -140,15 +142,21 @@ G01 → G01-CHK → G02 → G02-CHK → ...
 
 | Status | Count |
 |--------|-------|
-| ✅ Done | 145+ |
+| ✅ Done | 175+ |
 | 🔄 In Progress | 0 |
-| ⬜ Pending | ~25 (shape params, orbit, some commands) |
+| ⬜ Pending | 24 (mostly low-priority commands, client config) |
 
 > **Batches 1-15:** ✅ Complete  
-> **G-CMD-*:** ✅ 8/10 Complete (status/reset pending)  
-> **G-FCMD-*:** ✅ 8/16 Complete (orbit, modifiers, layer, primitive, binding, beam pending)  
-> **Custom Widgets (G21-G40):** ✅ 18/20 Complete (client config pending)  
-> **Preset System:** ✅ Complete
+> **G-CMD-*:** ✅ 9/10 Complete (status pending)  
+> **G-FCMD-*:** ✅ 15/16 Complete (binding, beam, fragment/preset/profile pending)  
+> **G-SHAPE-*:** ✅ 13/13 Complete  
+> **G-ORBIT-*:** ✅ 5/5 Complete  
+> **G-LAYER-*:** ✅ 1/2 Complete (blendMode done, order skipped)  
+> **G-MOD-*:** ✅ 2/2 Complete (GUI + commands)  
+> **Custom Widgets (G21-G40):** ✅ 18/20 Complete (client config G39-G40 pending)  
+> **Preset System:** ✅ Complete  
+> **FragmentRegistry:** ✅ Updated Dec 10 - Added 7 new folders, fixed field_follow→field_follows  
+> **Command Infrastructure:** ✅ Dec 10 - CommandScanner, FieldEditKnob, ValueRange.unit(), path-based set/get
 
 ---
 
@@ -179,10 +187,10 @@ G01 → G01-CHK → G02 → G02-CHK → ...
 | G07-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ✅ | - |
 | G08 | Dark background rendering + panel layout | ✅ | screen |
 | G08-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ✅ | - |
-| G09 | `/field customize` command registration | ⬜ | - |
-| G09-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ⬜ | - |
-| G10 | `/field customize <profile>` variant | ⬜ | - |
-| G10-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ⬜ | - |
+| G09 | `/field customize` command registration | ✅ | - |
+| G09-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ✅ | - |
+| G10 | `/field customize <profile>` variant | ✅ | - |
+| G10-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ✅ | - |
 | CHK-01 | ⚠️ **BATCH 1 COMPLETE** - [Directives Checklist](./GUI_TODO_DIRECTIVES.md#after-completing-a-todo) | ✅ | - |
 
 ---
@@ -276,7 +284,7 @@ G01 → G01-CHK → G02 → G02-CHK → ...
 | G39-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ⬜ | - |
 | G40 | Client config - rememberTabState, debugMenuEnabled | ⬜ | config |
 | G40-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-04 | ⚠️ **BATCH 4 COMPLETE** - [Directives Checklist](./GUI_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| CHK-04 | ⚠️ **BATCH 4 PARTIAL** - Client config pending | ⬜ | - |
 
 ---
 
@@ -288,30 +296,31 @@ G01 → G01-CHK → G02 → G02-CHK → ...
 
 > **Ref:** GUI_ARCHITECTURE §2.1, 03_PARAMETERS §1-4  
 > **Package:** `net.cyberpunk042.client.gui.panel`
+> **Updated Dec 10:** All implemented in QuickPanel.java
 
 | ID | Task | Status | Package |
 |----|------|--------|---------|
-| G41 | `QuickPanel extends AbstractPanel` - layout structure | ⬜ | panel |
-| G41-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ⬜ | - |
-| G42 | Shape type dropdown - SPHERE, RING, DISC, PRISM, CYLINDER, POLYHEDRON | ⬜ | panel |
-| G42-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ⬜ | - |
-| G43 | Radius slider - 0.1 to 10.0 | ⬜ | panel |
-| G43-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ⬜ | - |
-| G44 | Color button - with theme picker popup | ⬜ | panel |
-| G44-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ⬜ | - |
-| G45 | Alpha slider - 0.0 to 1.0 | ⬜ | panel |
-| G45-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ⬜ | - |
-| G46 | Fill mode dropdown - SOLID, WIREFRAME, CAGE | ⬜ | panel |
-| G46-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ⬜ | - |
-| G47 | Spin speed slider - -0.5 to 0.5 | ⬜ | panel |
-| G47-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ⬜ | - |
-| G48 | Follow mode dropdown - SNAP, SMOOTH, GLIDE | ⬜ | panel |
-| G48-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ⬜ | - |
-| G49 | Prediction toggle - enable/disable | ⬜ | panel |
-| G49-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ⬜ | - |
-| G50 | Prediction preset dropdown - OFF, LOW, MEDIUM, HIGH, CUSTOM | ⬜ | panel |
-| G50-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ⬜ | - |
-| CHK-05 | ⚠️ **BATCH 5 COMPLETE** - [Directives Checklist](./GUI_TODO_DIRECTIVES.md#after-completing-a-todo) | ⬜ | - |
+| G41 | `QuickPanel extends AbstractPanel` - layout structure | ✅ | panel |
+| G41-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ✅ | - |
+| G42 | Shape type dropdown - SPHERE, RING, DISC, PRISM, CYLINDER, POLYHEDRON | ✅ | panel |
+| G42-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ✅ | - |
+| G43 | Radius slider - 0.1 to 10.0 | ✅ | panel |
+| G43-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ✅ | - |
+| G44 | Color button - with theme picker popup | ✅ | panel |
+| G44-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ✅ | - |
+| G45 | Alpha slider - 0.0 to 1.0 | ✅ | panel |
+| G45-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ✅ | - |
+| G46 | Fill mode dropdown - SOLID, WIREFRAME, CAGE | ✅ | panel |
+| G46-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ✅ | - |
+| G47 | Spin speed slider - -0.5 to 0.5 | ✅ | panel |
+| G47-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ✅ | - |
+| G48 | Follow mode dropdown - SNAP, SMOOTH, GLIDE | ✅ | panel |
+| G48-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ✅ | - |
+| G49 | Prediction toggle - enable/disable | ✅ | panel |
+| G49-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ✅ | - |
+| G50 | Prediction preset dropdown - OFF, LOW, MEDIUM, HIGH, CUSTOM | ✅ | panel |
+| G50-CHK | ↳ [GUI_TODO_DIRECTIVES](./GUI_TODO_DIRECTIVES.md) check | ✅ | - |
+| CHK-05 | ⚠️ **BATCH 5 COMPLETE** - [Directives Checklist](./GUI_TODO_DIRECTIVES.md#after-completing-a-todo) | ✅ | - |
 
 ---
 

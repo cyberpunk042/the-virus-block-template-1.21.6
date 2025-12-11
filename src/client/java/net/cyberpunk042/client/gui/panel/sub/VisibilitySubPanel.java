@@ -8,6 +8,7 @@ import net.cyberpunk042.client.gui.widget.ExpandableSection;
 import net.cyberpunk042.client.gui.widget.LabeledSlider;
 import net.cyberpunk042.client.gui.util.FragmentRegistry;
 import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.visual.visibility.MaskType;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
@@ -27,26 +28,9 @@ import java.util.List;
  */
 public class VisibilitySubPanel extends AbstractPanel {
     
-    private ExpandableSection section;
-    private int startY;
-    private final List<net.minecraft.client.gui.widget.ClickableWidget> widgets = new ArrayList<>();
-    private CyclingButtonWidget<String> fragmentDropdown;
+    private int startY;    private CyclingButtonWidget<String> fragmentDropdown;
     private boolean applyingFragment = false;
     private String currentFragment = "Default";
-    
-    /** Visibility mask types. */
-    public enum MaskType {
-        FULL("Full (No Mask)"),
-        BANDS("Horizontal Bands"),
-        STRIPES("Vertical Stripes"),
-        CHECKER("Checkerboard"),
-        RADIAL("Radial Gradient"),
-        GRADIENT("Linear Gradient");
-        
-        private final String label;
-        MaskType(String label) { this.label = label; }
-        @Override public String toString() { return label; }
-    }
     
     /** Gradient direction. */
     public enum GradientDirection {
@@ -79,26 +63,20 @@ public class VisibilitySubPanel extends AbstractPanel {
         this.panelHeight = height;
         widgets.clear();
         
-        section = new ExpandableSection(
-            GuiConstants.PADDING, startY,
-            width - GuiConstants.PADDING * 2,
-            "Visibility Mask", false
-        );
         
         int x = GuiConstants.PADDING;
-        int y = section.getContentY();
+        int y = startY + GuiConstants.PADDING;
         int w = width - GuiConstants.PADDING * 2;
         int halfW = (w - GuiConstants.PADDING) / 2;
 
         // Preset dropdown
-        fragmentDropdown = CyclingButtonWidget.<String>builder(net.minecraft.text.Text::literal)
-            .values(FragmentRegistry.listVisibilityFragments())
+        List<String> visPresets = FragmentRegistry.listVisibilityFragments();
+
+        fragmentDropdown = CyclingButtonWidget.<String>builder(v -> net.minecraft.text.Text.literal(v))
+            .values(visPresets)
             .initially(currentFragment)
-            .build(
-                x, y, w, GuiConstants.WIDGET_HEIGHT,
-                net.minecraft.text.Text.literal("Preset"),
-                (btn, val) -> applyPreset(val)
-            );
+            .build(x, y, w, GuiConstants.WIDGET_HEIGHT, net.minecraft.text.Text.literal("Variant"),
+                (btn, val) -> applyPreset(val));
         widgets.add(fragmentDropdown);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
@@ -106,7 +84,7 @@ public class VisibilitySubPanel extends AbstractPanel {
         maskTypeDropdown = GuiWidgets.enumDropdown(x, y, w, "Mask Type", MaskType.class, MaskType.FULL,
             "Pattern visibility mask", v -> {
                 onUserChange(() -> {
-                    state.setMaskType(v.name());
+                    state.set("mask.mask", v.name());  // Field is named 'mask', not 'type'
                     rebuildForMaskType(v);
                     Logging.GUI.topic("visibility").debug("Mask: {}", v);
                 });
@@ -117,9 +95,9 @@ public class VisibilitySubPanel extends AbstractPanel {
         // Count (bands/stripes)
         countSlider = LabeledSlider.builder("Count")
             .position(x, y).width(halfW)
-            .range(1, 32).initial(state.getMaskCount()).format("%d").step(1)
+            .range(1, 32).initial(state.getInt("mask.count")).format("%d").step(1)
             .onChange(v -> onUserChange(() -> {
-                state.setMaskCount(v.intValue());
+                state.set("mask.count", v.intValue());
                 Logging.GUI.topic("visibility").trace("Count: {}", v.intValue());
             })).build();
         widgets.add(countSlider);
@@ -127,9 +105,9 @@ public class VisibilitySubPanel extends AbstractPanel {
         // Thickness
         thicknessSlider = LabeledSlider.builder("Thickness")
             .position(x + halfW + GuiConstants.PADDING, y).width(halfW)
-            .range(0.01f, 1f).initial(state.getMaskThickness()).format("%.2f")
+            .range(0.01f, 1f).initial(state.getFloat("mask.thickness")).format("%.2f")
             .onChange(v -> onUserChange(() -> {
-                state.setMaskThickness(v);
+                state.set("mask.thickness", v);
                 Logging.GUI.topic("visibility").trace("Thickness: {}", v);
             })).build();
         widgets.add(thicknessSlider);
@@ -138,9 +116,9 @@ public class VisibilitySubPanel extends AbstractPanel {
         // Offset
         offsetSlider = LabeledSlider.builder("Offset")
             .position(x, y).width(halfW)
-            .range(0f, 1f).initial(state.getMaskOffset()).format("%.2f")
+            .range(0f, 1f).initial(state.getFloat("mask.offset")).format("%.2f")
             .onChange(v -> onUserChange(() -> {
-                state.setMaskOffset(v);
+                state.set("mask.offset", v);
                 Logging.GUI.topic("visibility").trace("Offset: {}", v);
             })).build();
         widgets.add(offsetSlider);
@@ -148,19 +126,19 @@ public class VisibilitySubPanel extends AbstractPanel {
         // Feather
         featherSlider = LabeledSlider.builder("Feather")
             .position(x + halfW + GuiConstants.PADDING, y).width(halfW)
-            .range(0f, 1f).initial(state.getMaskFeather()).format("%.2f")
+            .range(0f, 1f).initial(state.getFloat("mask.feather")).format("%.2f")
             .onChange(v -> onUserChange(() -> {
-                state.setMaskFeather(v);
+                state.set("mask.feather", v);
                 Logging.GUI.topic("visibility").trace("Feather: {}", v);
             })).build();
         widgets.add(featherSlider);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
         // Invert
-        invertToggle = GuiWidgets.toggle(x, y, halfW, "Invert", state.isMaskInverted(),
+        invertToggle = GuiWidgets.toggle(x, y, halfW, "Invert", state.getBool("mask.invert"),
             "Invert mask pattern", v -> {
                 onUserChange(() -> {
-                    state.setMaskInverted(v);
+                    state.set("mask.invert", v);
                     Logging.GUI.topic("visibility").debug("Invert: {}", v);
                 });
             });
@@ -168,9 +146,9 @@ public class VisibilitySubPanel extends AbstractPanel {
         
         // Animate
         animateToggle = GuiWidgets.toggle(x + halfW + GuiConstants.PADDING, y, halfW, "Animate",
-            state.isMaskAnimated(), "Animate mask pattern", v -> {
+            state.getBool("mask.animate"), "Animate mask pattern", v -> {
                 onUserChange(() -> {
-                    state.setMaskAnimated(v);
+                    state.set("mask.animate", v);
                     updateAnimateWidgets();
                     Logging.GUI.topic("visibility").debug("Animate: {}", v);
                 });
@@ -181,15 +159,15 @@ public class VisibilitySubPanel extends AbstractPanel {
         // Animate speed
         animateSpeedSlider = LabeledSlider.builder("Speed")
             .position(x, y).width(w)
-            .range(0.1f, 10f).initial(state.getMaskAnimateSpeed()).format("%.1f")
+            .range(0.1f, 10f).initial(state.getFloat("mask.animSpeed")).format("%.1f")
             .onChange(v -> onUserChange(() -> {
-                state.setMaskAnimateSpeed(v);
+                state.set("mask.animSpeed", v);
                 Logging.GUI.topic("visibility").trace("Animate speed: {}", v);
             })).build();
         widgets.add(animateSpeedSlider);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
-        section.setContentHeight(y - section.getContentY());
+        contentHeight = y - startY + GuiConstants.PADDING;
         updateAnimateWidgets();
         Logging.GUI.topic("panel").debug("VisibilitySubPanel initialized");
     }
@@ -202,7 +180,7 @@ public class VisibilitySubPanel extends AbstractPanel {
     }
     
     private void updateAnimateWidgets() {
-        boolean animated = state.isMaskAnimated();
+        boolean animated = state.getBool("mask.animate");
         if (animateSpeedSlider != null) animateSpeedSlider.active = animated;
     }
     
@@ -210,17 +188,15 @@ public class VisibilitySubPanel extends AbstractPanel {
     
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        section.render(context, net.minecraft.client.MinecraftClient.getInstance().textRenderer, mouseX, mouseY, delta);
-        if (section.isExpanded()) {
-            for (var widget : widgets) widget.render(context, mouseX, mouseY, delta);
-        }
+        // Render widgets directly (no expandable section)
+        for (var widget : widgets) widget.render(context, mouseX, mouseY, delta);
     }
     
-    public int getHeight() { return section.getTotalHeight(); }
+    public int getHeight() { return contentHeight; }
     
     public List<net.minecraft.client.gui.widget.ClickableWidget> getWidgets() {
         List<net.minecraft.client.gui.widget.ClickableWidget> all = new ArrayList<>();
-        all.add(section.getHeaderButton());
+        // No header button (direct content)
         all.addAll(widgets);
         return all;
     }
@@ -247,15 +223,15 @@ public class VisibilitySubPanel extends AbstractPanel {
 
     private void syncFromState() {
         if (maskTypeDropdown != null) {
-            try { maskTypeDropdown.setValue(MaskType.valueOf(state.getMaskType())); } catch (IllegalArgumentException ignored) {}
+            try { maskTypeDropdown.setValue(MaskType.valueOf(state.getString("mask.mask"))); } catch (IllegalArgumentException ignored) {}
         }
-        if (countSlider != null) countSlider.setValue(state.getMaskCount());
-        if (thicknessSlider != null) thicknessSlider.setValue(state.getMaskThickness());
-        if (offsetSlider != null) offsetSlider.setValue(state.getMaskOffset());
-        if (featherSlider != null) featherSlider.setValue(state.getMaskFeather());
-        if (invertToggle != null) invertToggle.setValue(state.isMaskInverted());
-        if (animateToggle != null) animateToggle.setValue(state.isMaskAnimated());
-        if (animateSpeedSlider != null) animateSpeedSlider.setValue(state.getMaskAnimateSpeed());
+        if (countSlider != null) countSlider.setValue(state.getInt("mask.count"));
+        if (thicknessSlider != null) thicknessSlider.setValue(state.getFloat("mask.thickness"));
+        if (offsetSlider != null) offsetSlider.setValue(state.getFloat("mask.offset"));
+        if (featherSlider != null) featherSlider.setValue(state.getFloat("mask.feather"));
+        if (invertToggle != null) invertToggle.setValue(state.getBool("mask.invert"));
+        if (animateToggle != null) animateToggle.setValue(state.getBool("mask.animate"));
+        if (animateSpeedSlider != null) animateSpeedSlider.setValue(state.getFloat("mask.animSpeed"));
         rebuildForMaskType(maskTypeDropdown.getValue());
         updateAnimateWidgets();
     }

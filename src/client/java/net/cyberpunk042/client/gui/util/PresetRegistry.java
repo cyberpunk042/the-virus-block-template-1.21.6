@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Stream;
 
+import org.joml.Vector3f;
 /**
  * Registry for multi-scope presets organized by category.
  * Loads from: config/the-virus-block/field_presets/{category}/
@@ -64,16 +65,39 @@ public class PresetRegistry {
             .getConfigDir()
             .resolve("the-virus-block")
             .resolve("field_presets");
+        Path altPresetsRoot = Path.of("config", "the-virus-block", "field_presets"); // dev fallback
         
-        if (!Files.exists(presetsRoot)) {
-            TheVirusBlock.LOGGER.info("No presets folder found at {}", presetsRoot);
+        boolean any = false;
+        if (Files.exists(presetsRoot)) {
+            any |= loadPresetTree(presetsRoot);
+        }
+        if (Files.exists(altPresetsRoot)) {
+            any |= loadPresetTree(altPresetsRoot);
+        }
+        
+        // 3) Built-in resources (fallback for JAR distribution)
+        FabricLoader.getInstance().getModContainer(TheVirusBlock.MOD_ID).ifPresent(container -> {
+            container.findPath("data/" + TheVirusBlock.MOD_ID + "/field_presets")
+                .ifPresent(PresetRegistry::loadPresetTree);
+        });
+        any |= !PRESETS_BY_ID.isEmpty();
+        
+        if (!any) {
+            TheVirusBlock.LOGGER.info("No presets folder found at {} or {}", presetsRoot, altPresetsRoot);
             loaded = true;
             return;
         }
         
-        // Scan each category folder
+        int total = PRESETS_BY_ID.size();
+        TheVirusBlock.LOGGER.info("Loaded {} presets across {} categories", total, PresetCategory.values().length);
+        loaded = true;
+    }
+
+    private static boolean loadPresetTree(Path root) {
+        boolean any = false;
+        // Scan each category folder (field_presets/<category>/)
         for (PresetCategory category : PresetCategory.values()) {
-            Path categoryFolder = presetsRoot.resolve(category.getFolderName());
+            Path categoryFolder = root.resolve(category.getFolderName());
             if (!Files.isDirectory(categoryFolder)) {
                 continue;
             }
@@ -81,14 +105,28 @@ public class PresetRegistry {
             try (Stream<Path> files = Files.list(categoryFolder)) {
                 files.filter(p -> p.toString().endsWith(".json"))
                     .forEach(file -> loadPreset(file, category));
+                any = true;
             } catch (IOException e) {
                 TheVirusBlock.LOGGER.error("Failed to scan preset folder: {}", categoryFolder, e);
             }
         }
-        
-        int total = PRESETS_BY_ID.size();
-        TheVirusBlock.LOGGER.info("Loaded {} presets across {} categories", total, PresetCategory.values().length);
-        loaded = true;
+
+        // Also load any presets placed directly under root (no category subfolder)
+        try (Stream<Path> files = Files.list(root)) {
+            files.filter(p -> p.toString().endsWith(".json"))
+                .forEach(file -> loadPreset(file, PresetCategory.STYLE)); // default bucket
+            any = true;
+        } catch (IOException e) {
+            TheVirusBlock.LOGGER.error("Failed to scan root preset folder: {}", root, e);
+        }
+        return any;
+    }
+
+    /** Force reload on next access. */
+    public static void reset() {
+        loaded = false;
+        PRESETS_BY_CATEGORY.clear();
+        PRESETS_BY_ID.clear();
     }
     
     private static void loadPreset(Path file, PresetCategory category) {
@@ -225,38 +263,30 @@ public class PresetRegistry {
         // ═══════════════════════════════════════════════════════════════
         if (mergeData.has("fillMode")) {
             try {
-                state.setFillMode(net.cyberpunk042.visual.fill.FillMode.valueOf(mergeData.get("fillMode").getAsString()));
+                state.set("fill.mode", net.cyberpunk042.visual.fill.FillMode.valueOf(mergeData.get("fillMode").getAsString()));
             } catch (IllegalArgumentException ignored) {}
         }
         if (mergeData.has("wireThickness")) {
-            state.setWireThickness(mergeData.get("wireThickness").getAsFloat());
+            state.set("fill.wireThickness", mergeData.get("wireThickness").getAsFloat());
         }
         if (mergeData.has("glow")) {
-            state.setGlow(mergeData.get("glow").getAsFloat());
+            state.set("appearance.glow", mergeData.get("glow").getAsFloat());
         }
         if (mergeData.has("alpha")) {
-            state.setAlpha(mergeData.get("alpha").getAsFloat());
+            state.set("appearance.alpha", mergeData.get("alpha").getAsFloat());
         }
-        if (mergeData.has("spinEnabled")) {
-            state.setSpinEnabled(mergeData.get("spinEnabled").getAsBoolean());
-        }
-        if (mergeData.has("spinSpeed")) {
-            state.setSpinSpeed(mergeData.get("spinSpeed").getAsFloat());
-        }
-        if (mergeData.has("pulseEnabled")) {
-            state.setPulseEnabled(mergeData.get("pulseEnabled").getAsBoolean());
-        }
+        // Animation via nested "spin" / "pulse" objects (handled in applyAnimation)
         if (mergeData.has("primaryColor")) {
-            state.setPrimaryColor(mergeData.get("primaryColor").getAsInt());
+            state.set("appearance.primaryColor", mergeData.get("primaryColor").getAsInt());
         }
         if (mergeData.has("radius")) {
-            state.setRadius(mergeData.get("radius").getAsFloat());
+            state.set("radius", mergeData.get("radius").getAsFloat());
         }
         if (mergeData.has("latSteps")) {
-            state.setSphereLatSteps(mergeData.get("latSteps").getAsInt());
+            state.set("sphere.latSteps", mergeData.get("latSteps").getAsInt());
         }
         if (mergeData.has("lonSteps")) {
-            state.setSphereLonSteps(mergeData.get("lonSteps").getAsInt());
+            state.set("sphere.lonSteps", mergeData.get("lonSteps").getAsInt());
         }
         
         // ═══════════════════════════════════════════════════════════════
@@ -328,51 +358,81 @@ public class PresetRegistry {
     // ═══════════════════════════════════════════════════════════════════════
     
     private static void applyAppearance(FieldEditState state, JsonObject json) {
-        if (json.has("glow")) state.setGlow(json.get("glow").getAsFloat());
-        if (json.has("emissive")) state.setEmissive(json.get("emissive").getAsFloat());
-        if (json.has("saturation")) state.setSaturation(json.get("saturation").getAsFloat());
-        if (json.has("primaryColor")) state.setPrimaryColor(json.get("primaryColor").getAsInt());
-        if (json.has("secondaryColor")) state.setSecondaryColor(json.get("secondaryColor").getAsInt());
+        if (json.has("glow")) state.set("appearance.glow", json.get("glow").getAsFloat());
+        if (json.has("emissive")) state.set("appearance.emissive", json.get("emissive").getAsFloat());
+        if (json.has("saturation")) state.set("appearance.saturation", json.get("saturation").getAsFloat());
+        if (json.has("primaryColor")) state.set("appearance.primaryColor", json.get("primaryColor").getAsInt());
+        if (json.has("secondaryColor")) state.set("appearance.secondaryColor", json.get("secondaryColor").getAsInt());
     }
     
     private static void applyAnimation(FieldEditState state, JsonObject json) {
-        if (json.has("spinEnabled")) state.setSpinEnabled(json.get("spinEnabled").getAsBoolean());
-        if (json.has("spinSpeed")) state.setSpinSpeed(json.get("spinSpeed").getAsFloat());
-        if (json.has("spinAxis")) state.setSpinAxis(json.get("spinAxis").getAsString());
-        if (json.has("pulseEnabled")) state.setPulseEnabled(json.get("pulseEnabled").getAsBoolean());
-        if (json.has("pulseFrequency")) state.setPulseFrequency(json.get("pulseFrequency").getAsFloat());
-        if (json.has("pulseAmplitude")) state.setPulseAmplitude(json.get("pulseAmplitude").getAsFloat());
-        if (json.has("alphaFadeEnabled")) state.setAlphaFadeEnabled(json.get("alphaFadeEnabled").getAsBoolean());
-        if (json.has("colorCycleEnabled")) state.setColorCycleEnabled(json.get("colorCycleEnabled").getAsBoolean());
-        if (json.has("colorCycleSpeed")) state.setColorCycleSpeed(json.get("colorCycleSpeed").getAsFloat());
-        if (json.has("wobbleEnabled")) state.setWobbleEnabled(json.get("wobbleEnabled").getAsBoolean());
-        if (json.has("waveEnabled")) state.setWaveEnabled(json.get("waveEnabled").getAsBoolean());
+        // Spin
+        if (json.has("spin")) {
+            JsonObject spin = json.getAsJsonObject("spin");
+            if (spin.has("speed")) state.set("spin.speed", spin.get("speed").getAsFloat());
+            if (spin.has("axis")) state.set("spin.axis", spin.get("axis").getAsString());
+        }
+        // Pulse
+        if (json.has("pulse")) {
+            JsonObject pulse = json.getAsJsonObject("pulse");
+            if (pulse.has("speed")) state.set("pulse.speed", pulse.get("speed").getAsFloat());
+            if (pulse.has("amplitude")) state.set("pulse.amplitude", pulse.get("amplitude").getAsFloat());
+        }
+        // Alpha pulse
+        if (json.has("alphaPulse")) {
+            JsonObject alpha = json.getAsJsonObject("alphaPulse");
+            if (alpha.has("min")) state.set("alphaPulse.min", alpha.get("min").getAsFloat());
+            if (alpha.has("max")) state.set("alphaPulse.max", alpha.get("max").getAsFloat());
+            if (alpha.has("speed")) state.set("alphaPulse.speed", alpha.get("speed").getAsFloat());
+        }
+        // Color cycle
+        if (json.has("colorCycle")) {
+            JsonObject cc = json.getAsJsonObject("colorCycle");
+            if (cc.has("speed")) state.set("colorCycle.speed", cc.get("speed").getAsFloat());
+            if (cc.has("blend")) state.set("colorCycle.blend", cc.get("blend").getAsBoolean());
+        }
+        // Wobble
+        if (json.has("wobble")) {
+            JsonObject wobble = json.getAsJsonObject("wobble");
+            if (wobble.has("amplitude")) state.set("wobble.amplitude", wobble.get("amplitude").getAsFloat());
+            if (wobble.has("speed")) state.set("wobble.speed", wobble.get("speed").getAsFloat());
+        }
+        // Wave
+        if (json.has("wave")) {
+            JsonObject wave = json.getAsJsonObject("wave");
+            if (wave.has("amplitude")) state.set("wave.amplitude", wave.get("amplitude").getAsFloat());
+            if (wave.has("frequency")) state.set("wave.frequency", wave.get("frequency").getAsFloat());
+        }
     }
     
     private static void applyVisibility(FieldEditState state, JsonObject json) {
-        if (json.has("maskType")) state.setMaskType(json.get("maskType").getAsString());
-        if (json.has("maskCount")) state.setMaskCount(json.get("maskCount").getAsInt());
-        if (json.has("maskThickness")) state.setMaskThickness(json.get("maskThickness").getAsFloat());
-        if (json.has("maskOffset")) state.setMaskOffset(json.get("maskOffset").getAsFloat());
-        if (json.has("maskInverted")) state.setMaskInverted(json.get("maskInverted").getAsBoolean());
-        if (json.has("maskAnimated")) state.setMaskAnimated(json.get("maskAnimated").getAsBoolean());
-        if (json.has("maskAnimateSpeed")) state.setMaskAnimateSpeed(json.get("maskAnimateSpeed").getAsFloat());
+        if (json.has("maskType")) state.set("mask.type", json.get("maskType").getAsString());
+        if (json.has("maskCount")) state.set("mask.count", json.get("maskCount").getAsInt());
+        if (json.has("maskThickness")) state.set("mask.thickness", json.get("maskThickness").getAsFloat());
+        if (json.has("maskOffset")) state.set("mask.offset", json.get("maskOffset").getAsFloat());
+        if (json.has("maskInverted")) state.set("mask.invert", json.get("maskInverted").getAsBoolean());
+        if (json.has("maskAnimated")) state.set("mask.animate", json.get("maskAnimated").getAsBoolean());
+        if (json.has("maskAnimateSpeed")) state.set("mask.animSpeed", json.get("maskAnimateSpeed").getAsFloat());
     }
     
     private static void applyTransform(FieldEditState state, JsonObject json) {
-        if (json.has("scale")) state.setScale(json.get("scale").getAsFloat());
-        if (json.has("anchor")) state.setAnchor(json.get("anchor").getAsString());
+        if (json.has("scale")) state.set("transform.scale", json.get("scale").getAsFloat());
+        if (json.has("anchor")) state.set("transform.anchor", json.get("anchor").getAsString());
         if (json.has("offsetX") || json.has("offsetY") || json.has("offsetZ")) {
-            float x = json.has("offsetX") ? json.get("offsetX").getAsFloat() : state.getOffsetX();
-            float y = json.has("offsetY") ? json.get("offsetY").getAsFloat() : state.getOffsetY();
-            float z = json.has("offsetZ") ? json.get("offsetZ").getAsFloat() : state.getOffsetZ();
-            state.setOffset(x, y, z);
+            // Handle nullable offset - default to 0
+            Vector3f currentOffset = state.transform() != null ? state.transform().offset() : null;
+            float x = json.has("offsetX") ? json.get("offsetX").getAsFloat() : (currentOffset != null ? currentOffset.x : 0);
+            float y = json.has("offsetY") ? json.get("offsetY").getAsFloat() : (currentOffset != null ? currentOffset.y : 0);
+            float z = json.has("offsetZ") ? json.get("offsetZ").getAsFloat() : (currentOffset != null ? currentOffset.z : 0);
+            state.set("transform.offset", new Vector3f(x, y, z));
         }
         if (json.has("rotationX") || json.has("rotationY") || json.has("rotationZ")) {
-            float x = json.has("rotationX") ? json.get("rotationX").getAsFloat() : state.getRotationX();
-            float y = json.has("rotationY") ? json.get("rotationY").getAsFloat() : state.getRotationY();
-            float z = json.has("rotationZ") ? json.get("rotationZ").getAsFloat() : state.getRotationZ();
-            state.setRotation(x, y, z);
+            // Handle nullable rotation - default to 0
+            Vector3f currentRot = state.transform() != null ? state.transform().rotation() : null;
+            float x = json.has("rotationX") ? json.get("rotationX").getAsFloat() : (currentRot != null ? currentRot.x : 0);
+            float y = json.has("rotationY") ? json.get("rotationY").getAsFloat() : (currentRot != null ? currentRot.y : 0);
+            float z = json.has("rotationZ") ? json.get("rotationZ").getAsFloat() : (currentRot != null ? currentRot.z : 0);
+            state.set("transform.rotation", new Vector3f(x, y, z));
         }
     }
     
@@ -439,15 +499,29 @@ public class PresetRegistry {
     }
     
     private static void applyLayerProperties(FieldEditState state, int layerIndex, JsonObject json) {
-        if (json.has("blendMode")) state.setLayerBlendMode(layerIndex, json.get("blendMode").getAsString());
-        if (json.has("alpha")) state.setLayerAlpha(layerIndex, json.get("alpha").getAsFloat());
-        if (json.has("order")) state.setLayerOrder(layerIndex, json.get("order").getAsInt());
-        if (json.has("visible")) {
-            boolean visible = json.get("visible").getAsBoolean();
-            if (state.isLayerVisible(layerIndex) != visible) {
-                state.toggleLayerVisibility(layerIndex);
-            }
+        var layers = state.getFieldLayers();
+        if (layerIndex < 0 || layerIndex >= layers.size()) return;
+        
+        var layer = layers.get(layerIndex);
+        
+        // Parse new values or keep existing
+        net.cyberpunk042.visual.layer.BlendMode blendMode = layer.blendMode();
+        if (json.has("blendMode")) {
+            try {
+                blendMode = net.cyberpunk042.visual.layer.BlendMode.valueOf(json.get("blendMode").getAsString().toUpperCase());
+            } catch (IllegalArgumentException ignored) {}
         }
+        
+        float alpha = json.has("alpha") ? json.get("alpha").getAsFloat() : layer.alpha();
+        boolean visible = json.has("visible") ? json.get("visible").getAsBoolean() : layer.visible();
+        
+        // Create new layer with updated properties (FieldLayer is immutable)
+        net.cyberpunk042.field.FieldLayer updated = new net.cyberpunk042.field.FieldLayer(
+            layer.id(), layer.primitives(), layer.transform(), layer.animation(),
+            alpha, visible, blendMode
+        );
+        layers.set(layerIndex, updated);
+        state.markDirty();
     }
     
     // ═══════════════════════════════════════════════════════════════════════
@@ -535,9 +609,15 @@ public class PresetRegistry {
     public static List<String> listPresets() {
         ensureLoaded();
         List<String> names = new ArrayList<>();
-        names.add("None");
         PRESETS_BY_ID.keySet().stream().sorted().forEach(names::add);
         return names;
+    }
+
+    /**
+     * Get display label for a preset id (falls back to id).
+     */
+    public static String getDisplayLabel(String id) {
+        return getPreset(id).map(PresetEntry::name).orElse(id);
     }
 
 }

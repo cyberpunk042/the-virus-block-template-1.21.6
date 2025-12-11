@@ -22,21 +22,49 @@ package net.cyberpunk042.visual.layer;
  */
 public enum BlendMode {
     /** Standard alpha blending (DEFAULT) */
-    NORMAL,
+    NORMAL("Normal"),
     
     /** Additive blending - colors add together (glow effects) */
-    ADD,
+    ADD("Additive"),
     
     /** Multiply blend - darkens (Phase 2 - requires custom shader) */
-    MULTIPLY,
+    MULTIPLY("Multiply"),
     
     /** Screen blend - brightens (Phase 2 - requires custom shader) */
-    SCREEN;
+    SCREEN("Screen");
+    
+    private final String label;
+    
+    BlendMode(String label) {
+        this.label = label;
+    }
+    
+    /** Display label for GUI */
+    public String label() {
+        return label;
+    }
+    
+    @Override
+    public String toString() {
+        return label;
+    }
     
     /**
      * Returns true if this blend mode is supported in Phase 1.
      */
     public boolean isPhase1Supported() {
         return this == NORMAL || this == ADD;
+    }
+    
+    /**
+     * Parse from string (case-insensitive).
+     */
+    public static BlendMode fromId(String id) {
+        if (id == null || id.isEmpty()) return NORMAL;
+        try {
+            return valueOf(id.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return NORMAL;
+        }
     }
 }

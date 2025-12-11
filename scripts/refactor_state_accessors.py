@@ -130,8 +130,6 @@ SKIP_METHODS: Set[str] = {
 
 # Direct fields (no record prefix, just @StateField primitives)
 DIRECT_FIELDS: Set[str] = {
-    "color", "alpha", "glow", "emissive", "saturation",
-    "primaryColor", "secondaryColor",
     "radius", "shapeType",
     "followMode", "followEnabled", "predictionEnabled",
     "livePreviewEnabled", "autoSaveEnabled", "debugUnlocked",
@@ -139,7 +137,13 @@ DIRECT_FIELDS: Set[str] = {
     "triggerType", "triggerEffect", "triggerIntensity", "triggerDuration",
     "primitiveId", "radiusOffset", "phaseOffset", "mirrorAxis",
     "followLinked", "scaleWithLinked",
-    "cageLatCount", "cageLonCount", "pointSize",
+    # Note: cageLatCount, cageLonCount, pointSize handled by CageOptionsAdapter
+}
+
+# Appearance record fields (routed to appearance.fieldName)
+APPEARANCE_FIELDS: Set[str] = {
+    "color", "alpha", "glow", "emissive", "saturation",
+    "primaryColor", "secondaryColor",
 }
 
 CLIENT_DIR = "src/client/java/net/cyberpunk042/client"
@@ -196,6 +200,10 @@ def parse_setter_method(method_name: str) -> Optional[str]:
     field_name = camel_to_lower(remainder)
     if field_name in DIRECT_FIELDS:
         return field_name
+    
+    # Check appearance fields (routed to appearance.fieldName)
+    if field_name in APPEARANCE_FIELDS:
+        return f"appearance.{field_name}"
     
     # Check record prefixes (longest first to match "ColorCycle" before "Color")
     for prefix, record in sorted(RECORD_PREFIXES.items(), key=lambda x: -len(x[0])):
@@ -299,6 +307,25 @@ def process_file_smart(filepath: str) -> Optional[Tuple[str, str, str, List[str]
         return f'state.set("{path}", {args})'
     
     content = re.sub(pattern, replacement, content)
+    
+    # Second pass: Update existing state.set("old_path", ...) to state.set("new_path", ...)
+    # for appearance fields that need the appearance. prefix
+    appearance_path_fixes = {
+        '"color"': '"appearance.color"',
+        '"alpha"': '"appearance.alpha"',
+        '"glow"': '"appearance.glow"',
+        '"emissive"': '"appearance.emissive"',
+        '"saturation"': '"appearance.saturation"',
+        '"primaryColor"': '"appearance.primaryColor"',
+        '"secondaryColor"': '"appearance.secondaryColor"',
+    }
+    
+    for old_path, new_path in appearance_path_fixes.items():
+        old_pattern = rf'state\.set\({old_path},'
+        new_replacement = f'state.set({new_path},'
+        if re.search(old_pattern, content):
+            content = re.sub(old_pattern, new_replacement, content)
+            changes.append(f'state.set({old_path}, ...) → state.set({new_path}, ...)')
     
     # Add Vector3f import if needed
     if needs_vector3f_import:

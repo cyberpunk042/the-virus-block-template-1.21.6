@@ -56,6 +56,16 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
         // === PHASE 2: Resolve Color (includes animation effects) ===
         int color = resolveColor(primitive, resolver, overrides, time);
         
+        // === PHASE 2.5: Apply Animated Mask Alpha ===
+        // Note: For animated masks, we apply alpha modulation at render time
+        // since tessellation is cached. This affects overall primitive alpha.
+        if (primitive.visibility() != null && primitive.visibility().animate()) {
+            // Apply average mask alpha based on animation time
+            // This is an approximation - true per-vertex mask would require re-tessellation
+            float maskAlpha = 0.5f + 0.5f * (float)Math.sin(time * primitive.visibility().animSpeed() * 0.1f);
+            color = net.cyberpunk042.visual.color.ColorMath.multiplyAlpha(color, maskAlpha);
+        }
+        
         // === PHASE 3: Get Wave Config for Vertex Displacement ===
         Animation animation = primitive.animation();
         net.cyberpunk042.visual.animation.WaveConfig waveConfig = 
@@ -137,6 +147,9 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
             } else {
                 baseColor = 0xFFFFFFFF;
             }
+            
+            // Apply appearance color modifiers (saturation, brightness, hueShift)
+            baseColor = applyAppearanceModifiers(baseColor, appearance, resolver);
         }
         
         // Apply alpha from appearance (AlphaRange - use max value)
@@ -144,9 +157,14 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
         float alpha = (appearance != null && appearance.alpha() != null) 
             ? appearance.alpha().max() : 1.0f;
         
-        // Apply alpha pulse animation
+        // Apply alpha pulse animation (from AlphaPulseConfig)
         if (animation != null && animation.hasAlphaPulse()) {
             alpha *= AnimationApplier.getAlphaPulse(animation.alphaPulse(), time);
+        }
+        
+        // Apply pulse alpha (when PulseConfig.mode == ALPHA)
+        if (animation != null && animation.hasPulse()) {
+            alpha *= AnimationApplier.getPulseAlpha(animation.pulse(), time);
         }
         
         if (overrides != null) {
@@ -185,6 +203,52 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
             Logging.FIELD.topic("render").warn("Invalid hex color: {}", hex);
         }
         return 0xFFFFFFFF;
+    }
+    
+    /**
+     * Applies appearance color modifiers (saturation, brightness, hueShift, secondaryColor).
+     * 
+     * @param baseColor Base ARGB color
+     * @param appearance Appearance config
+     * @param resolver Color resolver for secondary color references
+     * @return Modified ARGB color
+     */
+    protected int applyAppearanceModifiers(int baseColor, Appearance appearance, ColorResolver resolver) {
+        int color = baseColor;
+        
+        // Apply saturation (1.0 = no change, 0.0 = grayscale, 2.0 = hyper-saturated)
+        if (appearance.saturation() != 1.0f) {
+            color = net.cyberpunk042.visual.color.ColorMath.multiplySaturation(color, appearance.saturation());
+        }
+        
+        // Apply brightness (1.0 = no change)
+        if (appearance.brightness() != 1.0f) {
+            color = net.cyberpunk042.visual.color.ColorMath.multiplyBrightness(color, appearance.brightness());
+        }
+        
+        // Apply hue shift (degrees)
+        if (appearance.hueShift() != 0.0f) {
+            color = net.cyberpunk042.visual.color.ColorMath.shiftHue(color, appearance.hueShift());
+        }
+        
+        // Apply secondary color blending
+        if (appearance.hasSecondaryColor()) {
+            String secondaryRef = appearance.secondaryColor();
+            int secondaryColor = 0xFFFFFFFF;
+            
+            if (resolver != null) {
+                secondaryColor = resolver.resolve(secondaryRef);
+            } else if (secondaryRef != null && secondaryRef.startsWith("#")) {
+                secondaryColor = parseHexColor(secondaryRef);
+            }
+            
+            color = net.cyberpunk042.visual.color.ColorMath.blend(color, secondaryColor, appearance.colorBlend());
+            
+            Logging.FIELD.topic("render").trace(
+                "Applied secondary color blend: {} @ {:.2f}", secondaryRef, appearance.colorBlend());
+        }
+        
+        return color;
     }
     
     // =========================================================================

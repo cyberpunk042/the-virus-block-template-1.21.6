@@ -15,6 +15,7 @@ import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import java.util.ArrayList;
 import java.util.List;
 import net.cyberpunk042.client.network.GuiPacketSender;
+import net.cyberpunk042.client.gui.state.FieldEditStateHolder;
 import net.cyberpunk042.client.gui.widget.ToastNotification;
 
 /**
@@ -29,11 +30,7 @@ import net.cyberpunk042.client.gui.widget.ToastNotification;
  */
 public class LifecycleSubPanel extends AbstractPanel {
     
-    private ExpandableSection section;
-    private int startY;
-    
-    private final List<net.minecraft.client.gui.widget.ClickableWidget> widgets = new ArrayList<>();
-    
+    private int startY;    
     /** Lifecycle states. */
     public enum LifecycleState {
         SPAWNING("Spawning"),
@@ -65,14 +62,9 @@ public class LifecycleSubPanel extends AbstractPanel {
         this.panelHeight = height;
         widgets.clear();
         
-        section = new ExpandableSection(
-            GuiConstants.PADDING, startY,
-            width - GuiConstants.PADDING * 2,
-            "Lifecycle", true // Start expanded in debug
-        );
         
         int x = GuiConstants.PADDING;
-        int y = section.getContentY();
+        int y = startY + GuiConstants.PADDING;
         int w = width - GuiConstants.PADDING * 2;
         int halfW = (w - GuiConstants.PADDING) / 2;
         
@@ -80,7 +72,7 @@ public class LifecycleSubPanel extends AbstractPanel {
         stateDropdown = GuiWidgets.enumDropdown(
             x, y, w, "State", LifecycleState.class, LifecycleState.ACTIVE,
             "Current lifecycle state", s -> {
-                state.setLifecycleState(s.name());
+                state.set("lifecycleState", s.name());
                 Logging.GUI.topic("lifecycle").info("State changed: {}", s);
             }
         );
@@ -90,9 +82,9 @@ public class LifecycleSubPanel extends AbstractPanel {
         // G83: Fade durations
         fadeInDuration = LabeledSlider.builder("Fade In (ticks)")
             .position(x, y).width(halfW)
-            .range(0, 100).initial(state.getFadeInTicks()).format("%d").step(1)
+            .range(0, 100).initial(state.getInt("fadeInTicks")).format("%d").step(1)
             .onChange(v -> {
-                state.setFadeInTicks(v.intValue());
+                state.set("fadeInTicks", v.intValue());
                 Logging.GUI.topic("lifecycle").trace("Fade in: {}", v.intValue());
             })
             .build();
@@ -100,9 +92,9 @@ public class LifecycleSubPanel extends AbstractPanel {
         
         fadeOutDuration = LabeledSlider.builder("Fade Out (ticks)")
             .position(x + halfW + GuiConstants.PADDING, y).width(halfW)
-            .range(0, 100).initial(state.getFadeOutTicks()).format("%d").step(1)
+            .range(0, 100).initial(state.getInt("fadeOutTicks")).format("%d").step(1)
             .onChange(v -> {
-                state.setFadeOutTicks(v.intValue());
+                state.set("fadeOutTicks", v.intValue());
                 Logging.GUI.topic("lifecycle").trace("Fade out: {}", v.intValue());
             })
             .build();
@@ -113,28 +105,30 @@ public class LifecycleSubPanel extends AbstractPanel {
         int btnW = (w - GuiConstants.PADDING * 2) / 3;
         spawnBtn = GuiWidgets.button(x, y, btnW, "Spawn", "Force spawn field", () -> {
             Logging.GUI.topic("lifecycle").info("Force spawn triggered");
-            GuiPacketSender.spawnDebugField(state.toStateJson());
+            // Use FieldEditStateHolder to set active flag AND send packet
+            FieldEditStateHolder.spawnTestField();
         });
         widgets.add(spawnBtn);
         
         despawnBtn = GuiWidgets.button(x + btnW + GuiConstants.PADDING, y, btnW, "Despawn", "Force despawn field", () -> {
             Logging.GUI.topic("lifecycle").info("Force despawn triggered");
-            GuiPacketSender.despawnDebugField();
+            // Use FieldEditStateHolder to clear active flag AND send packet
+            FieldEditStateHolder.despawnTestField();
         });
         widgets.add(despawnBtn);
         
         // G85: Reset button
         resetBtn = GuiWidgets.button(x + (btnW + GuiConstants.PADDING) * 2, y, btnW, "Reset", "Reset to defaults", () -> {
             Logging.GUI.topic("lifecycle").info("Lifecycle reset triggered");
-            state.setLifecycleState("ACTIVE");
-            state.setFadeInTicks(0);
-            state.setFadeOutTicks(0);
+            state.set("lifecycleState", "ACTIVE");
+            state.set("fadeInTicks", 0);
+            state.set("fadeOutTicks", 0);
             ToastNotification.info("Lifecycle reset to defaults");
         });
         widgets.add(resetBtn);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
-        section.setContentHeight(y - section.getContentY());
+        contentHeight = y - startY + GuiConstants.PADDING;
         
         Logging.GUI.topic("panel").debug("LifecycleSubPanel initialized");
     }
@@ -144,22 +138,19 @@ public class LifecycleSubPanel extends AbstractPanel {
     
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        section.render(context, net.minecraft.client.MinecraftClient.getInstance().textRenderer, mouseX, mouseY, delta);
-        
-        if (section.isExpanded()) {
-            for (var widget : widgets) {
-                widget.render(context, mouseX, mouseY, delta);
-            }
+        // Render widgets directly (no expandable section)
+        for (var widget : widgets) {
+            widget.render(context, mouseX, mouseY, delta);
         }
     }
     
     public int getHeight() {
-        return section.getTotalHeight();
+        return contentHeight;
     }
     
     public List<net.minecraft.client.gui.widget.ClickableWidget> getWidgets() {
         List<net.minecraft.client.gui.widget.ClickableWidget> all = new ArrayList<>();
-        all.add(section.getHeaderButton());
+        // No header button (direct content)
         all.addAll(widgets);
         return all;
     }

@@ -27,11 +27,7 @@ import java.util.List;
  */
 public class AppearanceSubPanel extends AbstractPanel {
     
-    private ExpandableSection section;
-    private int startY;
-    
-    private final List<net.minecraft.client.gui.widget.ClickableWidget> widgets = new ArrayList<>();
-    
+    private int startY;    
     // G71: Glow
     private LabeledSlider glowSlider;
     
@@ -57,22 +53,17 @@ public class AppearanceSubPanel extends AbstractPanel {
         this.panelHeight = height;
         widgets.clear();
         
-        section = new ExpandableSection(
-            GuiConstants.PADDING, startY,
-            width - GuiConstants.PADDING * 2,
-            "Appearance", false // Start collapsed
-        );
         
         int x = GuiConstants.PADDING;
-        int y = section.getContentY();
+        int y = startY + GuiConstants.PADDING;
         int w = width - GuiConstants.PADDING * 2;
         
         // G71: Glow intensity
         glowSlider = LabeledSlider.builder("Glow")
             .position(x, y).width(w)
-            .range(0f, 2f).initial(state.getGlow()).format("%.2f")
+            .range(0f, 2f).initial(state.getFloat("appearance.glow")).format("%.2f")
             .onChange(v -> {
-                state.setGlow(v);
+                state.set("appearance.glow", v);
                 Logging.GUI.topic("appearance").trace("Glow: {}", v);
             })
             .build();
@@ -82,9 +73,9 @@ public class AppearanceSubPanel extends AbstractPanel {
         // G72: Emissive intensity
         emissiveSlider = LabeledSlider.builder("Emissive")
             .position(x, y).width(w)
-            .range(0f, 1f).initial(state.getEmissive()).format("%.2f")
+            .range(0f, 1f).initial(state.getFloat("appearance.emissive")).format("%.2f")
             .onChange(v -> {
-                state.setEmissive(v);
+                state.set("appearance.emissive", v);
                 Logging.GUI.topic("appearance").trace("Emissive: {}", v);
             })
             .build();
@@ -94,9 +85,9 @@ public class AppearanceSubPanel extends AbstractPanel {
         // G73: Saturation modifier
         saturationSlider = LabeledSlider.builder("Saturation")
             .position(x, y).width(w)
-            .range(-1f, 1f).initial(state.getSaturation()).format("%+.2f")
+            .range(-1f, 1f).initial(state.getFloat("appearance.saturation")).format("%+.2f")
             .onChange(v -> {
-                state.setSaturation(v);
+                state.set("appearance.saturation", v);
                 Logging.GUI.topic("appearance").trace("Saturation: {}", v);
             })
             .build();
@@ -105,21 +96,21 @@ public class AppearanceSubPanel extends AbstractPanel {
         
         // G74: Primary color
         int colorBtnWidth = (w - GuiConstants.PADDING) / 2;
-        primaryColorBtn = new ColorButton(x, y, colorBtnWidth, "Primary", state.getPrimaryColor(), color -> {
-            state.setPrimaryColor(color);
+        primaryColorBtn = new ColorButton(x, y, colorBtnWidth, "Primary", state.getInt("appearance.primaryColor"), color -> {
+            state.set("appearance.primaryColor", color);
             Logging.GUI.topic("appearance").debug("Primary color: #{}", Integer.toHexString(color));
         });
         widgets.add(primaryColorBtn);
         
         // G75: Secondary color
-        secondaryColorBtn = new ColorButton(x + colorBtnWidth + GuiConstants.PADDING, y, colorBtnWidth, "Secondary", state.getSecondaryColor(), color -> {
-            state.setSecondaryColor(color);
+        secondaryColorBtn = new ColorButton(x + colorBtnWidth + GuiConstants.PADDING, y, colorBtnWidth, "Secondary", state.getInt("appearance.secondaryColor"), color -> {
+            state.set("appearance.secondaryColor", color);
             Logging.GUI.topic("appearance").debug("Secondary color: #{}", Integer.toHexString(color));
         });
         widgets.add(secondaryColorBtn);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
-        section.setContentHeight(y - section.getContentY());
+        contentHeight = y - startY + GuiConstants.PADDING;
         
         Logging.GUI.topic("panel").debug("AppearanceSubPanel initialized");
     }
@@ -129,22 +120,19 @@ public class AppearanceSubPanel extends AbstractPanel {
     
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        section.render(context, net.minecraft.client.MinecraftClient.getInstance().textRenderer, mouseX, mouseY, delta);
-        
-        if (section.isExpanded()) {
-            for (var widget : widgets) {
-                widget.render(context, mouseX, mouseY, delta);
-            }
+        // Render widgets directly (no expandable section)
+        for (var widget : widgets) {
+            widget.render(context, mouseX, mouseY, delta);
         }
     }
     
     public int getHeight() {
-        return section.getTotalHeight();
+        return contentHeight;
     }
     
     public List<net.minecraft.client.gui.widget.ClickableWidget> getWidgets() {
         List<net.minecraft.client.gui.widget.ClickableWidget> all = new ArrayList<>();
-        all.add(section.getHeaderButton());
+        // No header button (direct content)
         all.addAll(widgets);
         return all;
     }

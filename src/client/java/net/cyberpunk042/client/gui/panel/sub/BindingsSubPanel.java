@@ -1,5 +1,8 @@
 package net.cyberpunk042.client.gui.panel.sub;
 
+import net.cyberpunk042.client.gui.panel.AbstractPanel;
+import net.minecraft.client.gui.screen.Screen;
+
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.GuiLayout;
@@ -37,8 +40,7 @@ import java.util.List;
  * @see BindingSources
  * @see net.cyberpunk042.field.influence.BindingConfig
  */
-public class BindingsSubPanel {
-    
+public class BindingsSubPanel extends AbstractPanel {
     // ═══════════════════════════════════════════════════════════════════════════
     // ENUMS - Property targets (what to bind TO)
     // ═══════════════════════════════════════════════════════════════════════════
@@ -73,12 +75,10 @@ public class BindingsSubPanel {
     // FIELDS
     // ═══════════════════════════════════════════════════════════════════════════
     
-    private final FieldEditState state;
-    private final List<ClickableWidget> widgets = new ArrayList<>();
-    private final GuiLayout layout;
+    private GuiLayout layout;
     
     // Available sources from BindingSources registry
-    private final List<String> availableSources;
+    private List<String> availableSources;
     
     // Current binding being edited
     private BindableProperty selectedProperty = BindableProperty.ALPHA;
@@ -98,6 +98,11 @@ public class BindingsSubPanel {
     private LabeledSlider outputMinSlider;
     private LabeledSlider outputMaxSlider;
     private ButtonWidget addBindingButton;
+    private ButtonWidget removeBindingButton;
+
+    // Binding list state
+    private int selectedBindingIndex = -1;
+    private static final int BINDING_ITEM_HEIGHT = 16;
     
     // ═══════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
@@ -111,10 +116,24 @@ public class BindingsSubPanel {
      * @param y Starting Y position
      * @param width Panel width
      */
-    public BindingsSubPanel(FieldEditState state, int x, int y, int width) {
-        this.state = state;
-        this.layout = new GuiLayout(x, y, GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING, width);
+    public BindingsSubPanel(Screen parent, FieldEditState state, int startY) {
+        super(parent, state);
+        this.startY = startY;
+    }
+    
+    private int startY;
+    
+    @Override
+    public void init(int width, int height) {
+        this.panelWidth = width;
+        this.panelHeight = height;
+        widgets.clear();
         
+        int x = net.cyberpunk042.client.gui.util.GuiConstants.PADDING;
+        int y = startY;
+        this.layout = new GuiLayout(x, y, net.cyberpunk042.client.gui.util.GuiConstants.WIDGET_HEIGHT + net.cyberpunk042.client.gui.util.GuiConstants.PADDING, width - net.cyberpunk042.client.gui.util.GuiConstants.PADDING * 2);
+        
+        // Original build logic...
         // Get sources from the REAL registry
         this.availableSources = new ArrayList<>(BindingSources.getAvailableIds());
         this.availableSources.sort(String::compareTo);
@@ -139,7 +158,7 @@ public class BindingsSubPanel {
             .initially(selectedProperty)
             .build(
                 layout.getStartX() + GuiConstants.PADDING,
-                layout.getStartY(),
+                layout.getY(),
                 halfWidth,
                 GuiConstants.ELEMENT_HEIGHT,
                 Text.literal("Property"),
@@ -158,7 +177,7 @@ public class BindingsSubPanel {
             .initially(selectedSource)
             .build(
                 layout.getStartX() + GuiConstants.PADDING + halfWidth + GuiConstants.ELEMENT_SPACING,
-                layout.getStartY(),
+                layout.getY(),
                 halfWidth,
                 GuiConstants.ELEMENT_HEIGHT,
                 Text.literal("Source"),
@@ -178,7 +197,7 @@ public class BindingsSubPanel {
             .initially(selectedCurve)
             .build(
                 layout.getStartX() + GuiConstants.PADDING,
-                layout.getStartY(),
+                layout.getY(),
                 controlWidth,
                 GuiConstants.ELEMENT_HEIGHT,
                 Text.literal("Curve"),
@@ -192,7 +211,7 @@ public class BindingsSubPanel {
         // ─────────────────────────────────────────────────────────────────────────
         inputMinSlider = new LabeledSlider(
             layout.getStartX() + GuiConstants.PADDING,
-            layout.getStartY(),
+            layout.getY(),
             halfWidth,
             "In Min",
             0f, 100f, // Will be updated based on source
@@ -204,7 +223,7 @@ public class BindingsSubPanel {
         
         inputMaxSlider = new LabeledSlider(
             layout.getStartX() + GuiConstants.PADDING + halfWidth + GuiConstants.ELEMENT_SPACING,
-            layout.getStartY(),
+            layout.getY(),
             halfWidth,
             "In Max",
             0f, 100f,
@@ -220,7 +239,7 @@ public class BindingsSubPanel {
         // ─────────────────────────────────────────────────────────────────────────
         outputMinSlider = new LabeledSlider(
             layout.getStartX() + GuiConstants.PADDING,
-            layout.getStartY(),
+            layout.getY(),
             halfWidth,
             "Out Min",
             selectedProperty.minValue, selectedProperty.maxValue,
@@ -232,7 +251,7 @@ public class BindingsSubPanel {
         
         outputMaxSlider = new LabeledSlider(
             layout.getStartX() + GuiConstants.PADDING + halfWidth + GuiConstants.ELEMENT_SPACING,
-            layout.getStartY(),
+            layout.getY(),
             halfWidth,
             "Out Max",
             selectedProperty.minValue, selectedProperty.maxValue,
@@ -244,22 +263,86 @@ public class BindingsSubPanel {
         layout.nextRow();
         
         // ─────────────────────────────────────────────────────────────────────────
-        // Add Binding Button
+        // Add/Remove Binding Buttons
         // ─────────────────────────────────────────────────────────────────────────
-        addBindingButton = ButtonWidget.builder(Text.literal("+ Add Binding"), button -> {
+        addBindingButton = ButtonWidget.builder(Text.literal("+ Add"), button -> {
             addCurrentBinding();
+            selectedBindingIndex = state.getBindings().size() - 1;
         }).dimensions(
             layout.getStartX() + GuiConstants.PADDING,
-            layout.getStartY(),
-            controlWidth,
+            layout.getY(),
+            halfWidth,
             GuiConstants.ELEMENT_HEIGHT
         ).build();
         widgets.add(addBindingButton);
+
+        removeBindingButton = ButtonWidget.builder(Text.literal("- Remove"), button -> {
+            removeSelectedBinding();
+        }).dimensions(
+            layout.getStartX() + GuiConstants.PADDING + halfWidth + GuiConstants.ELEMENT_SPACING,
+            layout.getY(),
+            halfWidth,
+            GuiConstants.ELEMENT_HEIGHT
+        ).build();
+        widgets.add(removeBindingButton);
         layout.nextRow();
-        
+
         // Initialize ranges
         updateInputSliderRanges();
         updateOutputSliderRanges();
+        updateRemoveButtonState();
+    }
+
+    /**
+     * Removes the currently selected binding.
+     */
+    private void removeSelectedBinding() {
+        var bindings = state.getBindings();
+        if (selectedBindingIndex >= 0 && selectedBindingIndex < bindings.size()) {
+            String property = bindings.get(selectedBindingIndex).property();
+            state.removeBinding(property);
+            selectedBindingIndex = Math.min(selectedBindingIndex, state.getBindings().size() - 1);
+            updateRemoveButtonState();
+        }
+    }
+
+    /**
+     * Updates remove button state based on selection.
+     */
+    private void updateRemoveButtonState() {
+        if (removeBindingButton != null) {
+            removeBindingButton.active = selectedBindingIndex >= 0 && selectedBindingIndex < state.getBindings().size();
+        }
+    }
+
+    /**
+     * Loads the selected binding into the form for editing.
+     */
+    private void loadBindingToForm(net.cyberpunk042.field.influence.BindingConfig binding) {
+        // Find matching property enum
+        for (BindableProperty prop : BindableProperty.values()) {
+            if (prop.getPath().equals(binding.property())) {
+                selectedProperty = prop;
+                if (propertyButton != null) propertyButton.setValue(prop);
+                break;
+            }
+        }
+
+        // Set source
+        selectedSource = binding.source();
+        if (sourceButton != null && availableSources.contains(selectedSource)) {
+            sourceButton.setValue(selectedSource);
+        }
+
+        // Set curve
+        selectedCurve = binding.curve();
+        if (curveButton != null) curveButton.setValue(selectedCurve);
+
+        // Set ranges
+        inputMin = binding.inputMin();
+        inputMax = binding.inputMax();
+        outputMin = binding.outputMin();
+        outputMax = binding.outputMax();
     }
     
     /**
@@ -314,13 +397,14 @@ public class BindingsSubPanel {
      * Adds the currently configured binding to the state.
      */
     private void addCurrentBinding() {
-        // Store binding in FieldEditState
-        state.addBinding(
-            selectedProperty.getPath(),
-            selectedSource,
-            inputMin, inputMax,
-            outputMin, outputMax,
-            selectedCurve.name()
+        // Store binding in FieldEditState using BindingConfig
+        state.addBinding(net.cyberpunk042.field.influence.BindingConfig.builder()
+            .property(selectedProperty.getPath())
+            .source(selectedSource)
+            .inputRange(inputMin, inputMax)
+            .outputRange(outputMin, outputMax)
+            .curve(selectedCurve)
+            .build()
         );
         
         net.cyberpunk042.log.Logging.GUI.topic("bindings").info(
@@ -345,23 +429,90 @@ public class BindingsSubPanel {
     /** Renders the sub-panel. */
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         var textRenderer = MinecraftClient.getInstance().textRenderer;
-        
+
         // Section header
-        context.drawText(textRenderer, "§e§lProperty Bindings", 
-            layout.getStartX() + GuiConstants.PADDING, 
-            layout.getStartY() - 14, 
-            GuiConstants.TEXT_PRIMARY, false);
-        
-        // Source count info
-        context.drawText(textRenderer, 
-            "§7" + availableSources.size() + " sources available",
+        context.drawText(textRenderer, "§e§lProperty Bindings",
             layout.getStartX() + GuiConstants.PADDING,
-            layout.getStartY() + getHeight() + 4,
-            GuiConstants.TEXT_SECONDARY, false);
+            layout.getY() - 14,
+            GuiConstants.TEXT_PRIMARY, false);
+
+        // Render existing bindings list
+        int listY = layout.getCurrentY() + 4;
+        int listX = layout.getStartX() + GuiConstants.PADDING;
+        int listWidth = layout.getPanelWidth() - GuiConstants.PADDING * 2;
+
+        var bindings = state.getBindings();
+        if (bindings.isEmpty()) {
+            context.drawText(textRenderer, "§7No bindings configured",
+                listX, listY, GuiConstants.TEXT_SECONDARY, false);
+        } else {
+            context.drawText(textRenderer, "§7Active Bindings (" + bindings.size() + "):",
+                listX, listY, GuiConstants.TEXT_SECONDARY, false);
+            listY += 12;
+
+            for (int i = 0; i < bindings.size(); i++) {
+                var binding = bindings.get(i);
+                boolean selected = i == selectedBindingIndex;
+                boolean hovered = mouseX >= listX && mouseX < listX + listWidth &&
+                                  mouseY >= listY && mouseY < listY + BINDING_ITEM_HEIGHT;
+
+                // Background for selected/hovered
+                if (selected) {
+                    context.fill(listX - 2, listY - 1, listX + listWidth, listY + BINDING_ITEM_HEIGHT - 1, 0x40FFFFFF);
+                } else if (hovered) {
+                    context.fill(listX - 2, listY - 1, listX + listWidth, listY + BINDING_ITEM_HEIGHT - 1, 0x20FFFFFF);
+                }
+
+                // Binding text: "property ← source (curve)"
+                String bindingText = String.format("%s ← %s (%s)",
+                    binding.property(),
+                    formatSourceName(binding.source()),
+                    binding.curve().name().toLowerCase()
+                );
+                int color = selected ? 0xFFFFFF : (hovered ? 0xCCCCCC : 0xAAAAAA);
+                context.drawText(textRenderer, bindingText, listX, listY + 2, color, false);
+
+                listY += BINDING_ITEM_HEIGHT;
+            }
+        }
+    }
+
+    /**
+     * Handle mouse clicks on binding list.
+     */
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button != 0) return false;
+
+        int listY = layout.getCurrentY() + 4 + 12; // After header
+        int listX = layout.getStartX() + GuiConstants.PADDING;
+        int listWidth = layout.getPanelWidth() - GuiConstants.PADDING * 2;
+
+        var bindings = state.getBindings();
+        for (int i = 0; i < bindings.size(); i++) {
+            int itemY = listY + i * BINDING_ITEM_HEIGHT;
+            if (mouseX >= listX && mouseX < listX + listWidth &&
+                mouseY >= itemY && mouseY < itemY + BINDING_ITEM_HEIGHT) {
+
+                selectedBindingIndex = i;
+                loadBindingToForm(bindings.get(i));
+                updateRemoveButtonState();
+                return true;
+            }
+        }
+        return false;
     }
     
     /** Returns the total height of this sub-panel. */
     public int getHeight() {
-        return layout.getCurrentY() - layout.getStartY();
+        int baseHeight = layout.getCurrentY() - layout.getY();
+        // Add space for binding list
+        int bindingListHeight = 16 + state.getBindings().size() * BINDING_ITEM_HEIGHT;
+        return baseHeight + bindingListHeight;
     }
+
+    @Override
+    public void tick() {
+        // No per-tick updates needed
+    }
+
 }

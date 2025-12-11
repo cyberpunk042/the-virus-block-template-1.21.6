@@ -5,9 +5,10 @@ import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.GuiWidgets;
 import net.cyberpunk042.client.gui.util.FragmentRegistry;
-import net.cyberpunk042.client.gui.widget.ExpandableSection;
 import net.cyberpunk042.client.gui.widget.LabeledSlider;
 import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.visual.shape.PolyType;
+import net.cyberpunk042.visual.shape.SphereAlgorithm;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
@@ -30,21 +31,24 @@ import java.util.List;
  */
 public class ShapeSubPanel extends AbstractPanel {
     
-    private ExpandableSection section;
+    private static final int TITLE_HEIGHT = 16;  // Compact title bar
     private int startY;
     
-    // Common shape widgets (rebuilt per shape type)
-    private final List<net.minecraft.client.gui.widget.ClickableWidget> shapeWidgets = new ArrayList<>();
+    // Shape widgets are stored in inherited 'widgets' list from AbstractPanel
     
     // Current shape state
     private String currentShapeType = "";
-    private String perfHint = null;
-    private int perfColor = GuiConstants.TEXT_SECONDARY;
+    
+    // Warning callback - called when performance hint changes
+    private java.util.function.BiConsumer<String, Integer> warningCallback;
+    // Shape change callback - called when shape type changes and widgets are rebuilt
+    private Runnable shapeChangedCallback;
     private CyclingButtonWidget<String> fragmentDropdown;
     private boolean applyingFragment = false;
     private String currentFragment = "Default";
     
     // G63-G64: Sphere controls
+    private LabeledSlider sphereRadius;
     private LabeledSlider sphereLatSteps;
     private LabeledSlider sphereLonSteps;
     private LabeledSlider sphereLatStart;
@@ -89,6 +93,7 @@ public class ShapeSubPanel extends AbstractPanel {
     private LabeledSlider cylinderHeightSegments;
     private net.minecraft.client.gui.widget.CheckboxWidget cylinderCapTop;
     private net.minecraft.client.gui.widget.CheckboxWidget cylinderCapBottom;
+    // open-ended is derived: capTop=false && capBottom=false
     private net.minecraft.client.gui.widget.CheckboxWidget cylinderOpenEnded;
     
     // G70: Polyhedron controls
@@ -96,27 +101,39 @@ public class ShapeSubPanel extends AbstractPanel {
     private LabeledSlider polyRadius;
     private LabeledSlider polySubdivisions;
     
-    /** Sphere tessellation algorithms. */
-    public enum SphereAlgorithm {
-        LAT_LON("Lat/Lon"),
-        UV_SPHERE("UV Sphere"),
-        ICO_SPHERE("Icosphere");
-        
-        private final String label;
-        SphereAlgorithm(String label) { this.label = label; }
-        @Override public String toString() { return label; }
-    }
+    // Shape type selector
+    private CyclingButtonWidget<ShapeKind> shapeTypeDropdown;
     
-    /** Polyhedron base types. */
-    public enum PolyType {
-        CUBE("Cube"),
-        OCTAHEDRON("Octahedron"),
-        ICOSAHEDRON("Icosahedron"),
-        DODECAHEDRON("Dodecahedron");
+    /**
+     * Available shape types for the field primitive.
+     */
+    public enum ShapeKind {
+        SPHERE("sphere", "Sphere"),
+        RING("ring", "Ring"),
+        DISC("disc", "Disc"),
+        PRISM("prism", "Prism"),
+        CYLINDER("cylinder", "Cylinder"),
+        CUBE("cube", "Cube"),
+        OCTAHEDRON("octahedron", "Octahedron"),
+        ICOSAHEDRON("icosahedron", "Icosahedron");
         
+        private final String id;
         private final String label;
-        PolyType(String label) { this.label = label; }
+        
+        ShapeKind(String id, String label) {
+            this.id = id;
+            this.label = label;
+        }
+        
+        public String getId() { return id; }
         @Override public String toString() { return label; }
+        
+        public static ShapeKind fromId(String id) {
+            for (ShapeKind k : values()) {
+                if (k.id.equalsIgnoreCase(id)) return k;
+            }
+            return SPHERE;  // Default
+        }
     }
     
     public ShapeSubPanel(Screen parent, FieldEditState state, int startY) {
@@ -125,29 +142,42 @@ public class ShapeSubPanel extends AbstractPanel {
         Logging.GUI.topic("panel").debug("ShapeSubPanel created");
     }
     
+    /**
+     * Sets a callback for when the performance warning changes.
+     * Callback receives (warningText, color) or (null, 0) to clear.
+     */
+    public void setWarningCallback(java.util.function.BiConsumer<String, Integer> callback) {
+        this.warningCallback = callback;
+    }
+    
+    /**
+     * Sets a callback for when the shape type changes and widgets are rebuilt.
+     * The screen should use this to re-register widgets.
+     */
+    public void setShapeChangedCallback(Runnable callback) {
+        this.shapeChangedCallback = callback;
+    }
+    
     @Override
     public void init(int width, int height) {
         this.panelWidth = width;
         this.panelHeight = height;
         
-        // Expandable section header
-        section = new ExpandableSection(
-            GuiConstants.PADDING, startY, 
-            width - GuiConstants.PADDING * 2,
-            "Shape Parameters", true // Start expanded
-        );
-        
         rebuildForCurrentShape();
         
-        Logging.GUI.topic("panel").debug("ShapeSubPanel initialized for shape: {}", state.getShapeType());
+        Logging.GUI.topic("panel").debug("ShapeSubPanel initialized for shape: {}", state.getString("shapeType"));
     }
     
     /**
      * Rebuilds controls for the current shape type.
      */
     public void rebuildForCurrentShape() {
-        shapeWidgets.clear();
-        String shapeType = state.getShapeType();
+        // Remember if we need to reapply bounds offset after rebuild
+        boolean needsOffset = bounds != null && !bounds.isEmpty();
+        
+        widgets.clear();
+        
+        String shapeType = state.getString("shapeType");
         
         if (!shapeType.equals(currentShapeType)) {
             currentShapeType = shapeType;
@@ -155,24 +185,38 @@ public class ShapeSubPanel extends AbstractPanel {
         }
         
         int x = GuiConstants.PADDING;
-        int y = section.getContentY();
+        int y = startY + TITLE_HEIGHT;  // Start after title bar
         int w = panelWidth - GuiConstants.PADDING * 2;
+        int halfW = (w - GuiConstants.PADDING) / 2;
 
-        // Preset dropdown for this shape
+        // Shape TYPE selector (left half)
+        ShapeKind currentKind = ShapeKind.fromId(shapeType);
+        shapeTypeDropdown = CyclingButtonWidget.<ShapeKind>builder(k -> net.minecraft.text.Text.literal(k.toString()))
+            .values(ShapeKind.values())
+            .initially(currentKind)
+            .build(x, y, halfW, GuiConstants.COMPACT_HEIGHT, net.minecraft.text.Text.literal("Shape"),
+                (btn, val) -> {
+                    state.set("shapeType", val.getId());
+                    rebuildForCurrentShape();  // Rebuild with new shape type
+                    // Notify screen to re-register widgets
+                    if (shapeChangedCallback != null) {
+                        shapeChangedCallback.run();
+                    }
+                });
+        widgets.add(shapeTypeDropdown);
+
+        // Preset dropdown for this shape (right half)
         List<String> presets = FragmentRegistry.listShapeFragments(shapeType);
         if (!presets.contains(currentFragment)) {
             currentFragment = presets.contains("Default") ? "Default" : presets.get(0);
         }
-        fragmentDropdown = CyclingButtonWidget.<String>builder(net.minecraft.text.Text::literal)
+        fragmentDropdown = CyclingButtonWidget.<String>builder(v -> net.minecraft.text.Text.literal(v))
             .values(presets)
             .initially(currentFragment)
-            .build(
-                x, y, w, GuiConstants.WIDGET_HEIGHT,
-                net.minecraft.text.Text.literal("Preset"),
-                (btn, val) -> applyPreset(val)
-            );
-        shapeWidgets.add(fragmentDropdown);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .build(x + halfW + GuiConstants.PADDING, y, halfW, GuiConstants.COMPACT_HEIGHT, net.minecraft.text.Text.literal("Variant"),
+                (btn, val) -> applyPreset(val));
+        widgets.add(fragmentDropdown);
+        y += GuiConstants.COMPACT_HEIGHT + GuiConstants.COMPACT_GAP;
         
         switch (shapeType.toLowerCase()) {
             case "sphere" -> buildSphereControls(x, y, w);
@@ -184,11 +228,18 @@ public class ShapeSubPanel extends AbstractPanel {
             default -> Logging.GUI.topic("panel").warn("Unknown shape type: {}", shapeType);
         }
         
-        // Update section content height
-        int controlsHeight = shapeWidgets.size() * (GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING);
-        section.setContentHeight(controlsHeight);
+        // Track content height based on final y
+        contentHeight = y - startY;
         
-        Logging.GUI.topic("panel").debug("Built {} controls for shape: {}", shapeWidgets.size(), shapeType);
+        // Compute and send warning to callback
+        computePerformanceHint();
+        
+        // If bounds are already set (rebuild scenario), reapply offset to position widgets correctly
+        if (needsOffset) {
+            applyBoundsOffset();
+        }
+        
+        Logging.GUI.topic("panel").debug("Built {} controls for shape: {}", widgets.size(), shapeType);
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -196,42 +247,51 @@ public class ShapeSubPanel extends AbstractPanel {
     // ═══════════════════════════════════════════════════════════════════════════
     
     private void buildSphereControls(int x, int y, int w) {
-        sphereLatSteps = LabeledSlider.builder("Lat Steps")
-            .position(x, y).width(w).range(4, 256).initial(state.getSphereLatSteps()).format("%d").step(1)
-            .onChange(v -> onUserChange(() -> state.setSphereLatSteps(Math.round(v))))
+        int step = GuiConstants.COMPACT_HEIGHT + GuiConstants.COMPACT_GAP;
+        
+        sphereRadius = LabeledSlider.builder("Radius")
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(0.1f, 20.0f).initial(state.getFloat("sphere.radius")).format("%.2f")
+            .onChange(v -> onUserChange(() -> state.set("sphere.radius", v)))
             .build();
-        shapeWidgets.add(sphereLatSteps);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        widgets.add(sphereRadius);
+        y += step;
+        
+        sphereLatSteps = LabeledSlider.builder("Lat Steps")
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(4, 256).initial(state.getInt("sphere.latSteps")).format("%d").step(1)
+            .onChange(v -> onUserChange(() -> state.set("sphere.latSteps", Math.round(v))))
+            .build();
+        widgets.add(sphereLatSteps);
+        y += step;
         
         sphereLonSteps = LabeledSlider.builder("Lon Steps")
-            .position(x, y).width(w).range(4, 256).initial(state.getSphereLonSteps()).format("%d").step(1)
-            .onChange(v -> onUserChange(() -> state.setSphereLonSteps(Math.round(v))))
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(4, 256).initial(state.getInt("sphere.lonSteps")).format("%d").step(1)
+            .onChange(v -> onUserChange(() -> state.set("sphere.lonSteps", Math.round(v))))
             .build();
-        shapeWidgets.add(sphereLonSteps);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        widgets.add(sphereLonSteps);
+        y += step;
         
         sphereLatStart = LabeledSlider.builder("Lat Start")
-            .position(x, y).width(w).range(0f, 1f).initial(state.getSphereLatStart()).format("%.2f")
-            .onChange(v -> onUserChange(() -> state.setSphereLatStart(v)))
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(0f, 1f).initial(state.getFloat("sphere.latStart")).format("%.2f")
+            .onChange(v -> onUserChange(() -> state.set("sphere.latStart", v)))
             .build();
-        shapeWidgets.add(sphereLatStart);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        widgets.add(sphereLatStart);
+        y += step;
         
         sphereLatEnd = LabeledSlider.builder("Lat End")
-            .position(x, y).width(w).range(0f, 1f).initial(state.getSphereLatEnd()).format("%.2f")
-            .onChange(v -> onUserChange(() -> state.setSphereLatEnd(v)))
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(0f, 1f).initial(state.getFloat("sphere.latEnd")).format("%.2f")
+            .onChange(v -> onUserChange(() -> state.set("sphere.latEnd", v)))
             .build();
-        shapeWidgets.add(sphereLatEnd);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        widgets.add(sphereLatEnd);
+        y += step;
         
         sphereAlgorithm = GuiWidgets.enumDropdown(
-            x, y, w, "Algorithm", SphereAlgorithm.class, SphereAlgorithm.LAT_LON,
-            "Tessellation algorithm", v -> onUserChange(() -> state.setSphereAlgorithm(v.name()))
+            x, y, w, GuiConstants.COMPACT_HEIGHT, "Algo", SphereAlgorithm.class, SphereAlgorithm.LAT_LON,
+            "Tessellation algorithm", v -> onUserChange(() -> state.set("sphere.algorithm", v))
         );
         try {
-            sphereAlgorithm.setValue(SphereAlgorithm.valueOf(state.getSphereAlgorithm()));
+            sphereAlgorithm.setValue(SphereAlgorithm.valueOf(state.getString("sphere.algorithm")));
         } catch (IllegalArgumentException ignored) {}
-        shapeWidgets.add(sphereAlgorithm);
+        widgets.add(sphereAlgorithm);
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -239,52 +299,54 @@ public class ShapeSubPanel extends AbstractPanel {
     // ═══════════════════════════════════════════════════════════════════════════
     
     private void buildRingControls(int x, int y, int w) {
-        ringInnerRadius = LabeledSlider.builder("Inner Radius")
-            .position(x, y).width(w).range(0.0f, 10.0f).initial(state.getRingInnerRadius()).format("%.2f")
-            .onChange(v -> onUserChange(() -> state.setRingInnerRadius(v))).build();
-        shapeWidgets.add(ringInnerRadius);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        int step = GuiConstants.COMPACT_HEIGHT + GuiConstants.COMPACT_GAP;
         
-        ringOuterRadius = LabeledSlider.builder("Outer Radius")
-            .position(x, y).width(w).range(0.0f, 20.0f).initial(state.getRingOuterRadius()).format("%.2f")
-            .onChange(v -> onUserChange(() -> state.setRingOuterRadius(v))).build();
-        shapeWidgets.add(ringOuterRadius);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        ringInnerRadius = LabeledSlider.builder("Inner R")
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(0.0f, 10.0f).initial(state.getFloat("ring.innerRadius")).format("%.2f")
+            .onChange(v -> onUserChange(() -> state.set("ring.innerRadius", v))).build();
+        widgets.add(ringInnerRadius);
+        y += step;
+        
+        ringOuterRadius = LabeledSlider.builder("Outer R")
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(0.0f, 20.0f).initial(state.getFloat("ring.outerRadius")).format("%.2f")
+            .onChange(v -> onUserChange(() -> state.set("ring.outerRadius", v))).build();
+        widgets.add(ringOuterRadius);
+        y += step;
         
         ringSegments = LabeledSlider.builder("Segments")
-            .position(x, y).width(w).range(3, 512).initial(state.getRingSegments()).format("%d").step(1)
-            .onChange(v -> onUserChange(() -> state.setRingSegments(Math.round(v)))).build();
-        shapeWidgets.add(ringSegments);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(3, 512).initial(state.getInt("ring.segments")).format("%d").step(1)
+            .onChange(v -> onUserChange(() -> state.set("ring.segments", Math.round(v)))).build();
+        widgets.add(ringSegments);
+        y += step;
         
-        ringHeight = LabeledSlider.builder("Height (3D)")
-            .position(x, y).width(w).range(0f, 10f).initial(state.getRingHeight()).format("%.2f")
-            .onChange(v -> onUserChange(() -> state.setRingHeight(v))).build();
-        shapeWidgets.add(ringHeight);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        ringHeight = LabeledSlider.builder("Height")
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(0f, 10f).initial(state.getFloat("ring.height")).format("%.2f")
+            .onChange(v -> onUserChange(() -> state.set("ring.height", v))).build();
+        widgets.add(ringHeight);
+        y += step;
         
-        ringY = LabeledSlider.builder("Y Position")
-            .position(x, y).width(w).range(-5f, 5f).initial(state.getRingY()).format("%.2f")
-            .onChange(v -> onUserChange(() -> state.setRingY(v))).build();
-        shapeWidgets.add(ringY);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        ringY = LabeledSlider.builder("Y Pos")
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(-5f, 5f).initial(state.getFloat("ring.y")).format("%.2f")
+            .onChange(v -> onUserChange(() -> state.set("ring.y", v))).build();
+        widgets.add(ringY);
+        y += step;
         
         ringArcStart = LabeledSlider.builder("Arc Start")
-            .position(x, y).width(w).range(0f, 360f).initial(state.getRingArcStart()).format("%.0f°")
-            .onChange(v -> onUserChange(() -> state.setRingArcStart(v))).build();
-        shapeWidgets.add(ringArcStart);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(0f, 360f).initial(state.getFloat("ring.arcStart")).format("%.0f°")
+            .onChange(v -> onUserChange(() -> state.set("ring.arcStart", v))).build();
+        widgets.add(ringArcStart);
+        y += step;
         
         ringArcEnd = LabeledSlider.builder("Arc End")
-            .position(x, y).width(w).range(0f, 360f).initial(state.getRingArcEnd()).format("%.0f°")
-            .onChange(v -> onUserChange(() -> state.setRingArcEnd(v))).build();
-        shapeWidgets.add(ringArcEnd);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(0f, 360f).initial(state.getFloat("ring.arcEnd")).format("%.0f°")
+            .onChange(v -> onUserChange(() -> state.set("ring.arcEnd", v))).build();
+        widgets.add(ringArcEnd);
+        y += step;
         
         ringTwist = LabeledSlider.builder("Twist")
-            .position(x, y).width(w).range(-360f, 360f).initial(state.getRingTwist()).format("%.0f°")
-            .onChange(v -> onUserChange(() -> state.setRingTwist(v))).build();
-        shapeWidgets.add(ringTwist);
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(-360f, 360f).initial(state.getFloat("ring.twist")).format("%.0f°")
+            .onChange(v -> onUserChange(() -> state.set("ring.twist", v))).build();
+        widgets.add(ringTwist);
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -292,46 +354,48 @@ public class ShapeSubPanel extends AbstractPanel {
     // ═══════════════════════════════════════════════════════════════════════════
     
     private void buildDiscControls(int x, int y, int w) {
+        int step = GuiConstants.COMPACT_HEIGHT + GuiConstants.COMPACT_GAP;
+
         discRadius = LabeledSlider.builder("Radius")
-            .position(x, y).width(w).range(0.0f, 20.0f).initial(state.getDiscRadius()).format("%.2f")
-            .onChange(v -> onUserChange(() -> state.setDiscRadius(v))).build();
-        shapeWidgets.add(discRadius);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(0.0f, 20.0f).initial(state.getFloat("disc.radius")).format("%.2f")
+            .onChange(v -> onUserChange(() -> state.set("disc.radius", v))).build();
+        widgets.add(discRadius);
+        y += step;
         
         discSegments = LabeledSlider.builder("Segments")
-            .position(x, y).width(w).range(3, 512).initial(state.getDiscSegments()).format("%d").step(1)
-            .onChange(v -> onUserChange(() -> state.setDiscSegments(Math.round(v)))).build();
-        shapeWidgets.add(discSegments);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(3, 512).initial(state.getInt("disc.segments")).format("%d").step(1)
+            .onChange(v -> onUserChange(() -> state.set("disc.segments", Math.round(v)))).build();
+        widgets.add(discSegments);
+        y += step;
         
         discY = LabeledSlider.builder("Y Position")
-            .position(x, y).width(w).range(-5f, 5f).initial(state.getDiscY()).format("%.2f")
-            .onChange(v -> onUserChange(() -> state.setDiscY(v))).build();
-        shapeWidgets.add(discY);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(-5f, 5f).initial(state.getFloat("disc.y")).format("%.2f")
+            .onChange(v -> onUserChange(() -> state.set("disc.y", v))).build();
+        widgets.add(discY);
+        y += step;
         
         discInnerRadius = LabeledSlider.builder("Inner Radius")
-            .position(x, y).width(w).range(0f, 10f).initial(state.getDiscInnerRadius()).format("%.2f")
-            .onChange(v -> onUserChange(() -> state.setDiscInnerRadius(v))).build();
-        shapeWidgets.add(discInnerRadius);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(0f, 10f).initial(state.getFloat("disc.innerRadius")).format("%.2f")
+            .onChange(v -> onUserChange(() -> state.set("disc.innerRadius", v))).build();
+        widgets.add(discInnerRadius);
+        y += step;
         
         discArcStart = LabeledSlider.builder("Arc Start")
-            .position(x, y).width(w).range(0f, 360f).initial(state.getDiscArcStart()).format("%.0f°")
-            .onChange(v -> onUserChange(() -> state.setDiscArcStart(v))).build();
-        shapeWidgets.add(discArcStart);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(0f, 360f).initial(state.getFloat("disc.arcStart")).format("%.0f°")
+            .onChange(v -> onUserChange(() -> state.set("disc.arcStart", v))).build();
+        widgets.add(discArcStart);
+        y += step;
         
         discArcEnd = LabeledSlider.builder("Arc End")
-            .position(x, y).width(w).range(0f, 360f).initial(state.getDiscArcEnd()).format("%.0f°")
-            .onChange(v -> onUserChange(() -> state.setDiscArcEnd(v))).build();
-        shapeWidgets.add(discArcEnd);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(0f, 360f).initial(state.getFloat("disc.arcEnd")).format("%.0f°")
+            .onChange(v -> onUserChange(() -> state.set("disc.arcEnd", v))).build();
+        widgets.add(discArcEnd);
+        y += step;
         
         discRings = LabeledSlider.builder("Rings")
-            .position(x, y).width(w).range(1, 100).initial(state.getDiscRings()).format("%d").step(1)
-            .onChange(v -> onUserChange(() -> state.setDiscRings(Math.round(v)))).build();
-        shapeWidgets.add(discRings);
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(1, 100).initial(state.getInt("disc.rings")).format("%d").step(1)
+            .onChange(v -> onUserChange(() -> state.set("disc.rings", Math.round(v)))).build();
+        widgets.add(discRings);
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -339,52 +403,54 @@ public class ShapeSubPanel extends AbstractPanel {
     // ═══════════════════════════════════════════════════════════════════════════
     
     private void buildPrismControls(int x, int y, int w) {
+        int step = GuiConstants.COMPACT_HEIGHT + GuiConstants.COMPACT_GAP;
+
         prismSides = LabeledSlider.builder("Sides")
-            .position(x, y).width(w).range(3, 64).initial(state.getPrismSides()).format("%d").step(1)
-            .onChange(v -> onUserChange(() -> state.setPrismSides(Math.round(v)))).build();
-        shapeWidgets.add(prismSides);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(3, 64).initial(state.getInt("prism.sides")).format("%d").step(1)
+            .onChange(v -> onUserChange(() -> state.set("prism.sides", Math.round(v)))).build();
+        widgets.add(prismSides);
+        y += step;
         
         prismRadius = LabeledSlider.builder("Radius")
-            .position(x, y).width(w).range(0.1f, 20.0f).initial(state.getPrismRadius()).format("%.2f")
-            .onChange(v -> onUserChange(() -> state.setPrismRadius(v))).build();
-        shapeWidgets.add(prismRadius);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(0.1f, 20.0f).initial(state.getFloat("prism.radius")).format("%.2f")
+            .onChange(v -> onUserChange(() -> state.set("prism.radius", v))).build();
+        widgets.add(prismRadius);
+        y += step;
         
         prismHeight = LabeledSlider.builder("Height")
-            .position(x, y).width(w).range(0.1f, 20.0f).initial(state.getPrismHeight()).format("%.2f")
-            .onChange(v -> onUserChange(() -> state.setPrismHeight(v))).build();
-        shapeWidgets.add(prismHeight);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(0.1f, 20.0f).initial(state.getFloat("prism.height")).format("%.2f")
+            .onChange(v -> onUserChange(() -> state.set("prism.height", v))).build();
+        widgets.add(prismHeight);
+        y += step;
         
         prismTopRadius = LabeledSlider.builder("Top Radius")
-            .position(x, y).width(w).range(0.0f, 20.0f).initial(state.getPrismTopRadius()).format("%.2f")
-            .onChange(v -> onUserChange(() -> state.setPrismTopRadius(v))).build();
-        shapeWidgets.add(prismTopRadius);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(0.0f, 20.0f).initial(state.getFloat("prism.topRadius")).format("%.2f")
+            .onChange(v -> onUserChange(() -> state.set("prism.topRadius", v))).build();
+        widgets.add(prismTopRadius);
+        y += step;
         
         prismTwist = LabeledSlider.builder("Twist")
-            .position(x, y).width(w).range(-360f, 360f).initial(state.getPrismTwist()).format("%.0f°")
-            .onChange(v -> onUserChange(() -> state.setPrismTwist(v))).build();
-        shapeWidgets.add(prismTwist);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(-360f, 360f).initial(state.getFloat("prism.twist")).format("%.0f°")
+            .onChange(v -> onUserChange(() -> state.set("prism.twist", v))).build();
+        widgets.add(prismTwist);
+        y += step;
         
         prismHeightSegments = LabeledSlider.builder("Height Segs")
-            .position(x, y).width(w).range(1, 100).initial(state.getPrismHeightSegments()).format("%d").step(1)
-            .onChange(v -> onUserChange(() -> state.setPrismHeightSegments(Math.round(v)))).build();
-        shapeWidgets.add(prismHeightSegments);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(1, 100).initial(state.getInt("prism.heightSegments")).format("%d").step(1)
+            .onChange(v -> onUserChange(() -> state.set("prism.heightSegments", Math.round(v)))).build();
+        widgets.add(prismHeightSegments);
+        y += step;
         
         int halfW = (w - GuiConstants.PADDING) / 2;
         var textRenderer = net.minecraft.client.MinecraftClient.getInstance().textRenderer;
         
-        prismCapTop = GuiWidgets.checkbox(x, y, "Cap Top", state.isPrismCapTop(), "Render top cap",
-            textRenderer, v -> onUserChange(() -> state.setPrismCapTop(v)));
-        shapeWidgets.add(prismCapTop);
+        prismCapTop = GuiWidgets.checkbox(x, y, "Cap Top", state.getBool("prism.capTop"), "Render top cap",
+            textRenderer, v -> onUserChange(() -> state.set("prism.capTop", v)));
+        widgets.add(prismCapTop);
         
-        prismCapBottom = GuiWidgets.checkbox(x + halfW + GuiConstants.PADDING, y, "Cap Bottom", state.isPrismCapBottom(), "Render bottom cap",
-            textRenderer, v -> onUserChange(() -> state.setPrismCapBottom(v)));
-        shapeWidgets.add(prismCapBottom);
+        prismCapBottom = GuiWidgets.checkbox(x + halfW + GuiConstants.PADDING, y, "Cap Bottom", state.getBool("prism.capBottom"), "Render bottom cap",
+            textRenderer, v -> onUserChange(() -> state.set("prism.capBottom", v)));
+        widgets.add(prismCapBottom);
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -392,57 +458,69 @@ public class ShapeSubPanel extends AbstractPanel {
     // ═══════════════════════════════════════════════════════════════════════════
     
     private void buildCylinderControls(int x, int y, int w) {
+        int step = GuiConstants.COMPACT_HEIGHT + GuiConstants.COMPACT_GAP;
+
         cylinderRadius = LabeledSlider.builder("Radius")
-            .position(x, y).width(w).range(0.1f, 20.0f).initial(state.getCylinderRadius()).format("%.2f")
-            .onChange(v -> onUserChange(() -> state.setCylinderRadius(v))).build();
-        shapeWidgets.add(cylinderRadius);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(0.1f, 20.0f).initial(state.getFloat("cylinder.radius")).format("%.2f")
+            .onChange(v -> onUserChange(() -> state.set("cylinder.radius", v))).build();
+        widgets.add(cylinderRadius);
+        y += step;
         
         cylinderHeight = LabeledSlider.builder("Height")
-            .position(x, y).width(w).range(0.1f, 256f).initial(state.getCylinderHeight()).format("%.2f")
-            .onChange(v -> onUserChange(() -> state.setCylinderHeight(v))).build();
-        shapeWidgets.add(cylinderHeight);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(0.1f, 256f).initial(state.getFloat("cylinder.height")).format("%.2f")
+            .onChange(v -> onUserChange(() -> state.set("cylinder.height", v))).build();
+        widgets.add(cylinderHeight);
+        y += step;
         
         cylinderSegments = LabeledSlider.builder("Segments")
-            .position(x, y).width(w).range(3, 256).initial(state.getCylinderSegments()).format("%d").step(1)
-            .onChange(v -> onUserChange(() -> state.setCylinderSegments(Math.round(v)))).build();
-        shapeWidgets.add(cylinderSegments);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(3, 256).initial(state.getInt("cylinder.segments")).format("%d").step(1)
+            .onChange(v -> onUserChange(() -> state.set("cylinder.segments", Math.round(v)))).build();
+        widgets.add(cylinderSegments);
+        y += step;
         
         cylinderTopRadius = LabeledSlider.builder("Top Radius")
-            .position(x, y).width(w).range(0f, 20f).initial(state.getCylinderTopRadius()).format("%.2f")
-            .onChange(v -> onUserChange(() -> state.setCylinderTopRadius(v))).build();
-        shapeWidgets.add(cylinderTopRadius);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(0f, 20f).initial(state.getFloat("cylinder.topRadius")).format("%.2f")
+            .onChange(v -> onUserChange(() -> state.set("cylinder.topRadius", v))).build();
+        widgets.add(cylinderTopRadius);
+        y += step;
         
         cylinderArc = LabeledSlider.builder("Arc")
-            .position(x, y).width(w).range(0f, 360f).initial(state.getCylinderArc()).format("%.0f°")
-            .onChange(v -> onUserChange(() -> state.setCylinderArc(v))).build();
-        shapeWidgets.add(cylinderArc);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(0f, 360f).initial(state.getFloat("cylinder.arc")).format("%.0f°")
+            .onChange(v -> onUserChange(() -> state.set("cylinder.arc", v))).build();
+        widgets.add(cylinderArc);
+        y += step;
         
         cylinderHeightSegments = LabeledSlider.builder("Height Segs")
-            .position(x, y).width(w).range(1, 100).initial(state.getCylinderHeightSegments()).format("%d").step(1)
-            .onChange(v -> onUserChange(() -> state.setCylinderHeightSegments(Math.round(v)))).build();
-        shapeWidgets.add(cylinderHeightSegments);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+            .position(x, y).width(w).height(GuiConstants.COMPACT_HEIGHT).range(1, 100).initial(state.getInt("cylinder.heightSegments")).format("%d").step(1)
+            .onChange(v -> onUserChange(() -> state.set("cylinder.heightSegments", Math.round(v)))).build();
+        widgets.add(cylinderHeightSegments);
+        y += step;
         
         int halfW = (w - GuiConstants.PADDING) / 2;
         var textRenderer = net.minecraft.client.MinecraftClient.getInstance().textRenderer;
         
-        cylinderCapTop = GuiWidgets.checkbox(x, y, "Cap Top", state.isCylinderCapTop(), "Render top cap",
-            textRenderer, v -> onUserChange(() -> state.setCylinderCapTop(v)));
-        shapeWidgets.add(cylinderCapTop);
+        boolean capTopInitial = state.getBool("cylinder.capTop");
+        boolean capBottomInitial = state.getBool("cylinder.capBottom");
+        boolean openEndedInitial = !capTopInitial && !capBottomInitial;
+
+        cylinderCapTop = GuiWidgets.checkbox(x, y, "Cap Top", capTopInitial, "Render top cap",
+            textRenderer, v -> onUserChange(() -> state.set("cylinder.capTop", v)));
+        widgets.add(cylinderCapTop);
         
-        cylinderCapBottom = GuiWidgets.checkbox(x + halfW + GuiConstants.PADDING, y, "Cap Bottom", state.isCylinderCapBottom(), "Render bottom cap",
-            textRenderer, v -> onUserChange(() -> state.setCylinderCapBottom(v)));
-        shapeWidgets.add(cylinderCapBottom);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        cylinderCapBottom = GuiWidgets.checkbox(x + halfW + GuiConstants.PADDING, y, "Cap Bottom", capBottomInitial, "Render bottom cap",
+            textRenderer, v -> onUserChange(() -> state.set("cylinder.capBottom", v)));
+        widgets.add(cylinderCapBottom);
+        y += step;
         
-        cylinderOpenEnded = GuiWidgets.checkbox(x, y, "Open Ended (Tube)", state.isCylinderOpenEnded(), "No caps (tube mode)",
-            textRenderer, v -> onUserChange(() -> state.setCylinderOpenEnded(v)));
-        shapeWidgets.add(cylinderOpenEnded);
+        cylinderOpenEnded = GuiWidgets.checkbox(x, y, "Open Ended (Tube)", openEndedInitial, "No caps (tube mode)",
+            textRenderer, v -> onUserChange(() -> {
+                // When open-ended is checked, disable both caps; otherwise restore both caps on
+                state.set("cylinder.capTop", !v);
+                state.set("cylinder.capBottom", !v);
+                // Rebuild to reflect UI state instead of calling non-existent setters
+                rebuildForCurrentShape();
+            }));
+        widgets.add(cylinderOpenEnded);
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -452,24 +530,24 @@ public class ShapeSubPanel extends AbstractPanel {
     private void buildPolyhedronControls(int x, int y, int w) {
         polyType = GuiWidgets.enumDropdown(
             x, y, w, "Type", PolyType.class, PolyType.CUBE,
-            "Polyhedron type", v -> onUserChange(() -> state.setPolyType(v.name()))
+            "Polyhedron type", v -> onUserChange(() -> state.set("polyhedron.polyType", v.name()))
         );
         try {
-            polyType.setValue(PolyType.valueOf(state.getPolyType()));
+            polyType.setValue(PolyType.valueOf(state.getString("polyhedron.polyType")));
         } catch (IllegalArgumentException ignored) {}
-        shapeWidgets.add(polyType);
+        widgets.add(polyType);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
         polyRadius = LabeledSlider.builder("Size")
-            .position(x, y).width(w).range(0.5f, 10f).initial(state.getPolyRadius()).format("%.1f")
-            .onChange(v -> onUserChange(() -> state.setPolyRadius(v))).build();
-        shapeWidgets.add(polyRadius);
+            .position(x, y).width(w).range(0.5f, 10f).initial(state.getFloat("polyhedron.radius")).format("%.1f")
+            .onChange(v -> onUserChange(() -> state.set("polyhedron.radius", v))).build();
+        widgets.add(polyRadius);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
         polySubdivisions = LabeledSlider.builder("Subdivisions")
-            .position(x, y).width(w).range(0, 4).initial(state.getPolySubdivisions()).format("%d").step(1)
-            .onChange(v -> onUserChange(() -> state.setPolySubdivisions(Math.round(v)))).build();
-        shapeWidgets.add(polySubdivisions);
+            .position(x, y).width(w).range(0, 4).initial(state.getInt("polyhedron.subdivisions")).format("%d").step(1)
+            .onChange(v -> onUserChange(() -> state.set("polyhedron.subdivisions", Math.round(v)))).build();
+        widgets.add(polySubdivisions);
     }
     
     @Override
@@ -477,36 +555,27 @@ public class ShapeSubPanel extends AbstractPanel {
     
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Render section header
-        section.render(context, net.minecraft.client.MinecraftClient.getInstance().textRenderer, mouseX, mouseY, delta);
+        var tr = net.minecraft.client.MinecraftClient.getInstance().textRenderer;
         
-        // Performance hint (draw just under header if present)
-        computePerformanceHint();
-        if (perfHint != null && section.isExpanded()) {
-            var tr = net.minecraft.client.MinecraftClient.getInstance().textRenderer;
-            int hintY = section.getContentY() - GuiConstants.PADDING;
-            context.drawText(tr, perfHint, GuiConstants.PADDING + 2, hintY, perfColor, false);
-        }
+        // Use bounds for positioning
+        int bx = bounds.x();
+        int by = bounds.y();
         
-        // Render shape controls if expanded
-        if (section.isExpanded()) {
-            for (var widget : shapeWidgets) {
-                widget.render(context, mouseX, mouseY, delta);
-            }
+        // Draw simple title bar
+        int titleX = bx + GuiConstants.PADDING;
+        int titleY = by + (TITLE_HEIGHT - 8) / 2;
+        context.drawTextWithShadow(tr, "Shape", titleX, titleY, 0xFF88AACC);
+        
+        // Render all widgets directly (no collapse)
+        for (var widget : widgets) {
+            widget.render(context, mouseX, mouseY, delta);
         }
     }
     
     public int getHeight() {
-        return section.getTotalHeight();
+        return contentHeight;
     }
     
-    public List<net.minecraft.client.gui.widget.ClickableWidget> getWidgets() {
-        List<net.minecraft.client.gui.widget.ClickableWidget> all = new ArrayList<>();
-        all.add(section.getHeaderButton());
-        all.addAll(shapeWidgets);
-        return all;
-    }
-
     private void onUserChange(Runnable r) {
         r.run();
         if (!applyingFragment) {
@@ -515,6 +584,8 @@ public class ShapeSubPanel extends AbstractPanel {
                 fragmentDropdown.setValue("Custom");
             }
         }
+        // Update performance warning after any change
+        computePerformanceHint();
     }
 
     private void applyPreset(String name) {
@@ -530,84 +601,84 @@ public class ShapeSubPanel extends AbstractPanel {
     }
 
     private void syncSlidersFromState() {
-        if (sphereLatSteps != null) sphereLatSteps.setValue(state.getSphereLatSteps());
-        if (sphereLonSteps != null) sphereLonSteps.setValue(state.getSphereLonSteps());
-        if (sphereLatStart != null) sphereLatStart.setValue(state.getSphereLatStart());
-        if (sphereLatEnd != null) sphereLatEnd.setValue(state.getSphereLatEnd());
+        if (sphereRadius != null) sphereRadius.setValue(state.getFloat("sphere.radius"));
+        if (sphereLatSteps != null) sphereLatSteps.setValue(state.getInt("sphere.latSteps"));
+        if (sphereLonSteps != null) sphereLonSteps.setValue(state.getInt("sphere.lonSteps"));
+        if (sphereLatStart != null) sphereLatStart.setValue(state.getFloat("sphere.latStart"));
+        if (sphereLatEnd != null) sphereLatEnd.setValue(state.getFloat("sphere.latEnd"));
         if (sphereAlgorithm != null) {
-            try { sphereAlgorithm.setValue(SphereAlgorithm.valueOf(state.getSphereAlgorithm())); } catch (IllegalArgumentException ignored) {}
+            try { sphereAlgorithm.setValue(SphereAlgorithm.valueOf(state.getString("sphere.algorithm"))); } catch (IllegalArgumentException ignored) {}
         }
-        if (ringInnerRadius != null) ringInnerRadius.setValue(state.getRingInnerRadius());
-        if (ringOuterRadius != null) ringOuterRadius.setValue(state.getRingOuterRadius());
-        if (ringSegments != null) ringSegments.setValue(state.getRingSegments());
-        if (ringHeight != null) ringHeight.setValue(state.getRingHeight());
-        if (ringY != null) ringY.setValue(state.getRingY());
-        if (discRadius != null) discRadius.setValue(state.getDiscRadius());
-        if (discSegments != null) discSegments.setValue(state.getDiscSegments());
-        if (discY != null) discY.setValue(state.getDiscY());
-        if (discInnerRadius != null) discInnerRadius.setValue(state.getDiscInnerRadius());
-        if (prismSides != null) prismSides.setValue(state.getPrismSides());
-        if (prismRadius != null) prismRadius.setValue(state.getPrismRadius());
-        if (prismHeight != null) prismHeight.setValue(state.getPrismHeight());
-        if (prismTopRadius != null) prismTopRadius.setValue(state.getPrismTopRadius());
-        if (cylinderRadius != null) cylinderRadius.setValue(state.getCylinderRadius());
-        if (cylinderHeight != null) cylinderHeight.setValue(state.getCylinderHeight());
-        if (cylinderSegments != null) cylinderSegments.setValue(state.getCylinderSegments());
-        if (cylinderTopRadius != null) cylinderTopRadius.setValue(state.getCylinderTopRadius());
+        if (ringInnerRadius != null) ringInnerRadius.setValue(state.getFloat("ring.innerRadius"));
+        if (ringOuterRadius != null) ringOuterRadius.setValue(state.getFloat("ring.outerRadius"));
+        if (ringSegments != null) ringSegments.setValue(state.getInt("ring.segments"));
+        if (ringHeight != null) ringHeight.setValue(state.getFloat("ring.height"));
+        if (ringY != null) ringY.setValue(state.getFloat("ring.y"));
+        if (discRadius != null) discRadius.setValue(state.getFloat("disc.radius"));
+        if (discSegments != null) discSegments.setValue(state.getInt("disc.segments"));
+        if (discY != null) discY.setValue(state.getFloat("disc.y"));
+        if (discInnerRadius != null) discInnerRadius.setValue(state.getFloat("disc.innerRadius"));
+        if (prismSides != null) prismSides.setValue(state.getInt("prism.sides"));
+        if (prismRadius != null) prismRadius.setValue(state.getFloat("prism.radius"));
+        if (prismHeight != null) prismHeight.setValue(state.getFloat("prism.height"));
+        if (prismTopRadius != null) prismTopRadius.setValue(state.getFloat("prism.topRadius"));
+        if (cylinderRadius != null) cylinderRadius.setValue(state.getFloat("cylinder.radius"));
+        if (cylinderHeight != null) cylinderHeight.setValue(state.getFloat("cylinder.height"));
+        if (cylinderSegments != null) cylinderSegments.setValue(state.getInt("cylinder.segments"));
+        if (cylinderTopRadius != null) cylinderTopRadius.setValue(state.getFloat("cylinder.topRadius"));
         if (polyType != null) {
-            try { polyType.setValue(PolyType.valueOf(state.getPolyType())); } catch (IllegalArgumentException ignored) {}
+            try { polyType.setValue(PolyType.valueOf(state.getString("polyhedron.polyType"))); } catch (IllegalArgumentException ignored) {}
         }
-        if (polyRadius != null) polyRadius.setValue(state.getPolyRadius());
-        if (polySubdivisions != null) polySubdivisions.setValue(state.getPolySubdivisions());
+        if (polyRadius != null) polyRadius.setValue(state.getFloat("polyhedron.radius"));
+        if (polySubdivisions != null) polySubdivisions.setValue(state.getInt("polyhedron.subdivisions"));
     }
 
     private void computePerformanceHint() {
-        String shape = state.getShapeType().toLowerCase();
+        String shape = state.getString("shapeType").toLowerCase();
         switch (shape) {
             case "sphere" -> {
-                int lat = state.getSphereLatSteps();
-                int lon = state.getSphereLonSteps();
+                int lat = state.getInt("sphere.latSteps");
+                int lon = state.getInt("sphere.lonSteps");
                 int tess = lat * lon;
-                setHintForTessellation(tess, 640, 1280, "Sphere tessellation ~" + tess + " (lat×lon)");
+                sendWarning(tess, 640, 1280, "~" + tess + " tris");
             }
             case "ring" -> {
-                int seg = state.getRingSegments();
-                setHintForTessellation(seg, 256, 512, "Ring segments ~" + seg);
+                int seg = state.getInt("ring.segments");
+                sendWarning(seg, 256, 512, "~" + seg + " segs");
             }
             case "disc" -> {
-                int seg = state.getDiscSegments();
-                setHintForTessellation(seg, 256, 512, "Disc segments ~" + seg);
+                int seg = state.getInt("disc.segments");
+                sendWarning(seg, 256, 512, "~" + seg + " segs");
             }
             case "prism" -> {
-                int seg = state.getPrismSides();
-                setHintForTessellation(seg, 64, 128, "Prism sides ~" + seg);
+                int seg = state.getInt("prism.sides");
+                sendWarning(seg, 64, 128, "~" + seg + " sides");
             }
             case "cylinder", "beam" -> {
-                int seg = state.getCylinderSegments();
-                setHintForTessellation(seg, 128, 256, "Cylinder segments ~" + seg);
+                int seg = state.getInt("cylinder.segments");
+                sendWarning(seg, 128, 256, "~" + seg + " segs");
             }
             case "cube", "octahedron", "icosahedron" -> {
-                int sub = state.getPolySubdivisions();
-                // crude estimate: base faces 6/8/20 times 4^sub
+                int sub = state.getInt("polyhedron.subdivisions");
                 int base = shape.equals("cube") ? 6 : (shape.equals("octahedron") ? 8 : 20);
                 int tess = (int) (base * Math.pow(4, sub));
-                setHintForTessellation(tess, 200, 800, "Poly faces ~" + tess);
+                sendWarning(tess, 200, 800, "~" + tess + " faces");
             }
             default -> {
-                perfHint = null;
+                if (warningCallback != null) warningCallback.accept(null, 0);
             }
         }
     }
 
-    private void setHintForTessellation(int value, int warn, int high, String label) {
+    private void sendWarning(int value, int warn, int high, String label) {
+        if (warningCallback == null) return;
+        
         if (value >= high) {
-            perfHint = "⚠ High complexity: " + label;
-            perfColor = GuiConstants.ERROR;
+            warningCallback.accept("⚠ High: " + label, GuiConstants.ERROR);
         } else if (value >= warn) {
-            perfHint = "⚠ Medium complexity: " + label;
-            perfColor = GuiConstants.WARNING;
+            warningCallback.accept("⚠ Med: " + label, GuiConstants.WARNING);
         } else {
-            perfHint = null;
+            warningCallback.accept(null, 0);
         }
     }
 }

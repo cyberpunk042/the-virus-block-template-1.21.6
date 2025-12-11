@@ -1,5 +1,6 @@
 package net.cyberpunk042.client.gui.panel;
 
+import net.cyberpunk042.client.gui.layout.Bounds;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.state.FieldEditState.ProfileEntry;
 import net.cyberpunk042.client.gui.util.GuiConstants;
@@ -24,7 +25,16 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * G91-G100: Profiles management panel with source and category filters.
+ * G91-G100: Profiles management panel with dual-panel layout.
+ * 
+ * <p><b>Dual-Panel Layout:</b></p>
+ * <ul>
+ *   <li><b>LEFT Panel:</b> Filters + Profile List + Name Field</li>
+ *   <li><b>RIGHT Panel:</b> Current Config Summary + Stats + Action Buttons</li>
+ * </ul>
+ * 
+ * <p>Call {@link #setDualBounds(Bounds, Bounds)} before {@link #init(int, int)} to enable
+ * dual-panel mode. If only single bounds are set, falls back to cramped single-panel mode.</p>
  */
 public class ProfilesPanel extends AbstractPanel {
     
@@ -33,25 +43,32 @@ public class ProfilesPanel extends AbstractPanel {
     private int selectedProfileIndex = 0;
     private int listScrollOffset = 0;
     
-    // Filter widgets
-    private CyclingButtonWidget<String> sourceFilter;  // All, Local, Server, Bundled
-    private CyclingButtonWidget<String> categoryFilter; // All, Combat, Utility, Decorative, Experimental
+    // Dual-panel bounds
+    private Bounds leftBounds;
+    private Bounds rightBounds;
+    
+    // Filter widgets (LEFT panel)
+    private CyclingButtonWidget<String> sourceFilter;
+    private CyclingButtonWidget<String> categoryFilter;
     private TextFieldWidget searchField;
+    private TextFieldWidget nameField;
     
     // Selected filter values (null = All)
     private String selectedSource = null;
     private String selectedCategory = null;
     
-    // Action buttons
+    // Action buttons (RIGHT panel)
     private ButtonWidget loadBtn, saveBtn, saveAsBtn, deleteBtn;
     private ButtonWidget duplicateBtn, renameBtn;
-    private ButtonWidget saveToServerBtn;  // OP only
-    private TextFieldWidget nameField;
+    private ButtonWidget saveToServerBtn;
     
-    private static final int FILTER_ROW_HEIGHT = 28;
-    private static final int LIST_HEIGHT = 140;
+    private static final int FILTER_HEIGHT = 20;
+    private static final int FILTER_GAP = 4;
+    private static final int LIST_HEADER_HEIGHT = 20;
     private static final int ITEM_HEIGHT = 22;
-    private static final int SUMMARY_HEIGHT = 60;
+    private static final int SECTION_GAP = 8;
+    private static final int BTN_HEIGHT = 20;
+    private static final int BTN_GAP = 4;
     
     public ProfilesPanel(Screen parent, FieldEditState state) {
         super(parent, state);
@@ -59,90 +76,214 @@ public class ProfilesPanel extends AbstractPanel {
         this.filteredProfiles = new ArrayList<>(allProfiles);
     }
     
+    /**
+     * Sets both left and right panel bounds for dual-panel layout.
+     * Call this BEFORE init() to enable proper dual-panel rendering.
+     */
+    public void setDualBounds(Bounds left, Bounds right) {
+        this.leftBounds = left;
+        this.rightBounds = right;
+        // Set the base bounds to left for compatibility
+        this.bounds = left;
+    }
+    
+    /**
+     * Returns true if dual-panel mode is enabled.
+     */
+    public boolean isDualMode() {
+        return leftBounds != null && rightBounds != null;
+    }
+    
     @Override
     public void init(int width, int height) {
         this.panelWidth = width;
         this.panelHeight = height;
         
-        int x = GuiConstants.PADDING;
-        int y = GuiConstants.TAB_HEIGHT + GuiConstants.PADDING;
-        int w = width - GuiConstants.PADDING * 2;
-        int filterWidth = 90;
-        int searchWidth = w - filterWidth * 2 - GuiConstants.PADDING * 2;
+        if (isDualMode()) {
+            initDualMode();
+        } else {
+            initSingleMode(width, height);
+        }
         
-        // ═══════════════════════════════════════════════════════════════
-        // FILTER ROW: [Source▼] [Category▼] [🔍 Search...]
-        // ═══════════════════════════════════════════════════════════════
+        updateButtonStates();
+    }
+    
+    /**
+     * Initializes widgets for dual-panel mode (proper layout).
+     */
+    private void initDualMode() {
+        var textRenderer = MinecraftClient.getInstance().textRenderer;
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // LEFT PANEL: Filters + Profile List + Name Field
+        // ═══════════════════════════════════════════════════════════════════
+        int lx = leftBounds.x() + GuiConstants.PADDING;
+        int ly = leftBounds.y() + GuiConstants.PADDING;
+        int lw = leftBounds.width() - GuiConstants.PADDING * 2;
+        
+        // Filter row: [Source] [Category]
+        int filterW = (lw - GuiConstants.PADDING) / 2;
         
         List<String> sources = List.of("All", "Local", "Server", "Bundled");
         sourceFilter = CyclingButtonWidget.<String>builder(Text::literal)
             .values(sources)
             .initially("All")
-            .build(x, y, filterWidth, 20, Text.literal("Source"),
+            .build(lx, ly, filterW, FILTER_HEIGHT, Text.literal("Source"),
                 (btn, val) -> {
                     selectedSource = "All".equals(val) ? null : val;
                     applyFilters();
                 });
         
-        List<String> categories = List.of("All", "Combat", "Utility", "Decorative", "Experimental");
         categoryFilter = CyclingButtonWidget.<String>builder(Text::literal)
-            .values(categories)
+            .values(List.of("All", "Combat", "Utility", "Decorative", "Experimental"))
             .initially("All")
-            .build(x + filterWidth + GuiConstants.PADDING, y, filterWidth, 20, Text.literal("Category"),
+            .build(lx + filterW + GuiConstants.PADDING, ly, filterW, FILTER_HEIGHT, Text.literal("Category"),
                 (btn, val) -> {
                     selectedCategory = "All".equals(val) ? null : val;
                     applyFilters();
                 });
         
-        searchField = new TextFieldWidget(
-            MinecraftClient.getInstance().textRenderer,
-            x + filterWidth * 2 + GuiConstants.PADDING * 2, y, searchWidth, 20,
-            Text.literal("Search")
-        );
+        ly += FILTER_HEIGHT + FILTER_GAP;
+        
+        // Search field (full width)
+        searchField = new TextFieldWidget(textRenderer, lx, ly, lw, FILTER_HEIGHT, Text.literal("Search"));
         searchField.setPlaceholder(Text.literal("🔍 Search profiles..."));
         searchField.setChangedListener(text -> applyFilters());
         
-        y += FILTER_ROW_HEIGHT;
+        ly += FILTER_HEIGHT + SECTION_GAP;
         
-        // ═══════════════════════════════════════════════════════════════
-        // PROFILE LIST (left side)
-        // ═══════════════════════════════════════════════════════════════
-        int listW = (w - GuiConstants.PADDING) / 2;
-        // List is rendered in render(), position stored for mouse handling
+        // Profile list is rendered manually (not a widget)
+        // Calculate list height to leave room for name field
+        int listHeight = leftBounds.bottom() - ly - FILTER_HEIGHT - SECTION_GAP - GuiConstants.PADDING;
         
-        // ═══════════════════════════════════════════════════════════════
-        // NAME FIELD (below list, full width of left side)
-        // ═══════════════════════════════════════════════════════════════
-        int nameFieldY = y + LIST_HEIGHT + GuiConstants.PADDING;
-        nameField = new TextFieldWidget(
-            MinecraftClient.getInstance().textRenderer,
-            x, nameFieldY, listW, GuiConstants.WIDGET_HEIGHT,
-            Text.literal("Profile Name")
-        );
+        // Name field at bottom of left panel
+        int nameY = leftBounds.bottom() - GuiConstants.PADDING - FILTER_HEIGHT;
+        nameField = new TextFieldWidget(textRenderer, lx, nameY, lw, FILTER_HEIGHT, Text.literal("Profile Name"));
         nameField.setMaxLength(32);
         nameField.setText(getSelectedProfileName());
         
-        // ═══════════════════════════════════════════════════════════════
-        // ACTION BUTTONS (below name field)
-        // ═══════════════════════════════════════════════════════════════
-        int btnY = nameFieldY + GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
-        int btnW = (listW - GuiConstants.PADDING * 2) / 3;
+        // ═══════════════════════════════════════════════════════════════════
+        // RIGHT PANEL: Summary + Stats + Action Buttons
+        // ═══════════════════════════════════════════════════════════════════
+        int rx = rightBounds.x() + GuiConstants.PADDING;
+        int ry = rightBounds.y() + GuiConstants.PADDING;
+        int rw = rightBounds.width() - GuiConstants.PADDING * 2;
         
-        loadBtn = GuiWidgets.button(x, btnY, btnW, "Load", "Load selected profile", this::loadProfile);
-        saveBtn = GuiWidgets.button(x + btnW + GuiConstants.PADDING, btnY, btnW, "Save", "Save changes", this::saveProfile);
-        deleteBtn = GuiWidgets.button(x + (btnW + GuiConstants.PADDING) * 2, btnY, btnW, "Delete", "Delete profile", this::deleteProfile);
+        // Summary and stats are rendered manually (below)
         
-        btnY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        // Action buttons - at bottom of right panel
+        // Calculate button layout: 2 rows of 3 buttons + 1 full-width button
+        int btnW = (rw - BTN_GAP * 2) / 3;
+        int btnY = rightBounds.bottom() - GuiConstants.PADDING - BTN_HEIGHT * 3 - BTN_GAP * 2;
         
-        saveAsBtn = GuiWidgets.button(x, btnY, btnW, "Save As", "Save as new profile", this::saveAsProfile);
-        duplicateBtn = GuiWidgets.button(x + btnW + GuiConstants.PADDING, btnY, btnW, "Duplicate", "Copy profile", this::duplicateProfile);
-        renameBtn = GuiWidgets.button(x + (btnW + GuiConstants.PADDING) * 2, btnY, btnW, "Rename", "Rename profile", this::renameProfile);
+        // Row 1: Load, Save, Delete
+        loadBtn = ButtonWidget.builder(Text.literal("Load"), btn -> loadProfile())
+            .dimensions(rx, btnY, btnW, BTN_HEIGHT)
+            .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Load selected profile")))
+            .build();
         
-        // OP-only: Save to Server button (third row)
-        btnY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
-        saveToServerBtn = GuiWidgets.button(x, btnY, listW, "⚡ Save to Server", "Save as server profile (OP only)", this::promptSaveToServer);
+        saveBtn = ButtonWidget.builder(Text.literal("Save"), btn -> saveProfile())
+            .dimensions(rx + btnW + BTN_GAP, btnY, btnW, BTN_HEIGHT)
+            .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Save current changes")))
+            .build();
         
-        updateButtonStates();
+        deleteBtn = ButtonWidget.builder(Text.literal("Delete"), btn -> deleteProfile())
+            .dimensions(rx + (btnW + BTN_GAP) * 2, btnY, btnW, BTN_HEIGHT)
+            .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Delete selected profile")))
+            .build();
+        
+        btnY += BTN_HEIGHT + BTN_GAP;
+        
+        // Row 2: Save As, Duplicate, Rename
+        saveAsBtn = ButtonWidget.builder(Text.literal("Save As"), btn -> saveAsProfile())
+            .dimensions(rx, btnY, btnW, BTN_HEIGHT)
+            .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Save as new profile")))
+            .build();
+        
+        duplicateBtn = ButtonWidget.builder(Text.literal("Copy"), btn -> duplicateProfile())
+            .dimensions(rx + btnW + BTN_GAP, btnY, btnW, BTN_HEIGHT)
+            .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Duplicate profile")))
+            .build();
+        
+        renameBtn = ButtonWidget.builder(Text.literal("Rename"), btn -> renameProfile())
+            .dimensions(rx + (btnW + BTN_GAP) * 2, btnY, btnW, BTN_HEIGHT)
+            .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Rename profile")))
+            .build();
+        
+        btnY += BTN_HEIGHT + BTN_GAP;
+        
+        // Row 3: Save to Server (full width, OP only)
+        saveToServerBtn = ButtonWidget.builder(Text.literal("⚡ Save to Server"), btn -> promptSaveToServer())
+            .dimensions(rx, btnY, rw, BTN_HEIGHT)
+            .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Save as server profile (OP only)")))
+            .build();
+    }
+    
+    /**
+     * Fallback initialization for single-panel mode (legacy/cramped).
+     */
+    private void initSingleMode(int width, int height) {
+        var textRenderer = MinecraftClient.getInstance().textRenderer;
+        
+        int x = GuiConstants.PADDING;
+        int y = GuiConstants.PADDING;
+        int w = width - GuiConstants.PADDING * 2;
+        int filterW = Math.min(80, (w - GuiConstants.PADDING * 2) / 3);
+        
+        List<String> sources = List.of("All", "Local", "Server", "Bundled");
+        sourceFilter = CyclingButtonWidget.<String>builder(Text::literal)
+            .values(sources)
+            .initially("All")
+            .build(x, y, filterW, FILTER_HEIGHT, Text.literal("Src"),
+                (btn, val) -> {
+                    selectedSource = "All".equals(val) ? null : val;
+                    applyFilters();
+                });
+        
+        categoryFilter = CyclingButtonWidget.<String>builder(Text::literal)
+            .values(List.of("All", "Combat", "Utility", "Deco", "Exp"))
+            .initially("All")
+            .build(x + filterW + 2, y, filterW, FILTER_HEIGHT, Text.literal("Cat"),
+                (btn, val) -> {
+                    selectedCategory = "All".equals(val) ? null : val;
+                    applyFilters();
+                });
+        
+        int searchW = w - filterW * 2 - 4;
+        searchField = new TextFieldWidget(textRenderer, 
+            x + filterW * 2 + 4, y, Math.max(40, searchW), FILTER_HEIGHT, 
+            Text.literal("Search"));
+        searchField.setPlaceholder(Text.literal("🔍"));
+        searchField.setChangedListener(text -> applyFilters());
+        
+        y += FILTER_HEIGHT + SECTION_GAP;
+        
+        // Name field
+        nameField = new TextFieldWidget(textRenderer, x, height - GuiConstants.PADDING - FILTER_HEIGHT, 
+            w, FILTER_HEIGHT, Text.literal("Name"));
+        nameField.setMaxLength(32);
+        nameField.setText(getSelectedProfileName());
+        
+        // Buttons (compact)
+        int btnW = (w - 4) / 3;
+        int btnY = height - GuiConstants.PADDING - FILTER_HEIGHT - BTN_GAP - BTN_HEIGHT * 2 - BTN_GAP;
+        
+        loadBtn = ButtonWidget.builder(Text.literal("Load"), btn -> loadProfile())
+            .dimensions(x, btnY, btnW, BTN_HEIGHT).build();
+        saveBtn = ButtonWidget.builder(Text.literal("Save"), btn -> saveProfile())
+            .dimensions(x + btnW + 2, btnY, btnW, BTN_HEIGHT).build();
+        deleteBtn = ButtonWidget.builder(Text.literal("Del"), btn -> deleteProfile())
+            .dimensions(x + (btnW + 2) * 2, btnY, btnW, BTN_HEIGHT).build();
+        
+        btnY += BTN_HEIGHT + 2;
+        saveAsBtn = ButtonWidget.builder(Text.literal("As"), btn -> saveAsProfile())
+            .dimensions(x, btnY, btnW, BTN_HEIGHT).build();
+        duplicateBtn = ButtonWidget.builder(Text.literal("Dup"), btn -> duplicateProfile())
+            .dimensions(x + btnW + 2, btnY, btnW, BTN_HEIGHT).build();
+        renameBtn = ButtonWidget.builder(Text.literal("Ren"), btn -> renameProfile())
+            .dimensions(x + (btnW + 2) * 2, btnY, btnW, BTN_HEIGHT).build();
+        
+        saveToServerBtn = null; // Skip in cramped mode
     }
     
     private void applyFilters() {
@@ -155,26 +296,20 @@ public class ProfilesPanel extends AbstractPanel {
                     boolean isLocal = !p.isServer();
                     if ("Local".equals(selectedSource) && !isLocal) return false;
                     if ("Server".equals(selectedSource) && isLocal) return false;
-                    // "Bundled" would need ProfileSource info - for now treat as Local
+                }
+                // Category filter - check description for category keyword (simplified)
+                if (selectedCategory != null && p.description() != null) {
+                    if (!p.description().toLowerCase().contains(selectedCategory.toLowerCase())) return false;
+                }
+                // Search filter
+                if (!searchText.isEmpty()) {
+                    if (!p.name().toLowerCase().contains(searchText)) return false;
                 }
                 return true;
             })
-            .filter(p -> {
-                // Category filter - would need ProfileCategory info on ProfileEntry
-                // For now, all profiles pass category filter
-                return true;
-            })
-            .filter(p -> {
-                // Search filter
-                if (searchText.isEmpty()) return true;
-                return p.name().toLowerCase().contains(searchText);
-            })
             .collect(Collectors.toList());
         
-        // Clamp selection
-        if (selectedProfileIndex >= filteredProfiles.size()) {
-            selectedProfileIndex = Math.max(0, filteredProfiles.size() - 1);
-        }
+        selectedProfileIndex = Math.min(selectedProfileIndex, Math.max(0, filteredProfiles.size() - 1));
         listScrollOffset = 0;
         
         if (nameField != null) {
@@ -190,309 +325,259 @@ public class ProfilesPanel extends AbstractPanel {
     
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        int panelY = GuiConstants.TAB_HEIGHT;
-        context.fill(0, panelY, panelWidth, panelHeight, GuiConstants.BG_PANEL);
-        
+        if (isDualMode()) {
+            renderDualMode(context, mouseX, mouseY, delta);
+        } else {
+            renderSingleMode(context, mouseX, mouseY, delta);
+        }
+    }
+    
+    /**
+     * Renders dual-panel layout.
+     */
+    private void renderDualMode(DrawContext context, int mouseX, int mouseY, float delta) {
         var textRenderer = MinecraftClient.getInstance().textRenderer;
         
-        int x = GuiConstants.PADDING;
-        int y = panelY + GuiConstants.PADDING + FILTER_ROW_HEIGHT;
-        int w = panelWidth - GuiConstants.PADDING * 2;
-        int listW = (w - GuiConstants.PADDING) / 2;
-        int summaryX = x + listW + GuiConstants.PADDING;
-        int summaryW = w - listW - GuiConstants.PADDING;
+        // ═══════════════════════════════════════════════════════════════════
+        // LEFT PANEL BACKGROUND
+        // ═══════════════════════════════════════════════════════════════════
+        context.fill(leftBounds.x(), leftBounds.y(), leftBounds.right(), leftBounds.bottom(), GuiConstants.BG_PANEL);
+        context.drawBorder(leftBounds.x(), leftBounds.y(), leftBounds.width(), leftBounds.height(), GuiConstants.BORDER);
         
-        // ═══════════════════════════════════════════════════════════════
-        // PROFILE LIST (left side)
-        // ═══════════════════════════════════════════════════════════════
-        context.fill(x, y, x + listW, y + LIST_HEIGHT, 0xFF1A1A1A);
-        context.drawBorder(x, y, listW, LIST_HEIGHT, GuiConstants.BORDER);
+        // LEFT PANEL TITLE
+        context.drawText(textRenderer, "Profiles", leftBounds.x() + GuiConstants.PADDING, 
+            leftBounds.y() + 4, GuiConstants.TEXT_PRIMARY, false);
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // RIGHT PANEL BACKGROUND
+        // ═══════════════════════════════════════════════════════════════════
+        context.fill(rightBounds.x(), rightBounds.y(), rightBounds.right(), rightBounds.bottom(), GuiConstants.BG_PANEL);
+        context.drawBorder(rightBounds.x(), rightBounds.y(), rightBounds.width(), rightBounds.height(), GuiConstants.BORDER);
+        
+        // RIGHT PANEL TITLE
+        context.drawText(textRenderer, "Details", rightBounds.x() + GuiConstants.PADDING, 
+            rightBounds.y() + 4, GuiConstants.TEXT_PRIMARY, false);
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // PROFILE LIST (LEFT PANEL, below filters)
+        // ═══════════════════════════════════════════════════════════════════
+        int listX = leftBounds.x() + GuiConstants.PADDING;
+        int listY = leftBounds.y() + GuiConstants.PADDING + FILTER_HEIGHT * 2 + FILTER_GAP * 2 + SECTION_GAP;
+        int listW = leftBounds.width() - GuiConstants.PADDING * 2;
+        int listH = leftBounds.bottom() - listY - FILTER_HEIGHT - SECTION_GAP - GuiConstants.PADDING;
+        
+        // List background
+        context.fill(listX, listY, listX + listW, listY + listH, 0xFF1A1A1A);
+        context.drawBorder(listX, listY, listW, listH, GuiConstants.BORDER);
         
         // List header
-        context.drawText(textRenderer, "Profiles (" + filteredProfiles.size() + ")", x + 6, y + 4, GuiConstants.TEXT_SECONDARY, false);
+        context.drawText(textRenderer, "Profiles (" + filteredProfiles.size() + ")", 
+            listX + 4, listY + 4, GuiConstants.TEXT_SECONDARY, false);
         
-        int itemY = y + 18 - listScrollOffset;
+        // Enable scissor for list items
+        context.enableScissor(listX, listY + LIST_HEADER_HEIGHT, listX + listW, listY + listH);
+        
+        int itemY = listY + LIST_HEADER_HEIGHT - listScrollOffset;
         for (int i = 0; i < filteredProfiles.size(); i++) {
-            if (itemY >= y + 16 && itemY + ITEM_HEIGHT <= y + LIST_HEIGHT) {
+            if (itemY + ITEM_HEIGHT > listY + LIST_HEADER_HEIGHT && itemY < listY + listH) {
                 boolean selected = i == selectedProfileIndex;
-                boolean hovered = mouseX >= x && mouseX < x + listW && 
+                boolean hovered = mouseX >= listX && mouseX < listX + listW && 
                                   mouseY >= itemY && mouseY < itemY + ITEM_HEIGHT;
                 
                 // Background
                 if (selected) {
-                    context.fill(x + 2, itemY, x + listW - 2, itemY + ITEM_HEIGHT - 2, GuiConstants.ACCENT);
+                    context.fill(listX + 2, itemY, listX + listW - 2, itemY + ITEM_HEIGHT - 2, GuiConstants.ACCENT);
                 } else if (hovered) {
-                    context.fill(x + 2, itemY, x + listW - 2, itemY + ITEM_HEIGHT - 2, 0x40FFFFFF);
+                    context.fill(listX + 2, itemY, listX + listW - 2, itemY + ITEM_HEIGHT - 2, 0x40FFFFFF);
                 }
                 
                 ProfileEntry entry = filteredProfiles.get(i);
                 
                 // Source icon
                 String icon = entry.isServer() ? "🔒" : "✎";
-                context.drawText(textRenderer, icon, x + 6, itemY + 5, GuiConstants.TEXT_SECONDARY, false);
+                context.drawText(textRenderer, icon, listX + 6, itemY + 5, GuiConstants.TEXT_SECONDARY, false);
                 
                 // Profile name
-                String name = entry.name();
                 int textColor = selected ? 0xFFFFFFFF : GuiConstants.TEXT_PRIMARY;
-                context.drawText(textRenderer, name, x + 22, itemY + 5, textColor, false);
+                context.drawText(textRenderer, entry.name(), listX + 22, itemY + 5, textColor, false);
                 
                 // Source label (right side)
                 String sourceLabel = entry.isServer() ? "server" : "local";
                 int labelWidth = textRenderer.getWidth(sourceLabel);
-                context.drawText(textRenderer, sourceLabel, x + listW - labelWidth - 8, itemY + 5, GuiConstants.TEXT_SECONDARY, false);
+                context.drawText(textRenderer, sourceLabel, listX + listW - labelWidth - 8, itemY + 5, 
+                    GuiConstants.TEXT_SECONDARY, false);
             }
             itemY += ITEM_HEIGHT;
         }
         
-        // ═══════════════════════════════════════════════════════════════
-        // CATEGORY SUMMARY (right side)
-        // ═══════════════════════════════════════════════════════════════
-        context.fill(summaryX, y, summaryX + summaryW, y + SUMMARY_HEIGHT, GuiConstants.BG_SECONDARY);
-        context.drawBorder(summaryX, y, summaryW, SUMMARY_HEIGHT, GuiConstants.BORDER);
-        context.drawText(textRenderer, "Current Configuration", summaryX + 6, y + 4, GuiConstants.TEXT_PRIMARY, false);
+        context.disableScissor();
         
-        int lineY = y + 18;
-        lineY = drawSummaryLine(context, textRenderer, summaryX + 6, lineY, "Shape", state.getCurrentShapeFragmentName());
-        lineY = drawSummaryLine(context, textRenderer, summaryX + 6, lineY, "Fill", state.getCurrentFillFragmentName());
-        lineY = drawSummaryLine(context, textRenderer, summaryX + 6, lineY, "Animation", state.getCurrentAnimationFragmentName());
+        // ═══════════════════════════════════════════════════════════════════
+        // CONFIGURATION SUMMARY (RIGHT PANEL)
+        // ═══════════════════════════════════════════════════════════════════
+        int rx = rightBounds.x() + GuiConstants.PADDING;
+        int ry = rightBounds.y() + GuiConstants.PADDING + 16; // Below title
+        int rw = rightBounds.width() - GuiConstants.PADDING * 2;
         
-        // Stats below summary
-        int statsY = y + SUMMARY_HEIGHT + GuiConstants.PADDING;
-        context.fill(summaryX, statsY, summaryX + summaryW, statsY + 60, GuiConstants.BG_SECONDARY);
-        context.drawBorder(summaryX, statsY, summaryW, 60, GuiConstants.BORDER);
-        context.drawText(textRenderer, "Stats", summaryX + 6, statsY + 4, GuiConstants.TEXT_PRIMARY, false);
+        // Current Configuration section
+        int summaryH = 80;
+        context.fill(rx, ry, rx + rw, ry + summaryH, GuiConstants.BG_SECONDARY);
+        context.drawBorder(rx, ry, rw, summaryH, GuiConstants.BORDER);
+        context.drawText(textRenderer, "Current Configuration", rx + 4, ry + 4, GuiConstants.TEXT_PRIMARY, false);
         
-        int statLineY = statsY + 18;
-        context.drawText(textRenderer, "latSteps: " + state.getSphereLatSteps(), summaryX + 6, statLineY, GuiConstants.TEXT_SECONDARY, false);
-        context.drawText(textRenderer, "lonSteps: " + state.getSphereLonSteps(), summaryX + 80, statLineY, GuiConstants.TEXT_SECONDARY, false);
-        statLineY += 12;
-        context.drawText(textRenderer, "radius: " + String.format("%.1f", state.getRadius()), summaryX + 6, statLineY, GuiConstants.TEXT_SECONDARY, false);
-        context.drawText(textRenderer, "alpha: " + String.format("%.2f", state.getAlpha()), summaryX + 80, statLineY, GuiConstants.TEXT_SECONDARY, false);
+        int lineY = ry + 18;
+        lineY = drawSummaryLine(context, textRenderer, rx + 6, lineY, "Shape", state.getCurrentShapeFragmentName());
+        lineY = drawSummaryLine(context, textRenderer, rx + 6, lineY, "Fill", state.getCurrentFillFragmentName());
+        lineY = drawSummaryLine(context, textRenderer, rx + 6, lineY, "Animation", state.getCurrentAnimationFragmentName());
         
-        // Render filter widgets
+        ry += summaryH + SECTION_GAP;
+        
+        // Stats section
+        int statsH = 60;
+        context.fill(rx, ry, rx + rw, ry + statsH, GuiConstants.BG_SECONDARY);
+        context.drawBorder(rx, ry, rw, statsH, GuiConstants.BORDER);
+        context.drawText(textRenderer, "Stats", rx + 4, ry + 4, GuiConstants.TEXT_PRIMARY, false);
+        
+        int statY = ry + 18;
+        context.drawText(textRenderer, "latSteps: " + state.getInt("sphere.latSteps"), rx + 6, statY, GuiConstants.TEXT_SECONDARY, false);
+        context.drawText(textRenderer, "lonSteps: " + state.getInt("sphere.lonSteps"), rx + 90, statY, GuiConstants.TEXT_SECONDARY, false);
+        statY += 12;
+        context.drawText(textRenderer, "radius: " + String.format("%.1f", state.getFloat("radius")), rx + 6, statY, GuiConstants.TEXT_SECONDARY, false);
+        context.drawText(textRenderer, "alpha: " + String.format("%.2f", state.getFloat("appearance.alpha")), rx + 90, statY, GuiConstants.TEXT_SECONDARY, false);
+        
+        // Dirty indicator (right panel bottom area, above buttons)
+        if (state.isDirty()) {
+            int indicatorY = rightBounds.bottom() - GuiConstants.PADDING - BTN_HEIGHT * 3 - BTN_GAP * 2 - 20;
+            context.drawText(textRenderer, "● Unsaved changes", rx, indicatorY, GuiConstants.WARNING, false);
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // RENDER WIDGETS
+        // ═══════════════════════════════════════════════════════════════════
         if (sourceFilter != null) sourceFilter.render(context, mouseX, mouseY, delta);
         if (categoryFilter != null) categoryFilter.render(context, mouseX, mouseY, delta);
         if (searchField != null) searchField.render(context, mouseX, mouseY, delta);
-        
-        // Render other widgets
         if (nameField != null) nameField.render(context, mouseX, mouseY, delta);
+        
         if (loadBtn != null) loadBtn.render(context, mouseX, mouseY, delta);
         if (saveBtn != null) saveBtn.render(context, mouseX, mouseY, delta);
-        if (saveAsBtn != null) saveAsBtn.render(context, mouseX, mouseY, delta);
         if (deleteBtn != null) deleteBtn.render(context, mouseX, mouseY, delta);
+        if (saveAsBtn != null) saveAsBtn.render(context, mouseX, mouseY, delta);
         if (duplicateBtn != null) duplicateBtn.render(context, mouseX, mouseY, delta);
         if (renameBtn != null) renameBtn.render(context, mouseX, mouseY, delta);
-        if (saveToServerBtn != null && saveToServerBtn.visible) saveToServerBtn.render(context, mouseX, mouseY, delta);
+        if (saveToServerBtn != null) saveToServerBtn.render(context, mouseX, mouseY, delta);
+    }
+    
+    /**
+     * Renders single-panel layout (fallback).
+     */
+    private void renderSingleMode(DrawContext context, int mouseX, int mouseY, float delta) {
+        int bx = bounds.x();
+        int by = bounds.y();
+        int bw = bounds.width();
+        int bh = bounds.height();
+        
+        var textRenderer = MinecraftClient.getInstance().textRenderer;
+        
+        // Panel background
+        context.fill(bx, by, bx + bw, by + bh, GuiConstants.BG_PANEL);
+        context.drawBorder(bx, by, bw, bh, GuiConstants.BORDER);
+        
+        // Profile list
+        int listY = by + GuiConstants.PADDING + FILTER_HEIGHT + SECTION_GAP;
+        int listH = bh - GuiConstants.PADDING * 2 - FILTER_HEIGHT * 2 - BTN_HEIGHT * 2 - SECTION_GAP * 3;
+        int listW = bw - GuiConstants.PADDING * 2;
+        
+        context.fill(bx + GuiConstants.PADDING, listY, bx + bw - GuiConstants.PADDING, listY + listH, 0xFF1A1A1A);
+        context.drawBorder(bx + GuiConstants.PADDING, listY, listW, listH, GuiConstants.BORDER);
+        
+        context.drawText(textRenderer, "(" + filteredProfiles.size() + ")", bx + GuiConstants.PADDING + 4, listY + 4, 
+            GuiConstants.TEXT_SECONDARY, false);
+        
+        // Enable scissor for list
+        context.enableScissor(bx + GuiConstants.PADDING, listY + LIST_HEADER_HEIGHT, 
+            bx + bw - GuiConstants.PADDING, listY + listH);
+        
+        int itemY = listY + LIST_HEADER_HEIGHT - listScrollOffset;
+        for (int i = 0; i < filteredProfiles.size(); i++) {
+            if (itemY + ITEM_HEIGHT > listY + LIST_HEADER_HEIGHT && itemY < listY + listH) {
+                boolean selected = i == selectedProfileIndex;
+                boolean hovered = mouseX >= bx + GuiConstants.PADDING && mouseX < bx + bw - GuiConstants.PADDING && 
+                                  mouseY >= itemY && mouseY < itemY + ITEM_HEIGHT;
+                
+                if (selected) {
+                    context.fill(bx + GuiConstants.PADDING + 2, itemY, 
+                        bx + bw - GuiConstants.PADDING - 2, itemY + ITEM_HEIGHT - 2, GuiConstants.ACCENT);
+                } else if (hovered) {
+                    context.fill(bx + GuiConstants.PADDING + 2, itemY, 
+                        bx + bw - GuiConstants.PADDING - 2, itemY + ITEM_HEIGHT - 2, 0x40FFFFFF);
+                }
+                
+                ProfileEntry entry = filteredProfiles.get(i);
+                String icon = entry.isServer() ? "🔒" : "✎";
+                int textColor = selected ? 0xFFFFFFFF : GuiConstants.TEXT_PRIMARY;
+                context.drawText(textRenderer, icon + " " + entry.name(), bx + GuiConstants.PADDING + 4, itemY + 5, textColor, false);
+            }
+            itemY += ITEM_HEIGHT;
+        }
+        
+        context.disableScissor();
         
         // Dirty indicator
         if (state.isDirty()) {
-            context.drawText(textRenderer, "● Unsaved changes", x, panelHeight - 20, GuiConstants.WARNING, false);
+            context.drawText(textRenderer, "●", bx + bw - 16, by + 4, GuiConstants.WARNING, false);
+        }
+        
+        // Render widgets
+        if (sourceFilter != null) sourceFilter.render(context, mouseX, mouseY, delta);
+        if (categoryFilter != null) categoryFilter.render(context, mouseX, mouseY, delta);
+        if (searchField != null) searchField.render(context, mouseX, mouseY, delta);
+        if (nameField != null) nameField.render(context, mouseX, mouseY, delta);
+        if (loadBtn != null) loadBtn.render(context, mouseX, mouseY, delta);
+        if (saveBtn != null) saveBtn.render(context, mouseX, mouseY, delta);
+        if (deleteBtn != null) deleteBtn.render(context, mouseX, mouseY, delta);
+        if (saveAsBtn != null) saveAsBtn.render(context, mouseX, mouseY, delta);
+        if (duplicateBtn != null) duplicateBtn.render(context, mouseX, mouseY, delta);
+        if (renameBtn != null) renameBtn.render(context, mouseX, mouseY, delta);
+    }
+    
+    private int drawSummaryLine(DrawContext context, net.minecraft.client.font.TextRenderer textRenderer,
+                               int x, int y, String label, String value) {
+        context.drawText(textRenderer, label + ":", x, y, GuiConstants.TEXT_SECONDARY, false);
+        context.drawText(textRenderer, value != null ? value : "—", x + 70, y, GuiConstants.TEXT_PRIMARY, false);
+        return y + 14;
+    }
+    
+    @Override
+    public void applyBoundsOffset() {
+        // In dual mode, widgets are already at absolute positions
+        // In single mode, apply offset from base bounds
+        if (!isDualMode()) {
+            super.applyBoundsOffset();
+            
+            int dx = bounds.x();
+            int dy = bounds.y();
+            
+            // Offset our custom widgets
+            offsetWidget(sourceFilter, dx, dy);
+            offsetWidget(categoryFilter, dx, dy);
+            offsetWidget(searchField, dx, dy);
+            offsetWidget(nameField, dx, dy);
+            offsetWidget(loadBtn, dx, dy);
+            offsetWidget(saveBtn, dx, dy);
+            offsetWidget(saveAsBtn, dx, dy);
+            offsetWidget(deleteBtn, dx, dy);
+            offsetWidget(duplicateBtn, dx, dy);
+            offsetWidget(renameBtn, dx, dy);
+            offsetWidget(saveToServerBtn, dx, dy);
         }
     }
     
-    private int drawSummaryLine(DrawContext ctx, net.minecraft.client.font.TextRenderer renderer, int x, int y, String label, String value) {
-        ctx.drawText(renderer, label + ":", x, y, GuiConstants.TEXT_SECONDARY, false);
-        ctx.drawText(renderer, value, x + 70, y, GuiConstants.TEXT_PRIMARY, false);
-        return y + 12;
-    }
-    
-    private void loadProfile() {
-        ProfileEntry entry = getSelectedProfile();
-        if (entry == null) return;
-        
-        state.setCurrentProfile(entry.name(), entry.isServer());
-        state.clearDirty();
-        state.saveProfileSnapshot();
-        ToastNotification.success("Loaded: " + entry.name());
-        Logging.GUI.topic("profile").info("Loaded profile: {}", entry.name());
-    }
-    
-    private void saveProfile() {
-        ProfileEntry entry = getSelectedProfile();
-        if (entry == null || entry.isServer()) {
-            ToastNotification.warning("Cannot save server profile - use Save As");
-            return;
+    private void offsetWidget(net.minecraft.client.gui.widget.ClickableWidget widget, int dx, int dy) {
+        if (widget != null) {
+            widget.setX(widget.getX() + dx);
+            widget.setY(widget.getY() + dy);
         }
-        
-        state.clearDirty();
-        ToastNotification.success("Saved: " + entry.name());
-    }
-    
-    private void saveAsProfile() {
-        String name = nameField.getText().trim();
-        if (name.isEmpty()) {
-            ToastNotification.warning("Enter a profile name");
-            return;
-        }
-        
-        // Add new profile entry
-        boolean exists = allProfiles.stream().anyMatch(p -> p.name().equals(name));
-        if (!exists) {
-            allProfiles.add(new ProfileEntry(name, false));
-            applyFilters();
-        }
-        
-        state.setCurrentProfile(name, false);
-        state.clearDirty();
-        ToastNotification.success("Saved as: " + name);
-    }
-    
-    private void deleteProfile() {
-        ProfileEntry entry = getSelectedProfile();
-        if (entry == null) return;
-        
-        if (entry.isServer()) {
-            ToastNotification.warning("Cannot delete server profile");
-            return;
-        }
-        
-        if (allProfiles.size() <= 1) {
-            ToastNotification.warning("Cannot delete last profile");
-            return;
-        }
-        
-        String name = entry.name();
-        allProfiles.remove(entry);
-        applyFilters();
-        ToastNotification.info("Deleted: " + name);
-    }
-    
-    private void duplicateProfile() {
-        ProfileEntry entry = getSelectedProfile();
-        if (entry == null) return;
-        
-        String newName = entry.name() + " (Copy)";
-        allProfiles.add(new ProfileEntry(newName, false));
-        applyFilters();
-        
-        // Select the new profile
-        for (int i = 0; i < filteredProfiles.size(); i++) {
-            if (filteredProfiles.get(i).name().equals(newName)) {
-                selectedProfileIndex = i;
-                nameField.setText(newName);
-                break;
-            }
-        }
-        
-        ToastNotification.info("Duplicated: " + entry.name());
-    }
-    
-    private void renameProfile() {
-        ProfileEntry entry = getSelectedProfile();
-        if (entry == null || entry.isServer()) {
-            ToastNotification.warning("Cannot rename server profile");
-            return;
-        }
-        
-        String newName = nameField.getText().trim();
-        if (newName.isEmpty()) {
-            ToastNotification.warning("Enter a name");
-            return;
-        }
-        
-        // Remove old, add new
-        int idx = allProfiles.indexOf(entry);
-        if (idx >= 0) {
-            allProfiles.set(idx, new ProfileEntry(newName, false));
-            applyFilters();
-            ToastNotification.info("Renamed: " + entry.name() + " → " + newName);
-        }
-    }
-    
-    /**
-     * Prompt before saving to server (OP only).
-     */
-    private void promptSaveToServer() {
-        String name = nameField.getText().trim();
-        if (name.isEmpty()) {
-            ToastNotification.warning("Enter a profile name");
-            return;
-        }
-        
-        // Show warning dialog
-        ConfirmDialog.show(parent,
-            "Save to Server",
-            "This will save '" + name + "' as a server profile. All players will be able to use this profile.",
-            () -> doSaveToServer(name)
-        );
-    }
-    
-    /**
-     * Send profile to server for OP save.
-     */
-    private void doSaveToServer(String name) {
-        // Build profile JSON from current state
-        String json = state.toProfileJson(name);
-        
-        // Send to server
-        ClientPlayNetworking.send(ProfileSaveC2SPayload.saveToServer(name, json));
-        ToastNotification.info("Saving to server: " + name);
-        Logging.GUI.topic("profile").info("OP saving server profile: {}", name);
-    }
-    
-    private ProfileEntry getSelectedProfile() {
-        if (selectedProfileIndex >= 0 && selectedProfileIndex < filteredProfiles.size()) {
-            return filteredProfiles.get(selectedProfileIndex);
-        }
-        return null;
-    }
-    
-    private String getSelectedProfileName() {
-        ProfileEntry entry = getSelectedProfile();
-        return entry != null ? entry.name() : "Default";
-    }
-    
-    private void updateButtonStates() {
-        ProfileEntry entry = getSelectedProfile();
-        boolean hasSelection = entry != null;
-        boolean isLocal = hasSelection && !entry.isServer();
-        boolean isDirty = state.isDirty();
-        boolean isOp = isPlayerOp();
-        
-        if (loadBtn != null) loadBtn.active = hasSelection;
-        if (saveBtn != null) saveBtn.active = isDirty && isLocal;
-        if (saveAsBtn != null) saveAsBtn.active = true;
-        if (deleteBtn != null) deleteBtn.active = isLocal && allProfiles.size() > 1;
-        if (duplicateBtn != null) duplicateBtn.active = hasSelection;
-        if (renameBtn != null) renameBtn.active = isLocal;
-        
-        // OP-only button
-        if (saveToServerBtn != null) {
-            saveToServerBtn.active = isOp;
-            saveToServerBtn.visible = isOp;
-        }
-    }
-    
-    /**
-     * Check if current player has OP permissions.
-     */
-    private boolean isPlayerOp() {
-        var player = MinecraftClient.getInstance().player;
-        return player != null && player.hasPermissionLevel(2);
-    }
-    
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        int x = GuiConstants.PADDING;
-        int y = GuiConstants.TAB_HEIGHT + GuiConstants.PADDING + FILTER_ROW_HEIGHT;
-        int w = panelWidth - GuiConstants.PADDING * 2;
-        int listW = (w - GuiConstants.PADDING) / 2;
-        
-        if (mouseX >= x && mouseX < x + listW && mouseY >= y + 16 && mouseY < y + LIST_HEIGHT) {
-            int clickedIndex = (int) ((mouseY - y - 16 + listScrollOffset) / ITEM_HEIGHT);
-            if (clickedIndex >= 0 && clickedIndex < filteredProfiles.size()) {
-                selectedProfileIndex = clickedIndex;
-                nameField.setText(getSelectedProfileName());
-                updateButtonStates();
-                return true;
-            }
-        }
-        return false;
-    }
-    
-    public boolean mouseScrolled(double mouseX, double mouseY, double hAmount, double vAmount) {
-        int maxScroll = Math.max(0, filteredProfiles.size() * ITEM_HEIGHT - (LIST_HEIGHT - 18));
-        listScrollOffset = Math.max(0, Math.min(maxScroll, listScrollOffset - (int)(vAmount * ITEM_HEIGHT)));
-        return true;
     }
     
     public List<net.minecraft.client.gui.widget.ClickableWidget> getWidgets() {
@@ -507,8 +592,221 @@ public class ProfilesPanel extends AbstractPanel {
         if (deleteBtn != null) list.add(deleteBtn);
         if (duplicateBtn != null) list.add(duplicateBtn);
         if (renameBtn != null) list.add(renameBtn);
-        if (saveToServerBtn != null && saveToServerBtn.visible) list.add(saveToServerBtn);
+        if (saveToServerBtn != null) list.add(saveToServerBtn);
         return list;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MOUSE HANDLING
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button != 0) return false;
+        
+        // Determine list bounds
+        int listX, listY, listW, listH;
+        if (isDualMode()) {
+            listX = leftBounds.x() + GuiConstants.PADDING;
+            listY = leftBounds.y() + GuiConstants.PADDING + FILTER_HEIGHT * 2 + FILTER_GAP * 2 + SECTION_GAP;
+            listW = leftBounds.width() - GuiConstants.PADDING * 2;
+            listH = leftBounds.bottom() - listY - FILTER_HEIGHT - SECTION_GAP - GuiConstants.PADDING;
+        } else {
+            listX = bounds.x() + GuiConstants.PADDING;
+            listY = bounds.y() + GuiConstants.PADDING + FILTER_HEIGHT + SECTION_GAP;
+            listW = bounds.width() - GuiConstants.PADDING * 2;
+            listH = bounds.height() - GuiConstants.PADDING * 2 - FILTER_HEIGHT * 2 - BTN_HEIGHT * 2 - SECTION_GAP * 3;
+        }
+        
+        if (mouseX >= listX && mouseX < listX + listW && 
+            mouseY >= listY + LIST_HEADER_HEIGHT && mouseY < listY + listH) {
+            
+            int relY = (int) mouseY - listY - LIST_HEADER_HEIGHT + listScrollOffset;
+            int idx = relY / ITEM_HEIGHT;
+            
+            if (idx >= 0 && idx < filteredProfiles.size()) {
+                selectedProfileIndex = idx;
+                if (nameField != null) {
+                    nameField.setText(getSelectedProfileName());
+                }
+                updateButtonStates();
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    public boolean mouseScrolled(double mouseX, double mouseY, double hAmount, double vAmount) {
+        // Determine list bounds
+        int listH;
+        if (isDualMode()) {
+            int listY = leftBounds.y() + GuiConstants.PADDING + FILTER_HEIGHT * 2 + FILTER_GAP * 2 + SECTION_GAP;
+            listH = leftBounds.bottom() - listY - FILTER_HEIGHT - SECTION_GAP - GuiConstants.PADDING;
+        } else {
+            listH = bounds.height() - GuiConstants.PADDING * 2 - FILTER_HEIGHT * 2 - BTN_HEIGHT * 2 - SECTION_GAP * 3;
+        }
+        
+        int contentH = filteredProfiles.size() * ITEM_HEIGHT;
+        int maxScroll = Math.max(0, contentH - (listH - LIST_HEADER_HEIGHT));
+        listScrollOffset = Math.max(0, Math.min(maxScroll, listScrollOffset - (int)(vAmount * ITEM_HEIGHT)));
+        return true;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PROFILE ACTIONS
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    private String getSelectedProfileName() {
+        if (selectedProfileIndex >= 0 && selectedProfileIndex < filteredProfiles.size()) {
+            return filteredProfiles.get(selectedProfileIndex).name();
+        }
+        return "";
+    }
+    
+    private ProfileEntry getSelectedProfile() {
+        if (selectedProfileIndex >= 0 && selectedProfileIndex < filteredProfiles.size()) {
+            return filteredProfiles.get(selectedProfileIndex);
+        }
+        return null;
+    }
+    
+    private void updateButtonStates() {
+        ProfileEntry selected = getSelectedProfile();
+        boolean hasSelection = selected != null;
+        boolean isServerProfile = hasSelection && selected.isServer();
+        boolean isDefaultProfile = hasSelection && selected.name().equalsIgnoreCase("default");
+        boolean canModify = hasSelection && !isServerProfile;
+        boolean canDelete = canModify && !isDefaultProfile;
+
+        if (loadBtn != null) loadBtn.active = hasSelection;
+        if (saveBtn != null) saveBtn.active = canModify && state.isDirty();
+        if (deleteBtn != null) deleteBtn.active = canDelete;
+        if (saveAsBtn != null) saveAsBtn.active = true;
+        if (duplicateBtn != null) duplicateBtn.active = hasSelection;
+        if (renameBtn != null) renameBtn.active = canModify;
+        
+        if (saveToServerBtn != null) {
+            var player = MinecraftClient.getInstance().player;
+            boolean isOp = player != null && player.hasPermissionLevel(2);
+            saveToServerBtn.visible = isOp;
+            saveToServerBtn.active = isOp && hasSelection;
+        }
+    }
+    
+    private void loadProfile() {
+        ProfileEntry entry = getSelectedProfile();
+        if (entry != null) {
+            // Set as current profile (actual loading happens via network for server profiles)
+            state.setCurrentProfile(entry.name(), entry.isServer());
+            ToastNotification.success("Loaded: " + entry.name());
+            Logging.GUI.info("Loaded profile: {}", entry.name());
+        }
+    }
+    
+    private void saveProfile() {
+        ProfileEntry entry = getSelectedProfile();
+        if (entry != null && !entry.isServer()) {
+            // Mark as saved (actual persistence is external)
+            state.setCurrentProfile(entry.name(), false);
+            state.clearDirty();
+            ToastNotification.success("Saved: " + entry.name());
+            Logging.GUI.info("Saved profile: {}", entry.name());
+            updateButtonStates();
+        }
+    }
+    
+    private void saveAsProfile() {
+        String name = nameField != null ? nameField.getText().trim() : "";
+        if (name.isEmpty()) {
+            ToastNotification.warning("Enter a profile name");
+            return;
+        }
+        
+        boolean exists = allProfiles.stream().anyMatch(p -> p.name().equals(name));
+        if (exists) {
+            ToastNotification.warning("Profile already exists");
+            return;
+        }
+        
+        // Add to local profiles list and set as current
+        allProfiles.add(new ProfileEntry(name, false, ""));
+        state.setCurrentProfile(name, false);
+        state.clearDirty();
+        applyFilters();
+        ToastNotification.success("Created: " + name);
+        Logging.GUI.info("Created profile: {}", name);
+    }
+    
+    private void deleteProfile() {
+        ProfileEntry entry = getSelectedProfile();
+        if (entry != null && !entry.isServer()) {
+            // Prevent deleting the default profile
+            if (entry.name().equalsIgnoreCase("default")) {
+                ToastNotification.warning("Cannot delete default profile");
+                return;
+            }
+            allProfiles.remove(entry);
+            applyFilters();
+            ToastNotification.success("Deleted: " + entry.name());
+            Logging.GUI.info("Deleted profile: {}", entry.name());
+        }
+    }
+    
+    private void duplicateProfile() {
+        ProfileEntry entry = getSelectedProfile();
+        if (entry != null) {
+            String baseName = entry.name() + " (copy)";
+            String finalName = baseName;
+            int counter = 1;
+            while (profileNameExists(finalName)) {
+                finalName = entry.name() + " (copy " + (++counter) + ")";
+            }
+            // Duplicate in list with same description
+            allProfiles.add(new ProfileEntry(finalName, false, entry.description()));
+            applyFilters();
+            ToastNotification.success("Duplicated: " + finalName);
+            Logging.GUI.info("Duplicated profile {} to {}", entry.name(), finalName);
+        }
+    }
+    
+    private boolean profileNameExists(String name) {
+        for (ProfileEntry p : allProfiles) {
+            if (p.name().equals(name)) return true;
+        }
+        return false;
+    }
+    
+    private void renameProfile() {
+        ProfileEntry entry = getSelectedProfile();
+        String newName = nameField != null ? nameField.getText().trim() : "";
+        
+        if (entry == null || entry.isServer() || newName.isEmpty()) return;
+        if (newName.equals(entry.name())) return;
+        
+        boolean exists = allProfiles.stream().anyMatch(p -> p.name().equals(newName));
+        if (exists) {
+            ToastNotification.warning("Name already exists");
+            return;
+        }
+        
+        // Update in list
+        int idx = allProfiles.indexOf(entry);
+        if (idx >= 0) {
+            allProfiles.set(idx, new ProfileEntry(newName, entry.isServer(), entry.description()));
+        }
+        applyFilters();
+        ToastNotification.success("Renamed to: " + newName);
+        Logging.GUI.info("Renamed profile {} to {}", entry.name(), newName);
+    }
+    
+    private void promptSaveToServer() {
+        ProfileEntry entry = getSelectedProfile();
+        if (entry == null) return;
+        
+        // Send to server using proper constructor
+        String jsonStr = state.toProfileJson(entry.name());
+        ClientPlayNetworking.send(ProfileSaveC2SPayload.saveToServer(entry.name(), jsonStr));
+        ToastNotification.info("Sent to server: " + entry.name());
+        Logging.GUI.info("Sent profile to server: {}", entry.name());
     }
     
     public List<String> getProfileNames() {

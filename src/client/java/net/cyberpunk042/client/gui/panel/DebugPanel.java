@@ -1,13 +1,16 @@
 package net.cyberpunk042.client.gui.panel;
 
+import net.cyberpunk042.client.gui.panel.sub.ArrangeSubPanel;
 import net.cyberpunk042.client.gui.panel.sub.BindingsSubPanel;
 import net.cyberpunk042.client.gui.panel.sub.BeamSubPanel;
 import net.cyberpunk042.client.gui.panel.sub.LifecycleSubPanel;
 import net.cyberpunk042.client.gui.panel.sub.TriggerSubPanel;
+import net.cyberpunk042.client.gui.render.TestFieldRenderer;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.state.FieldEditStateHolder;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.GuiWidgets;
+import net.cyberpunk042.client.gui.widget.ToastNotification;
 import net.cyberpunk042.log.Logging;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -33,8 +36,10 @@ public class DebugPanel extends AbstractPanel {
     private TriggerSubPanel triggerPanel;
     private BindingsSubPanel bindingsPanel;
     private BeamSubPanel beamPanel;
+    private ArrangeSubPanel arrangePanel;
     
     private ButtonWidget testFieldBtn;
+    private ButtonWidget debounceToggleBtn;
     
     private int scrollOffset = 0;
     private int contentHeight = 0;
@@ -49,7 +54,7 @@ public class DebugPanel extends AbstractPanel {
         this.panelWidth = width;
         this.panelHeight = height;
         
-        if (!state.isDebugUnlocked()) {
+        if (!state.getBool("debugUnlocked")) {
             Logging.GUI.topic("panel").warn("Debug panel accessed without unlock");
         }
         
@@ -64,6 +69,21 @@ public class DebugPanel extends AbstractPanel {
             "Spawn/despawn a test field following you",
             () -> FieldEditStateHolder.toggleTestField()
         );
+        contentY += 24;
+        
+        // Debounce toggle button (for immediate preview updates)
+        int smallBtnWidth = 180;
+        int smallBtnX = (width - smallBtnWidth) / 2;
+        debounceToggleBtn = GuiWidgets.button(
+            smallBtnX, contentY, smallBtnWidth,
+            getDebounceButtonLabel(),
+            "Toggle render debouncing (for performance vs responsiveness)",
+            () -> {
+                TestFieldRenderer.setDebounceEnabled(!TestFieldRenderer.isDebounceEnabled());
+                debounceToggleBtn.setMessage(net.minecraft.text.Text.literal(getDebounceButtonLabel()));
+                ToastNotification.info("Debounce: " + (TestFieldRenderer.isDebounceEnabled() ? "ON" : "OFF"));
+            }
+        );
         contentY += 28;
         
         // G82-G85: Lifecycle controls
@@ -77,16 +97,22 @@ public class DebugPanel extends AbstractPanel {
         contentY += triggerPanel.getHeight() + GuiConstants.SECTION_SPACING;
         
         // Bindings panel (property <- source mappings)
-        bindingsPanel = new BindingsSubPanel(state, 0, contentY, width);
+        bindingsPanel = new BindingsSubPanel(parent, state, contentY);
         contentY += bindingsPanel.getHeight() + GuiConstants.SECTION_SPACING;
 
         // Beam config panel
-        beamPanel = new BeamSubPanel(state, 0, contentY, width);
+        beamPanel = new BeamSubPanel(parent, state, contentY);
+        beamPanel.init(width, height);
         contentY += beamPanel.getHeight() + GuiConstants.SECTION_SPACING;
+        
+        // Arrangement/Shuffle panel (uses setBounds which triggers init via reflow)
+        arrangePanel = new ArrangeSubPanel(parent, state, MinecraftClient.getInstance().textRenderer);
+        arrangePanel.setBounds(new net.cyberpunk042.client.gui.layout.Bounds(0, contentY, width, 300));
+        contentY += arrangePanel.getHeight() + GuiConstants.SECTION_SPACING;
         
         contentHeight = contentY;
         
-        Logging.GUI.topic("panel").debug("DebugPanel initialized with 4 sub-panels");
+        Logging.GUI.topic("panel").debug("DebugPanel initialized with 5 sub-panels");
     }
     
     @Override
@@ -106,7 +132,7 @@ public class DebugPanel extends AbstractPanel {
         context.fill(0, panelY, panelWidth, panelHeight, GuiConstants.BG_PANEL);
         
         // Warning banner if not unlocked
-        if (!state.isDebugUnlocked()) {
+        if (!state.getBool("debugUnlocked")) {
             context.drawCenteredTextWithShadow(
                 net.minecraft.client.MinecraftClient.getInstance().textRenderer,
                 "⚠ Debug Mode - Operator Access Required",
@@ -122,6 +148,11 @@ public class DebugPanel extends AbstractPanel {
             testFieldBtn.render(context, mouseX, mouseY, delta);
         }
         
+        // Render debounce toggle
+        if (debounceToggleBtn != null) {
+            debounceToggleBtn.render(context, mouseX, mouseY, delta);
+        }
+        
         if (lifecyclePanel != null) {
             lifecyclePanel.setScrollOffset(scrollOffset);
             lifecyclePanel.render(context, mouseX, mouseY + scrollOffset, delta);
@@ -135,6 +166,9 @@ public class DebugPanel extends AbstractPanel {
         }
         if (beamPanel != null) {
             beamPanel.render(context, mouseX, mouseY + scrollOffset, delta);
+        }
+        if (arrangePanel != null) {
+            arrangePanel.render(context, mouseX, mouseY + scrollOffset, delta);
         }
         
         context.disableScissor();
@@ -152,10 +186,23 @@ public class DebugPanel extends AbstractPanel {
             : "§a▶ Spawn Test Field";
     }
     
+    private String getDebounceButtonLabel() {
+        return TestFieldRenderer.isDebounceEnabled()
+            ? "§7Debounce: §aON §7(60fps)"
+            : "§7Debounce: §cOFF §7(immediate)";
+    }
+    
     /**
      * Returns the test field button for Screen to add as a child widget.
      */
     public ButtonWidget getTestFieldButton() {
         return testFieldBtn;
+    }
+    
+    /**
+     * Returns the debounce toggle button for Screen to add as a child widget.
+     */
+    public ButtonWidget getDebounceToggleButton() {
+        return debounceToggleBtn;
     }
 }

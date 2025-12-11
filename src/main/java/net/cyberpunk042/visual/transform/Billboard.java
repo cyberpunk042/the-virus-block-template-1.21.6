@@ -11,13 +11,29 @@ package net.cyberpunk042.visual.transform;
  */
 public enum Billboard {
     /** No billboarding - primitive maintains its orientation (DEFAULT) */
-    NONE,
+    NONE("None"),
     
     /** Fully faces the camera on all axes */
-    FULL,
+    FULL("Full Billboard"),
     
     /** Rotates around Y-axis only to face camera (like a tree in old games) */
-    Y_AXIS;
+    Y_AXIS("Y-Axis Only");
+    
+    private final String label;
+    
+    Billboard(String label) {
+        this.label = label;
+    }
+    
+    /** Display label for GUI */
+    public String label() {
+        return label;
+    }
+    
+    @Override
+    public String toString() {
+        return label;
+    }
     
     /**
      * Parse from string (case-insensitive).

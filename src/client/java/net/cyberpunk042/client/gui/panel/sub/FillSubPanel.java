@@ -4,46 +4,58 @@ import net.cyberpunk042.client.gui.panel.AbstractPanel;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.GuiWidgets;
-import net.cyberpunk042.client.gui.widget.ExpandableSection;
 import net.cyberpunk042.client.gui.widget.LabeledSlider;
 import net.cyberpunk042.client.gui.util.FragmentRegistry;
 import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.visual.fill.CageOptionsAdapter;
+import java.util.List;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * FillSubPanel - Detailed fill mode options.
+ * 
+ * <p>Uses {@link CageOptionsAdapter} for shape-aware cage option editing
+ * with dynamic labels based on the current shape type.</p>
  * 
  * <p>From 03_PARAMETERS.md §6 Fill Level:</p>
  * <ul>
  *   <li>wireThickness, doubleSided, depthTest, depthWrite</li>
- *   <li>Cage: latitudeCount, longitudeCount, showEquator, showPoles</li>
+ *   <li>Cage: shape-specific options via CageOptionsAdapter</li>
  *   <li>Points: pointSize</li>
  * </ul>
+ * 
+ * <p>Note: This panel is displayed inside a sub-tab, so it renders content
+ * directly without an ExpandableSection header.</p>
  */
 public class FillSubPanel extends AbstractPanel {
     
-    private ExpandableSection section;
     private int startY;
-    private final List<net.minecraft.client.gui.widget.ClickableWidget> widgets = new ArrayList<>();
     private CyclingButtonWidget<String> fragmentDropdown;
     private boolean applyingFragment = false;
     private String currentFragment = "Default";
     
+    // Common fill options
     private LabeledSlider wireThicknessSlider;
     private CyclingButtonWidget<Boolean> doubleSidedToggle;
     private CyclingButtonWidget<Boolean> depthTestToggle;
     private CyclingButtonWidget<Boolean> depthWriteToggle;
     
-    // Cage-specific
-    private LabeledSlider latCountSlider;
-    private LabeledSlider lonCountSlider;
+    // Cage-specific (dynamic labels via adapter)
+    private LabeledSlider primaryCountSlider;
+    private LabeledSlider secondaryCountSlider;
+    private CyclingButtonWidget<Boolean> showEquatorToggle;
+    private CyclingButtonWidget<Boolean> showPolesToggle;
+    private CyclingButtonWidget<Boolean> showCapsToggle;
+    private CyclingButtonWidget<Boolean> allEdgesToggle;
+    private CyclingButtonWidget<Boolean> faceOutlinesToggle;
+    
     // Points-specific
     private LabeledSlider pointSizeSlider;
+    
+    // Current adapter for shape-aware cage options
+    private CageOptionsAdapter cageAdapter;
     
     public FillSubPanel(Screen parent, FieldEditState state, int startY) {
         super(parent, state);
@@ -57,45 +69,41 @@ public class FillSubPanel extends AbstractPanel {
         this.panelHeight = height;
         widgets.clear();
         
-        section = new ExpandableSection(
-            GuiConstants.PADDING, startY,
-            width - GuiConstants.PADDING * 2,
-            "Fill Options", false
-        );
+        // Initialize adapter based on current shape
+        cageAdapter = CageOptionsAdapter.forShape(state.shapeType, state.fill().cage());
         
         int x = GuiConstants.PADDING;
-        int y = section.getContentY();
+        int y = startY + GuiConstants.PADDING;
         int w = width - GuiConstants.PADDING * 2;
         int halfW = (w - GuiConstants.PADDING) / 2;
 
         // Preset dropdown
-        fragmentDropdown = CyclingButtonWidget.<String>builder(net.minecraft.text.Text::literal)
-            .values(FragmentRegistry.listFillFragments())
+        List<String> fillPresets = FragmentRegistry.listFillFragments();
+
+        fragmentDropdown = CyclingButtonWidget.<String>builder(v -> net.minecraft.text.Text.literal(v))
+            .values(fillPresets)
             .initially(currentFragment)
-            .build(
-                x, y, w, GuiConstants.WIDGET_HEIGHT,
-                net.minecraft.text.Text.literal("Preset"),
-                (btn, val) -> applyPreset(val)
-            );
+            .build(x, y, w, GuiConstants.WIDGET_HEIGHT, net.minecraft.text.Text.literal("Variant"),
+                (btn, val) -> applyPreset(val));
         widgets.add(fragmentDropdown);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
         // Wire thickness
         wireThicknessSlider = LabeledSlider.builder("Wire Thickness")
             .position(x, y).width(w)
-            .range(0.1f, 5f).initial(state.getWireThickness()).format("%.1f")
+            .range(0.1f, 5f).initial(state.fill().wireThickness()).format("%.1f")
             .onChange(v -> onUserChange(() -> {
-                state.setWireThickness(v);
+                state.set("fill.wireThickness", v);
                 Logging.GUI.topic("fill").trace("Wire thickness: {}", v);
             })).build();
         widgets.add(wireThicknessSlider);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
         // Double sided
-        doubleSidedToggle = GuiWidgets.toggle(x, y, halfW, "Double Sided", state.isDoubleSided(),
+        doubleSidedToggle = GuiWidgets.toggle(x, y, halfW, "Double Sided", state.fill().doubleSided(),
             "Render both faces", v -> {
                 onUserChange(() -> {
-                    state.setDoubleSided(v);
+                    state.set("fill.doubleSided", v);
                     Logging.GUI.topic("fill").debug("Double sided: {}", v);
                 });
             });
@@ -103,67 +111,130 @@ public class FillSubPanel extends AbstractPanel {
         
         // Depth test
         depthTestToggle = GuiWidgets.toggle(x + halfW + GuiConstants.PADDING, y, halfW, "Depth Test",
-            state.isDepthTest(), "Enable depth testing", v -> {
+            state.fill().depthTest(), "Enable depth testing", v -> {
                 onUserChange(() -> {
-                    state.setDepthTest(v);
+                    state.set("fill.depthTest", v);
                     Logging.GUI.topic("fill").debug("Depth test: {}", v);
                 });
             });
         widgets.add(depthTestToggle);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
-        // Cage settings section
-        latCountSlider = LabeledSlider.builder("Lat Lines")
-            .position(x, y).width(halfW)
-            .range(1, 32).initial(state.getCageLatCount()).format("%d").step(1)
-            .onChange(v -> onUserChange(() -> {
-                state.setCageLatCount(v.intValue());
-                Logging.GUI.topic("fill").trace("Cage lat: {}", v.intValue());
-            })).build();
-        widgets.add(latCountSlider);
+        // Cage settings - dynamic labels from adapter
+        if (cageAdapter.supportsCountOptions()) {
+            primaryCountSlider = LabeledSlider.builder(cageAdapter.primaryLabel())
+                .position(x, y).width(halfW)
+                .range(1, 32).initial(cageAdapter.primaryCount()).format("%d").step(1)
+                .onChange(v -> onUserChange(() -> {
+                    cageAdapter = cageAdapter.withPrimaryCount(v.intValue());
+                    updateCageInState();
+                    Logging.GUI.topic("fill").trace("Cage primary: {}", v.intValue());
+                })).build();
+            widgets.add(primaryCountSlider);
+            
+            secondaryCountSlider = LabeledSlider.builder(cageAdapter.secondaryLabel())
+                .position(x + halfW + GuiConstants.PADDING, y).width(halfW)
+                .range(1, 64).initial(cageAdapter.secondaryCount()).format("%d").step(1)
+                .onChange(v -> onUserChange(() -> {
+                    cageAdapter = cageAdapter.withSecondaryCount(v.intValue());
+                    updateCageInState();
+                    Logging.GUI.topic("fill").trace("Cage secondary: {}", v.intValue());
+                })).build();
+            widgets.add(secondaryCountSlider);
+            y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        }
         
-        lonCountSlider = LabeledSlider.builder("Lon Lines")
-            .position(x + halfW + GuiConstants.PADDING, y).width(halfW)
-            .range(1, 64).initial(state.getCageLonCount()).format("%d").step(1)
-            .onChange(v -> onUserChange(() -> {
-                state.setCageLonCount(v.intValue());
-                Logging.GUI.topic("fill").trace("Cage lon: {}", v.intValue());
-            })).build();
-        widgets.add(lonCountSlider);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        // Sphere-specific extras
+        if (cageAdapter.hasSphereExtras()) {
+            showEquatorToggle = GuiWidgets.toggle(x, y, halfW, "Show Equator", 
+                cageAdapter.showEquator(), "Show equator line", v -> {
+                    onUserChange(() -> {
+                        cageAdapter = cageAdapter.withShowEquator(v);
+                        updateCageInState();
+                    });
+                });
+            widgets.add(showEquatorToggle);
+            
+            showPolesToggle = GuiWidgets.toggle(x + halfW + GuiConstants.PADDING, y, halfW, 
+                "Show Poles", cageAdapter.showPoles(), "Show pole markers", v -> {
+                    onUserChange(() -> {
+                        cageAdapter = cageAdapter.withShowPoles(v);
+                        updateCageInState();
+                    });
+                });
+            widgets.add(showPolesToggle);
+            y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        }
+        
+        // Cylinder/Prism caps option
+        if (cageAdapter.hasCapsOption()) {
+            showCapsToggle = GuiWidgets.toggle(x, y, w, "Show Caps", 
+                cageAdapter.showCaps(), "Show top/bottom caps", v -> {
+                    onUserChange(() -> {
+                        cageAdapter = cageAdapter.withShowCaps(v);
+                        updateCageInState();
+                    });
+                });
+            widgets.add(showCapsToggle);
+            y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        }
+        
+        // Polyhedron-specific options
+        if (cageAdapter.hasPolyhedronExtras()) {
+            allEdgesToggle = GuiWidgets.toggle(x, y, halfW, "All Edges", 
+                cageAdapter.allEdges(), "Show all structural edges", v -> {
+                    onUserChange(() -> {
+                        cageAdapter = cageAdapter.withAllEdges(v);
+                        updateCageInState();
+                    });
+                });
+            widgets.add(allEdgesToggle);
+            
+            faceOutlinesToggle = GuiWidgets.toggle(x + halfW + GuiConstants.PADDING, y, halfW, 
+                "Face Outlines", cageAdapter.faceOutlines(), "Show face outlines only", v -> {
+                    onUserChange(() -> {
+                        cageAdapter = cageAdapter.withFaceOutlines(v);
+                        updateCageInState();
+                    });
+                });
+            widgets.add(faceOutlinesToggle);
+            y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        }
         
         // Point size
         pointSizeSlider = LabeledSlider.builder("Point Size")
             .position(x, y).width(w)
-            .range(1f, 10f).initial(state.getPointSize()).format("%.1f")
+            .range(1f, 10f).initial(state.pointSize).format("%.1f")
             .onChange(v -> onUserChange(() -> {
-                state.setPointSize(v);
+                state.set("pointSize", v);
                 Logging.GUI.topic("fill").trace("Point size: {}", v);
             })).build();
         widgets.add(pointSizeSlider);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
-        section.setContentHeight(y - section.getContentY());
-        Logging.GUI.topic("panel").debug("FillSubPanel initialized");
+        // Track content height for scrolling
+        contentHeight = y - startY;
+        Logging.GUI.topic("panel").debug("FillSubPanel initialized for shape: {}", cageAdapter.shapeType());
+    }
+    
+    /** Updates the cage options in state's fill config. */
+    private void updateCageInState() {
+        var newFill = state.fill().toBuilder().cage(cageAdapter.build()).build();
+        state.set("fill", newFill);
     }
     
     @Override public void tick() {}
     
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        section.render(context, net.minecraft.client.MinecraftClient.getInstance().textRenderer, mouseX, mouseY, delta);
-        if (section.isExpanded()) {
-            for (var widget : widgets) widget.render(context, mouseX, mouseY, delta);
+        // Render all widgets directly (no expandable section)
+        for (var widget : widgets) {
+            widget.render(context, mouseX, mouseY, delta);
         }
     }
     
-    public int getHeight() { return section.getTotalHeight(); }
-    
-    public List<net.minecraft.client.gui.widget.ClickableWidget> getWidgets() {
-        List<net.minecraft.client.gui.widget.ClickableWidget> all = new ArrayList<>();
-        all.add(section.getHeaderButton());
-        all.addAll(widgets);
-        return all;
+    public int getHeight() { 
+        return contentHeight; 
     }
 
     private void onUserChange(Runnable r) {
@@ -187,12 +258,33 @@ public class FillSubPanel extends AbstractPanel {
     }
 
     private void syncFromState() {
-        if (wireThicknessSlider != null) wireThicknessSlider.setValue(state.getWireThickness());
-        if (doubleSidedToggle != null) doubleSidedToggle.setValue(state.isDoubleSided());
-        if (depthTestToggle != null) depthTestToggle.setValue(state.isDepthTest());
-        if (depthWriteToggle != null) depthWriteToggle.setValue(state.isDepthWrite());
-        if (latCountSlider != null) latCountSlider.setValue(state.getCageLatCount());
-        if (lonCountSlider != null) lonCountSlider.setValue(state.getCageLonCount());
-        if (pointSizeSlider != null) pointSizeSlider.setValue(state.getPointSize());
+        // Refresh adapter for current shape
+        cageAdapter = CageOptionsAdapter.forShape(state.shapeType, state.fill().cage());
+        
+        if (wireThicknessSlider != null) wireThicknessSlider.setValue(state.fill().wireThickness());
+        if (doubleSidedToggle != null) doubleSidedToggle.setValue(state.fill().doubleSided());
+        if (depthTestToggle != null) depthTestToggle.setValue(state.fill().depthTest());
+        if (depthWriteToggle != null) depthWriteToggle.setValue(state.fill().depthWrite());
+        
+        // Cage values from adapter
+        if (primaryCountSlider != null && cageAdapter.supportsCountOptions()) {
+            primaryCountSlider.setValue(cageAdapter.primaryCount());
+        }
+        if (secondaryCountSlider != null && cageAdapter.supportsCountOptions()) {
+            secondaryCountSlider.setValue(cageAdapter.secondaryCount());
+        }
+        if (showEquatorToggle != null) showEquatorToggle.setValue(cageAdapter.showEquator());
+        if (showPolesToggle != null) showPolesToggle.setValue(cageAdapter.showPoles());
+        if (showCapsToggle != null) showCapsToggle.setValue(cageAdapter.showCaps());
+        if (allEdgesToggle != null) allEdgesToggle.setValue(cageAdapter.allEdges());
+        if (faceOutlinesToggle != null) faceOutlinesToggle.setValue(cageAdapter.faceOutlines());
+        
+        if (pointSizeSlider != null) pointSizeSlider.setValue(state.pointSize);
+    }
+    
+    /** Called when shape type changes - rebuilds widgets with new labels. */
+    public void onShapeChanged() {
+        // Re-init to get new labels and options for the new shape
+        init(panelWidth, panelHeight);
     }
 }

@@ -10,45 +10,56 @@ package net.cyberpunk042.visual.shape;
  * <ul>
  *   <li><b>LAT_LON</b>: Traditional latitude/longitude grid. Best for patterns,
  *       partial spheres, and visibility masks. Has pole singularities.</li>
- *   <li><b>TYPE_A</b>: Overlapping cubes projection. More uniform distribution,
- *       best for accurate close-up rendering. Higher vertex count.</li>
- *   <li><b>TYPE_E</b>: Rotated rectangles projection. Efficient for distant
- *       rendering and LOD. Good balance of quality and performance.</li>
+ *   <li><b>UV_SPHERE</b>: Standard UV-mapped sphere. Good general purpose.</li>
+ *   <li><b>ICO_SPHERE</b>: Icosahedron subdivision. Uniform distribution,
+ *       best for smooth appearance without pole artifacts.</li>
+ *   <li><b>TYPE_A</b>: Overlapping axis-aligned cubes. Accurate, more elements.
+ *       Best for close-up viewing.</li>
+ *   <li><b>TYPE_E</b>: Rotated thin rectangles forming hexadecagon. Efficient,
+ *       fewer elements. Best for distant objects or animations.</li>
  * </ul>
  * 
  * @see SphereShape
  */
 public enum SphereAlgorithm {
-    UV("uv", "UV Sphere"),
     /** Latitude/longitude tessellation (DEFAULT) - best for patterns and partial spheres */
-    LAT_LON("lat_lon", "Latitude/Longitude grid"),
+    LAT_LON("lat_lon", "Lat/Lon"),
     
-    /** Overlapping cubes projection - best for accurate close-up rendering */
-    TYPE_A("type_a", "Overlapping cubes"),
+    /** Standard UV-mapped sphere - good general purpose */
+    UV_SPHERE("uv_sphere", "UV Sphere"),
     
-    /** Rotated rectangles projection - best for distant/LOD rendering */
-    TYPE_E("type_e", "Rotated rectangles");
+    /** Icosahedron subdivision - uniform distribution, no pole artifacts */
+    ICO_SPHERE("ico_sphere", "Icosphere"),
+    
+    /** Overlapping cubes projection - accurate, more elements, best for close-up */
+    TYPE_A("type_a", "Type A (Accuracy)"),
+    
+    /** Rotated rectangles projection - efficient, fewer elements, best for distant */
+    TYPE_E("type_e", "Type E (Efficiency)");
     
     private final String id;
-    private final String description;
+    private final String label;
     
-    SphereAlgorithm(String id, String description) {
+    SphereAlgorithm(String id, String label) {
         this.id = id;
-        this.description = description;
+        this.label = label;
     }
     
     /** String identifier for JSON/commands */
     public String id() { return id; }
     
-    /** Human-readable description */
-    public String description() { return description; }
+    /** Display label for GUI */
+    public String label() { return label; }
+    
+    @Override
+    public String toString() { return label; }
     
     /** Returns true if this is the default algorithm */
     public boolean isDefault() { return this == LAT_LON; }
     
     /** Returns true if this algorithm supports partial spheres */
     public boolean supportsPartialSphere() {
-        return this == LAT_LON;
+        return this == LAT_LON || this == UV_SPHERE;
     }
     
     /** Returns true if this algorithm supports visibility patterns */
@@ -65,8 +76,13 @@ public enum SphereAlgorithm {
         if (id == null || id.isEmpty()) {
             return LAT_LON;
         }
+        String normalized = id.toLowerCase().replace("-", "_").replace(" ", "_");
+        
+        // Support legacy "uv" alias
+        if (normalized.equals("uv")) normalized = "uv_sphere";
+        
         for (SphereAlgorithm algo : values()) {
-            if (algo.id.equalsIgnoreCase(id)) {
+            if (algo.id.equalsIgnoreCase(normalized) || algo.name().equalsIgnoreCase(normalized)) {
                 return algo;
             }
         }

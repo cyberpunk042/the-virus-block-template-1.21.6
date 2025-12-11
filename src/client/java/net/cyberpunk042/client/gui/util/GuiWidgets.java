@@ -67,13 +67,34 @@ public final class GuiWidgets {
         
         Logging.GUI.topic("widget").trace("Creating toggle: {} = {}", label, initial);
         
+        // Value formatter shows just ON/OFF, label is added by build() call
         return CyclingButtonWidget.<Boolean>builder(val -> 
-                Text.literal(label + ": " + (val ? "ON" : "OFF")))
+                Text.literal(val ? "ON" : "OFF"))
             .values(Boolean.TRUE, Boolean.FALSE)
             .initially(initial)
             .tooltip(val -> Tooltip.of(Text.literal(tooltip)))
             .build(x, y, width, GuiConstants.WIDGET_HEIGHT, Text.literal(label), (btn, val) -> {
                 Logging.GUI.topic("toggle").trace("{} → {}", label, val);
+                onChange.accept(val);
+            });
+    }
+    
+    /**
+     * Create a compact toggle button (ON/OFF) with smaller height.
+     * Uses omitKeyText() to prevent the "Label: " prefix from being added.
+     */
+    public static CyclingButtonWidget<Boolean> compactToggle(
+            int x, int y, int width,
+            String label, boolean initial, String tooltip,
+            Consumer<Boolean> onChange) {
+
+        return CyclingButtonWidget.<Boolean>builder(val -> 
+                Text.literal(label + ": " + (val ? "ON" : "OFF")))
+            .values(Boolean.TRUE, Boolean.FALSE)
+            .initially(initial)
+            .tooltip(val -> Tooltip.of(Text.literal(tooltip)))
+            .omitKeyText()
+            .build(x, y, width, GuiConstants.COMPACT_HEIGHT, Text.literal(""), (btn, val) -> {
                 onChange.accept(val);
             });
     }
@@ -115,16 +136,47 @@ public final class GuiWidgets {
             int x, int y, int width,
             String label, Class<E> enumClass, E initial, String tooltip,
             Consumer<E> onChange) {
+        return enumDropdown(x, y, width, GuiConstants.WIDGET_HEIGHT, label, enumClass, initial, tooltip, onChange);
+    }
+    
+    /**
+     * Create an enum dropdown selector with custom height.
+     */
+    public static <E extends Enum<E>> CyclingButtonWidget<E> enumDropdown(
+            int x, int y, int width, int height,
+            String label, Class<E> enumClass, E initial, String tooltip,
+            Consumer<E> onChange) {
         
         Logging.GUI.topic("widget").trace("Creating enum dropdown: {} = {}", label, initial);
         
+        // Value formatter shows just the value, label is added by build() call
         return CyclingButtonWidget.<E>builder(val -> 
-                Text.literal(label + ": " + formatEnumName(val)))
+                Text.literal(formatEnumName(val)))
             .values(enumClass.getEnumConstants())
             .initially(initial)
             .tooltip(val -> Tooltip.of(Text.literal(tooltip)))
-            .build(x, y, width, GuiConstants.WIDGET_HEIGHT, Text.literal(label), (btn, val) -> {
+            .build(x, y, width, height, Text.literal(label), (btn, val) -> {
                 Logging.GUI.topic("enum").trace("{} → {}", label, val);
+                onChange.accept(val);
+            });
+    }
+    
+    /**
+     * Create a compact enum dropdown (no label prefix, smaller height).
+     * Uses omitKeyText() to prevent the "Label: " prefix from being added.
+     */
+    public static <E extends Enum<E>> CyclingButtonWidget<E> compactEnumDropdown(
+            int x, int y, int width,
+            Class<E> enumClass, E initial, String tooltip,
+            Consumer<E> onChange) {
+
+        return CyclingButtonWidget.<E>builder(val ->
+                Text.literal(formatEnumName(val)))
+            .values(enumClass.getEnumConstants())
+            .initially(initial)
+            .tooltip(val -> Tooltip.of(Text.literal(tooltip)))
+            .omitKeyText()
+            .build(x, y, width, GuiConstants.COMPACT_HEIGHT, Text.literal(""), (btn, val) -> {
                 onChange.accept(val);
             });
     }
@@ -151,9 +203,9 @@ public final class GuiWidgets {
                 ? initial
                 : (values.isEmpty() ? "" : values.get(0));
         
-        // Explicit type parameter to avoid Object inference
+        // Value formatter shows just the value, label is added by build() call
         return CyclingButtonWidget.<String>builder(val ->
-                    Text.literal(label + ": " + val))
+                    Text.literal(val))
             .values(values)
             .initially(safeInitial)
             .tooltip(val -> Tooltip.of(Text.literal(tooltip)))
@@ -180,7 +232,7 @@ public final class GuiWidgets {
         double normalized = (initial - min) / (max - min);
         
         return new SliderWidget(x, y, width, GuiConstants.WIDGET_HEIGHT, 
-                Text.literal(label + ": " + String.format(format, initial)), normalized) {
+                Text.literal(label + ": " + formatSliderValue(format, initial)), normalized) {
             
             private final float minVal = min;
             private final float maxVal = max;
@@ -190,7 +242,7 @@ public final class GuiWidgets {
             @Override
             protected void updateMessage() {
                 float val = (float) (minVal + value * (maxVal - minVal));
-                setMessage(Text.literal(lbl + ": " + String.format(fmt, val)));
+                setMessage(Text.literal(lbl + ": " + formatSliderValue(fmt, val)));
             }
             
             @Override
@@ -200,6 +252,16 @@ public final class GuiWidgets {
                 onChange.accept(val);
             }
         };
+    }
+    
+    /**
+     * Formats slider value, handling both %d (int) and %f (float) format strings.
+     */
+    private static String formatSliderValue(String format, float value) {
+        if (format.contains("d")) {
+            return String.format(format, Math.round(value));
+        }
+        return String.format(format, value);
     }
     
     /**

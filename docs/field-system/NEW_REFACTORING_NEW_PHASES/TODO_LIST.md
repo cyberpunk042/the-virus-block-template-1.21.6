@@ -79,7 +79,8 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 > **Batches 1-21:** ✅ Complete  
 > **Next:** Batch 22 (Integration Testing)  
 > **Then:** Batch 23 (Final Audit)  
-> **Phase 2:** [GUI_TODO_LIST.md](./_design/gui/GUI_TODO_LIST.md) - 151 tasks ready
+> **Phase 2:** [GUI_TODO_LIST.md](./_design/gui/GUI_TODO_LIST.md) - 151 tasks (~143 done)  
+> **Command System:** ✅ Dec 10 - CommandScanner, FieldEditKnob, ValueRange.unit(), path-based set/get
 
 ---
 
@@ -923,7 +924,8 @@ F01 → F01-CHK → F02 → F02-CHK → ...
 
 ---
 
-*Last updated: December 8, 2024*  
+*Last updated: December 10, 2024*  
 *Phase 1: 209 tasks + 208 CHK = 417 rows*  
-*Phase 2 Draft: 4 tasks*  
+*Phase 2: GUI implementation - 151 tasks (~143 done)*  
+*Command System: CommandScanner + FieldEditKnob + path-based commands*  
 *Total: 421 rows*

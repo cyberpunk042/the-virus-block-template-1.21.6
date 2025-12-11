@@ -11,6 +11,7 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import net.cyberpunk042.client.gui.widget.LabeledSlider;
+import net.cyberpunk042.visual.layer.BlendMode;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -45,13 +46,6 @@ public class LayerPanel extends AbstractPanel {
     // G-LAYER: Layer settings
     private CyclingButtonWidget<BlendMode> blendModeDropdown;
     private LabeledSlider alphaSlider;
-    
-    public enum BlendMode {
-        NORMAL("Normal"), ADD("Additive"), MULTIPLY("Multiply"), SCREEN("Screen");
-        private final String label;
-        BlendMode(String label) { this.label = label; }
-        @Override public String toString() { return label; }
-    }
     
     // Layout
     private int startY;

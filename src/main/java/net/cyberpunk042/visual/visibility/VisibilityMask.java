@@ -113,13 +113,29 @@ public record VisibilityMask(
      * @return true if the cell should be rendered
      */
     public boolean isVisible(float u, float v) {
+        return isVisible(u, v, 0f);
+    }
+    
+    /**
+     * Checks visibility with animation support.
+     * 
+     * @param u horizontal coordinate (0-1)
+     * @param v vertical coordinate (0-1)
+     * @param time animation time (for animated masks)
+     * @return true if the cell should be rendered
+     */
+    public boolean isVisible(float u, float v, float time) {
         if (mask == MaskType.FULL) {
             return true;
         }
         
-        // Apply offset
-        float adjustedU = (u + offset) % 1.0f;
-        float adjustedV = (v + offset) % 1.0f;
+        // Apply offset (static + animated)
+        float animOffset = animate ? (time * animSpeed * 0.01f) : 0f;
+        float totalOffset = offset + animOffset;
+        float adjustedU = (u + totalOffset) % 1.0f;
+        float adjustedV = (v + totalOffset) % 1.0f;
+        if (adjustedU < 0) adjustedU += 1.0f;
+        if (adjustedV < 0) adjustedV += 1.0f;
         
         boolean visible = switch (mask) {
             case FULL -> true;
@@ -164,6 +180,55 @@ public record VisibilityMask(
         };
         
         return invert ? !visible : visible;
+    }
+    
+    /**
+     * Gets visibility alpha at UV coordinates (for feathered edges).
+     * 
+     * <p>When {@link #feather()} &gt; 0, edges of visible regions are faded.
+     * 
+     * @param u horizontal coordinate (0-1)
+     * @param v vertical coordinate (0-1)
+     * @param time animation time
+     * @return alpha value (0.0 = invisible, 1.0 = fully visible)
+     */
+    public float getAlpha(float u, float v, float time) {
+        if (mask == MaskType.FULL) {
+            return 1.0f;
+        }
+        
+        if (feather <= 0) {
+            return isVisible(u, v, time) ? 1.0f : 0.0f;
+        }
+        
+        // Apply offset (static + animated)
+        float animOffset = animate ? (time * animSpeed * 0.01f) : 0f;
+        float totalOffset = offset + animOffset;
+        float adjustedU = (u + totalOffset) % 1.0f;
+        float adjustedV = (v + totalOffset) % 1.0f;
+        if (adjustedU < 0) adjustedU += 1.0f;
+        if (adjustedV < 0) adjustedV += 1.0f;
+        
+        // Calculate distance from edge based on mask type
+        float edgeDist = switch (mask) {
+            case FULL -> 1.0f;
+            
+            case BANDS -> {
+                float bandPos = (adjustedV * count) % 1.0f;
+                float dist = bandPos < thickness ? bandPos : (thickness - bandPos);
+                yield Math.min(dist / feather, 1.0f);
+            }
+            
+            case STRIPES -> {
+                float stripePos = (adjustedU * count) % 1.0f;
+                float dist = stripePos < thickness ? stripePos : (thickness - stripePos);
+                yield Math.min(dist / feather, 1.0f);
+            }
+            
+            default -> isVisible(u, v, time) ? 1.0f : 0.0f;
+        };
+        
+        return invert ? (1.0f - edgeDist) : edgeDist;
     }
     
     // =========================================================================

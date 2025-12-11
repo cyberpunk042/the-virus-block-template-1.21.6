@@ -4,6 +4,8 @@ import net.cyberpunk042.log.Logging;
 
 import com.google.gson.JsonObject;
 import net.cyberpunk042.util.json.JsonField;
+import net.cyberpunk042.visual.validation.Range;
+import net.cyberpunk042.visual.validation.ValueRange;
 import net.cyberpunk042.util.json.JsonSerializer;
 
 
@@ -49,18 +51,18 @@ import net.cyberpunk042.util.json.JsonSerializer;
  */
 public record Modifiers(
     // Multipliers
-    @JsonField(skipIfDefault = true, defaultValue = "1.0") float radiusMultiplier,
-    @JsonField(skipIfDefault = true, defaultValue = "1.0") float strengthMultiplier,
-    @JsonField(skipIfDefault = true, defaultValue = "1.0") float alphaMultiplier,
-    @JsonField(skipIfDefault = true, defaultValue = "1.0") float spinMultiplier,
+    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "1.0") float radiusMultiplier,
+    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "1.0") float strengthMultiplier,
+    @Range(ValueRange.ALPHA) @JsonField(skipIfDefault = true, defaultValue = "1.0") float alphaMultiplier,
+    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "1.0") float spinMultiplier,
     // Visual modifiers
-    @JsonField(skipIfDefault = true, defaultValue = "1.0") float visualScale,
-    @JsonField(skipIfDefault = true) float tiltMultiplier,
-    @JsonField(skipIfDefault = true) float swirlStrength,
+    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "1.0") float visualScale,
+    @Range(ValueRange.ALPHA) @JsonField(skipIfDefault = true) float tiltMultiplier,
+    @Range(ValueRange.ALPHA) @JsonField(skipIfDefault = true) float swirlStrength,
     // Animation modifiers
-    @JsonField(skipIfDefault = true) float bobbing,
+    @Range(ValueRange.ALPHA) @JsonField(skipIfDefault = true) float bobbing,
     // Vertical oscillation strength (0-1)
-    @JsonField(skipIfDefault = true) float breathing,
+    @Range(ValueRange.ALPHA) @JsonField(skipIfDefault = true) float breathing,
     // Scale breathing strength (0-1)
     
     // Flags

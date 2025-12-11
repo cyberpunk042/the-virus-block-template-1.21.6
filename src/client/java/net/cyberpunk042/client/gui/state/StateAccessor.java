@@ -96,6 +96,158 @@ public final class StateAccessor {
         return false;
     }
     
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PATH-BASED GETTERS (consistent with setters)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Get a value by path using dot notation.
+     * 
+     * <p>Examples:</p>
+     * <pre>
+     * get(state, "radius");              // Direct field
+     * get(state, "sphere.latSteps");     // Record property
+     * get(state, "beam.pulse.speed");    // Nested record property
+     * </pre>
+     */
+    public static Object get(Object state, String path) {
+        if (path.contains(".")) {
+            return getNestedProperty(state, path);
+        } else {
+            return getDirectField(state, path);
+        }
+    }
+    
+    /**
+     * Get an int value by path.
+     */
+    public static int getInt(Object state, String path) {
+        Object value = get(state, path);
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        throw new IllegalArgumentException("Field '" + path + "' is not a number: " + value);
+    }
+    
+    /**
+     * Get a float value by path.
+     */
+    public static float getFloat(Object state, String path) {
+        Object value = get(state, path);
+        if (value instanceof Number) {
+            return ((Number) value).floatValue();
+        }
+        throw new IllegalArgumentException("Field '" + path + "' is not a number: " + value);
+    }
+    
+    /**
+     * Get a boolean value by path.
+     */
+    public static boolean getBool(Object state, String path) {
+        Object value = get(state, path);
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        throw new IllegalArgumentException("Field '" + path + "' is not a boolean: " + value);
+    }
+    
+    /**
+     * Get a String value by path.
+     */
+    public static String getString(Object state, String path) {
+        Object value = get(state, path);
+        if (value == null) return null;
+        if (value instanceof String) {
+            return (String) value;
+        }
+        // Handle enums - return name
+        if (value instanceof Enum<?>) {
+            return ((Enum<?>) value).name();
+        }
+        return value.toString();
+    }
+    
+    /**
+     * Get a typed value by path.
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T getTyped(Object state, String path, Class<T> type) {
+        Object value = get(state, path);
+        if (value == null) return null;
+        if (type.isInstance(value)) {
+            return (T) value;
+        }
+        throw new IllegalArgumentException("Field '" + path + "' is not of type " + type.getSimpleName() + ": " + value);
+    }
+    
+    private static Object getDirectField(Object state, String name) {
+        Field field = getStateFields(state.getClass()).get(name);
+        if (field == null) {
+            throw new IllegalArgumentException("No @StateField named: " + name);
+        }
+        try {
+            field.setAccessible(true);
+            return field.get(state);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Cannot access field: " + name, e);
+        }
+    }
+    
+    private static Object getNestedProperty(Object state, String path) {
+        String[] parts = path.split("\\.", 2);
+        String fieldName = parts[0];
+        String remaining = parts[1];
+        
+        // Get the record value
+        Field field = getStateFields(state.getClass()).get(fieldName);
+        if (field == null) {
+            throw new IllegalArgumentException("No @StateField named: " + fieldName);
+        }
+        
+        try {
+            field.setAccessible(true);
+            Object record = field.get(state);
+            if (record == null) {
+                return null;
+            }
+            
+            // Navigate the remaining path
+            return getRecordProperty(record, remaining);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Cannot access field: " + fieldName, e);
+        }
+    }
+    
+    private static Object getRecordProperty(Object record, String path) {
+        try {
+            if (path.contains(".")) {
+                // Nested: "pulse.speed" -> get pulse, then get speed
+                String[] parts = path.split("\\.", 2);
+                String propertyName = parts[0];
+                String remaining = parts[1];
+                
+                var getter = record.getClass().getMethod(propertyName);
+                Object nestedRecord = getter.invoke(record);
+                if (nestedRecord == null) {
+                    return null;
+                }
+                return getRecordProperty(nestedRecord, remaining);
+            } else {
+                // Direct property
+                var getter = record.getClass().getMethod(path);
+                return getter.invoke(record);
+            }
+        } catch (NoSuchMethodException e) {
+            throw new IllegalArgumentException("No property '" + path + "' on " + record.getClass().getSimpleName());
+        } catch (Exception e) {
+            throw new RuntimeException("Cannot get property: " + path, e);
+        }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PATH-BASED SETTERS
+    // ═══════════════════════════════════════════════════════════════════════════
+    
     /**
      * Set a @StateField by name, or a nested property using dot notation.
      * 
@@ -185,7 +337,8 @@ public final class StateAccessor {
             } else {
                 // Direct property: find and call builder method
                 var builderSetter = findBuilderMethod(builder.getClass(), path);
-                builderSetter.invoke(builder, value);
+                Object convertedValue = convertToParameterType(value, builderSetter.getParameterTypes()[0]);
+                builderSetter.invoke(builder, convertedValue);
             }
             
             // Build and return
@@ -206,6 +359,52 @@ public final class StateAccessor {
             }
         }
         throw new IllegalArgumentException("No builder method: " + name + " on " + builderClass.getSimpleName());
+    }
+    
+    /**
+     * Convert a value to the expected parameter type (handles String-to-Enum, primitive boxing, etc.).
+     */
+    @SuppressWarnings("unchecked")
+    private static Object convertToParameterType(Object value, Class<?> targetType) {
+        if (value == null) return null;
+        
+        // Already correct type
+        if (targetType.isInstance(value)) return value;
+        
+        // String to Enum conversion
+        if (targetType.isEnum() && value instanceof String strValue) {
+            try {
+                return Enum.valueOf((Class<Enum>) targetType, strValue);
+            } catch (IllegalArgumentException e) {
+                // Try case-insensitive match
+                for (Object constant : targetType.getEnumConstants()) {
+                    if (((Enum<?>) constant).name().equalsIgnoreCase(strValue)) {
+                        return constant;
+                    }
+                }
+                throw e;
+            }
+        }
+        
+        // Enum to String conversion (less common)
+        if (targetType == String.class && value instanceof Enum<?> enumValue) {
+            return enumValue.name();
+        }
+        
+        // Number conversions
+        if (value instanceof Number numValue) {
+            if (targetType == int.class || targetType == Integer.class) return numValue.intValue();
+            if (targetType == float.class || targetType == Float.class) return numValue.floatValue();
+            if (targetType == double.class || targetType == Double.class) return numValue.doubleValue();
+            if (targetType == long.class || targetType == Long.class) return numValue.longValue();
+        }
+        
+        // Boolean from String
+        if ((targetType == boolean.class || targetType == Boolean.class) && value instanceof String strValue) {
+            return Boolean.parseBoolean(strValue);
+        }
+        
+        return value;
     }
     
     /**

@@ -1,11 +1,13 @@
 package net.cyberpunk042.client.gui.util;
 
+import net.cyberpunk042.visual.animation.PulseConfig;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.field.instance.FollowMode;
 import net.fabricmc.loader.api.FabricLoader;
+import net.cyberpunk042.TheVirusBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,7 +27,14 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li>{@code config/the-virus-block/field_arrangements/} - Pattern arrangement presets</li>
  *   <li>{@code config/the-virus-block/field_animations/} - Animation presets</li>
  *   <li>{@code config/the-virus-block/field_beams/} - Debug beam presets</li>
- *   <li>{@code config/the-virus-block/field_follow/} - Follow mode presets</li>
+ *   <li>{@code config/the-virus-block/field_follows/} - Follow mode presets</li>
+ *   <li>{@code config/the-virus-block/field_appearances/} - Appearance presets</li>
+ *   <li>{@code config/the-virus-block/field_layers/} - Layer configuration presets</li>
+ *   <li>{@code config/the-virus-block/field_links/} - Primitive link presets</li>
+ *   <li>{@code config/the-virus-block/field_orbits/} - Orbit configuration presets</li>
+ *   <li>{@code config/the-virus-block/field_predictions/} - Prediction presets</li>
+ *   <li>{@code config/the-virus-block/field_primitives/} - Primitive presets</li>
+ *   <li>{@code config/the-virus-block/field_transforms/} - Transform presets</li>
  * </ul>
  *
  * <p>Each JSON file represents one preset. The "name" field in JSON becomes the dropdown label.
@@ -45,7 +54,14 @@ public final class FragmentRegistry {
     private static final String ARRANGEMENTS_FOLDER = "field_arrangements";
     private static final String ANIMATIONS_FOLDER = "field_animations";
     private static final String BEAMS_FOLDER = "field_beams";
-    private static final String FOLLOW_FOLDER = "field_follow";
+    private static final String FOLLOW_FOLDER = "field_follows";
+    private static final String APPEARANCES_FOLDER = "field_appearances";
+    private static final String LAYERS_FOLDER = "field_layers";
+    private static final String LINKS_FOLDER = "field_links";
+    private static final String ORBITS_FOLDER = "field_orbits";
+    private static final String PREDICTIONS_FOLDER = "field_predictions";
+    private static final String PRIMITIVES_FOLDER = "field_primitives";
+    private static final String TRANSFORMS_FOLDER = "field_transforms";
 
     // Caches: presetName -> JsonObject
     private static final Map<String, Map<String, JsonObject>> shapePresets = new ConcurrentHashMap<>();
@@ -55,6 +71,13 @@ public final class FragmentRegistry {
     private static final Map<String, JsonObject> animationPresets = new ConcurrentHashMap<>();
     private static final Map<String, JsonObject> beamPresets = new ConcurrentHashMap<>();
     private static final Map<String, JsonObject> followPresets = new ConcurrentHashMap<>();
+    private static final Map<String, JsonObject> appearancePresets = new ConcurrentHashMap<>();
+    private static final Map<String, JsonObject> layerPresets = new ConcurrentHashMap<>();
+    private static final Map<String, JsonObject> linkPresets = new ConcurrentHashMap<>();
+    private static final Map<String, JsonObject> orbitPresets = new ConcurrentHashMap<>();
+    private static final Map<String, JsonObject> predictionPresets = new ConcurrentHashMap<>();
+    private static final Map<String, JsonObject> primitivePresets = new ConcurrentHashMap<>();
+    private static final Map<String, JsonObject> transformPresets = new ConcurrentHashMap<>();
 
     private static boolean loaded = false;
 
@@ -76,6 +99,13 @@ public final class FragmentRegistry {
         animationPresets.clear();
         beamPresets.clear();
         followPresets.clear();
+        appearancePresets.clear();
+        layerPresets.clear();
+        linkPresets.clear();
+        orbitPresets.clear();
+        predictionPresets.clear();
+        primitivePresets.clear();
+        transformPresets.clear();
         loaded = false;
         ensureLoaded();
     }
@@ -91,6 +121,13 @@ public final class FragmentRegistry {
         ensureFolder(ANIMATIONS_FOLDER);
         ensureFolder(BEAMS_FOLDER);
         ensureFolder(FOLLOW_FOLDER);
+        ensureFolder(APPEARANCES_FOLDER);
+        ensureFolder(LAYERS_FOLDER);
+        ensureFolder(LINKS_FOLDER);
+        ensureFolder(ORBITS_FOLDER);
+        ensureFolder(PREDICTIONS_FOLDER);
+        ensureFolder(PRIMITIVES_FOLDER);
+        ensureFolder(TRANSFORMS_FOLDER);
 
         // Load each category
         loadShapeFragments();
@@ -100,13 +137,30 @@ public final class FragmentRegistry {
         loadSimplePresets(ANIMATIONS_FOLDER, animationPresets);
         loadSimplePresets(BEAMS_FOLDER, beamPresets);
         loadSimplePresets(FOLLOW_FOLDER, followPresets);
+        loadSimplePresets(APPEARANCES_FOLDER, appearancePresets);
+        loadSimplePresets(LAYERS_FOLDER, layerPresets);
+        loadSimplePresets(LINKS_FOLDER, linkPresets);
+        loadSimplePresets(ORBITS_FOLDER, orbitPresets);
+        loadSimplePresets(PREDICTIONS_FOLDER, predictionPresets);
+        loadSimplePresets(PRIMITIVES_FOLDER, primitivePresets);
+        loadSimplePresets(TRANSFORMS_FOLDER, transformPresets);
 
-        LOGGER.info("Presets loaded: shapes={}, fills={}, masks={}, arrangements={}, animations={}, beams={}, follow={}",
+        LOGGER.info("Presets loaded: shapes={}, fills={}, masks={}, arrangements={}, animations={}, beams={}, follow={}, appearances={}, layers={}, links={}, orbits={}, predictions={}, primitives={}, transforms={}",
             shapePresets.values().stream().mapToInt(Map::size).sum(),
             fillPresets.size(), maskPresets.size(), arrangementPresets.size(),
-            animationPresets.size(), beamPresets.size(), followPresets.size());
+            animationPresets.size(), beamPresets.size(), followPresets.size(),
+            appearancePresets.size(), layerPresets.size(), linkPresets.size(),
+            orbitPresets.size(), predictionPresets.size(), primitivePresets.size(), transformPresets.size());
 
         loaded = true;
+
+        // Diagnostic: log counts so we can see if config data is actually loaded
+        LOGGER.info("Fragments loaded: shapes={}, fills={}, masks={}, arrangements={}, animations={}, beams={}, follows={}, appearances={}, layers={}, links={}, orbits={}, predictions={}, primitives={}, transforms={}",
+            shapePresets.values().stream().mapToInt(Map::size).sum(),
+            fillPresets.size(), maskPresets.size(), arrangementPresets.size(),
+            animationPresets.size(), beamPresets.size(), followPresets.size(),
+            appearancePresets.size(), layerPresets.size(), linkPresets.size(),
+            orbitPresets.size(), predictionPresets.size(), primitivePresets.size(), transformPresets.size());
     }
 
     private static void ensureFolder(String folder) {
@@ -121,10 +175,26 @@ public final class FragmentRegistry {
         }
     }
 
-    private static void loadShapeFragments() {
-        Path folder = CONFIG_ROOT.resolve(SHAPES_FOLDER);
-        if (!Files.exists(folder)) return;
+    private static final String MODID = TheVirusBlock.MOD_ID;
 
+    private static void loadShapeFragments() {
+        // 1) User config folder
+        Path configFolder = CONFIG_ROOT.resolve(SHAPES_FOLDER);
+        if (Files.exists(configFolder)) {
+            loadShapeFragmentsFromFolder(configFolder);
+        }
+
+        // 2) Built-in resources (fallback so presets show even on first launch)
+        FabricLoader.getInstance().getModContainer(MODID).ifPresent(container -> {
+            container.findPath("data/" + MODID + "/" + SHAPES_FOLDER)
+                .ifPresent(FragmentRegistry::loadShapeFragmentsFromFolder);
+        });
+    }
+
+    /**
+     * Load shape presets from a given folder path containing *.json files.
+     */
+    private static void loadShapeFragmentsFromFolder(Path folder) {
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(folder, "*.json")) {
             for (Path file : stream) {
                 try {
@@ -134,20 +204,34 @@ public final class FragmentRegistry {
                     String type = json.has("type") ? json.get("type").getAsString().toLowerCase() : "sphere";
 
                     shapePresets.computeIfAbsent(type, k -> new LinkedHashMap<>()).put(name, json);
-                    LOGGER.debug("Loaded shape preset: {} (type={})", name, type);
+                    LOGGER.debug("Loaded shape preset: {} (type={}) from {}", name, type, folder);
                 } catch (Exception e) {
                     LOGGER.warn("Failed to load shape preset {}: {}", file, e.getMessage());
                 }
             }
         } catch (IOException e) {
-            LOGGER.warn("Failed to scan shapes folder: {}", e.getMessage());
+            LOGGER.warn("Failed to scan shapes folder {}: {}", folder, e.getMessage());
         }
     }
 
     private static void loadSimplePresets(String folder, Map<String, JsonObject> target) {
-        Path path = CONFIG_ROOT.resolve(folder);
-        if (!Files.exists(path)) return;
+        // 1) User config folder
+        Path configPath = CONFIG_ROOT.resolve(folder);
+        if (Files.exists(configPath)) {
+            loadSimplePresetsFromFolder(configPath, target, folder);
+        }
 
+        // 2) Built-in resources (fallback) — ensures dropdowns populate even if config is empty
+        FabricLoader.getInstance().getModContainer(MODID).ifPresent(container -> {
+            container.findPath("data/" + MODID + "/" + folder)
+                .ifPresent(path -> loadSimplePresetsFromFolder(path, target, folder));
+        });
+    }
+
+    /**
+     * Load simple presets (non-shape categories) from a folder of *.json files.
+     */
+    private static void loadSimplePresetsFromFolder(Path path, Map<String, JsonObject> target, String folderName) {
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(path, "*.json")) {
             for (Path file : stream) {
                 try {
@@ -155,13 +239,13 @@ public final class FragmentRegistry {
                     JsonObject json = JsonParser.parseString(content).getAsJsonObject();
                     String name = json.has("name") ? json.get("name").getAsString() : file.getFileName().toString().replace(".json", "");
                     target.put(name, json);
-                    LOGGER.debug("Loaded preset from {}: {}", folder, name);
+                    LOGGER.debug("Loaded preset from {}: {}", path, name);
                 } catch (Exception e) {
                     LOGGER.warn("Failed to load preset {}: {}", file, e.getMessage());
                 }
             }
         } catch (IOException e) {
-            LOGGER.warn("Failed to scan {} folder: {}", folder, e.getMessage());
+            LOGGER.warn("Failed to scan {} folder: {}", folderName, e.getMessage());
         }
     }
 
@@ -203,46 +287,47 @@ public final class FragmentRegistry {
     }
 
     private static void applySpherePreset(FieldEditState state, JsonObject json) {
-        if (json.has("latSteps")) state.setSphereLatSteps(json.get("latSteps").getAsInt());
-        if (json.has("lonSteps")) state.setSphereLonSteps(json.get("lonSteps").getAsInt());
-        if (json.has("latStart")) state.setSphereLatStart(json.get("latStart").getAsFloat());
-        if (json.has("latEnd")) state.setSphereLatEnd(json.get("latEnd").getAsFloat());
-        if (json.has("algorithm")) state.setSphereAlgorithm(json.get("algorithm").getAsString());
+        if (json.has("radius")) state.set("sphere.radius", json.get("radius").getAsFloat());
+        if (json.has("latSteps")) state.set("sphere.latSteps", json.get("latSteps").getAsInt());
+        if (json.has("lonSteps")) state.set("sphere.lonSteps", json.get("lonSteps").getAsInt());
+        if (json.has("latStart")) state.set("sphere.latStart", json.get("latStart").getAsFloat());
+        if (json.has("latEnd")) state.set("sphere.latEnd", json.get("latEnd").getAsFloat());
+        if (json.has("algorithm")) state.set("sphere.algorithm", json.get("algorithm").getAsString());
     }
 
     private static void applyRingPreset(FieldEditState state, JsonObject json) {
-        if (json.has("innerRadius")) state.setRingInnerRadius(json.get("innerRadius").getAsFloat());
-        if (json.has("outerRadius")) state.setRingOuterRadius(json.get("outerRadius").getAsFloat());
-        if (json.has("segments")) state.setRingSegments(json.get("segments").getAsInt());
-        if (json.has("height")) state.setRingHeight(json.get("height").getAsFloat());
-        if (json.has("y")) state.setRingY(json.get("y").getAsFloat());
+        if (json.has("innerRadius")) state.set("ring.innerRadius", json.get("innerRadius").getAsFloat());
+        if (json.has("outerRadius")) state.set("ring.outerRadius", json.get("outerRadius").getAsFloat());
+        if (json.has("segments")) state.set("ring.segments", json.get("segments").getAsInt());
+        if (json.has("height")) state.set("ring.height", json.get("height").getAsFloat());
+        if (json.has("y")) state.set("ring.y", json.get("y").getAsFloat());
     }
 
     private static void applyDiscPreset(FieldEditState state, JsonObject json) {
-        if (json.has("radius")) state.setDiscRadius(json.get("radius").getAsFloat());
-        if (json.has("segments")) state.setDiscSegments(json.get("segments").getAsInt());
-        if (json.has("y")) state.setDiscY(json.get("y").getAsFloat());
-        if (json.has("innerRadius")) state.setDiscInnerRadius(json.get("innerRadius").getAsFloat());
+        if (json.has("radius")) state.set("disc.radius", json.get("radius").getAsFloat());
+        if (json.has("segments")) state.set("disc.segments", json.get("segments").getAsInt());
+        if (json.has("y")) state.set("disc.y", json.get("y").getAsFloat());
+        if (json.has("innerRadius")) state.set("disc.innerRadius", json.get("innerRadius").getAsFloat());
     }
 
     private static void applyPrismPreset(FieldEditState state, JsonObject json) {
-        if (json.has("sides")) state.setPrismSides(json.get("sides").getAsInt());
-        if (json.has("radius")) state.setPrismRadius(json.get("radius").getAsFloat());
-        if (json.has("height")) state.setPrismHeight(json.get("height").getAsFloat());
-        if (json.has("topRadius")) state.setPrismTopRadius(json.get("topRadius").getAsFloat());
+        if (json.has("sides")) state.set("prism.sides", json.get("sides").getAsInt());
+        if (json.has("radius")) state.set("prism.radius", json.get("radius").getAsFloat());
+        if (json.has("height")) state.set("prism.height", json.get("height").getAsFloat());
+        if (json.has("topRadius")) state.set("prism.topRadius", json.get("topRadius").getAsFloat());
     }
 
     private static void applyCylinderPreset(FieldEditState state, JsonObject json) {
-        if (json.has("radius")) state.setCylinderRadius(json.get("radius").getAsFloat());
-        if (json.has("height")) state.setCylinderHeight(json.get("height").getAsFloat());
-        if (json.has("segments")) state.setCylinderSegments(json.get("segments").getAsInt());
-        if (json.has("topRadius")) state.setCylinderTopRadius(json.get("topRadius").getAsFloat());
+        if (json.has("radius")) state.set("cylinder.radius", json.get("radius").getAsFloat());
+        if (json.has("height")) state.set("cylinder.height", json.get("height").getAsFloat());
+        if (json.has("segments")) state.set("cylinder.segments", json.get("segments").getAsInt());
+        if (json.has("topRadius")) state.set("cylinder.topRadius", json.get("topRadius").getAsFloat());
     }
 
     private static void applyPolyPreset(FieldEditState state, JsonObject json) {
-        if (json.has("type")) state.setPolyType(json.get("type").getAsString());
-        if (json.has("radius")) state.setPolyRadius(json.get("radius").getAsFloat());
-        if (json.has("subdivisions")) state.setPolySubdivisions(json.get("subdivisions").getAsInt());
+        if (json.has("type")) state.set("polyhedron.type", json.get("type").getAsString());
+        if (json.has("radius")) state.set("polyhedron.radius", json.get("radius").getAsFloat());
+        if (json.has("subdivisions")) state.set("polyhedron.subdivisions", json.get("subdivisions").getAsInt());
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -261,17 +346,44 @@ public final class FragmentRegistry {
         JsonObject json = fillPresets.get(presetName);
         if (json == null) return;
 
-        if (json.has("wireThickness")) state.setWireThickness(json.get("wireThickness").getAsFloat());
-        if (json.has("doubleSided")) state.setDoubleSided(json.get("doubleSided").getAsBoolean());
-        if (json.has("depthTest")) state.setDepthTest(json.get("depthTest").getAsBoolean());
-        if (json.has("depthWrite")) state.setDepthWrite(json.get("depthWrite").getAsBoolean());
-        if (json.has("pointSize")) state.setPointSize(json.get("pointSize").getAsFloat());
+        if (json.has("wireThickness")) state.set("fill.wireThickness", json.get("wireThickness").getAsFloat());
+        if (json.has("doubleSided")) state.set("fill.doubleSided", json.get("doubleSided").getAsBoolean());
+        if (json.has("depthTest")) state.set("fill.depthTest", json.get("depthTest").getAsBoolean());
+        if (json.has("depthWrite")) state.set("fill.depthWrite", json.get("depthWrite").getAsBoolean());
+        if (json.has("pointSize")) state.set("pointSize", json.get("pointSize").getAsFloat());
 
-        // Cage settings
+        // Cage settings - build proper cage object based on shape type
         if (json.has("cage")) {
             JsonObject cage = json.getAsJsonObject("cage");
-            if (cage.has("latitudeCount")) state.setCageLatCount(cage.get("latitudeCount").getAsInt());
-            if (cage.has("longitudeCount")) state.setCageLonCount(cage.get("longitudeCount").getAsInt());
+            String shapeType = state.getString("shapeType");
+            
+            // Build cage options via adapter for shape-appropriate handling
+            var adapter = net.cyberpunk042.visual.fill.CageOptionsAdapter.forShape(shapeType, state.fill().cage());
+            
+            if (adapter.supportsCountOptions()) {
+                if (cage.has("latitudeCount")) {
+                    adapter = adapter.withPrimaryCount(cage.get("latitudeCount").getAsInt());
+                }
+                if (cage.has("longitudeCount")) {
+                    adapter = adapter.withSecondaryCount(cage.get("longitudeCount").getAsInt());
+                }
+                if (cage.has("primaryCount")) {
+                    adapter = adapter.withPrimaryCount(cage.get("primaryCount").getAsInt());
+                }
+                if (cage.has("secondaryCount")) {
+                    adapter = adapter.withSecondaryCount(cage.get("secondaryCount").getAsInt());
+                }
+            }
+            if (cage.has("lineWidth")) {
+                adapter = adapter.withLineWidth(cage.get("lineWidth").getAsFloat());
+            }
+            if (cage.has("showEdges")) {
+                adapter = adapter.withShowEdges(cage.get("showEdges").getAsBoolean());
+            }
+            
+            // Update fill config with new cage
+            var newFill = state.fill().toBuilder().cage(adapter.build()).build();
+            state.set("fill", newFill);
         }
     }
 
@@ -291,14 +403,14 @@ public final class FragmentRegistry {
         JsonObject json = maskPresets.get(presetName);
         if (json == null) return;
 
-        if (json.has("mask")) state.setMaskType(json.get("mask").getAsString());
-        if (json.has("count")) state.setMaskCount(json.get("count").getAsInt());
-        if (json.has("thickness")) state.setMaskThickness(json.get("thickness").getAsFloat());
-        if (json.has("offset")) state.setMaskOffset(json.get("offset").getAsFloat());
-        if (json.has("invert")) state.setMaskInverted(json.get("invert").getAsBoolean());
-        if (json.has("feather")) state.setMaskFeather(json.get("feather").getAsFloat());
-        if (json.has("animate")) state.setMaskAnimated(json.get("animate").getAsBoolean());
-        if (json.has("animateSpeed")) state.setMaskAnimateSpeed(json.get("animateSpeed").getAsFloat());
+        if (json.has("mask")) state.set("mask.mask", json.get("mask").getAsString());
+        if (json.has("count")) state.set("mask.count", json.get("count").getAsInt());
+        if (json.has("thickness")) state.set("mask.thickness", json.get("thickness").getAsFloat());
+        if (json.has("offset")) state.set("mask.offset", json.get("offset").getAsFloat());
+        if (json.has("invert")) state.set("mask.invert", json.get("invert").getAsBoolean());
+        if (json.has("feather")) state.set("mask.feather", json.get("feather").getAsFloat());
+        if (json.has("animate")) state.set("mask.animate", json.get("animate").getAsBoolean());
+        if (json.has("animateSpeed")) state.set("mask.animSpeed", json.get("animateSpeed").getAsFloat());
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -317,10 +429,11 @@ public final class FragmentRegistry {
         JsonObject json = arrangementPresets.get(presetName);
         if (json == null) return;
 
-        if (json.has("quad")) state.setQuadPattern(json.get("quad").getAsString());
-        if (json.has("segment")) state.setSegmentPattern(json.get("segment").getAsString());
-        if (json.has("sector")) state.setSectorPattern(json.get("sector").getAsString());
-        if (json.has("multiPart")) state.setMultiPartArrangement(json.get("multiPart").getAsBoolean());
+        if (json.has("quad")) state.set("arrangement.quadPattern", json.get("quad").getAsString());
+        if (json.has("segment")) state.set("arrangement.segmentPattern", json.get("segment").getAsString());
+        if (json.has("sector")) state.set("arrangement.sectorPattern", json.get("sector").getAsString());
+        // multiPart is UI-only, not stored in config
+        if (json.has("defaultPattern")) state.set("arrangement.defaultPattern", json.get("defaultPattern").getAsString());
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -339,29 +452,29 @@ public final class FragmentRegistry {
         JsonObject json = animationPresets.get(presetName);
         if (json == null) return;
 
-        // Spin
+        // Spin (enabled = has non-zero speed)
         if (json.has("spin")) {
             JsonObject spin = json.getAsJsonObject("spin");
-            if (spin.has("enabled")) state.setSpinEnabled(spin.get("enabled").getAsBoolean());
-            if (spin.has("axis")) state.setSpinAxis(spin.get("axis").getAsString());
-            if (spin.has("speed")) state.setSpinSpeed(spin.get("speed").getAsFloat());
+            if (spin.has("axis")) state.set("spin.axis", spin.get("axis").getAsString());
+            if (spin.has("speed")) state.set("spin.speed", spin.get("speed").getAsFloat());
         }
 
-        // Pulse
+        // Pulse (enabled = has non-zero speed/scale)
         if (json.has("pulse")) {
             JsonObject pulse = json.getAsJsonObject("pulse");
-            if (pulse.has("enabled")) state.setPulseEnabled(pulse.get("enabled").getAsBoolean());
-            if (pulse.has("mode")) state.setPulseMode(pulse.get("mode").getAsString());
-            if (pulse.has("frequency")) state.setPulseFrequency(pulse.get("frequency").getAsFloat());
-            if (pulse.has("amplitude")) state.setPulseAmplitude(pulse.get("amplitude").getAsFloat());
+            if (pulse.has("mode")) state.set("pulse.mode", pulse.get("mode").getAsString());
+            if (pulse.has("frequency")) state.set("pulse.speed", pulse.get("frequency").getAsFloat());
+            if (pulse.has("speed")) state.set("pulse.speed", pulse.get("speed").getAsFloat());
+            if (pulse.has("amplitude")) state.set("pulse.scale", pulse.get("amplitude").getAsFloat());
+            if (pulse.has("scale")) state.set("pulse.scale", pulse.get("scale").getAsFloat());
         }
 
-        // Alpha pulse
+        // Alpha pulse (enabled = min != max && speed != 0)
         if (json.has("alphaPulse")) {
             JsonObject alpha = json.getAsJsonObject("alphaPulse");
-            if (alpha.has("enabled")) state.setAlphaFadeEnabled(alpha.get("enabled").getAsBoolean());
-            if (alpha.has("min")) state.setAlphaMin(alpha.get("min").getAsFloat());
-            if (alpha.has("max")) state.setAlphaMax(alpha.get("max").getAsFloat());
+            if (alpha.has("min")) state.set("alphaPulse.min", alpha.get("min").getAsFloat());
+            if (alpha.has("max")) state.set("alphaPulse.max", alpha.get("max").getAsFloat());
+            if (alpha.has("speed")) state.set("alphaPulse.speed", alpha.get("speed").getAsFloat());
         }
     }
 
@@ -381,21 +494,32 @@ public final class FragmentRegistry {
         JsonObject json = beamPresets.get(presetName);
         if (json == null) return;
 
-        if (json.has("enabled")) state.setBeamEnabled(json.get("enabled").getAsBoolean());
-        if (json.has("innerRadius")) state.setBeamInnerRadius(json.get("innerRadius").getAsFloat());
-        if (json.has("outerRadius")) state.setBeamOuterRadius(json.get("outerRadius").getAsFloat());
-        if (json.has("height")) state.setBeamHeight(json.get("height").getAsFloat());
-        if (json.has("glow")) state.setBeamGlow(json.get("glow").getAsFloat());
+        if (json.has("enabled")) state.set("beam.enabled", json.get("enabled").getAsBoolean());
+        if (json.has("innerRadius")) state.set("beam.innerRadius", json.get("innerRadius").getAsFloat());
+        if (json.has("outerRadius")) state.set("beam.outerRadius", json.get("outerRadius").getAsFloat());
+        if (json.has("height")) state.set("beam.height", json.get("height").getAsFloat());
+        if (json.has("glow")) state.set("beam.glow", json.get("glow").getAsFloat());
 
-        // Pulse settings
+        // Pulse settings - need to ensure pulse is not null before setting nested properties
         if (json.has("pulse")) {
             JsonObject pulse = json.getAsJsonObject("pulse");
-            if (pulse.has("enabled")) state.setBeamPulseEnabled(pulse.get("enabled").getAsBoolean());
-            if (pulse.has("scale")) state.setBeamPulseScale(pulse.get("scale").getAsFloat());
-            if (pulse.has("speed")) state.setBeamPulseSpeed(pulse.get("speed").getAsFloat());
-            if (pulse.has("waveform")) state.setBeamPulseWaveform(pulse.get("waveform").getAsString());
-            if (pulse.has("min")) state.setBeamPulseMin(pulse.get("min").getAsFloat());
-            if (pulse.has("max")) state.setBeamPulseMax(pulse.get("max").getAsFloat());
+            
+            // First, ensure beam has a non-null pulse (initialize with defaults if needed)
+            if (state.beam() == null || state.beam().pulse() == null) {
+                // Set default pulse config so nested properties can be set
+                state.set("beam.pulse", PulseConfig.DEFAULT);
+            }
+            
+            if (pulse.has("enabled") && !pulse.get("enabled").getAsBoolean()) {
+                state.set("beam.pulse", PulseConfig.NONE);
+            } else {
+                // Now we can safely set nested properties
+                if (pulse.has("scale")) state.set("beam.pulse.scale", pulse.get("scale").getAsFloat());
+                if (pulse.has("speed")) state.set("beam.pulse.speed", pulse.get("speed").getAsFloat());
+                if (pulse.has("waveform")) state.set("beam.pulse.waveform", pulse.get("waveform").getAsString());
+                if (pulse.has("min")) state.set("beam.pulse.min", pulse.get("min").getAsFloat());
+                if (pulse.has("max")) state.set("beam.pulse.max", pulse.get("max").getAsFloat());
+            }
         }
     }
 
@@ -415,14 +539,50 @@ public final class FragmentRegistry {
         JsonObject json = followPresets.get(presetName);
         if (json == null) return;
 
-        if (json.has("enabled")) state.setFollowEnabled(json.get("enabled").getAsBoolean());
+        if (json.has("enabled")) state.set("followEnabled", json.get("enabled").getAsBoolean());
         if (json.has("mode")) {
             try {
-                state.setFollowMode(FollowMode.valueOf(json.get("mode").getAsString()));
+                state.set("followMode", FollowMode.valueOf(json.get("mode").getAsString()));
             } catch (IllegalArgumentException e) {
                 LOGGER.warn("Unknown follow mode: {}", json.get("mode").getAsString());
             }
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // APPEARANCE PRESETS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public static List<String> listAppearanceFragments() {
+        ensureLoaded();
+        return withDefaults(appearancePresets.keySet());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ORBIT PRESETS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public static List<String> listOrbitFragments() {
+        ensureLoaded();
+        return withDefaults(orbitPresets.keySet());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // TRANSFORM PRESETS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public static List<String> listTransformFragments() {
+        ensureLoaded();
+        return withDefaults(transformPresets.keySet());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PREDICTION PRESETS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public static List<String> listPredictionFragments() {
+        ensureLoaded();
+        return withDefaults(predictionPresets.keySet());
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -440,7 +600,14 @@ public final class FragmentRegistry {
             case "arrangement", "arrangements" -> arrangementPresets.get(presetName);
             case "animation", "animations" -> animationPresets.get(presetName);
             case "beam", "beams" -> beamPresets.get(presetName);
-            case "follow" -> followPresets.get(presetName);
+            case "follow", "follows" -> followPresets.get(presetName);
+            case "appearance", "appearances" -> appearancePresets.get(presetName);
+            case "layer", "layers" -> layerPresets.get(presetName);
+            case "link", "links" -> linkPresets.get(presetName);
+            case "orbit", "orbits" -> orbitPresets.get(presetName);
+            case "prediction", "predictions" -> predictionPresets.get(presetName);
+            case "primitive", "primitives" -> primitivePresets.get(presetName);
+            case "transform", "transforms" -> transformPresets.get(presetName);
             default -> null;
         });
     }
@@ -495,7 +662,7 @@ public final class FragmentRegistry {
             case "shape" -> {
                 // Shape presets might be in field_shapes/<shape_type>/<preset>.json
                 // or just field_shapes/<preset>.json for generic shape settings
-                String shapeType = state.getShapeType();
+                String shapeType = state.getString("shapeType");
                 applyShapeFragment(state, shapeType, presetName);
             }
             case "fill" -> applyFillFragment(state, presetName);
@@ -509,8 +676,8 @@ public final class FragmentRegistry {
             case "transform" -> {
                 // Transform isn't a separate folder - apply from JSON directly
                 getPresetJson("transform", presetName).ifPresent(json -> {
-                    if (json.has("anchor")) state.setAnchor(json.get("anchor").getAsString());
-                    if (json.has("scale")) state.setScale(json.get("scale").getAsFloat());
+                    if (json.has("anchor")) state.set("transform.anchor", json.get("anchor").getAsString());
+                    if (json.has("scale")) state.set("transform.scale", json.get("scale").getAsFloat());
                     // Offset and rotation would need composite setters
                 });
             }

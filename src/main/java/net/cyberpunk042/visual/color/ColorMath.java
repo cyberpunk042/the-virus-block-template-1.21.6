@@ -157,6 +157,50 @@ public final class ColorMath {
     }
     
     /**
+     * Sets absolute saturation level.
+     * @param argb the color
+     * @param saturation 0.0 = grayscale, 1.0 = full saturation
+     */
+    public static int setSaturation(int argb, float saturation) {
+        float[] hsl = toHSL(argb);
+        hsl[1] = Math.max(0, Math.min(1, saturation));
+        return fromHSL(hsl[0], hsl[1], hsl[2], alphaF(argb));
+    }
+    
+    /**
+     * Multiplies saturation by factor.
+     * @param argb the color
+     * @param factor 0.0 = grayscale, 1.0 = no change, 2.0 = double saturation
+     */
+    public static int multiplySaturation(int argb, float factor) {
+        float[] hsl = toHSL(argb);
+        hsl[1] = Math.max(0, Math.min(1, hsl[1] * factor));
+        return fromHSL(hsl[0], hsl[1], hsl[2], alphaF(argb));
+    }
+    
+    /**
+     * Shifts hue by degrees.
+     * @param argb the color
+     * @param degrees hue shift (-360 to 360)
+     */
+    public static int shiftHue(int argb, float degrees) {
+        float[] hsl = toHSL(argb);
+        hsl[0] = (hsl[0] + degrees + 360) % 360;
+        return fromHSL(hsl[0], hsl[1], hsl[2], alphaF(argb));
+    }
+    
+    /**
+     * Multiplies brightness/lightness by factor.
+     * @param argb the color
+     * @param factor 0.0 = black, 1.0 = no change, 2.0 = brighter (clamped)
+     */
+    public static int multiplyBrightness(int argb, float factor) {
+        float[] hsl = toHSL(argb);
+        hsl[2] = Math.max(0, Math.min(1, hsl[2] * factor));
+        return fromHSL(hsl[0], hsl[1], hsl[2], alphaF(argb));
+    }
+    
+    /**
      * Blends two colors.
      * @param a first color
      * @param b second color

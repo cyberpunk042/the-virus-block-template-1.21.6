@@ -1,5 +1,8 @@
 package net.cyberpunk042.client.gui.panel.sub;
 
+import net.cyberpunk042.client.gui.panel.AbstractPanel;
+import net.minecraft.client.gui.screen.Screen;
+
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.GuiLayout;
@@ -27,8 +30,7 @@ import java.util.List;
  * 
  * @see <a href="GUI_CLASS_DIAGRAM.md §4.9">PredictionSubPanel specification</a>
  */
-public class PredictionSubPanel {
-    
+public class PredictionSubPanel extends AbstractPanel {
     // ═══════════════════════════════════════════════════════════════════════════
     // ENUMS
     // ═══════════════════════════════════════════════════════════════════════════
@@ -65,9 +67,7 @@ public class PredictionSubPanel {
     // FIELDS
     // ═══════════════════════════════════════════════════════════════════════════
     
-    private final FieldEditState state;
-    private final List<ClickableWidget> widgets = new ArrayList<>();
-    private final GuiLayout layout;
+    private GuiLayout layout;
     
     // Widgets
     private CyclingButtonWidget<PredictionPreset> presetButton;
@@ -93,9 +93,28 @@ public class PredictionSubPanel {
      * @param y Starting Y position
      * @param width Panel width
      */
-    public PredictionSubPanel(FieldEditState state, int x, int y, int width) {
-        this.state = state;
-        this.layout = new GuiLayout(x, y, GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING, width);
+    public PredictionSubPanel(Screen parent, FieldEditState state, int startY) {
+        super(parent, state);
+        this.startY = startY;
+    }
+    
+    private int startY;
+    
+    @Override
+    public void init(int width, int height) {
+        this.panelWidth = width;
+        this.panelHeight = height;
+        widgets.clear();
+        
+        int x = net.cyberpunk042.client.gui.util.GuiConstants.PADDING;
+        int y = startY;
+        this.layout = new GuiLayout(
+            x,
+            y,
+            GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING,
+            width - GuiConstants.PADDING * 2);
+        
+        // Continue with original build logic...
         initWidgets();
     }
     
@@ -109,33 +128,29 @@ public class PredictionSubPanel {
         // ─────────────────────────────────────────────────────────────────────────
         // Preset Selector - quick presets for common configurations
         // ─────────────────────────────────────────────────────────────────────────
+        int rowY = layout.getCurrentY();
         presetButton = CyclingButtonWidget.<PredictionPreset>builder(p -> Text.literal(p.getDisplayName()))
             .values(PredictionPreset.values())
             .initially(currentFragment)
-            .build(
-                layout.getStartX() + GuiConstants.PADDING,
-                layout.getStartY(),
-                controlWidth,
-                GuiConstants.ELEMENT_HEIGHT,
-                Text.literal("Preset"),
-                (button, value) -> applyPreset(value)
-            );
+            .build(layout.getStartX() + GuiConstants.PADDING, rowY, controlWidth,
+                GuiConstants.ELEMENT_HEIGHT, Text.literal("Variant"), (button, value) -> applyPreset(value));
         widgets.add(presetButton);
         layout.nextRow();
         
         // ─────────────────────────────────────────────────────────────────────────
         // Enabled Toggle - master on/off for prediction
         // ─────────────────────────────────────────────────────────────────────────
+        rowY = layout.getCurrentY();
         enabledButton = CyclingButtonWidget.<Boolean>builder(v -> Text.literal(v ? "Enabled" : "Disabled"))
             .values(List.of(false, true))
-            .initially(state.isPredictionEnabled())
+            .initially(state.getBool("predictionEnabled"))
             .build(
                 layout.getStartX() + GuiConstants.PADDING,
-                layout.getStartY(),
+                rowY,
                 controlWidth,
                 GuiConstants.ELEMENT_HEIGHT,
                 Text.literal("Prediction"),
-                (button, value) -> onUserChange(() -> state.setPredictionEnabled(value))
+                (button, value) -> onUserChange(() -> state.set("predictionEnabled", value))
             );
         widgets.add(enabledButton);
         layout.nextRow();
@@ -143,15 +158,16 @@ public class PredictionSubPanel {
         // ─────────────────────────────────────────────────────────────────────────
         // Lead Ticks - how many game ticks ahead to predict
         // ─────────────────────────────────────────────────────────────────────────
+        rowY = layout.getCurrentY();
         leadTicksSlider = new LabeledSlider(
             layout.getStartX() + GuiConstants.PADDING,
-            layout.getStartY(),
+            rowY,
             controlWidth,
             "Lead Ticks",
             1f, 10f,
-            (float) state.getPredictionLeadTicks(),
+            (float) state.getInt("prediction.leadTicks"),
             "%d", 1f,
-            v -> onUserChange(() -> state.setPredictionLeadTicks(v.intValue()))
+            v -> onUserChange(() -> state.set("prediction.leadTicks", v.intValue()))
         );
         widgets.add(leadTicksSlider);
         layout.nextRow();
@@ -159,15 +175,16 @@ public class PredictionSubPanel {
         // ─────────────────────────────────────────────────────────────────────────
         // Max Distance - maximum prediction distance in blocks
         // ─────────────────────────────────────────────────────────────────────────
+        rowY = layout.getCurrentY();
         maxDistanceSlider = new LabeledSlider(
             layout.getStartX() + GuiConstants.PADDING,
-            layout.getStartY(),
+            rowY,
             controlWidth,
             "Max Distance",
             1f, 50f,
-            state.getPredictionMaxDistance(),
+            state.getFloat("prediction.maxDistance"),
             "%.1f", null,
-            v -> onUserChange(() -> state.setPredictionMaxDistance(v))
+            v -> onUserChange(() -> state.set("prediction.maxDistance", v))
         );
         widgets.add(maxDistanceSlider);
         layout.nextRow();
@@ -175,15 +192,16 @@ public class PredictionSubPanel {
         // ─────────────────────────────────────────────────────────────────────────
         // Look Ahead - velocity weighting factor (0 = position only, 1 = full velocity)
         // ─────────────────────────────────────────────────────────────────────────
+        rowY = layout.getCurrentY();
         lookAheadSlider = new LabeledSlider(
             layout.getStartX() + GuiConstants.PADDING,
-            layout.getStartY(),
+            rowY,
             controlWidth,
             "Look Ahead",
             0f, 1f,
-            state.getPredictionLookAhead(),
+            state.getFloat("prediction.lookAhead"),
             "%.2f", null,
-            v -> onUserChange(() -> state.setPredictionLookAhead(v))
+            v -> onUserChange(() -> state.set("prediction.lookAhead", v))
         );
         widgets.add(lookAheadSlider);
         layout.nextRow();
@@ -191,15 +209,16 @@ public class PredictionSubPanel {
         // ─────────────────────────────────────────────────────────────────────────
         // Vertical Boost - extra compensation for vertical movement (jumping, falling)
         // ─────────────────────────────────────────────────────────────────────────
+        rowY = layout.getCurrentY();
         verticalBoostSlider = new LabeledSlider(
             layout.getStartX() + GuiConstants.PADDING,
-            layout.getStartY(),
+            rowY,
             controlWidth,
             "Vertical Boost",
             0f, 2f,
-            state.getPredictionVerticalBoost(),
+            state.getFloat("prediction.verticalBoost"),
             "%.2f", null,
-            v -> onUserChange(() -> state.setPredictionVerticalBoost(v))
+            v -> onUserChange(() -> state.set("prediction.verticalBoost", v))
         );
         widgets.add(verticalBoostSlider);
         layout.nextRow();
@@ -217,11 +236,11 @@ public class PredictionSubPanel {
         applyingFragment = true;
         currentFragment = preset;
         if (preset != PredictionPreset.CUSTOM) {
-            state.setPredictionEnabled(preset.enabled);
-            state.setPredictionLeadTicks(preset.leadTicks);
-            state.setPredictionMaxDistance(preset.maxDistance);
-            state.setPredictionLookAhead(preset.lookAhead);
-            state.setPredictionVerticalBoost(preset.verticalBoost);
+            state.set("predictionEnabled", preset.enabled);
+            state.set("prediction.leadTicks", preset.leadTicks);
+            state.set("prediction.maxDistance", preset.maxDistance);
+            state.set("prediction.lookAhead", preset.lookAhead);
+            state.set("prediction.verticalBoost", preset.verticalBoost);
         }
         boolean isCustom = (preset == PredictionPreset.CUSTOM);
         enabledButton.active = isCustom || preset == PredictionPreset.OFF;
@@ -249,15 +268,15 @@ public class PredictionSubPanel {
     
     /** Returns the total height of this sub-panel. */
     public int getHeight() {
-        return layout.getCurrentY() - layout.getStartY();
+        return layout.getCurrentY() - layout.getY();
     }
 
     private void syncFromState() {
-        if (enabledButton != null) enabledButton.setValue(state.isPredictionEnabled());
-        if (leadTicksSlider != null) leadTicksSlider.setValue(state.getPredictionLeadTicks());
-        if (maxDistanceSlider != null) maxDistanceSlider.setValue(state.getPredictionMaxDistance());
-        if (lookAheadSlider != null) lookAheadSlider.setValue(state.getPredictionLookAhead());
-        if (verticalBoostSlider != null) verticalBoostSlider.setValue(state.getPredictionVerticalBoost());
+        if (enabledButton != null) enabledButton.setValue(state.getBool("predictionEnabled"));
+        if (leadTicksSlider != null) leadTicksSlider.setValue(state.getInt("prediction.leadTicks"));
+        if (maxDistanceSlider != null) maxDistanceSlider.setValue(state.getFloat("prediction.maxDistance"));
+        if (lookAheadSlider != null) lookAheadSlider.setValue(state.getFloat("prediction.lookAhead"));
+        if (verticalBoostSlider != null) verticalBoostSlider.setValue(state.getFloat("prediction.verticalBoost"));
         if (presetButton != null) presetButton.setValue(currentFragment);
     }
 
@@ -268,5 +287,11 @@ public class PredictionSubPanel {
             if (presetButton != null) presetButton.setValue(currentFragment);
         }
     }
+
+    @Override
+    public void tick() {
+        // No per-tick updates needed
+    }
+
 }
 

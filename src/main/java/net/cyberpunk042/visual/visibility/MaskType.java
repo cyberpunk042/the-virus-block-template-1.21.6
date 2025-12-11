@@ -26,25 +26,41 @@ package net.cyberpunk042.visual.visibility;
  */
 public enum MaskType {
     /** All cells visible (DEFAULT) */
-    FULL,
+    FULL("Full (No Mask)"),
     
     /** Horizontal stripes (latitude-based) */
-    BANDS,
+    BANDS("Horizontal Bands"),
     
     /** Vertical stripes (longitude-based) */
-    STRIPES,
+    STRIPES("Vertical Stripes"),
     
     /** Checkerboard pattern */
-    CHECKER,
+    CHECKER("Checkerboard"),
     
     /** Radial gradient visibility (Phase 2) */
-    RADIAL,
+    RADIAL("Radial Gradient"),
     
     /** Linear gradient visibility (Phase 2) */
-    GRADIENT,
+    GRADIENT("Linear Gradient"),
     
     /** Custom mask function (Future) */
-    CUSTOM;
+    CUSTOM("Custom");
+    
+    private final String label;
+    
+    MaskType(String label) {
+        this.label = label;
+    }
+    
+    /** Display label for GUI */
+    public String label() {
+        return label;
+    }
+    
+    @Override
+    public String toString() {
+        return label;
+    }
     
     /**
      * Parse from string (case-insensitive).

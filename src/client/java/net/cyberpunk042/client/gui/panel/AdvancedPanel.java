@@ -100,15 +100,15 @@ public class AdvancedPanel extends AbstractPanel {
         contentY += fillSubPanel.getHeight() + GuiConstants.SECTION_SPACING;
         
         // Linking (primitive linking)
-        linkingSubPanel = new LinkingSubPanel(state, 0, contentY, width);
+        linkingSubPanel = new LinkingSubPanel(parent, state, contentY);
         contentY += linkingSubPanel.getHeight() + GuiConstants.SECTION_SPACING;
         
         // Prediction (movement prediction settings)
-        predictionSubPanel = new PredictionSubPanel(state, 0, contentY, width);
+        predictionSubPanel = new PredictionSubPanel(parent, state, contentY);
         contentY += predictionSubPanel.getHeight() + GuiConstants.SECTION_SPACING;
         
         // Follow Mode (how field follows player)
-        followModeSubPanel = new FollowModeSubPanel(state, 0, contentY, width);
+        followModeSubPanel = new FollowModeSubPanel(parent, state, contentY);
         contentY += followModeSubPanel.getHeight() + GuiConstants.SECTION_SPACING;
         
         contentHeight = contentY;

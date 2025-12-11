@@ -1,0 +1,9 @@
+{
+  "name": "Disc Target",
+  "description": "Target/bullseye pattern",
+  "type": "disc",
+  "radius": 1.0,
+  "segments": 64,
+  "innerRadius": 0.2,
+  "rings": 3
+}

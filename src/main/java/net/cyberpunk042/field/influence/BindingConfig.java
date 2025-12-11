@@ -31,7 +31,8 @@ import net.cyberpunk042.util.json.JsonSerializer;
  * @see BindingResolver
  */
 public record BindingConfig(
-    String source,
+    String property,  // Target property path (e.g., "radius", "fill.alpha")
+    String source,    // Binding source ID (e.g., "player.health_percent")
     float inputMin,
     float inputMax,
     float outputMin,
@@ -40,12 +41,15 @@ public record BindingConfig(
 ){
     /** Default binding (pass-through). */
     public static final BindingConfig DEFAULT = new BindingConfig(
-        "player.health_percent", 0, 1, 0, 1, InterpolationCurve.LINEAR);
+        "radius", "player.health_percent", 0, 1, 0, 1, InterpolationCurve.LINEAR);
     
     /**
      * Creates a binding config.
      */
     public BindingConfig {
+        if (property == null || property.isEmpty()) {
+            property = "radius";
+        }
         if (source == null || source.isEmpty()) {
             source = "player.health_percent";
         }
@@ -57,12 +61,12 @@ public record BindingConfig(
     /**
      * Convenience constructor with arrays.
      */
-    public static BindingConfig of(String source, float[] inputRange, float[] outputRange, InterpolationCurve curve) {
+    public static BindingConfig of(String property, String source, float[] inputRange, float[] outputRange, InterpolationCurve curve) {
         float inMin = inputRange != null && inputRange.length >= 2 ? inputRange[0] : 0;
         float inMax = inputRange != null && inputRange.length >= 2 ? inputRange[1] : 1;
         float outMin = outputRange != null && outputRange.length >= 2 ? outputRange[0] : 0;
         float outMax = outputRange != null && outputRange.length >= 2 ? outputRange[1] : 1;
-        return new BindingConfig(source, inMin, inMax, outMin, outMax, curve);
+        return new BindingConfig(property, source, inMin, inMax, outMin, outMax, curve);
     }
     
     /**
@@ -72,6 +76,7 @@ public record BindingConfig(
     public static BindingConfig fromJson(JsonObject json) {
         if (json == null) return DEFAULT;
         
+        String property = json.has("property") ? json.get("property").getAsString() : "radius";
         String source = json.has("source") ? json.get("source").getAsString() : "player.health_percent";
         
         // Support both new field format and legacy array format
@@ -108,8 +113,8 @@ public record BindingConfig(
             curve = InterpolationCurve.fromId(json.get("curve").getAsString());
         }
         
-        Logging.FIELD.topic("binding").trace("Parsed BindingConfig: source={}, curve={}", source, curve);
-        return new BindingConfig(source, inputMin, inputMax, outputMin, outputMax, curve);
+        Logging.FIELD.topic("binding").trace("Parsed BindingConfig: property={}, source={}, curve={}", property, source, curve);
+        return new BindingConfig(property, source, inputMin, inputMax, outputMin, outputMax, curve);
     }
     
     /**
@@ -119,6 +124,7 @@ public record BindingConfig(
     /** Create a builder pre-populated with this record's values. */
     public Builder toBuilder() {
         return new Builder()
+            .property(property)
             .source(source)
             .inputRange(inputMin, inputMax)
             .outputRange(outputMin, outputMax)
@@ -135,18 +141,20 @@ public record BindingConfig(
 
     
     public static class Builder {
+        private String property = "radius";
         private String source = "player.health_percent";
         private float inputMin = 0, inputMax = 1;
         private float outputMin = 0, outputMax = 1;
         private InterpolationCurve curve = InterpolationCurve.LINEAR;
         
+        public Builder property(String p) { this.property = p; return this; }
         public Builder source(String s) { this.source = s; return this; }
         public Builder inputRange(float min, float max) { this.inputMin = min; this.inputMax = max; return this; }
         public Builder outputRange(float min, float max) { this.outputMin = min; this.outputMax = max; return this; }
         public Builder curve(InterpolationCurve c) { this.curve = c; return this; }
         
         public BindingConfig build() {
-            return new BindingConfig(source, inputMin, inputMax, outputMin, outputMax, curve);
+            return new BindingConfig(property, source, inputMin, inputMax, outputMin, outputMax, curve);
         }
     }
 }

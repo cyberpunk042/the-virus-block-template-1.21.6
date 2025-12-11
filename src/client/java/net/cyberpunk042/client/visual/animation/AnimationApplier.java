@@ -3,6 +3,7 @@ package net.cyberpunk042.client.visual.animation;
 import net.cyberpunk042.visual.animation.Animation;
 import net.cyberpunk042.visual.animation.SpinConfig;
 import net.cyberpunk042.visual.animation.PulseConfig;
+import net.cyberpunk042.visual.animation.PulseMode;
 import net.cyberpunk042.visual.animation.WobbleConfig;
 import net.cyberpunk042.visual.animation.WaveConfig;
 import net.cyberpunk042.visual.animation.AlphaPulseConfig;
@@ -114,20 +115,68 @@ public final class AnimationApplier {
     }
     
     /**
-     * Applies pulse scaling.
-     * Uses {@link Waveform#evaluate(float)} for waveform calculation.
+     * Applies pulse based on mode.
+     * <ul>
+     *   <li>SCALE: applies to MatrixStack</li>
+     *   <li>ALPHA/GLOW/COLOR: use {@link #getPulseValue} instead</li>
+     * </ul>
      */
     public static void applyPulse(MatrixStack matrices, PulseConfig pulse, float time) {
         if (pulse == null || !pulse.isActive()) return;
         
+        // Only apply to matrices if mode is SCALE
+        if (pulse.mode() == PulseMode.SCALE) {
+            float scale = getPulseValue(pulse, time);
+            matrices.scale(scale, scale, scale);
+            Logging.ANIMATION.topic("pulse").trace("Pulse SCALE: {}", scale);
+        }
+    }
+    
+    /**
+     * Gets the pulse value for any mode.
+     * @return Value between min and max based on waveform
+     */
+    public static float getPulseValue(PulseConfig pulse, float time) {
+        if (pulse == null || !pulse.isActive()) return 1.0f;
+        
         // Use Waveform.evaluate() for clean waveform calculation (returns 0-1)
         float normalizedWave = pulse.waveform().evaluate(time * pulse.speed());
         
-        // Map wave (0 to 1) to scale range (min to max)
-        float scale = pulse.min() + normalizedWave * (pulse.max() - pulse.min());
-        
-        matrices.scale(scale, scale, scale);
-        Logging.ANIMATION.topic("pulse").trace("Pulse: scale={}", scale);
+        // Map wave (0 to 1) to range (min to max)
+        return pulse.min() + normalizedWave * (pulse.max() - pulse.min());
+    }
+    
+    /**
+     * Gets pulse alpha multiplier (only if mode is ALPHA).
+     */
+    public static float getPulseAlpha(PulseConfig pulse, float time) {
+        if (pulse == null || !pulse.isActive() || pulse.mode() != PulseMode.ALPHA) {
+            return 1.0f;
+        }
+        return getPulseValue(pulse, time);
+    }
+    
+    /**
+     * Gets pulse glow multiplier (only if mode is GLOW).
+     */
+    public static float getPulseGlow(PulseConfig pulse, float time) {
+        if (pulse == null || !pulse.isActive() || pulse.mode() != PulseMode.GLOW) {
+            return 1.0f;
+        }
+        return getPulseValue(pulse, time);
+    }
+    
+    /**
+     * Gets pulse color/hue shift (only if mode is COLOR).
+     * @return Hue shift value (0-1 mapped from min-max)
+     */
+    public static float getPulseHueShift(PulseConfig pulse, float time) {
+        if (pulse == null || !pulse.isActive() || pulse.mode() != PulseMode.COLOR) {
+            return 0.0f;
+        }
+        // For color mode, return the raw wave value (0-1) for hue cycling
+        float normalizedWave = pulse.waveform().evaluate(time * pulse.speed());
+        return normalizedWave;
     }
     
     /**
@@ -147,6 +196,61 @@ public final class AnimationApplier {
         
         matrices.translate(wobbleX, wobbleY, wobbleZ);
         Logging.ANIMATION.topic("wobble").trace("Wobble: ({}, {}, {})", wobbleX, wobbleY, wobbleZ);
+    }
+    
+    // =========================================================================
+    // Modifiers: Bobbing & Breathing
+    // =========================================================================
+    
+    /**
+     * Applies bobbing (vertical oscillation) from Modifiers.
+     * 
+     * @param matrices MatrixStack to modify
+     * @param bobbing Bobbing strength (0-1)
+     * @param time Current time in ticks
+     */
+    public static void applyBobbing(MatrixStack matrices, float bobbing, float time) {
+        if (bobbing <= 0) return;
+        
+        // Slow, gentle bob - 0.5 Hz base frequency, amplitude based on strength
+        float amplitude = bobbing * 0.15f;  // Max 0.15 blocks at full strength
+        float y = MathHelper.sin(time * 0.1f) * amplitude;
+        
+        matrices.translate(0, y, 0);
+        Logging.ANIMATION.topic("modifiers").trace("Bobbing: y={}", y);
+    }
+    
+    /**
+     * Applies breathing (scale oscillation) from Modifiers.
+     * 
+     * @param matrices MatrixStack to modify
+     * @param breathing Breathing strength (0-1)
+     * @param time Current time in ticks
+     */
+    public static void applyBreathing(MatrixStack matrices, float breathing, float time) {
+        if (breathing <= 0) return;
+        
+        // Slow breathing - 0.3 Hz, scale range based on strength
+        float normalizedWave = (MathHelper.sin(time * 0.06f) + 1) / 2;  // 0-1
+        float scaleVariation = breathing * 0.1f;  // Max ±10% at full strength
+        float scale = 1.0f + (normalizedWave - 0.5f) * scaleVariation * 2;
+        
+        matrices.scale(scale, scale, scale);
+        Logging.ANIMATION.topic("modifiers").trace("Breathing: scale={}", scale);
+    }
+    
+    /**
+     * Applies all modifier animations (bobbing + breathing).
+     * 
+     * @param matrices MatrixStack to modify
+     * @param modifiers The Modifiers config
+     * @param time Current time in ticks
+     */
+    public static void applyModifiers(MatrixStack matrices, net.cyberpunk042.field.Modifiers modifiers, float time) {
+        if (modifiers == null || !modifiers.hasAnimationModifiers()) return;
+        
+        applyBobbing(matrices, modifiers.bobbing(), time);
+        applyBreathing(matrices, modifiers.breathing(), time);
     }
     
     // =========================================================================

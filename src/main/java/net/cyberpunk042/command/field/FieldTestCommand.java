@@ -1,133 +1,44 @@
 package net.cyberpunk042.command.field;
 
 import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import net.cyberpunk042.command.util.CommandFeedback;
-import net.cyberpunk042.command.util.ListFormatter;
 import net.cyberpunk042.command.util.ReportBuilder;
-import net.cyberpunk042.field.FieldDefinition;
-import net.cyberpunk042.field.FieldLayer;
-import net.cyberpunk042.field.FieldManager;
-import net.cyberpunk042.field.FieldProfileStore;
-import net.cyberpunk042.field.FieldRegistry;
-import net.cyberpunk042.field.instance.FollowMode;
 import net.cyberpunk042.log.Logging;
-import net.cyberpunk042.network.FieldNetworking;
-import net.cyberpunk042.visual.fill.FillMode;
 import net.cyberpunk042.visual.pattern.*;
-import net.cyberpunk042.visual.transform.Anchor;
-import net.cyberpunk042.visual.visibility.MaskType;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.Vec3d;
-
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
- * Debug/power-user commands for field testing (NOT synced with GUI).
+ * Debug commands for vertex pattern and shuffle exploration.
  * 
- * <p>For GUI-synced editing, use {@code /field edit} instead.</p>
- * 
- * <h2>Command Structure</h2>
+ * <h2>Commands</h2>
  * <pre>
- * /fieldtest spawn <id>              - Spawn field definition (server-side)
- * /fieldtest clear                   - Clear test field
- * /fieldtest list [filter]           - List definitions
- * /fieldtest info <id>               - Show definition details
- * /fieldtest cycle                   - Cycle through definitions
- * /fieldtest reload                  - Reload all definitions
- * /fieldtest status                  - Show current state values
- * 
- * /fieldtest vertex <pattern>        - Set vertex pattern
- * /fieldtest shuffle next|prev|jump  - Explore shuffle patterns
- * /fieldtest follow snap|smooth|glide- Set follow mode (server field)
- * /fieldtest predict on|off|...      - Configure prediction (server field)
- * 
- * /fieldtest save <name>             - Save current state as profile
- * /fieldtest load <name>             - Load saved profile
- * /fieldtest saved                   - List saved profiles
- * /fieldtest delete <name>           - Delete saved profile
+ * /fieldtest vertex [pattern]        - List or set vertex pattern
+ * /fieldtest shuffle                 - Show current shuffle state
+ * /fieldtest shuffle next|prev       - Navigate shuffle patterns
+ * /fieldtest shuffle jump <idx>      - Jump to specific index
+ * /fieldtest shuffle type <type>     - Switch shuffle type
  * </pre>
- * 
- * <p><b>NOTE:</b> /fieldtest uses its own static state, separate from GUI.
- * Use {@code /field edit} for commands that sync with FieldEditState.</p>
  * 
  * @see FieldEditSubcommand for GUI-synced editing
  */
 public final class FieldTestCommand {
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // STATE
+    // STATE (vertex/shuffle only)
     // ═══════════════════════════════════════════════════════════════════════════
     
-    // Current test field
-    private static String currentProfile = null;
-    private static long currentTestFieldId = -1;
-    private static int currentLayerIndex = 0;
-    
-    // Shape parameters
-    private static float shapeRadius = 5.0f;
-    private static int shapeLatSteps = 32;
-    private static int shapeLonSteps = 64;
-    private static String shapeAlgorithm = "lat_lon";
-    
-    // Transform parameters
-    private static Anchor transformAnchor = Anchor.CENTER;
-    private static float transformScale = 1.0f;
-    private static float transformOffsetX = 0.0f;
-    private static float transformOffsetY = 0.0f;
-    private static float transformOffsetZ = 0.0f;
-    
-    // Fill parameters
-    private static FillMode fillMode = FillMode.SOLID;
-    private static float fillWireThickness = 1.0f;
-    private static boolean fillDoubleSided = false;
-    
-    // Visibility parameters
-    private static MaskType visibilityMask = MaskType.FULL;
-    private static int visibilityCount = 4;
-    private static float visibilityThickness = 0.5f;
-    
-    // Appearance parameters
-    private static String appearanceColor = "@primary";
-    private static float appearanceAlpha = 0.6f;
-    private static float appearanceGlow = 0.3f;
-    
-    // Animation parameters
-    private static float animationSpin = 0.02f;
-    private static float animationPhase = 0.0f;
-    
-    // Pattern state
     private static VertexPattern editPattern = QuadPattern.DEFAULT;
     private static ShuffleType shuffleType = ShuffleType.QUAD;
     private static int shuffleIndex = 0;
     
-    // Follow mode and prediction
-    private static FollowMode followMode = FollowMode.SNAP;
-    private static boolean predictionEnabled = true;
-    private static int predictionLeadTicks = 2;
-    private static float predictionMaxDistance = 8.0f;
-    private static float predictionLookAhead = 0.5f;
-    private static float predictionVerticalBoost = 0.0f;
-    
-    // Profile cycling
-    private static final List<String> PROFILE_ORDER = new ArrayList<>();
-    private static int currentCycleIndex = 0;
-    
     // ═══════════════════════════════════════════════════════════════════════════
-    // ENUMS
+    // SHUFFLE TYPE ENUM
     // ═══════════════════════════════════════════════════════════════════════════
     
     public enum ShuffleType {
@@ -157,123 +68,19 @@ public final class FieldTestCommand {
                 case TRIANGLE -> ShuffleGenerator.triangleCount();
             };
         }
-        
-        public static ShuffleType fromId(String id) {
-            for (ShuffleType t : values()) {
-                if (t.id.equalsIgnoreCase(id)) return t;
-            }
-            return QUAD;
-        }
     }
     
     private FieldTestCommand() {}
     
     // ═══════════════════════════════════════════════════════════════════════════
-    // SUGGESTION PROVIDERS
+    // SUGGESTION PROVIDER
     // ═══════════════════════════════════════════════════════════════════════════
     
-    // Definition IDs
-    private static final SuggestionProvider<ServerCommandSource> DEFINITION_SUGGESTIONS = (ctx, builder) -> {
-        for (FieldDefinition def : FieldRegistry.all()) {
-            String id = def.id();
-            if (id.toLowerCase().contains(builder.getRemaining().toLowerCase())) {
-                builder.suggest(id);
-            }
-        }
-        return builder.buildFuture();
-    };
-    
-    // Algorithms
-    private static final SuggestionProvider<ServerCommandSource> ALGORITHM_SUGGESTIONS = (ctx, builder) -> {
-        builder.suggest("lat_lon", Text.literal("Lat/Lon tessellation"));
-        builder.suggest("type_a", Text.literal("Overlapping cubes"));
-        builder.suggest("type_e", Text.literal("Rotated rectangles"));
-        return builder.buildFuture();
-    };
-    
-    // Anchors
-    private static final SuggestionProvider<ServerCommandSource> ANCHOR_SUGGESTIONS = (ctx, builder) -> {
-        for (Anchor a : Anchor.values()) {
-            builder.suggest(a.name().toLowerCase(), Text.literal(a.name()));
-        }
-        return builder.buildFuture();
-    };
-    
-    // Fill modes
-    private static final SuggestionProvider<ServerCommandSource> FILL_MODE_SUGGESTIONS = (ctx, builder) -> {
-        for (FillMode m : FillMode.values()) {
-            builder.suggest(m.name().toLowerCase());
-        }
-        return builder.buildFuture();
-    };
-    
-    // Mask types
-    private static final SuggestionProvider<ServerCommandSource> MASK_TYPE_SUGGESTIONS = (ctx, builder) -> {
-        for (MaskType m : MaskType.values()) {
-            builder.suggest(m.name().toLowerCase());
-        }
-        return builder.buildFuture();
-    };
-    
-    // Colors
-    private static final SuggestionProvider<ServerCommandSource> COLOR_SUGGESTIONS = (ctx, builder) -> {
-        // Theme references
-        builder.suggest("@primary", Text.literal("Primary theme color"));
-        builder.suggest("@secondary", Text.literal("Secondary theme color"));
-        builder.suggest("@glow", Text.literal("Glow/emissive color"));
-        builder.suggest("@accent", Text.literal("Accent color"));
-        // Hex presets
-        builder.suggest("#00CCFF", Text.literal("Cyan"));
-        builder.suggest("#FF6600", Text.literal("Orange"));
-        builder.suggest("#00FF88", Text.literal("Green"));
-        builder.suggest("#FF0066", Text.literal("Pink"));
-        builder.suggest("#FFCC00", Text.literal("Gold"));
-        builder.suggest("#9900FF", Text.literal("Purple"));
-        builder.suggest("#FFFFFF", Text.literal("White"));
-        return builder.buildFuture();
-    };
-    
-    // $ref suggestions for each category
-    private static SuggestionProvider<ServerCommandSource> refSuggestions(String folder) {
-        return (ctx, builder) -> {
-            builder.suggest("$ref:" + folder + "/", Text.literal("Reference from " + folder));
-            
-            Path dataPath = Path.of("src/main/resources/data/the-virus-block/" + folder);
-            if (Files.exists(dataPath)) {
-                try (var stream = Files.list(dataPath)) {
-                    stream.filter(p -> p.toString().endsWith(".json"))
-                        .forEach(p -> {
-                            String name = p.getFileName().toString();
-                            name = name.substring(0, name.length() - 5);
-                            builder.suggest("$ref:" + folder + "/" + name);
-                        });
-                } catch (Exception ignored) {}
-            }
-            return builder.buildFuture();
-        };
-    }
-    
-    private static final SuggestionProvider<ServerCommandSource> SHAPE_REF = refSuggestions("field_shapes");
-    private static final SuggestionProvider<ServerCommandSource> TRANSFORM_REF = refSuggestions("field_transforms");
-    private static final SuggestionProvider<ServerCommandSource> FILL_REF = refSuggestions("field_fills");
-    private static final SuggestionProvider<ServerCommandSource> VISIBILITY_REF = refSuggestions("field_masks");
-    private static final SuggestionProvider<ServerCommandSource> APPEARANCE_REF = refSuggestions("field_appearances");
-    private static final SuggestionProvider<ServerCommandSource> ANIMATION_REF = refSuggestions("field_animations");
-    
-    // Vertex patterns
     private static final SuggestionProvider<ServerCommandSource> VERTEX_SUGGESTIONS = (ctx, builder) -> {
         for (String id : QuadPattern.ids()) builder.suggest(id);
         for (String id : SegmentPattern.ids()) builder.suggest(id);
         for (String id : SectorPattern.ids()) builder.suggest(id);
         for (String id : EdgePattern.ids()) builder.suggest(id);
-        return builder.buildFuture();
-    };
-    
-    // Saved profiles
-    private static final SuggestionProvider<ServerCommandSource> SAVED_SUGGESTIONS = (ctx, builder) -> {
-        for (String name : FieldProfileStore.list()) {
-            builder.suggest(name);
-        }
         return builder.buildFuture();
     };
     
@@ -283,280 +90,16 @@ public final class FieldTestCommand {
     
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
         var cmd = CommandManager.literal("fieldtest")
-            .requires(source -> source.hasPermissionLevel(2));
-        
-        // Core commands
-        cmd.then(buildSpawnCommand());
-        cmd.then(buildClearCommand());
-        cmd.then(buildListCommand());
-        cmd.then(buildInfoCommand());
-        cmd.then(buildCycleCommand());
-        cmd.then(buildReloadCommand());
-        cmd.then(buildStatusCommand());
-        
-        // NOTE: Edit commands moved to /field edit (FieldEditSubcommand)
-        // /fieldtest now only has debug-only features
-        
-        // Pattern commands
-        cmd.then(buildVertexCommand());
-        cmd.then(buildShuffleCommands());
-        
-        // Movement commands
-        cmd.then(buildFollowCommands());
-        cmd.then(buildPredictCommands());
-        
-        // Profile save/load
-        cmd.then(buildSaveCommand());
-        cmd.then(buildLoadCommand());
-        cmd.then(buildSavedCommand());
-        cmd.then(buildDeleteCommand());
+            .requires(source -> source.hasPermissionLevel(2))
+            .then(buildVertexCommand())
+            .then(buildShuffleCommands());
         
         dispatcher.register(cmd);
-        rebuildProfileOrder();
-        Logging.COMMANDS.info("Registered /fieldtest (debug commands, use /field edit for GUI-synced editing)");
+        Logging.COMMANDS.info("Registered /fieldtest (vertex/shuffle)");
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
-    // NOTE: Edit commands moved to /field edit (FieldEditSubcommand)
-    // The following is kept for debugging the static server-side field only.
-    // For GUI-synced editing, use /field edit instead.
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    @SuppressWarnings("unused") // Kept for reference/debugging
-    private static int showEditStatus(ServerCommandSource source) {
-        ReportBuilder.create("FieldTest Static State (Debug)")
-            .section("Shape", s -> s
-                .kv("radius", shapeRadius + " blocks")
-                .kv("latSteps", shapeLatSteps)
-                .kv("lonSteps", shapeLonSteps)
-                .kv("algorithm", shapeAlgorithm))
-            .section("Transform", s -> s
-                .kv("anchor", transformAnchor.name().toLowerCase())
-                .kv("scale", transformScale)
-                .kv("offset", String.format("(%.1f, %.1f, %.1f)", transformOffsetX, transformOffsetY, transformOffsetZ)))
-            .section("Fill", s -> s
-                .kv("mode", fillMode.name().toLowerCase())
-                .kv("wireThickness", fillWireThickness)
-                .kv("doubleSided", fillDoubleSided))
-            .section("Visibility", s -> s
-                .kv("mask", visibilityMask.name().toLowerCase())
-                .kv("count", visibilityCount)
-                .kv("thickness", visibilityThickness))
-            .section("Appearance", s -> s
-                .kv("color", appearanceColor)
-                .kv("alpha", appearanceAlpha)
-                .kv("glow", appearanceGlow))
-            .section("Animation", s -> s
-                .kv("spin", animationSpin + " rad/tick")
-                .kv("phase", animationPhase))
-            .section("Selection", s -> s
-                .kv("layer", currentLayerIndex)
-                .kv("profile", currentProfile != null ? currentProfile : "(none)"))
-            .send(source);
-        return 1;
-    }
-    
-    private static void resetEditValues() {
-        shapeRadius = 5.0f;
-        shapeLatSteps = 32;
-        shapeLonSteps = 64;
-        shapeAlgorithm = "lat_lon";
-        
-        transformAnchor = Anchor.CENTER;
-        transformScale = 1.0f;
-        transformOffsetX = 0.0f;
-        transformOffsetY = 0.0f;
-        transformOffsetZ = 0.0f;
-        
-        fillMode = FillMode.SOLID;
-        fillWireThickness = 1.0f;
-        fillDoubleSided = false;
-        
-        visibilityMask = MaskType.FULL;
-        visibilityCount = 4;
-        visibilityThickness = 0.5f;
-        
-        appearanceColor = "@primary";
-        appearanceAlpha = 0.6f;
-        appearanceGlow = 0.3f;
-        
-        animationSpin = 0.02f;
-        animationPhase = 0.0f;
-        
-        editPattern = QuadPattern.DEFAULT;
-        currentLayerIndex = 0;
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // CORE COMMANDS
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    private static LiteralArgumentBuilder<ServerCommandSource> buildSpawnCommand() {
-        return CommandManager.literal("spawn")
-            .then(CommandManager.argument("id", StringArgumentType.word())
-                .suggests(DEFINITION_SUGGESTIONS)
-                .executes(ctx -> handleSpawn(ctx.getSource(), StringArgumentType.getString(ctx, "id"))));
-    }
-    
-    private static int handleSpawn(ServerCommandSource source, String id) {
-        // Clear previous
-        if (currentTestFieldId != -1 && source.getEntity() instanceof ServerPlayerEntity player) {
-            FieldManager.get(player.getWorld()).remove(currentTestFieldId);
-            currentTestFieldId = -1;
-        }
-        
-        FieldDefinition def = FieldRegistry.get(Identifier.of("the-virus-block", id));
-        if (def == null) {
-            // Try without namespace
-            for (FieldDefinition d : FieldRegistry.all()) {
-                if (d.id().equals(id)) {
-                    def = d;
-                    break;
-                }
-            }
-        }
-        
-        if (def == null) {
-            CommandFeedback.notFound(source, "Field definition", id);
-            return 0;
-        }
-        
-        currentProfile = def.id();
-        shapeRadius = def.baseRadius();
-        if (def.modifiers() != null) {
-            transformScale = def.modifiers().visualScale();
-        }
-        
-        // Spawn
-        if (source.getEntity() instanceof ServerPlayerEntity player) {
-            Vec3d pos = player.getPos().add(0, 1.0, 0);
-            var instance = FieldManager.get(player.getWorld())
-                .spawnAt(Identifier.of("the-virus-block", def.id()), pos, shapeRadius * transformScale, -1);
-            if (instance != null) {
-                currentTestFieldId = instance.id();
-            }
-        }
-        
-        CommandFeedback.success(source, "Spawned: " + def.id());
-        return 1;
-    }
-    
-    private static LiteralArgumentBuilder<ServerCommandSource> buildClearCommand() {
-        return CommandManager.literal("clear")
-            .executes(ctx -> {
-                if (currentTestFieldId != -1 && ctx.getSource().getEntity() instanceof ServerPlayerEntity player) {
-                    FieldManager.get(player.getWorld()).remove(currentTestFieldId);
-                    currentTestFieldId = -1;
-                }
-                currentProfile = null;
-                resetEditValues();
-                CommandFeedback.success(ctx.getSource(), "Test field cleared");
-                return 1;
-            });
-    }
-    
-    private static LiteralArgumentBuilder<ServerCommandSource> buildListCommand() {
-        return CommandManager.literal("list")
-            .executes(ctx -> {
-                List<FieldDefinition> defs = new ArrayList<>();
-                FieldRegistry.all().forEach(defs::add);
-                defs.sort((a, b) -> a.id().compareTo(b.id()));
-                
-                return ListFormatter.<FieldDefinition>create("Field Definitions")
-                    .showCount(true)
-                    .items(defs, def -> ListFormatter.entry(def.id())
-                        .tag(def.type().id(), Formatting.DARK_AQUA)
-                        .tag(def.layers().size() + " layers", Formatting.GRAY))
-                    .send(ctx.getSource());
-            })
-            .then(CommandManager.argument("filter", StringArgumentType.word())
-                .executes(ctx -> {
-                    String filter = StringArgumentType.getString(ctx, "filter").toLowerCase();
-                    List<FieldDefinition> defs = new ArrayList<>();
-                    FieldRegistry.all().forEach(d -> {
-                        if (d.id().toLowerCase().contains(filter)) defs.add(d);
-                    });
-                    defs.sort((a, b) -> a.id().compareTo(b.id()));
-                    
-                    return ListFormatter.<FieldDefinition>create("Definitions matching: " + filter)
-                        .showCount(true)
-                        .items(defs, def -> ListFormatter.entry(def.id()))
-                        .send(ctx.getSource());
-                }));
-    }
-    
-    private static LiteralArgumentBuilder<ServerCommandSource> buildInfoCommand() {
-        return CommandManager.literal("info")
-            .then(CommandManager.argument("id", StringArgumentType.word())
-                .suggests(DEFINITION_SUGGESTIONS)
-                .executes(ctx -> {
-                    String id = StringArgumentType.getString(ctx, "id");
-                    FieldDefinition def = FieldRegistry.get(Identifier.of("the-virus-block", id));
-                    if (def == null) {
-                        CommandFeedback.notFound(ctx.getSource(), "Definition", id);
-                        return 0;
-                    }
-                    
-                    var report = ReportBuilder.create("Field: " + def.id())
-                        .kv("Type", def.type().id())
-                        .kv("Base Radius", def.baseRadius() + " blocks")
-                        .kv("Theme", def.themeId() != null ? def.themeId() : "default")
-                        .kv("Layers", def.layers().size());
-                    
-                    report.section("Layers", s -> {
-                        int idx = 0;
-                        for (FieldLayer layer : def.layers()) {
-                            s.line("[" + idx++ + "] " + layer.id() + " (" + layer.primitives().size() + " primitives)");
-                        }
-                    });
-                    
-                    report.send(ctx.getSource());
-                    return 1;
-                }));
-    }
-    
-    private static LiteralArgumentBuilder<ServerCommandSource> buildCycleCommand() {
-        return CommandManager.literal("cycle")
-            .executes(ctx -> {
-                if (PROFILE_ORDER.isEmpty()) rebuildProfileOrder();
-                if (PROFILE_ORDER.isEmpty()) {
-                    CommandFeedback.error(ctx.getSource(), "No profiles available");
-                    return 0;
-                }
-                
-                currentCycleIndex = (currentCycleIndex + 1) % PROFILE_ORDER.size();
-                String next = PROFILE_ORDER.get(currentCycleIndex);
-                CommandFeedback.highlight(ctx.getSource(), "[" + (currentCycleIndex + 1) + "/" + PROFILE_ORDER.size() + "] " + next);
-                return handleSpawn(ctx.getSource(), next);
-            });
-    }
-    
-    private static LiteralArgumentBuilder<ServerCommandSource> buildReloadCommand() {
-        return CommandManager.literal("reload")
-            .executes(ctx -> {
-                net.cyberpunk042.config.InfectionConfigRegistry.loadCommon();
-                rebuildProfileOrder();
-                java.util.concurrent.atomic.AtomicInteger count = new java.util.concurrent.atomic.AtomicInteger(0);
-                FieldRegistry.all().forEach(def -> count.incrementAndGet());
-                CommandFeedback.success(ctx.getSource(), "Reloaded " + count + " definitions");
-                return 1;
-            });
-    }
-    
-    private static LiteralArgumentBuilder<ServerCommandSource> buildStatusCommand() {
-        return CommandManager.literal("status")
-            .executes(ctx -> {
-                ReportBuilder.create("Field Test Status")
-                    .kv("Active Profile", currentProfile != null ? currentProfile : "none")
-                    .kv("Layer", currentLayerIndex)
-                    .kv("Pattern", editPattern.id())
-                    .send(ctx.getSource());
-                return 1;
-            });
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // VERTEX & SHUFFLE COMMANDS
+    // VERTEX COMMAND
     // ═══════════════════════════════════════════════════════════════════════════
     
     private static LiteralArgumentBuilder<ServerCommandSource> buildVertexCommand() {
@@ -582,10 +125,13 @@ public final class FieldTestCommand {
                     }
                     editPattern = pattern;
                     CommandFeedback.valueSet(ctx.getSource(), "Vertex pattern", pattern.id());
-                    syncToClients(ctx.getSource());
                     return 1;
                 }));
     }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SHUFFLE COMMANDS
+    // ═══════════════════════════════════════════════════════════════════════════
     
     private static LiteralArgumentBuilder<ServerCommandSource> buildShuffleCommands() {
         return CommandManager.literal("shuffle")
@@ -659,204 +205,12 @@ public final class FieldTestCommand {
         
         CommandFeedback.highlight(source, 
             String.format("[%s #%d/%d] %s", shuffleType.id().toUpperCase(), shuffleIndex + 1, shuffleType.count(), desc));
-        syncToClients(source);
         return 1;
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
-    // FOLLOW & PREDICT COMMANDS
+    // PUBLIC ACCESSOR
     // ═══════════════════════════════════════════════════════════════════════════
     
-    private static LiteralArgumentBuilder<ServerCommandSource> buildFollowCommands() {
-        return CommandManager.literal("follow")
-            .executes(ctx -> {
-                CommandFeedback.info(ctx.getSource(), "Follow mode: " + followMode.id());
-                return 1;
-            })
-            .then(CommandManager.literal("snap").executes(ctx -> setFollow(ctx.getSource(), FollowMode.SNAP)))
-            .then(CommandManager.literal("smooth").executes(ctx -> setFollow(ctx.getSource(), FollowMode.SMOOTH)))
-            .then(CommandManager.literal("glide").executes(ctx -> setFollow(ctx.getSource(), FollowMode.GLIDE)));
-    }
-    
-    private static int setFollow(ServerCommandSource source, FollowMode mode) {
-        followMode = mode;
-        CommandFeedback.valueSet(source, "Follow mode", mode.id());
-        syncToClients(source);
-        return 1;
-    }
-    
-    private static LiteralArgumentBuilder<ServerCommandSource> buildPredictCommands() {
-        return CommandManager.literal("predict")
-            .executes(ctx -> {
-                ReportBuilder.create("Prediction")
-                    .kv("Enabled", predictionEnabled)
-                    .kv("Lead", predictionLeadTicks + " ticks")
-                    .kv("Max", predictionMaxDistance + " blocks")
-                    .kv("Look", predictionLookAhead)
-                    .kv("Vertical", predictionVerticalBoost)
-                    .send(ctx.getSource());
-                return 1;
-            })
-            .then(CommandManager.literal("on").executes(ctx -> { 
-                predictionEnabled = true; 
-                CommandFeedback.toggle(ctx.getSource(), "Prediction", true);
-                syncToClients(ctx.getSource());
-                return 1;
-            }))
-            .then(CommandManager.literal("off").executes(ctx -> { 
-                predictionEnabled = false; 
-                CommandFeedback.toggle(ctx.getSource(), "Prediction", false);
-                syncToClients(ctx.getSource());
-                return 1;
-            }))
-            .then(CommandManager.literal("lead")
-                .then(CommandManager.argument("ticks", IntegerArgumentType.integer(0, 60))
-                    .executes(ctx -> {
-                        predictionLeadTicks = IntegerArgumentType.getInteger(ctx, "ticks");
-                        CommandFeedback.valueSet(ctx.getSource(), "Prediction lead", predictionLeadTicks + " ticks");
-                        syncToClients(ctx.getSource());
-                        return 1;
-                    })))
-            .then(CommandManager.literal("max")
-                .then(CommandManager.argument("blocks", FloatArgumentType.floatArg(0, 64))
-                    .executes(ctx -> {
-                        predictionMaxDistance = FloatArgumentType.getFloat(ctx, "blocks");
-                        CommandFeedback.valueSet(ctx.getSource(), "Prediction max", predictionMaxDistance + " blocks");
-                        syncToClients(ctx.getSource());
-                        return 1;
-                    })));
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // SAVE/LOAD COMMANDS
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    private static LiteralArgumentBuilder<ServerCommandSource> buildSaveCommand() {
-        return CommandManager.literal("save")
-            .then(CommandManager.argument("name", StringArgumentType.word())
-                .executes(ctx -> {
-                    if (currentProfile == null) {
-                        CommandFeedback.error(ctx.getSource(), "No active profile");
-                        return 0;
-                    }
-                    String name = StringArgumentType.getString(ctx, "name");
-                    FieldDefinition def = FieldRegistry.get(currentProfile);
-                    if (def != null && FieldProfileStore.save(name, def)) {
-                        CommandFeedback.success(ctx.getSource(), "Saved: " + name);
-                        return 1;
-                    }
-                    CommandFeedback.error(ctx.getSource(), "Failed to save");
-                    return 0;
-                }));
-    }
-    
-    private static LiteralArgumentBuilder<ServerCommandSource> buildLoadCommand() {
-        return CommandManager.literal("load")
-            .then(CommandManager.argument("name", StringArgumentType.word())
-                .suggests(SAVED_SUGGESTIONS)
-                .executes(ctx -> {
-                    String name = StringArgumentType.getString(ctx, "name");
-                    if (FieldProfileStore.loadAndRegister(name)) {
-                        CommandFeedback.success(ctx.getSource(), "Loaded: " + name);
-                        return 1;
-                    }
-                    CommandFeedback.notFound(ctx.getSource(), "Profile", name);
-                    return 0;
-                }));
-    }
-    
-    private static LiteralArgumentBuilder<ServerCommandSource> buildSavedCommand() {
-        return CommandManager.literal("saved")
-            .executes(ctx -> {
-                List<String> saved = FieldProfileStore.list();
-                if (saved.isEmpty()) {
-                    CommandFeedback.info(ctx.getSource(), "No saved profiles");
-                    return 1;
-                }
-                return ListFormatter.<String>create("Saved Profiles")
-                    .showCount(true)
-                    .items(saved, name -> ListFormatter.entry(name).tag("custom", Formatting.GOLD))
-                    .send(ctx.getSource());
-            });
-    }
-    
-    private static LiteralArgumentBuilder<ServerCommandSource> buildDeleteCommand() {
-        return CommandManager.literal("delete")
-            .then(CommandManager.argument("name", StringArgumentType.word())
-                .suggests(SAVED_SUGGESTIONS)
-                .executes(ctx -> {
-                    String name = StringArgumentType.getString(ctx, "name");
-                    if (FieldProfileStore.delete(name)) {
-                        CommandFeedback.success(ctx.getSource(), "Deleted: " + name);
-                        return 1;
-                    }
-                    CommandFeedback.error(ctx.getSource(), "Failed to delete");
-                    return 0;
-                }));
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // SYNC & UTILITIES
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    private static void syncToClients(ServerCommandSource source) {
-        if (currentTestFieldId == -1) return;
-        if (!(source.getEntity() instanceof ServerPlayerEntity player)) return;
-        
-        var world = player.getWorld();
-        var manager = FieldManager.get(world);
-        var instance = manager.getInstance(currentTestFieldId);
-        
-        if (instance == null) {
-            currentTestFieldId = -1;
-            return;
-        }
-        
-        instance.setScale(transformScale);
-        instance.setAlpha(appearanceAlpha);
-        
-        FieldNetworking.sendUpdateFull(world, instance,
-            shuffleType.id(), shuffleIndex,
-            followMode.id(), predictionEnabled,
-            predictionLeadTicks, predictionMaxDistance,
-            predictionLookAhead, predictionVerticalBoost);
-    }
-    
-    private static void rebuildProfileOrder() {
-        PROFILE_ORDER.clear();
-        FieldRegistry.all().forEach(def -> PROFILE_ORDER.add(def.id()));
-        PROFILE_ORDER.sort(String::compareTo);
-        currentCycleIndex = 0;
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PUBLIC ACCESSORS
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    public static String getCurrentProfile() { return currentProfile; }
-    public static int getCurrentLayerIndex() { return currentLayerIndex; }
-    public static float getShapeRadius() { return shapeRadius; }
-    public static float getAnimationSpin() { return animationSpin; }
-    public static float getAppearanceAlpha() { return appearanceAlpha; }
-    public static float getAppearanceGlow() { return appearanceGlow; }
-    public static float getTransformScale() { return transformScale; }
-    public static int getShapeLatSteps() { return shapeLatSteps; }
-    public static int getShapeLonSteps() { return shapeLonSteps; }
-    public static String getShapeAlgorithm() { return shapeAlgorithm; }
-    public static String getAppearanceColor() { return appearanceColor; }
     public static VertexPattern getEditPattern() { return editPattern; }
-    public static boolean hasActiveTestField() { return currentProfile != null; }
-    public static FollowMode getFollowMode() { return followMode; }
-    public static boolean isPredictionEnabled() { return predictionEnabled; }
-    
-    // Compatibility aliases
-    public static float getEditRadius() { return shapeRadius; }
-    public static float getEditSpin() { return animationSpin; }
-    public static float getEditAlpha() { return appearanceAlpha; }
-    public static float getEditGlow() { return appearanceGlow; }
-    public static float getEditScale() { return transformScale; }
-    public static int getEditLatSteps() { return shapeLatSteps; }
-    public static int getEditLonSteps() { return shapeLonSteps; }
-    public static String getEditAlgorithm() { return shapeAlgorithm; }
-    public static String getEditColor() { return appearanceColor; }
 }

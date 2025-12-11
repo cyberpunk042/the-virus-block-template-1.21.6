@@ -1,9 +1,6 @@
 package net.cyberpunk042.command.field;
 
-import com.mojang.brigadier.arguments.FloatArgumentType;
-import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import net.cyberpunk042.command.util.CommandFeedback;
 import net.cyberpunk042.command.util.CommandKnob;
 import net.cyberpunk042.field.instance.FollowMode;
 import net.cyberpunk042.log.Logging;
@@ -11,7 +8,17 @@ import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 
 /**
- * /field personal subcommands
+ * /field personal subcommands - Configure the player's personal field (shield).
+ * 
+ * <p>These settings control how the personal field behaves in-game:
+ * <ul>
+ *   <li>enabled - Toggle personal field visibility</li>
+ *   <li>visual - Toggle visual rendering</li>
+ *   <li>follow - Follow mode (SNAP, SMOOTH, GLIDE)</li>
+ *   <li>prediction - Movement prediction settings</li>
+ * </ul>
+ * 
+ * <p>Settings are persisted via CommandKnob to JSON config.</p>
  */
 public final class PersonalSubcommand {
     
@@ -19,13 +26,6 @@ public final class PersonalSubcommand {
     
     public static LiteralArgumentBuilder<ServerCommandSource> build() {
         var cmd = CommandManager.literal("personal")
-            .then(CommandManager.literal("on")
-                .executes(ctx -> handleOn(ctx.getSource(), 1.0f))
-                .then(CommandManager.argument("radius", FloatArgumentType.floatArg(0.5f, 5.0f))
-                    .executes(ctx -> handleOn(ctx.getSource(), 
-                        FloatArgumentType.getFloat(ctx, "radius")))))
-            .then(CommandManager.literal("off")
-                .executes(ctx -> handleOff(ctx.getSource())))
             .then(buildPrediction());
         
         // Knob-based settings
@@ -90,17 +90,5 @@ public final class PersonalSubcommand {
             .attach(cmd);
         
         return cmd;
-    }
-    
-    private static int handleOn(ServerCommandSource source, float radius) {
-        Logging.COMMANDS.info("Personal field ON, radius={}", radius);
-        CommandFeedback.success(source, "Personal field enabled (radius: " + radius + ")");
-        return 1;
-    }
-    
-    private static int handleOff(ServerCommandSource source) {
-        Logging.COMMANDS.info("Personal field OFF");
-        CommandFeedback.success(source, "Personal field disabled");
-        return 1;
     }
 }

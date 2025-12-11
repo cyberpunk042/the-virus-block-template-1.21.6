@@ -1,5 +1,8 @@
 package net.cyberpunk042.client.gui.panel.sub;
 
+import net.cyberpunk042.client.gui.panel.AbstractPanel;
+import net.minecraft.client.gui.screen.Screen;
+
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.GuiLayout;
@@ -29,8 +32,8 @@ import java.util.List;
  * 
  * @see <a href="GUI_CLASS_DIAGRAM.md §4.8">LinkingSubPanel specification</a>
  */
-public class LinkingSubPanel {
-    
+public class LinkingSubPanel extends AbstractPanel {
+
     // ═══════════════════════════════════════════════════════════════════════════
     // ENUMS
     // ═══════════════════════════════════════════════════════════════════════════
@@ -51,9 +54,7 @@ public class LinkingSubPanel {
     // FIELDS
     // ═══════════════════════════════════════════════════════════════════════════
     
-    private final FieldEditState state;
-    private final List<ClickableWidget> widgets = new ArrayList<>();
-    private final GuiLayout layout;
+    private GuiLayout layout;
     
     // Widgets
     private TextFieldWidget primitiveIdField;
@@ -75,9 +76,24 @@ public class LinkingSubPanel {
      * @param y Starting Y position
      * @param width Panel width
      */
-    public LinkingSubPanel(FieldEditState state, int x, int y, int width) {
-        this.state = state;
-        this.layout = new GuiLayout(x, y, GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING, width);
+    public LinkingSubPanel(Screen parent, FieldEditState state, int startY) {
+        super(parent, state);
+        this.startY = startY;
+    }
+    
+    private int startY;
+    
+    @Override
+    public void init(int width, int height) {
+        this.panelWidth = width;
+        this.panelHeight = height;
+        widgets.clear();
+        
+        int x = net.cyberpunk042.client.gui.util.GuiConstants.PADDING;
+        int y = startY;
+        this.layout = new GuiLayout(x, y, net.cyberpunk042.client.gui.util.GuiConstants.WIDGET_HEIGHT + net.cyberpunk042.client.gui.util.GuiConstants.PADDING, width - net.cyberpunk042.client.gui.util.GuiConstants.PADDING * 2);
+        
+        // Original build logic...
         initWidgets();
     }
     
@@ -96,14 +112,14 @@ public class LinkingSubPanel {
         primitiveIdField = new TextFieldWidget(
             client.textRenderer,
             layout.getStartX() + GuiConstants.PADDING,
-            layout.getStartY(),
+            layout.getY(),
             controlWidth,
             GuiConstants.ELEMENT_HEIGHT,
             Text.literal("Primitive ID")
         );
-        primitiveIdField.setText(state.getPrimitiveId());
+        primitiveIdField.setText(state.getString("primitiveId"));
         primitiveIdField.setMaxLength(32);
-        primitiveIdField.setChangedListener(value -> state.setPrimitiveId(value));
+        primitiveIdField.setChangedListener(value -> state.set("primitiveId", value));
         widgets.add(primitiveIdField);
         layout.nextRow();
         
@@ -112,13 +128,13 @@ public class LinkingSubPanel {
         // ─────────────────────────────────────────────────────────────────────────
         radiusOffsetSlider = new LabeledSlider(
             layout.getStartX() + GuiConstants.PADDING,
-            layout.getStartY(),
+            layout.getY(),
             controlWidth,
             "Radius Offset",
             -10f, 10f,
-            state.getRadiusOffset(),
+            state.getFloat("radiusOffset"),
             "%.1f", null,
-            v -> state.setRadiusOffset(v)
+            v -> state.set("radiusOffset", v)
         );
         widgets.add(radiusOffsetSlider);
         layout.nextRow();
@@ -128,13 +144,13 @@ public class LinkingSubPanel {
         // ─────────────────────────────────────────────────────────────────────────
         phaseOffsetSlider = new LabeledSlider(
             layout.getStartX() + GuiConstants.PADDING,
-            layout.getStartY(),
+            layout.getY(),
             controlWidth,
             "Phase Offset",
             0f, 1f,
-            state.getPhaseOffset(),
+            state.getFloat("phaseOffset"),
             "%.2f", null,
-            v -> state.setPhaseOffset(v)
+            v -> state.set("phaseOffset", v)
         );
         widgets.add(phaseOffsetSlider);
         layout.nextRow();
@@ -144,14 +160,14 @@ public class LinkingSubPanel {
         // ─────────────────────────────────────────────────────────────────────────
         mirrorButton = CyclingButtonWidget.<MirrorAxis>builder(axis -> Text.literal(axis.getDisplayName()))
             .values(MirrorAxis.values())
-            .initially(MirrorAxis.valueOf(state.getMirrorAxis()))
+            .initially(MirrorAxis.valueOf(state.getString("mirrorAxis")))
             .build(
                 layout.getStartX() + GuiConstants.PADDING,
-                layout.getStartY(),
+                layout.getY(),
                 controlWidth,
                 GuiConstants.ELEMENT_HEIGHT,
                 Text.literal("Mirror"),
-                (button, value) -> state.setMirrorAxis(value.name())
+                (button, value) -> state.set("mirrorAxis", value.name())
             );
         widgets.add(mirrorButton);
         layout.nextRow();
@@ -161,14 +177,14 @@ public class LinkingSubPanel {
         // ─────────────────────────────────────────────────────────────────────────
         followButton = CyclingButtonWidget.<Boolean>builder(v -> Text.literal(v ? "Following" : "Independent"))
             .values(List.of(false, true))
-            .initially(state.isFollowLinked())
+            .initially(state.getBool("followLinked"))
             .build(
                 layout.getStartX() + GuiConstants.PADDING,
-                layout.getStartY(),
+                layout.getY(),
                 halfWidth,
                 GuiConstants.ELEMENT_HEIGHT,
                 Text.literal("Follow"),
-                (button, value) -> state.setFollowLinked(value)
+                (button, value) -> state.set("followLinked", value)
             );
         widgets.add(followButton);
         
@@ -177,14 +193,14 @@ public class LinkingSubPanel {
         // ─────────────────────────────────────────────────────────────────────────
         scaleWithButton = CyclingButtonWidget.<Boolean>builder(v -> Text.literal(v ? "Linked" : "Independent"))
             .values(List.of(false, true))
-            .initially(state.isScaleWithLinked())
+            .initially(state.getBool("scaleWithLinked"))
             .build(
                 layout.getStartX() + GuiConstants.PADDING + halfWidth + GuiConstants.ELEMENT_SPACING,
-                layout.getStartY(),
+                layout.getY(),
                 halfWidth,
                 GuiConstants.ELEMENT_HEIGHT,
                 Text.literal("Scale With"),
-                (button, value) -> state.setScaleWithLinked(value)
+                (button, value) -> state.set("scaleWithLinked", value)
             );
         widgets.add(scaleWithButton);
         layout.nextRow();
@@ -206,7 +222,13 @@ public class LinkingSubPanel {
     
     /** Returns the total height of this sub-panel. */
     public int getHeight() {
-        return layout.getCurrentY() - layout.getStartY();
+        return layout.getCurrentY() - layout.getY();
     }
+
+    @Override
+    public void tick() {
+        // No per-tick updates needed
+    }
+
 }
 

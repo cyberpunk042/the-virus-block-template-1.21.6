@@ -13,6 +13,7 @@ import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
 
+import org.joml.Vector3f;
 /**
  * G131-G134: Client-side packet handlers for GUI.
  */
@@ -34,7 +35,7 @@ public final class GuiClientHandlers {
                 
                 FieldEditState state = new FieldEditState();
                 state.setCurrentProfileName(payload.profileName());
-                state.setDebugUnlocked(payload.debugUnlocked());
+                state.set("debugUnlocked", payload.debugUnlocked());
                 
                 MinecraftClient.getInstance().setScreen(new FieldCustomizerScreen(state));
             });
@@ -46,7 +47,15 @@ public final class GuiClientHandlers {
                 if (payload.success()) {
                     Logging.GUI.topic("network").debug("Profile synced: {}", payload.profileName());
                     ToastNotification.success("Profile loaded: " + payload.profileName());
-                    // TODO: Apply profile JSON to current state
+                    
+                    // Apply profile JSON to current state
+                    if (!payload.profileJson().isEmpty()) {
+                        FieldEditState state = FieldEditStateHolder.getOrCreate();
+                        state.fromProfileJson(payload.profileJson());
+                        state.setCurrentProfile(payload.profileName(), true);  // Server profile
+                        state.saveSnapshot();  // For revert functionality
+                        Logging.GUI.topic("network").info("Applied profile '{}' to state", payload.profileName());
+                    }
                 } else {
                     Logging.GUI.topic("network").warn("Profile sync failed: {}", payload.message());
                     ToastNotification.error(payload.message());
@@ -68,7 +77,10 @@ public final class GuiClientHandlers {
         ClientPlayNetworking.registerGlobalReceiver(ServerProfilesS2CPayload.ID, (payload, context) -> {
             context.client().execute(() -> {
                 Logging.GUI.topic("network").info("Received {} server profiles", payload.profileNames().size());
-                // TODO: Update profiles panel with server profiles
+                
+                // Update profiles panel with server profiles
+                FieldEditState state = FieldEditStateHolder.getOrCreate();
+                state.setServerProfiles(payload.profileNames());
             });
         });
         
@@ -107,7 +119,7 @@ public final class GuiClientHandlers {
                     }
                 }
                 case "SHAPE_TYPE" -> {
-                    if (json.has("type")) state.setShapeType(json.get("type").getAsString());
+                    if (json.has("type")) state.set("shapeType", json.get("type").getAsString());
                 }
                 case "SHAPE" -> applyShapeUpdate(state, json);
                 case "TRANSFORM" -> applyTransformUpdate(state, json);
@@ -119,7 +131,7 @@ public final class GuiClientHandlers {
                 case "FOLLOW" -> {
                     if (json.has("mode")) {
                         try {
-                            state.setFollowMode(net.cyberpunk042.field.instance.FollowMode.fromId(json.get("mode").getAsString()));
+                            state.set("followMode", net.cyberpunk042.field.instance.FollowMode.fromId(json.get("mode").getAsString()));
                         } catch (Exception ignored) {}
                     }
                 }
@@ -145,20 +157,20 @@ public final class GuiClientHandlers {
         
         if (json.has("radius")) {
             float newVal = json.get("radius").getAsFloat();
-            state.setRadius(newVal);
-            showProfileContext("radius", newVal, snapshot.radius);
+            state.set("radius", newVal);
+            showProfileContext("radius", newVal, snapshot.radius());
         }
         if (json.has("latSteps")) {
             int newVal = json.get("latSteps").getAsInt();
-            state.setSphereLatSteps(newVal);
-            showProfileContext("latSteps", newVal, snapshot.latSteps);
+            state.set("sphere.latSteps", newVal);
+            showProfileContext("latSteps", newVal, snapshot.latSteps());
         }
         if (json.has("lonSteps")) {
             int newVal = json.get("lonSteps").getAsInt();
-            state.setSphereLonSteps(newVal);
-            showProfileContext("lonSteps", newVal, snapshot.lonSteps);
+            state.set("sphere.lonSteps", newVal);
+            showProfileContext("lonSteps", newVal, snapshot.lonSteps());
         }
-        if (json.has("algorithm")) state.setSphereAlgorithm(json.get("algorithm").getAsString());
+        if (json.has("algorithm")) state.set("sphere.algorithm", json.get("algorithm").getAsString());
     }
     
     /**
@@ -171,75 +183,84 @@ public final class GuiClientHandlers {
     }
     
     private static void applyTransformUpdate(FieldEditState state, JsonObject json) {
-        if (json.has("anchor")) state.setAnchor(json.get("anchor").getAsString());
-        if (json.has("scale")) state.setScale(json.get("scale").getAsFloat());
+        if (json.has("anchor")) state.set("transform.anchor", json.get("anchor").getAsString());
+        if (json.has("scale")) state.set("transform.scale", json.get("scale").getAsFloat());
         
         // Handle offset (individual or combined)
-        float ox = json.has("offsetX") ? json.get("offsetX").getAsFloat() : state.getOffsetX();
-        float oy = json.has("offsetY") ? json.get("offsetY").getAsFloat() : state.getOffsetY();
-        float oz = json.has("offsetZ") ? json.get("offsetZ").getAsFloat() : state.getOffsetZ();
+        float ox = json.has("offsetX") ? json.get("offsetX").getAsFloat() : state.getFloat("transform.offset.x");
+        float oy = json.has("offsetY") ? json.get("offsetY").getAsFloat() : state.getFloat("transform.offset.y");
+        float oz = json.has("offsetZ") ? json.get("offsetZ").getAsFloat() : state.getFloat("transform.offset.z");
         if (json.has("offsetX") || json.has("offsetY") || json.has("offsetZ")) {
-            state.setOffset(ox, oy, oz);
+            state.set("transform.offset", new Vector3f(ox, oy, oz));
         }
         
         // Handle rotation (individual or combined)
-        float rx = json.has("rotationX") ? json.get("rotationX").getAsFloat() : state.getRotationX();
-        float ry = json.has("rotationY") ? json.get("rotationY").getAsFloat() : state.getRotationY();
-        float rz = json.has("rotationZ") ? json.get("rotationZ").getAsFloat() : state.getRotationZ();
+        float rx = json.has("rotationX") ? json.get("rotationX").getAsFloat() : state.getFloat("transform.rotation.x");
+        float ry = json.has("rotationY") ? json.get("rotationY").getAsFloat() : state.getFloat("transform.rotation.y");
+        float rz = json.has("rotationZ") ? json.get("rotationZ").getAsFloat() : state.getFloat("transform.rotation.z");
         if (json.has("rotationX") || json.has("rotationY") || json.has("rotationZ")) {
-            state.setRotation(rx, ry, rz);
+            state.set("transform.rotation", new Vector3f(rx, ry, rz));
         }
     }
     
     private static void applyOrbitUpdate(FieldEditState state, JsonObject json) {
-        if (json.has("enabled")) state.setOrbitEnabled(json.get("enabled").getAsBoolean());
-        if (json.has("radius")) state.setOrbitRadius(json.get("radius").getAsFloat());
-        if (json.has("speed")) state.setOrbitSpeed(json.get("speed").getAsFloat());
-        if (json.has("axis")) state.setOrbitAxis(json.get("axis").getAsString());
-        if (json.has("phase")) state.setOrbitPhase(json.get("phase").getAsFloat());
+        if (json.has("enabled")) state.set("orbit.enabled", json.get("enabled").getAsBoolean());
+        if (json.has("radius")) state.set("orbit.radius", json.get("radius").getAsFloat());
+        if (json.has("speed")) state.set("orbit.speed", json.get("speed").getAsFloat());
+        if (json.has("axis")) state.set("orbit.axis", json.get("axis").getAsString());
+        if (json.has("phase")) state.set("orbit.phase", json.get("phase").getAsFloat());
     }
     
     private static void applyFillUpdate(FieldEditState state, JsonObject json) {
-        if (json.has("mode")) state.setFillMode(net.cyberpunk042.visual.fill.FillMode.fromId(json.get("mode").getAsString()));
-        if (json.has("wireThickness")) state.setWireThickness(json.get("wireThickness").getAsFloat());
-        if (json.has("doubleSided")) state.setDoubleSided(json.get("doubleSided").getAsBoolean());
+        if (json.has("mode")) state.set("fill.mode", net.cyberpunk042.visual.fill.FillMode.fromId(json.get("mode").getAsString()));
+        if (json.has("wireThickness")) state.set("fill.wireThickness", json.get("wireThickness").getAsFloat());
+        if (json.has("doubleSided")) state.set("fill.doubleSided", json.get("doubleSided").getAsBoolean());
     }
     
     private static void applyVisibilityUpdate(FieldEditState state, JsonObject json) {
         FieldEditState.ProfileSnapshot snapshot = state.getProfileSnapshot();
         
-        if (json.has("mask")) state.setMaskType(json.get("mask").getAsString());
-        if (json.has("maskType")) state.setMaskType(json.get("maskType").getAsString());
+        if (json.has("mask")) state.set("mask.type", json.get("mask").getAsString());
+        if (json.has("maskType")) state.set("mask.type", json.get("maskType").getAsString());
         if (json.has("count")) {
             int newVal = json.get("count").getAsInt();
-            state.setMaskCount(newVal);
-            showProfileContext("maskCount", newVal, snapshot.maskCount);
+            state.set("mask.count", newVal);
+            showProfileContext("maskCount", newVal, snapshot.maskCount());
         }
         if (json.has("maskCount")) {
             int newVal = json.get("maskCount").getAsInt();
-            state.setMaskCount(newVal);
-            showProfileContext("maskCount", newVal, snapshot.maskCount);
+            state.set("mask.count", newVal);
+            showProfileContext("maskCount", newVal, snapshot.maskCount());
         }
-        if (json.has("thickness")) state.setMaskThickness(json.get("thickness").getAsFloat());
+        if (json.has("thickness")) state.set("mask.thickness", json.get("thickness").getAsFloat());
     }
     
     private static void applyAppearanceUpdate(FieldEditState state, JsonObject json) {
-        if (json.has("color")) state.setColor(json.get("color").getAsInt());
-        if (json.has("alpha")) state.setAlpha(json.get("alpha").getAsFloat());
-        if (json.has("glow")) state.setGlow(json.get("glow").getAsFloat());
-        if (json.has("emissive")) state.setEmissive(json.get("emissive").getAsFloat());
+        if (json.has("color")) state.set("appearance.color", json.get("color").getAsInt());
+        if (json.has("alpha")) state.set("appearance.alpha", json.get("alpha").getAsFloat());
+        if (json.has("glow")) state.set("appearance.glow", json.get("glow").getAsFloat());
+        if (json.has("emissive")) state.set("appearance.emissive", json.get("emissive").getAsFloat());
     }
     
     private static void applyAnimationUpdate(FieldEditState state, JsonObject json) {
-        if (json.has("spinEnabled")) state.setSpinEnabled(json.get("spinEnabled").getAsBoolean());
-        if (json.has("spinSpeed")) state.setSpinSpeed(json.get("spinSpeed").getAsFloat());
-        if (json.has("pulseEnabled")) state.setPulseEnabled(json.get("pulseEnabled").getAsBoolean());
+        // Spin
+        if (json.has("spin")) {
+            JsonObject spin = json.getAsJsonObject("spin");
+            if (spin.has("speed")) state.set("spin.speed", spin.get("speed").getAsFloat());
+            if (spin.has("axis")) state.set("spin.axis", spin.get("axis").getAsString());
+        }
+        // Pulse
+        if (json.has("pulse")) {
+            JsonObject pulse = json.getAsJsonObject("pulse");
+            if (pulse.has("speed")) state.set("pulse.speed", pulse.get("speed").getAsFloat());
+            if (pulse.has("amplitude")) state.set("pulse.amplitude", pulse.get("amplitude").getAsFloat());
+        }
     }
     
     private static void applyPredictionUpdate(FieldEditState state, JsonObject json) {
-        if (json.has("enabled")) state.setPredictionEnabled(json.get("enabled").getAsBoolean());
-        if (json.has("leadTicks")) state.setPredictionLeadTicks(json.get("leadTicks").getAsInt());
-        if (json.has("maxDistance")) state.setPredictionMaxDistance(json.get("maxDistance").getAsFloat());
+        if (json.has("enabled")) state.set("predictionEnabled", json.get("enabled").getAsBoolean());
+        if (json.has("leadTicks")) state.set("prediction.leadTicks", json.get("leadTicks").getAsInt());
+        if (json.has("maxDistance")) state.set("prediction.maxDistance", json.get("maxDistance").getAsFloat());
     }
     
     /**

@@ -1,0 +1,111 @@
+package net.cyberpunk042.client.gui.layout;
+
+/**
+ * Strategy interface for GUI layout.
+ * Implementations define where different UI regions are positioned.
+ * 
+ * <p>This enables the same panel code to work in both windowed and fullscreen modes
+ * by providing different bounds for each region.</p>
+ */
+public interface LayoutManager {
+    
+    /**
+     * @return The current GUI mode this layout represents.
+     */
+    GuiMode getMode();
+    
+    /**
+     * Recalculates all bounds based on screen dimensions.
+     * Should be called on init and resize.
+     */
+    void calculate(int screenWidth, int screenHeight);
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // REGION BOUNDS
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * @return Bounds for the entire GUI panel (for drawing frame/background).
+     */
+    Bounds getPanelBounds();
+    
+    /**
+     * @return Bounds for the title bar (mode toggle, title text, close button).
+     */
+    Bounds getTitleBarBounds();
+    
+    /**
+     * @return Bounds for the preview area.
+     *         In WINDOWED mode: small box on left side.
+     *         In FULLSCREEN mode: large viewport at top.
+     */
+    Bounds getPreviewBounds();
+    
+    /**
+     * @return Bounds for the tab bar (Q, A, D, P buttons).
+     */
+    Bounds getTabBarBounds();
+    
+    /**
+     * @return Bounds for the main content area (where panels render).
+     */
+    Bounds getContentBounds();
+    
+    /**
+     * @return Bounds for the status bar at bottom.
+     */
+    Bounds getStatusBarBounds();
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // WINDOWED-SPECIFIC (optional, may return EMPTY in fullscreen)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * @return Bounds for left side panel in windowed mode.
+     *         Returns EMPTY in fullscreen mode.
+     */
+    default Bounds getLeftPanelBounds() {
+        return Bounds.EMPTY;
+    }
+    
+    /**
+     * @return Bounds for right side panel in windowed mode.
+     *         Returns EMPTY in fullscreen mode.
+     */
+    default Bounds getRightPanelBounds() {
+        return Bounds.EMPTY;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // LAYOUT PROPERTIES
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * @return Whether this layout should pause the game.
+     */
+    default boolean shouldPauseGame() {
+        return getMode() == GuiMode.FULLSCREEN;
+    }
+    
+    /**
+     * @return Whether player can move while GUI is open.
+     */
+    default boolean allowsPlayerMovement() {
+        return getMode() == GuiMode.WINDOWED;
+    }
+    
+    /**
+     * @return Whether to render the game world behind the GUI.
+     */
+    default boolean showsGameWorld() {
+        return getMode() == GuiMode.WINDOWED;
+    }
+    
+    /**
+     * @return Whether to render a dedicated 3D preview widget.
+     */
+    default boolean hasPreviewWidget() {
+        return getMode() == GuiMode.FULLSCREEN;
+    }
+}
+

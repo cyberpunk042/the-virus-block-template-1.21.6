@@ -8,6 +8,9 @@ import net.cyberpunk042.client.gui.widget.ExpandableSection;
 import net.cyberpunk042.client.gui.widget.LabeledSlider;
 import net.cyberpunk042.client.gui.widget.Vec3Editor;
 import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.visual.transform.Anchor;
+import net.cyberpunk042.visual.transform.Billboard;
+import net.cyberpunk042.visual.transform.Facing;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
@@ -33,56 +36,15 @@ import java.util.List;
  */
 public class TransformSubPanel extends AbstractPanel {
     
-    private ExpandableSection section;
-    private int startY;
-    private final List<net.minecraft.client.gui.widget.ClickableWidget> widgets = new ArrayList<>();
-    
-    /** Anchor points for field positioning. */
-    public enum Anchor {
-        CENTER("Center"),
-        FEET("Feet"),
-        HEAD("Head"),
-        ABOVE("Above Head"),
-        BELOW("Below Feet"),
-        CHEST("Chest"),
-        BACK("Back");
-        
-        private final String label;
-        Anchor(String label) { this.label = label; }
-        @Override public String toString() { return label; }
-    }
-    
-    /** Facing modes for orientation. */
-    public enum FacingMode {
-        FIXED("Fixed"),
-        PLAYER_LOOK("Player Look"),
-        VELOCITY("Movement Direction"),
-        CAMERA("Always Face Camera");
-        
-        private final String label;
-        FacingMode(String label) { this.label = label; }
-        @Override public String toString() { return label; }
-    }
-    
-    /** Billboard modes. */
-    public enum BillboardMode {
-        NONE("None"),
-        FULL("Full Billboard"),
-        Y_AXIS("Y-Axis Only");
-        
-        private final String label;
-        BillboardMode(String label) { this.label = label; }
-        @Override public String toString() { return label; }
-    }
-    
+    private int startY;    
     private CyclingButtonWidget<Anchor> anchorDropdown;
     private Vec3Editor offsetEditor;
     private Vec3Editor rotationEditor;
     private LabeledSlider scaleSlider;
     private CyclingButtonWidget<Boolean> uniformScaleToggle;
     private Vec3Editor scaleXYZEditor;
-    private CyclingButtonWidget<FacingMode> facingDropdown;
-    private CyclingButtonWidget<BillboardMode> billboardDropdown;
+    private CyclingButtonWidget<Facing> facingDropdown;
+    private CyclingButtonWidget<Billboard> billboardDropdown;
     
     public TransformSubPanel(Screen parent, FieldEditState state, int startY) {
         super(parent, state);
@@ -96,40 +58,37 @@ public class TransformSubPanel extends AbstractPanel {
         this.panelHeight = height;
         widgets.clear();
         
-        section = new ExpandableSection(
-            GuiConstants.PADDING, startY,
-            width - GuiConstants.PADDING * 2,
-            "Transform", false
-        );
         
         int x = GuiConstants.PADDING;
-        int y = section.getContentY();
+        int y = startY + GuiConstants.PADDING;
         int w = width - GuiConstants.PADDING * 2;
         int halfW = (w - GuiConstants.PADDING) / 2;
         
         // Anchor
         anchorDropdown = GuiWidgets.enumDropdown(x, y, w, "Anchor", Anchor.class, Anchor.CENTER,
             "Field attachment point", v -> {
-                state.setAnchor(v.name());
+                state.set("transform.anchor", v.name());
                 Logging.GUI.topic("transform").debug("Anchor: {}", v);
             });
         widgets.add(anchorDropdown);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
-        // Offset
+        // Offset (nullable Vector3f - default to 0,0,0)
         TextRenderer tr = MinecraftClient.getInstance().textRenderer;
-        Vector3f offsetInit = new Vector3f(state.getOffsetX(), state.getOffsetY(), state.getOffsetZ());
+        Vector3f offset = state.transform() != null ? state.transform().offset() : null;
+        Vector3f offsetInit = offset != null ? new Vector3f(offset) : new Vector3f(0, 0, 0);
         offsetEditor = new Vec3Editor(tr, x, y, "Offset", offsetInit, v -> {
-            state.setOffset(v.x, v.y, v.z);
+            state.set("transform.offset", v);
             Logging.GUI.topic("transform").trace("Offset: ({}, {}, {})", v.x, v.y, v.z);
         });
         // Vec3Editor renders itself, not added to widgets
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
-        // Rotation
-        Vector3f rotInit = new Vector3f(state.getRotationX(), state.getRotationY(), state.getRotationZ());
+        // Rotation (nullable Vector3f - default to 0,0,0)
+        Vector3f rotation = state.transform() != null ? state.transform().rotation() : null;
+        Vector3f rotInit = rotation != null ? new Vector3f(rotation) : new Vector3f(0, 0, 0);
         rotationEditor = new Vec3Editor(tr, x, y, "Rotation", rotInit, v -> {
-            state.setRotation(v.x, v.y, v.z);
+            state.set("transform.rotation", v);
             Logging.GUI.topic("transform").trace("Rotation: ({}, {}, {})", v.x, v.y, v.z);
         });
         // Vec3Editor renders itself, not added to widgets
@@ -138,9 +97,9 @@ public class TransformSubPanel extends AbstractPanel {
         // Scale
         scaleSlider = LabeledSlider.builder("Scale")
             .position(x, y).width(halfW)
-            .range(0.1f, 5f).initial(state.getScale()).format("%.2f")
+            .range(0.1f, 5f).initial(state.getFloat("transform.scale")).format("%.2f")
             .onChange(v -> {
-                state.setScale(v);
+                state.set("transform.scale", v);
                 Logging.GUI.topic("transform").trace("Scale: {}", v);
             }).build();
         widgets.add(scaleSlider);
@@ -153,24 +112,24 @@ public class TransformSubPanel extends AbstractPanel {
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
         // Facing
-        facingDropdown = GuiWidgets.enumDropdown(x, y, halfW, "Facing", FacingMode.class, FacingMode.FIXED,
+        facingDropdown = GuiWidgets.enumDropdown(x, y, halfW, "Facing", Facing.class, Facing.FIXED,
             "How field orients", v -> {
-                state.setFacing(v.name());
+                state.set("transform.facing", v.name());
                 Logging.GUI.topic("transform").debug("Facing: {}", v);
             });
         widgets.add(facingDropdown);
         
         // Billboard
         billboardDropdown = GuiWidgets.enumDropdown(x + halfW + GuiConstants.PADDING, y, halfW,
-            "Billboard", BillboardMode.class, BillboardMode.NONE,
+            "Billboard", Billboard.class, Billboard.NONE,
             "Camera-facing mode", v -> {
-                state.setBillboard(v.name());
+                state.set("transform.billboard", v.name());
                 Logging.GUI.topic("transform").debug("Billboard: {}", v);
             });
         widgets.add(billboardDropdown);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
-        section.setContentHeight(y - section.getContentY());
+        contentHeight = y - startY + GuiConstants.PADDING;
         Logging.GUI.topic("panel").debug("TransformSubPanel initialized");
     }
     
@@ -179,20 +138,18 @@ public class TransformSubPanel extends AbstractPanel {
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         TextRenderer tr = MinecraftClient.getInstance().textRenderer;
-        section.render(context, tr, mouseX, mouseY, delta);
-        if (section.isExpanded()) {
-            for (var widget : widgets) widget.render(context, mouseX, mouseY, delta);
-            // Vec3Editors render separately (need TextRenderer)
-            if (offsetEditor != null) offsetEditor.render(context, tr, mouseX, mouseY, delta);
-            if (rotationEditor != null) rotationEditor.render(context, tr, mouseX, mouseY, delta);
-        }
+        // Render all widgets directly (no expandable section)
+        for (var widget : widgets) widget.render(context, mouseX, mouseY, delta);
+        // Vec3Editors render separately (need TextRenderer)
+        if (offsetEditor != null) offsetEditor.render(context, tr, mouseX, mouseY, delta);
+        if (rotationEditor != null) rotationEditor.render(context, tr, mouseX, mouseY, delta);
     }
     
-    public int getHeight() { return section.getTotalHeight(); }
+    public int getHeight() { return contentHeight; }
     
     public List<net.minecraft.client.gui.widget.ClickableWidget> getWidgets() {
         List<net.minecraft.client.gui.widget.ClickableWidget> all = new ArrayList<>();
-        all.add(section.getHeaderButton());
+        // No header button (direct content)
         all.addAll(widgets);
         return all;
     }

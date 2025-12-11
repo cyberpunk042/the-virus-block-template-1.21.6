@@ -349,6 +349,16 @@ public final class MeshBuilder {
     }
     
     /**
+     * Returns a vertex by index (for icosphere midpoint calculation).
+     * @param index Vertex index
+     * @return The vertex at that index
+     * @throws IndexOutOfBoundsException if index is invalid
+     */
+    public Vertex getVertex(int index) {
+        return vertices.get(index);
+    }
+    
+    /**
      * Returns the current number of indices added.
      */
     public int indexCount() {

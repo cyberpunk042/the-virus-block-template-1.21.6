@@ -390,12 +390,12 @@ public final class GrowthBlockCommands {
 
     private enum ApplyTarget { AUTO, BLOCK, HAND }
 
-    private static MutationParser.FieldType mapFieldType(GrowthField.Type type) {
+    private static MutationParser.ValueType mapFieldType(GrowthField.Type type) {
         return switch (type) {
-            case BOOLEAN -> MutationParser.FieldType.BOOLEAN;
-            case INT -> MutationParser.FieldType.INT;
-            case DOUBLE -> MutationParser.FieldType.DOUBLE;
-            case IDENTIFIER -> MutationParser.FieldType.IDENTIFIER;
+            case BOOLEAN -> MutationParser.ValueType.BOOLEAN;
+            case INT -> MutationParser.ValueType.INT;
+            case DOUBLE -> MutationParser.ValueType.DOUBLE;
+            case IDENTIFIER -> MutationParser.ValueType.IDENTIFIER;
         };
     }
 }

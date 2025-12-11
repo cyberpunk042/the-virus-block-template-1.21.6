@@ -1,11 +1,13 @@
 package net.cyberpunk042.client;
 
+import net.cyberpunk042.client.command.FieldEditCommands;
 import net.cyberpunk042.client.gui.render.TestFieldRenderer;
 import net.cyberpunk042.client.network.GuiClientHandlers;
 import net.cyberpunk042.log.Logging;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 
 /**
  * G141-G145: Client-side GUI initialization.
@@ -17,6 +19,7 @@ import net.fabricmc.api.Environment;
  *   <li>G143: Config loading</li>
  *   <li>G144: Profile storage init</li>
  *   <li>G145: Debug field renderer (future)</li>
+ *   <li>G146: Client-side /field edit commands</li>
  * </ul>
  * 
  * <p>Register this in fabric.mod.json under "client" entrypoints.</p>
@@ -42,6 +45,11 @@ public class GuiClientInit implements ClientModInitializer {
         
         // G145: Register test field renderer (client-side preview)
         TestFieldRenderer.init();
+        
+        // G146: Register client-side /field edit commands
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, access) -> {
+            FieldEditCommands.register(dispatcher);
+        });
         
         Logging.GUI.topic("init").info("GUI client initialized");
     }

@@ -372,6 +372,12 @@ public final class FieldRenderer {
         matrices.push();
         matrices.translate(position.x, position.y, position.z);
         
+        // === PHASE 3.5: Apply Field Modifiers (bobbing, breathing) ===
+        if (definition.modifiers() != null && definition.modifiers().hasAnimationModifiers()) {
+            net.cyberpunk042.client.visual.animation.AnimationApplier.applyModifiers(
+                matrices, definition.modifiers(), time);
+        }
+        
         // === PHASE 4: Render Each Layer ===
         int layerCount = 0;
         for (FieldLayer layer : definition.layers()) {

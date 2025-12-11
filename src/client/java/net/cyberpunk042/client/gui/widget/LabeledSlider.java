@@ -24,6 +24,7 @@ public class LabeledSlider extends SliderWidget {
      * @param x X position
      * @param y Y position
      * @param width Widget width
+     * @param height Widget height
      * @param label Display label
      * @param minValue Minimum value
      * @param maxValue Maximum value
@@ -32,11 +33,11 @@ public class LabeledSlider extends SliderWidget {
      * @param step Optional snap step, null for continuous
      * @param onChange Callback when value changes
      */
-    public LabeledSlider(int x, int y, int width, String label, 
+    public LabeledSlider(int x, int y, int width, int height, String label, 
                          float minValue, float maxValue, float initialValue,
                          String format, Float step, Consumer<Float> onChange) {
-        super(x, y, width, GuiConstants.WIDGET_HEIGHT, 
-              Text.literal(label + ": " + String.format(format, initialValue)),
+        super(x, y, width, height, 
+              Text.literal(label + ": " + formatValue(format, initialValue)),
               normalizeValue(initialValue, minValue, maxValue));
         this.label = label;
         this.minValue = minValue;
@@ -49,8 +50,27 @@ public class LabeledSlider extends SliderWidget {
             "LabeledSlider created: {} [{}-{}]", label, minValue, maxValue);
     }
     
+    /**
+     * Creates a labeled slider with default height.
+     */
+    public LabeledSlider(int x, int y, int width, String label, 
+                         float minValue, float maxValue, float initialValue,
+                         String format, Float step, Consumer<Float> onChange) {
+        this(x, y, width, GuiConstants.WIDGET_HEIGHT, label, minValue, maxValue, initialValue, format, step, onChange);
+    }
+    
     private static double normalizeValue(float value, float min, float max) {
         return (value - min) / (max - min);
+    }
+    
+    /**
+     * Formats value handling both %d (int) and %f (float) format strings.
+     */
+    private static String formatValue(String format, float value) {
+        if (format.contains("d")) {
+            return String.format(format, Math.round(value));
+        }
+        return String.format(format, value);
     }
     
     /**
@@ -75,7 +95,7 @@ public class LabeledSlider extends SliderWidget {
     @Override
     protected void updateMessage() {
         float val = getValue();
-        setMessage(Text.literal(label + ": " + String.format(format, val)));
+        setMessage(Text.literal(label + ": " + formatValue(format, val)));
     }
     
     @Override
@@ -94,7 +114,7 @@ public class LabeledSlider extends SliderWidget {
     
     public static class Builder {
         private final String label;
-        private int x, y, width = GuiConstants.SLIDER_WIDTH;
+        private int x, y, width = GuiConstants.SLIDER_WIDTH, height = GuiConstants.WIDGET_HEIGHT;
         private float min = 0f, max = 1f, initial = 0.5f;
         private String format = "%.2f";
         private Float step = null;
@@ -103,6 +123,9 @@ public class LabeledSlider extends SliderWidget {
         public Builder(String label) { this.label = label; }
         public Builder position(int x, int y) { this.x = x; this.y = y; return this; }
         public Builder width(int w) { this.width = w; return this; }
+        public Builder height(int h) { this.height = h; return this; }
+        /** Use compact height for dense layouts. */
+        public Builder compact() { this.height = GuiConstants.COMPACT_HEIGHT; return this; }
         public Builder range(float min, float max) { this.min = min; this.max = max; return this; }
         public Builder initial(float v) { this.initial = v; return this; }
         public Builder format(String f) { this.format = f; return this; }
@@ -110,7 +133,7 @@ public class LabeledSlider extends SliderWidget {
         public Builder onChange(Consumer<Float> c) { this.onChange = c; return this; }
         
         public LabeledSlider build() {
-            return new LabeledSlider(x, y, width, label, min, max, initial, format, step, onChange);
+            return new LabeledSlider(x, y, width, height, label, min, max, initial, format, step, onChange);
         }
     }
 }

@@ -125,6 +125,18 @@ public class ExpandableSection {
     public int getY() { return y; }
     public int getWidth() { return width; }
     
+    /**
+     * Offsets the section's internal position by the given delta.
+     * Also moves the headerButton to match.
+     */
+    public void offsetInternalPosition(int dx, int dy) {
+        this.x += dx;
+        this.y += dy;
+        // Also move the header button
+        headerButton.setX(headerButton.getX() + dx);
+        headerButton.setY(headerButton.getY() + dy);
+    }
+    
     public static ExpandableSection create(int x, int y, int width, String title) {
         return new ExpandableSection(x, y, width, title, false);
     }

@@ -77,7 +77,6 @@ public final class FieldCommand {
                     .executes(ctx -> openCustomizer(ctx.getSource(),
                         StringArgumentType.getString(ctx, "profile")))))
             .then(ThemeSubcommand.build())
-            .then(ShieldSubcommand.build())
             .then(PersonalSubcommand.build())
             .then(buildDebug())
             .then(buildTest())

@@ -20,60 +20,77 @@ public enum ValueRange {
     // ========== NORMALIZED VALUES ==========
     
     /** Alpha/opacity values (0.0 to 1.0) */
-    ALPHA(0f, 1f),
+    ALPHA(0f, 1f, null),
     
     /** Generic normalized values (0.0 to 1.0) */
-    NORMALIZED(0f, 1f),
+    NORMALIZED(0f, 1f, null),
     
     /** Percentage values (0 to 100) */
-    PERCENTAGE(0f, 100f),
+    PERCENTAGE(0f, 100f, "%"),
     
     // ========== ANGLE VALUES ==========
     
     /** Degree angles (0 to 360) */
-    DEGREES(0f, 360f),
+    DEGREES(0f, 360f, "°"),
     
     /** Signed degrees (-180 to 180) */
-    DEGREES_SIGNED(-180f, 180f),
+    DEGREES_SIGNED(-180f, 180f, "°"),
     
     /** Full rotation range (-360 to 360) */
-    DEGREES_FULL(-360f, 360f),
+    DEGREES_FULL(-360f, 360f, "°"),
     
     // ========== SIZE VALUES ==========
     
     /** Positive only (0 to infinity) */
-    POSITIVE(0f, Float.MAX_VALUE),
+    POSITIVE(0f, Float.MAX_VALUE, null),
     
     /** Strictly positive (0.001 to infinity) - prevents zero */
-    POSITIVE_NONZERO(0.001f, Float.MAX_VALUE),
+    POSITIVE_NONZERO(0.001f, Float.MAX_VALUE, null),
     
     /** Scale values (0.01 to 100) */
-    SCALE(0.01f, 100f),
+    SCALE(0.01f, 100f, "×"),
     
     /** Radius values (0.01 to infinity) */
-    RADIUS(0.01f, Float.MAX_VALUE),
+    RADIUS(0.01f, Float.MAX_VALUE, "blocks"),
     
     // ========== COUNT VALUES ==========
     
     /** Step/segment counts (1 to 1024) */
-    STEPS(1f, 1024f),
+    STEPS(1f, 1024f, null),
     
     /** Polygon sides (3 to 64) */
-    SIDES(3f, 64f),
+    SIDES(3f, 64f, null),
+    
+    // ========== SPEED VALUES ==========
+    
+    /** Rotation speed (radians per tick) */
+    SPEED(-10f, 10f, "rad/tick"),
+    
+    /** Ticks (0 to 1000) */
+    TICKS(0f, 1000f, "ticks"),
     
     // ========== SPECIAL ==========
     
     /** Unbounded (any value allowed) */
-    UNBOUNDED(Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY);
+    UNBOUNDED(Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY, null);
     
     // ========== FIELDS ==========
     
     private final float min;
     private final float max;
+    private final String unit;
     
-    ValueRange(float min, float max) {
+    ValueRange(float min, float max, String unit) {
         this.min = min;
         this.max = max;
+        this.unit = unit;
+    }
+    
+    /**
+     * @return the display unit (e.g., "blocks", "°") or null if none
+     */
+    public String unit() {
+        return unit;
     }
     
     // ========== CLAMPING ==========

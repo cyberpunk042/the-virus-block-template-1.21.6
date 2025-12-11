@@ -13,6 +13,8 @@ public final class GuiConstants {
     // ═══════════════════════════════════════════════════════════════════════════
     
     public static final int WIDGET_HEIGHT = 20;
+    public static final int COMPACT_HEIGHT = 14;    // Compact widget height (for dense panels)
+    public static final int COMPACT_GAP = 2;        // Gap between compact widgets
     public static final int BUTTON_WIDTH = 120;
     public static final int BUTTON_WIDTH_WIDE = 200;
     public static final int BUTTON_WIDTH_NARROW = 80;

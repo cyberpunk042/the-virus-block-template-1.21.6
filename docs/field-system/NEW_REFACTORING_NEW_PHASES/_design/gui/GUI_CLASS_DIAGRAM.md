@@ -1,8 +1,8 @@
 # GUI Class Diagram
 
-> **Status:** Implementation Complete  
+> **Status:** Implementation Complete ✅ (Verified by audit)  
 > **Created:** December 8, 2024  
-> **Updated:** December 9, 2024 (Added category system)  
+> **Updated:** December 10, 2025 (Added 13 evolved classes, audit verification)  
 > **Purpose:** Define all classes needed for the Field Customizer GUI  
 > **Reference:** [03_PARAMETERS.md](../03_PARAMETERS.md) for field coverage
 
@@ -13,10 +13,14 @@
 ```
 net.cyberpunk042.client.gui/
 ├── screen/
-│   └── FieldCustomizerScreen.java       # Main GUI screen
+│   ├── FieldCustomizerScreen.java       # Main GUI screen
+│   └── TabType.java                     # Tab navigation enum
 │
 ├── state/
-│   ├── FieldEditState.java                    # Full GUI state container
+│   ├── FieldEditState.java              # Full GUI state container
+│   ├── FieldEditStateHolder.java        # Singleton access to state
+│   ├── StateAccessor.java               # Reflection-based state access
+│   ├── AppearanceState.java             # Appearance-specific state
 │   ├── EditorState.java                 # Current editing context
 │   └── UndoManager.java                 # Undo/redo stack
 │
@@ -27,6 +31,7 @@ net.cyberpunk042.client.gui/
 │   ├── LayerPanel.java                  # Layer navigation
 │   ├── PrimitivePanel.java              # Primitive editing
 │   ├── ProfilesPanel.java               # Profile management
+│   ├── ActionPanel.java                 # Action buttons (Apply, Reset)
 │   └── sub/
 │       ├── ShapeSubPanel.java           # Shape parameters
 │       ├── AppearanceSubPanel.java      # Color, alpha, glow
@@ -41,24 +46,28 @@ net.cyberpunk042.client.gui/
 │       ├── LifecycleSubPanel.java       # Debug: Lifecycle
 │       ├── BeamSubPanel.java            # Debug: Central beam
 │       ├── PredictionSubPanel.java      # Prediction settings
-│       └── FollowModeSubPanel.java      # Follow mode settings
+│       ├── FollowModeSubPanel.java      # Follow mode settings
+│       ├── ModifiersSubPanel.java       # Bobbing, breathing, etc.
+│       └── OrbitSubPanel.java           # Orbit configuration
 │
 ├── widget/
 │   ├── LabeledSlider.java               # Slider with label + value
-│   ├── RangeSlider.java                 # Min/max range slider
-│   ├── EnumDropdown.java                # Enum selector
 │   ├── ColorButton.java                 # Color with popup picker
-│   ├── ThemePicker.java                 # Theme color picker
 │   ├── Vec3Editor.java                  # X/Y/Z inputs
 │   ├── ExpandableSection.java           # Collapsible section
-│   ├── TooltipWrapper.java              # Adds tooltip to any widget
-│   └── ActionButton.java                # Styled button
+│   ├── BottomActionBar.java             # Profile/preset quick bar
+│   ├── ConfirmDialog.java               # Confirmation popup
+│   ├── PresetConfirmDialog.java         # Preset application dialog
+│   ├── ToastNotification.java           # Toast feedback messages
+│   └── LoadingIndicator.java            # Loading spinner
+│   # Note: EnumDropdown, RangeSlider, ActionButton use MC's CyclingButtonWidget/SliderWidget
 │
 ├── util/
 │   ├── GuiWidgets.java                  # Widget factory methods
 │   ├── GuiAnimations.java               # Animation utilities (fade, lerp)
 │   ├── GuiLayout.java                   # Layout helpers (positioning)
 │   ├── GuiConstants.java                # Theme constants (colors, sizes)
+│   ├── GuiKeyboardNav.java              # Keyboard navigation helpers
 │   ├── FragmentRegistry.java            # Single-scope fragments (shape/fill/visibility/etc.)
 │   └── PresetRegistry.java              # Multi-scope presets (load from field_presets/)
 │
@@ -962,6 +971,145 @@ TabType enum:
 │   - expanded: boolean                                                       │
 │   - content: List<Widget>                                                   │
 │   - onToggle: Consumer<Boolean>                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+
+---
+
+## 6.7 BottomActionBar
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          BottomActionBar                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Global bottom action bar (hidden on Profiles tab).                          │
+│ Includes profile dropdown and preset two-tier selection.                    │
+│                                                                             │
+│ Layout:                                                                     │
+│   ┌────────────────────────────────────────────────────────────────────┐   │
+│   │ PRESETS                    │ PROFILE                              │   │
+│   │ [Category ▼] [Preset ▼]    │ [Profile ▼] [SAVE] [REVERT]          │   │
+│   └────────────────────────────────────────────────────────────────────┘   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Fields:                                                                     │
+│   - presetCategoryDropdown: CyclingButtonWidget                             │
+│   - presetDropdown: CyclingButtonWidget                                     │
+│   - profileDropdown: CyclingButtonWidget                                    │
+│   - saveButton, revertButton: ButtonWidget                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 6.8 ToastNotification
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         ToastNotification                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Animated toast messages for user feedback.                                  │
+│                                                                             │
+│ Types: SUCCESS (green), INFO (blue), WARNING (yellow), ERROR (red)          │
+│                                                                             │
+│ Static methods:                                                             │
+│   + success(String message)                                                 │
+│   + info(String message)                                                    │
+│   + warning(String message)                                                 │
+│   + error(String message)                                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 6.9 ConfirmDialog
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          ConfirmDialog                                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Modal confirmation popup for destructive actions.                           │
+│                                                                             │
+│ Fields:                                                                     │
+│   - title: String                                                           │
+│   - message: String                                                         │
+│   - onConfirm: Runnable                                                     │
+│   - onCancel: Runnable                                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Static:                                                                     │
+│   + show(String title, String message, Runnable onConfirm)                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 6A. State Utilities
+
+### 6A.1 StateAccessor
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          StateAccessor                                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Reflection-based accessor for FieldEditState paths.                         │
+│ Enables state.set("path.to.field", value) and state.get("path.to.field")    │
+│                                                                             │
+│ Supports:                                                                   │
+│   - Dot notation: "spin.speed", "orbit.radius"                              │
+│   - Array indices: "layers[0].primitives[1].fill.mode"                      │
+│   - @StateField annotations for path validation                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Methods:                                                                    │
+│   + set(Object target, String path, Object value)                           │
+│   + get(Object target, String path): Object                                 │
+│   + getType(Object target, String path): Class<?>                           │
+│   + listPaths(Object target): List<String>                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 6A.2 FieldEditStateHolder
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       FieldEditStateHolder                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Singleton holder for the current FieldEditState instance.                   │
+│ Used by commands and network handlers to access GUI state.                  │
+│                                                                             │
+│ Static methods:                                                             │
+│   + getInstance(): FieldEditState                                           │
+│   + setInstance(FieldEditState)                                             │
+│   + hasInstance(): boolean                                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 6B. Additional Sub-Panels
+
+### 6B.1 ModifiersSubPanel
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        ModifiersSubPanel                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Controls for visual modifiers:                                              │
+│   • bobbing: LabeledSlider (0-1)                                            │
+│   • breathing: LabeledSlider (0-1)                                          │
+│   • alphaMultiplier: LabeledSlider (0-1)                                    │
+│   • tiltMultiplier: LabeledSlider (0-1)                                     │
+│   • swirlStrength: LabeledSlider (0-1)                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 6B.2 OrbitSubPanel
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          OrbitSubPanel                                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Controls for orbit configuration:                                           │
+│   • enabled: Toggle                                                         │
+│   • radius: LabeledSlider (0.1-10)                                          │
+│   • speed: LabeledSlider (0-2)                                              │
+│   • axis: EnumDropdown (X, Y, Z, CUSTOM)                                    │
+│   • offset: Vec3Editor                                                      │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 

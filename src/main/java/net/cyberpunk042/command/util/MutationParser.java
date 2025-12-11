@@ -34,10 +34,11 @@ public class MutationParser<F extends Enum<F>, M> {
     public record ParsedMutation<F, M>(M mutation, String summary, List<FieldChange<F>> changes) {}
     public record FieldChange<F>(F field, Object value, boolean cleared) {}
 
-    public enum FieldType { BOOLEAN, INT, DOUBLE, IDENTIFIER }
+    /** Value types for field=value parsing. */
+    public enum ValueType { BOOLEAN, INT, DOUBLE, IDENTIFIER }
 
     private final Map<String, F> fieldLookup;
-    private final Function<F, FieldType> typeResolver;
+    private final Function<F, ValueType> typeResolver;
     private final MutationFactory<F, M> mutationFactory;
 
     @FunctionalInterface
@@ -54,7 +55,7 @@ public class MutationParser<F extends Enum<F>, M> {
 
     public MutationParser(
             Map<String, F> fieldLookup,
-            Function<F, FieldType> typeResolver,
+            Function<F, ValueType> typeResolver,
             MutationFactory<F, M> mutationFactory,
             MutationApplicator<F, M> applicator
     ) {
@@ -127,7 +128,7 @@ public class MutationParser<F extends Enum<F>, M> {
         }
         
         try {
-            FieldType type = typeResolver.apply(field);
+            ValueType type = typeResolver.apply(field);
             Object parsed = switch (type) {
                 case BOOLEAN -> parseBoolean(value);
                 case INT -> Integer.parseInt(value);

@@ -11,16 +11,32 @@ package net.cyberpunk042.visual.transform;
  */
 public enum Facing {
     /** Stays in world orientation - no rotation adjustment (DEFAULT) */
-    FIXED,
+    FIXED("Fixed"),
     
     /** Rotates to match the player's look direction */
-    PLAYER_LOOK,
+    PLAYER_LOOK("Player Look"),
     
     /** Points in the player's movement direction */
-    VELOCITY,
+    VELOCITY("Movement Direction"),
     
     /** Always faces the camera (useful for 2D sprites in 3D space) */
-    CAMERA;
+    CAMERA("Always Face Camera");
+    
+    private final String label;
+    
+    Facing(String label) {
+        this.label = label;
+    }
+    
+    /** Display label for GUI */
+    public String label() {
+        return label;
+    }
+    
+    @Override
+    public String toString() {
+        return label;
+    }
     
     /**
      * Parse from string (case-insensitive).
