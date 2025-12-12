@@ -5,9 +5,10 @@ import net.cyberpunk042.client.gui.panel.sub.BindingsSubPanel;
 import net.cyberpunk042.client.gui.panel.sub.BeamSubPanel;
 import net.cyberpunk042.client.gui.panel.sub.LifecycleSubPanel;
 import net.cyberpunk042.client.gui.panel.sub.TriggerSubPanel;
-import net.cyberpunk042.client.gui.render.TestFieldRenderer;
+import net.cyberpunk042.client.gui.render.SimplifiedFieldRenderer;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.state.FieldEditStateHolder;
+import net.cyberpunk042.client.gui.state.PipelineTracer;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.GuiWidgets;
 import net.cyberpunk042.client.gui.widget.ToastNotification;
@@ -40,6 +41,7 @@ public class DebugPanel extends AbstractPanel {
     
     private ButtonWidget testFieldBtn;
     private ButtonWidget debounceToggleBtn;
+    private ButtonWidget pipelineTraceBtn;
     
     private int scrollOffset = 0;
     private int contentHeight = 0;
@@ -79,10 +81,19 @@ public class DebugPanel extends AbstractPanel {
             getDebounceButtonLabel(),
             "Toggle render debouncing (for performance vs responsiveness)",
             () -> {
-                TestFieldRenderer.setDebounceEnabled(!TestFieldRenderer.isDebounceEnabled());
+                SimplifiedFieldRenderer.setDebounceEnabled(!SimplifiedFieldRenderer.isDebounceEnabled());
                 debounceToggleBtn.setMessage(net.minecraft.text.Text.literal(getDebounceButtonLabel()));
-                ToastNotification.info("Debounce: " + (TestFieldRenderer.isDebounceEnabled() ? "ON" : "OFF"));
+                ToastNotification.info("Debounce: " + (SimplifiedFieldRenderer.isDebounceEnabled() ? "ON" : "OFF"));
             }
+        );
+        contentY += 24;
+        
+        // Pipeline Trace button (for debugging render pipeline)
+        pipelineTraceBtn = GuiWidgets.button(
+            smallBtnX, contentY, smallBtnWidth,
+            getPipelineTraceButtonLabel(),
+            "Toggle pipeline tracing - tracks values through render pipeline",
+            this::togglePipelineTrace
         );
         contentY += 28;
         
@@ -153,6 +164,11 @@ public class DebugPanel extends AbstractPanel {
             debounceToggleBtn.render(context, mouseX, mouseY, delta);
         }
         
+        // Render pipeline trace button
+        if (pipelineTraceBtn != null) {
+            pipelineTraceBtn.render(context, mouseX, mouseY, delta);
+        }
+        
         if (lifecyclePanel != null) {
             lifecyclePanel.setScrollOffset(scrollOffset);
             lifecyclePanel.render(context, mouseX, mouseY + scrollOffset, delta);
@@ -187,9 +203,32 @@ public class DebugPanel extends AbstractPanel {
     }
     
     private String getDebounceButtonLabel() {
-        return TestFieldRenderer.isDebounceEnabled()
+        return SimplifiedFieldRenderer.isDebounceEnabled()
             ? "§7Debounce: §aON §7(60fps)"
             : "§7Debounce: §cOFF §7(immediate)";
+    }
+    
+    private String getPipelineTraceButtonLabel() {
+        return PipelineTracer.isEnabled()
+            ? "§6⚡ Pipeline Trace: §aON §7(click to dump)"
+            : "§7⚡ Pipeline Trace: §cOFF";
+    }
+    
+    private void togglePipelineTrace() {
+        if (PipelineTracer.isEnabled()) {
+            // Dump results and disable
+            PipelineTracer.dump();
+            String summary = PipelineTracer.summary();
+            PipelineTracer.disable();
+            ToastNotification.info("Trace dumped: " + summary);
+            Logging.GUI.topic("trace").info("=== TRACE SUMMARY: {} ===", summary);
+        } else {
+            // Clear and enable
+            PipelineTracer.clear();
+            PipelineTracer.enable();
+            ToastNotification.info("Tracing ON - change values, then click again");
+        }
+        pipelineTraceBtn.setMessage(net.minecraft.text.Text.literal(getPipelineTraceButtonLabel()));
     }
     
     /**
@@ -204,5 +243,12 @@ public class DebugPanel extends AbstractPanel {
      */
     public ButtonWidget getDebounceToggleButton() {
         return debounceToggleBtn;
+    }
+    
+    /**
+     * Returns the pipeline trace button for Screen to add as a child widget.
+     */
+    public ButtonWidget getPipelineTraceButton() {
+        return pipelineTraceBtn;
     }
 }

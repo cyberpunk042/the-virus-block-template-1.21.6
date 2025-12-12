@@ -11,6 +11,8 @@ import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.texture.SpriteAtlasTexture;
 import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.Nullable;
+import net.cyberpunk042.log.LogScope;
+import net.cyberpunk042.log.LogLevel;
 
 /**
  * Handles sprite atlas lookups and texture preloading for glow rendering.
@@ -41,9 +43,11 @@ public final class GlowTextureResolver {
      */
     public static void dumpGlowSprites(MinecraftClient client) {
         List<Identifier> glowTextures = glowTextureIds();
-        for (Identifier id : glowTextures) {
-            Sprite sprite = client.getSpriteAtlas(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE).apply(id);
-            Logging.RENDER.info("[GlowTextureResolver] Atlas contains {} -> {}", id, sprite.getContents().getId());
+        try (LogScope scope = Logging.RENDER.scope("process-glowTextures", LogLevel.INFO)) {
+            for (Identifier id : glowTextures) {
+                Sprite sprite = client.getSpriteAtlas(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE).apply(id);
+                scope.branch("texture").kv("id", id).kv("spriteId", sprite.getContents().getId());
+            }
         }
     }
 

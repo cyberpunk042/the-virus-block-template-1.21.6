@@ -40,12 +40,24 @@ public class FieldEditState {
     // SHAPE RECORDS
     // ═══════════════════════════════════════════════════════════════════════════
     
-    @StateField private SphereShape sphere = SphereShape.DEFAULT;
-    @StateField private RingShape ring = RingShape.DEFAULT;
-    @StateField private DiscShape disc = DiscShape.DEFAULT;
-    @StateField private PrismShape prism = PrismShape.builder().build();
-    @StateField private CylinderShape cylinder = CylinderShape.builder().build();
-    @StateField private PolyhedronShape polyhedron = PolyhedronShape.DEFAULT;
+    @StateField @PrimitiveComponent(value = "shape", shapeSpecific = true)
+    private SphereShape sphere = SphereShape.DEFAULT;
+    @StateField @PrimitiveComponent(value = "shape", shapeSpecific = true)
+    private RingShape ring = RingShape.DEFAULT;
+    @StateField @PrimitiveComponent(value = "shape", shapeSpecific = true)
+    private DiscShape disc = DiscShape.DEFAULT;
+    @StateField @PrimitiveComponent(value = "shape", shapeSpecific = true)
+    private PrismShape prism = PrismShape.builder().build();
+    @StateField @PrimitiveComponent(value = "shape", shapeSpecific = true)
+    private CylinderShape cylinder = CylinderShape.builder().build();
+    @StateField @PrimitiveComponent(value = "shape", shapeSpecific = true)
+    private PolyhedronShape polyhedron = PolyhedronShape.DEFAULT;
+    @StateField @PrimitiveComponent(value = "shape", shapeSpecific = true)
+    private TorusShape torus = TorusShape.DEFAULT;
+    @StateField @PrimitiveComponent(value = "shape", shapeSpecific = true)
+    private CapsuleShape capsule = CapsuleShape.DEFAULT;
+    @StateField @PrimitiveComponent(value = "shape", shapeSpecific = true)
+    private ConeShape cone = ConeShape.DEFAULT;
     
     @StateField public String shapeType = "sphere";
     @StateField public float radius = 3.0f;
@@ -57,7 +69,11 @@ public class FieldEditState {
             case "disc" -> disc;
             case "prism" -> prism;
             case "cylinder" -> cylinder;
-            case "polyhedron" -> polyhedron;
+            case "polyhedron", "cube", "octahedron", "icosahedron", 
+                 "tetrahedron", "dodecahedron" -> polyhedron;
+            case "torus" -> torus;
+            case "capsule" -> capsule;
+            case "cone" -> cone;
             default -> sphere;
         };
     }
@@ -66,45 +82,60 @@ public class FieldEditState {
     // TRANSFORM & ORBIT
     // ═══════════════════════════════════════════════════════════════════════════
     
-    @StateField private Transform transform = Transform.IDENTITY;
+    @StateField @PrimitiveComponent("transform")
+    private Transform transform = Transform.IDENTITY;
     @StateField private OrbitConfig orbit = OrbitConfig.NONE;
     
     // ═══════════════════════════════════════════════════════════════════════════
     // APPEARANCE & FILL
     // ═══════════════════════════════════════════════════════════════════════════
     
-    @StateField private FillConfig fill = FillConfig.SOLID;
-    @StateField private VisibilityMask mask = VisibilityMask.FULL;
-    @StateField private ArrangementConfig arrangement = ArrangementConfig.DEFAULT;
-    @StateField private AppearanceState appearance = AppearanceState.DEFAULT;
+    @StateField @PrimitiveComponent("fill")
+    private FillConfig fill = FillConfig.SOLID;
+    @StateField @PrimitiveComponent("mask")
+    private VisibilityMask mask = VisibilityMask.FULL;
+    @StateField @PrimitiveComponent("arrangement")
+    private ArrangementConfig arrangement = ArrangementConfig.DEFAULT;
+    @StateField @PrimitiveComponent("appearance")
+    private AppearanceState appearance = AppearanceState.DEFAULT;
     
     // ═══════════════════════════════════════════════════════════════════════════
-    // ANIMATION
+    // ANIMATION (primitive-level animations)
     // ═══════════════════════════════════════════════════════════════════════════
     
-    @StateField private SpinConfig spin = SpinConfig.NONE;
-    @StateField private PulseConfig pulse = PulseConfig.NONE;
-    @StateField private AlphaPulseConfig alphaPulse = AlphaPulseConfig.NONE;
-    @StateField private WobbleConfig wobble = WobbleConfig.builder().build();
-    @StateField private WaveConfig wave = WaveConfig.builder().build();
-    @StateField private ColorCycleConfig colorCycle = ColorCycleConfig.builder().build();
-    @StateField private Modifiers modifiers = Modifiers.DEFAULT;
+    @StateField @PrimitiveComponent("spin")
+    private SpinConfig spin = SpinConfig.NONE;
+    @StateField @PrimitiveComponent("pulse")
+    private PulseConfig pulse = PulseConfig.NONE;
+    @StateField @PrimitiveComponent("alphaPulse")
+    private AlphaPulseConfig alphaPulse = AlphaPulseConfig.NONE;
+    @StateField @PrimitiveComponent("wobble")
+    private WobbleConfig wobble = WobbleConfig.NONE;
+    @StateField @PrimitiveComponent("wave")
+    private WaveConfig wave = WaveConfig.NONE;
+    @StateField @PrimitiveComponent("colorCycle")
+    private ColorCycleConfig colorCycle = ColorCycleConfig.NONE;
+    @StateField @DefinitionField("modifiers")
+    private Modifiers modifiers = Modifiers.DEFAULT;
     
     // ═══════════════════════════════════════════════════════════════════════════
-    // FOLLOW & PREDICTION
+    // FOLLOW & PREDICTION (definition-level)
     // ═══════════════════════════════════════════════════════════════════════════
     
-    @StateField private FollowModeConfig followConfig = FollowModeConfig.DEFAULT;
-    @StateField private PredictionConfig prediction = PredictionConfig.DEFAULT;
+    @StateField @DefinitionField("followMode")
+    private FollowModeConfig followConfig = FollowModeConfig.DEFAULT;
+    @StateField @DefinitionField("prediction")
+    private PredictionConfig prediction = PredictionConfig.DEFAULT;
     @StateField public FollowMode followMode = FollowMode.SMOOTH;
     @StateField public boolean predictionEnabled = true;
     
     // ═══════════════════════════════════════════════════════════════════════════
-    // LINKING & BEAM
+    // LINKING & BEAM (definition-level)
     // ═══════════════════════════════════════════════════════════════════════════
     
     @StateField private PrimitiveLink link = null;
-    @StateField private BeamConfig beam = BeamConfig.NONE;
+    @StateField @DefinitionField("beam")
+    private BeamConfig beam = BeamConfig.NONE;
     
     // ═══════════════════════════════════════════════════════════════════════════
     // FILL EXTRAS (cage, point size)
@@ -294,6 +325,9 @@ public class FieldEditState {
         this.prism = PrismShape.builder().build();
         this.cylinder = CylinderShape.builder().build();
         this.polyhedron = PolyhedronShape.DEFAULT;
+        this.torus = TorusShape.DEFAULT;
+        this.capsule = CapsuleShape.DEFAULT;
+        this.cone = ConeShape.DEFAULT;
         this.shapeType = "sphere";
         this.radius = 3.0f;
         
@@ -311,9 +345,9 @@ public class FieldEditState {
         this.spin = SpinConfig.NONE;
         this.pulse = PulseConfig.NONE;
         this.alphaPulse = AlphaPulseConfig.NONE;
-        this.wobble = WobbleConfig.builder().build();
-        this.wave = WaveConfig.builder().build();
-        this.colorCycle = ColorCycleConfig.builder().build();
+        this.wobble = WobbleConfig.NONE;
+        this.wave = WaveConfig.NONE;
+        this.colorCycle = ColorCycleConfig.NONE;
         this.modifiers = Modifiers.DEFAULT;
         
         // Reset follow & prediction
@@ -365,8 +399,189 @@ public class FieldEditState {
      * </pre>
      */
     public void set(String path, Object value) { 
-        StateAccessor.set(this, path, value); 
+        StateAccessor.set(this, path, value);
+        
+        // CP1: GUI sets value in state - trace the path to segment mapping
+        traceCP1(path, value);
+        
         markDirty(); 
+    }
+    
+    /**
+     * Traces CP1 (GUI → State) for the given path.
+     */
+    private void traceCP1(String path, Object value) {
+        if (!PipelineTracer.isEnabled()) return;
+        
+        String segment = mapPathToSegment(path);
+        if (segment != null) {
+            PipelineTracer.trace(segment, 1, path, value);
+        }
+    }
+    
+    /**
+     * Maps a state path to a PipelineTracer segment ID.
+     * Comprehensive mapping for ALL 100+ segments.
+     */
+    private static String mapPathToSegment(String path) {
+        return switch (path) {
+            // =====================================================================
+            // APPEARANCE (A1-A11)
+            // =====================================================================
+            case "appearance.primaryColor", "primaryColor" -> PipelineTracer.A1_PRIMARY_COLOR;
+            case "appearance.alpha" -> PipelineTracer.A2_ALPHA;
+            case "appearance.glow" -> PipelineTracer.A3_GLOW;
+            case "appearance.emissive" -> PipelineTracer.A4_EMISSIVE;
+            case "appearance.saturation" -> PipelineTracer.A5_SATURATION;
+            case "appearance.secondaryColor", "secondaryColor" -> PipelineTracer.A6_SECONDARY_COLOR;
+            case "appearance.brightness" -> PipelineTracer.A7_BRIGHTNESS;
+            case "appearance.hueShift" -> PipelineTracer.A8_HUE_SHIFT;
+            case "appearance.colorBlend" -> PipelineTracer.A9_COLOR_BLEND;
+            case "appearance.alpha.min", "alpha.min" -> PipelineTracer.A10_ALPHA_MIN;
+            case "appearance.alpha.max", "alpha.max" -> PipelineTracer.A11_ALPHA_MAX;
+            
+            // =====================================================================
+            // SHAPE (S1-S18)
+            // =====================================================================
+            case "shapeType" -> PipelineTracer.S1_SHAPE_TYPE;
+            case "radius", "sphere.radius", "disc.radius", "cylinder.radius", "prism.radius" -> PipelineTracer.S2_RADIUS;
+            case "sphere.latSteps", "latSteps" -> PipelineTracer.S3_LAT_STEPS;
+            case "sphere.lonSteps", "lonSteps" -> PipelineTracer.S4_LON_STEPS;
+            case "sphere.algorithm", "algorithm" -> PipelineTracer.S5_ALGORITHM;
+            case "ring.innerRadius", "disc.innerRadius", "innerRadius" -> PipelineTracer.S6_INNER_RADIUS;
+            case "ring.outerRadius", "outerRadius" -> PipelineTracer.S7_OUTER_RADIUS;
+            case "ring.height", "cylinder.height", "prism.height", "height" -> PipelineTracer.S8_HEIGHT;
+            case "ring.segments", "cylinder.segments", "disc.segments", "segments" -> PipelineTracer.S9_SEGMENTS;
+            case "prism.sides", "sides" -> PipelineTracer.S10_SIDES;
+            case "polyhedron.type", "polyType" -> PipelineTracer.S11_POLY_TYPE;
+            case "polyhedron.faceCount", "faceCount" -> PipelineTracer.S12_FACE_COUNT;
+            case "cylinder.openTop", "openTop" -> PipelineTracer.S13_OPEN_TOP;
+            case "cylinder.openBottom", "openBottom" -> PipelineTracer.S14_OPEN_BOTTOM;
+            case "ring.thickness", "thickness" -> PipelineTracer.S15_THICKNESS;
+            case "hollow" -> PipelineTracer.S16_HOLLOW;
+            case "ringsCount" -> PipelineTracer.S17_RINGS_COUNT;
+            case "stacksCount" -> PipelineTracer.S18_STACKS_COUNT;
+            
+            // =====================================================================
+            // FILL (F1-F6)
+            // =====================================================================
+            case "fill.mode", "fillMode" -> PipelineTracer.F1_FILL_MODE;
+            case "fill.wireThickness", "wireThickness" -> PipelineTracer.F2_WIRE_THICKNESS;
+            case "fill.doubleSided", "doubleSided" -> PipelineTracer.F3_DOUBLE_SIDED;
+            case "fill.depthTest", "depthTest" -> PipelineTracer.F4_DEPTH_TEST;
+            case "fill.depthWrite", "depthWrite" -> PipelineTracer.F5_DEPTH_WRITE;
+            case "fill.cage", "cage", "cageOptions" -> PipelineTracer.F6_CAGE_OPTIONS;
+            
+            // =====================================================================
+            // ANIMATION (N1-N16)
+            // =====================================================================
+            case "spin.speed", "spinSpeed" -> PipelineTracer.N1_SPIN_SPEED;
+            case "spin.axis", "spinAxis" -> PipelineTracer.N2_SPIN_AXIS;
+            case "pulse.speed", "pulseSpeed" -> PipelineTracer.N3_PULSE_SPEED;
+            case "pulse.scale", "pulseScale" -> PipelineTracer.N4_PULSE_SCALE;
+            case "pulse.mode", "pulseMode" -> PipelineTracer.N5_PULSE_MODE;
+            case "alphaPulse.speed", "alphaPulseSpeed" -> PipelineTracer.N6_ALPHA_PULSE_SPEED;
+            case "alphaPulse.min", "alphaPulseMin" -> PipelineTracer.N7_ALPHA_PULSE_MIN;
+            case "alphaPulse.max", "alphaPulseMax" -> PipelineTracer.N8_ALPHA_PULSE_MAX;
+            case "wave.frequency", "wave.speed", "waveFrequency" -> PipelineTracer.N9_WAVE_SPEED;
+            case "wave.amplitude", "waveAmplitude" -> PipelineTracer.N10_WAVE_AMPLITUDE;
+            case "wobble.speed", "wobbleSpeed" -> PipelineTracer.N11_WOBBLE_SPEED;
+            case "colorCycle.active", "colorCycleActive" -> PipelineTracer.N12_COLOR_CYCLE;
+            case "phase", "animation.phase" -> PipelineTracer.N13_PHASE;
+            case "wobble.amplitude", "wobbleAmplitude" -> PipelineTracer.N14_WOBBLE_AMPLITUDE;
+            case "colorCycle.colors" -> PipelineTracer.N15_COLOR_CYCLE_COLORS;
+            case "colorCycle.speed" -> PipelineTracer.N16_COLOR_CYCLE_SPEED;
+            
+            // =====================================================================
+            // TRANSFORM (T1-T13)
+            // =====================================================================
+            case "transform.offset", "transform.offsetX", "transform.offsetY", "transform.offsetZ", "offset" -> PipelineTracer.T1_OFFSET;
+            case "transform.rotation", "transform.rotX", "transform.rotY", "transform.rotZ", "rotation" -> PipelineTracer.T2_ROTATION;
+            case "transform.scale", "scale" -> PipelineTracer.T3_SCALE;
+            case "transform.scaleX", "transform.scaleY", "transform.scaleZ", "scaleXYZ" -> PipelineTracer.T4_SCALE_XYZ;
+            case "transform.anchor", "anchor" -> PipelineTracer.T5_ANCHOR;
+            case "transform.billboard", "billboard" -> PipelineTracer.T6_BILLBOARD;
+            case "transform.orbit", "orbit" -> PipelineTracer.T7_ORBIT;
+            case "transform.inheritRotation", "inheritRotation" -> PipelineTracer.T8_INHERIT_ROTATION;
+            case "transform.scaleWithRadius", "scaleWithRadius" -> PipelineTracer.T9_SCALE_WITH_RADIUS;
+            case "transform.facing", "facing" -> PipelineTracer.T10_FACING;
+            case "transform.up", "upVector" -> PipelineTracer.T11_UP_VECTOR;
+            case "orbit.radius", "orbitRadius" -> PipelineTracer.T12_ORBIT_RADIUS;
+            case "orbit.speed", "orbitSpeed" -> PipelineTracer.T13_ORBIT_SPEED;
+            
+            // =====================================================================
+            // VISIBILITY/MASK (V1-V14)
+            // =====================================================================
+            case "mask.type", "visibility.mask", "maskType" -> PipelineTracer.V1_MASK_TYPE;
+            case "mask.count", "visibility.count", "maskCount" -> PipelineTracer.V2_MASK_COUNT;
+            case "mask.thickness", "visibility.thickness", "maskThickness" -> PipelineTracer.V3_MASK_THICKNESS;
+            case "mask.offset", "visibility.offset", "maskOffset" -> PipelineTracer.V4_MASK_OFFSET;
+            case "mask.animate", "visibility.animate", "maskAnimate" -> PipelineTracer.V5_MASK_ANIMATE;
+            case "mask.animSpeed", "visibility.animSpeed", "maskAnimSpeed" -> PipelineTracer.V6_MASK_ANIM_SPEED;
+            case "mask.invert", "visibility.invert", "maskInvert" -> PipelineTracer.V7_MASK_INVERT;
+            case "mask.feather", "visibility.feather", "maskFeather" -> PipelineTracer.V8_MASK_FEATHER;
+            case "mask.direction", "visibility.direction" -> PipelineTracer.V9_MASK_DIRECTION;
+            case "mask.falloff", "visibility.falloff" -> PipelineTracer.V10_MASK_FALLOFF;
+            case "mask.gradientStart", "gradientStart" -> PipelineTracer.V11_GRADIENT_START;
+            case "mask.gradientEnd", "gradientEnd" -> PipelineTracer.V12_GRADIENT_END;
+            case "mask.centerX", "visibility.centerX" -> PipelineTracer.V13_CENTER_X;
+            case "mask.centerY", "visibility.centerY" -> PipelineTracer.V14_CENTER_Y;
+            
+            // =====================================================================
+            // LAYER (L1-L6)
+            // =====================================================================
+            case "layer.alpha", "selectedLayer.alpha", "layerAlpha" -> PipelineTracer.L1_LAYER_ALPHA;
+            case "layer.visible", "selectedLayer.visible", "layerVisible" -> PipelineTracer.L2_LAYER_VISIBLE;
+            case "layer.blendMode", "selectedLayer.blendMode", "blendMode" -> PipelineTracer.L3_BLEND_MODE;
+            case "layer.id", "layerId" -> PipelineTracer.L4_LAYER_ID;
+            case "layer.transform" -> PipelineTracer.L5_LAYER_TRANSFORM;
+            case "layer.animation" -> PipelineTracer.L6_LAYER_ANIMATION;
+            
+            // =====================================================================
+            // FIELD-LEVEL (D1-D7)
+            // =====================================================================
+            case "modifiers.bobbing", "bobbing" -> PipelineTracer.D1_BOBBING;
+            case "modifiers.breathing", "breathing" -> PipelineTracer.D2_BREATHING;
+            case "prediction.enabled", "prediction" -> PipelineTracer.D3_PREDICTION;
+            case "followMode" -> PipelineTracer.D4_FOLLOW_MODE;
+            case "baseRadius" -> PipelineTracer.D5_BASE_RADIUS;
+            case "fieldType", "type" -> PipelineTracer.D6_FIELD_TYPE;
+            case "themeId" -> PipelineTracer.D7_THEME_ID;
+            
+            // =====================================================================
+            // MODIFIERS (M1-M9)
+            // =====================================================================
+            case "modifiers.radiusMultiplier", "radiusMultiplier" -> PipelineTracer.M1_RADIUS_MULT;
+            case "modifiers.strengthMultiplier", "strengthMultiplier" -> PipelineTracer.M2_STRENGTH_MULT;
+            case "modifiers.alphaMultiplier", "alphaMultiplier" -> PipelineTracer.M3_ALPHA_MULT;
+            case "modifiers.spinMultiplier", "spinMultiplier" -> PipelineTracer.M4_SPIN_MULT;
+            case "modifiers.visualScale", "visualScale" -> PipelineTracer.M5_VISUAL_SCALE;
+            case "modifiers.tiltMultiplier", "tiltMultiplier" -> PipelineTracer.M6_TILT_MULT;
+            case "modifiers.swirlStrength", "swirlStrength" -> PipelineTracer.M7_SWIRL_STRENGTH;
+            case "modifiers.inverted", "inverted" -> PipelineTracer.M8_INVERTED;
+            case "modifiers.pulsing" -> PipelineTracer.M9_PULSING;
+            
+            // =====================================================================
+            // BEAM (B1-B7)
+            // =====================================================================
+            case "beam.enabled", "beamEnabled" -> PipelineTracer.B1_BEAM_ENABLED;
+            case "beam.innerRadius", "beamInnerRadius" -> PipelineTracer.B2_BEAM_INNER_RADIUS;
+            case "beam.outerRadius", "beamOuterRadius" -> PipelineTracer.B3_BEAM_OUTER_RADIUS;
+            case "beam.color", "beamColor" -> PipelineTracer.B4_BEAM_COLOR;
+            case "beam.height", "beamHeight" -> PipelineTracer.B5_BEAM_HEIGHT;
+            case "beam.glow", "beamGlow" -> PipelineTracer.B6_BEAM_GLOW;
+            case "beam.pulse", "beamPulse" -> PipelineTracer.B7_BEAM_PULSE;
+            
+            // =====================================================================
+            // PRIMITIVE (P1-P4)
+            // =====================================================================
+            case "primitiveId", "primitive.id" -> PipelineTracer.P1_PRIMITIVE_ID;
+            case "primitiveType", "primitive.type" -> PipelineTracer.P2_PRIMITIVE_TYPE;
+            case "arrangement", "primitive.arrangement" -> PipelineTracer.P3_ARRANGEMENT;
+            case "link", "primitive.link" -> PipelineTracer.P4_LINK;
+            
+            default -> null;
+        };
     }
     
     /**
@@ -509,6 +724,9 @@ public class FieldEditState {
     public PrismShape prism() { return prism; }
     public CylinderShape cylinder() { return cylinder; }
     public PolyhedronShape polyhedron() { return polyhedron; }
+    public TorusShape torus() { return torus; }
+    public CapsuleShape capsule() { return capsule; }
+    public ConeShape cone() { return cone; }
 
     public Transform transform() { return transform; }
     public OrbitConfig orbit() { return orbit; }

@@ -89,6 +89,24 @@ public record Modifiers(
     }
     
     /**
+     * Creates a builder pre-populated with this record's values.
+     */
+    public Builder toBuilder() {
+        return new Builder()
+            .radiusMultiplier(radiusMultiplier)
+            .strengthMultiplier(strengthMultiplier)
+            .alphaMultiplier(alphaMultiplier)
+            .spinMultiplier(spinMultiplier)
+            .visualScale(visualScale)
+            .tiltMultiplier(tiltMultiplier)
+            .swirlStrength(swirlStrength)
+            .bobbing(bobbing)
+            .breathing(breathing)
+            .inverted(inverted)
+            .pulsing(pulsing);
+    }
+    
+    /**
      * Creates modifiers with just radius scaling.
      */
     public static Modifiers withRadius(float multiplier) {

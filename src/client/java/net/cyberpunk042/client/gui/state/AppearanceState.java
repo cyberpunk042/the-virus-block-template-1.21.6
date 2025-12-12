@@ -20,7 +20,7 @@ public record AppearanceState(
         0.8f,        // alpha
         0.5f,        // glow
         0f,          // emissive
-        0f,          // saturation
+        1f,          // saturation (1.0 = no change, 0.0 = grayscale)
         0xFF00FFFF,  // primaryColor
         0xFFFF00FF   // secondaryColor (magenta)
     );
@@ -43,7 +43,7 @@ public record AppearanceState(
         private float alpha = 0.8f;
         private float glow = 0.5f;
         private float emissive = 0f;
-        private float saturation = 0f;
+        private float saturation = 1f;  // 1.0 = no change, 0.0 = grayscale
         private int primaryColor = 0xFF00FFFF;
         private int secondaryColor = 0xFFFF00FF;
 

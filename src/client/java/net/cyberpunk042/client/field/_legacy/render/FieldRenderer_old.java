@@ -21,6 +21,8 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import net.cyberpunk042.log.LogScope;
+import net.cyberpunk042.log.LogLevel;
 
 /**
  * Main renderer for field definitions.
@@ -256,24 +258,24 @@ public final class FieldRenderer_old {
         matrices.translate(position.x, position.y, position.z);
         
         // Render each layer with overrides
-        for (FieldLayer fieldLayer : definition.layers()) {
-            // DIAGNOSTIC: Log each layer being rendered
-            if ((int) time % 60 == 0) {
-                Logging.RENDER.topic("fieldtest").info(
-                    "DIAG: Rendering layer '{}' with {} primitives",
-                    fieldLayer.id(), fieldLayer.primitives().size());
+        try (LogScope scope = Logging.RENDER.topic("fieldtest").scope("process-layers", LogLevel.INFO)) {
+            for (FieldLayer fieldLayer : definition.layers()) {
+                // DIAGNOSTIC: Log each layer being rendered
+                if ((int) time % 60 == 0) {
+                    scope.branch("fieldLayer").kv("_lvl", "i").kv("fieldLayer", fieldLayer.id()).kv("fieldLayer", fieldLayer.primitives().size());
+                }
+
+                LayerRenderer_old.renderWithOverrides(
+                    matrices,
+                    consumer,
+                    fieldLayer,
+                    theme,
+                    scale,
+                    time,
+                    alpha,
+                    overrides
+                );
             }
-            
-            LayerRenderer_old.renderWithOverrides(
-                matrices,
-                consumer,
-                fieldLayer,
-                theme,
-                scale,
-                time,
-                alpha,
-                overrides
-            );
         }
         
         matrices.pop();

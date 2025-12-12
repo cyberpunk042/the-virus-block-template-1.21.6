@@ -301,6 +301,12 @@ public final class StateAccessor {
             // Update the record (handles nested paths recursively)
             Object updated = updateRecordProperty(record, remaining, value);
             
+            // DEBUG: Log the update for fill-related changes
+            if (fieldName.equals("fill")) {
+                Logging.GUI.topic("accessor").debug("[FILL-DEBUG] StateAccessor updating '{}' from {} to {}", 
+                    path, record, updated);
+            }
+            
             // Set the updated record back
             field.set(state, updated);
         } catch (Exception e) {

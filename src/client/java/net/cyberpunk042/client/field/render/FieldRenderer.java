@@ -21,7 +21,11 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.math.Vec3d;
 
+import net.cyberpunk042.client.gui.state.PipelineTracer;
+
 import java.util.Map;
+import net.cyberpunk042.log.LogScope;
+import net.cyberpunk042.log.LogLevel;
 
 /**
  * Main renderer for field definitions.
@@ -347,58 +351,165 @@ public final class FieldRenderer {
             float alpha,
             RenderOverrides overrides) {
         
-        // Early exit checks
-        if (definition == null || alpha <= 0.01f) {
-            return;
-        }
+        // Outer scope: batches all logging into single TRACE output
+        try (LogScope scope = Logging.FIELD.topic("render").scope("field:" + (definition != null ? definition.id() : "null"), LogLevel.TRACE)) {
+            scope.kv("alpha", alpha)
+                 .kv("scale", scale);
+            
+            // Early exit checks
+            if (definition == null || alpha <= 0.01f) {
+                scope.leaf("SKIP: definition=" + (definition == null ? "null" : "ok") + ", alpha=" + alpha);
+                return;
+            }
+            
+            if (definition.layers() == null || definition.layers().isEmpty()) {
+                scope.leaf("SKIP: no layers");
+                return;
+            }
+            
+            scope.kv("layers", definition.layers().size());
         
-        if (definition.layers() == null || definition.layers().isEmpty()) {
-            Logging.FIELD.topic("render").trace(
-                "Definition '{}' has no layers, skipping", definition.id());
-            return;
-        }
+            // === PHASE 1: Resolve Theme ===
+            ColorTheme theme = resolveTheme(definition);
+            ColorResolver resolver = theme != null 
+                ? ColorResolver.fromTheme(theme) 
+                : ColorResolver.DEFAULT;
+            
+            // === PHASE 2: Render Layer Selection ===
+            // Note: Layer selection is now done per-primitive in LayerRenderer based on fill mode
+            
+            // === PHASE 3: Position ===
+            matrices.push();
+            try {
+            matrices.translate(position.x, position.y, position.z);
         
-        // === PHASE 1: Resolve Theme ===
-        ColorTheme theme = resolveTheme(definition);
-        ColorResolver resolver = theme != null 
-            ? ColorResolver.fromTheme(theme) 
-            : ColorResolver.DEFAULT;
+            // === PHASE 3.5: Apply Field Modifiers (bobbing, breathing) ===
+            if (definition.modifiers() != null) {
+                var mods = definition.modifiers();
+                // CP5: Values reaching renderer
+                PipelineTracer.trace(PipelineTracer.D1_BOBBING, 5, "render", String.valueOf(mods.bobbing()));
+                PipelineTracer.trace(PipelineTracer.D2_BREATHING, 5, "render", String.valueOf(mods.breathing()));
+                
+                if (mods.hasAnimationModifiers()) {
+                    scope.branch("modifiers").kv("bobbing", mods.bobbing()).kv("breathing", mods.breathing());
+                    net.cyberpunk042.client.visual.animation.AnimationApplier.applyModifiers(
+                        matrices, mods, time);
+                    // CP6: Matrix modified
+                    PipelineTracer.trace(PipelineTracer.D1_BOBBING, 6, "matrix", "applied");
+                    PipelineTracer.trace(PipelineTracer.D2_BREATHING, 6, "matrix", "applied");
+                    // CP7: Transformation complete
+                    PipelineTracer.trace(PipelineTracer.D1_BOBBING, 7, "complete", "transformed");
+                    PipelineTracer.trace(PipelineTracer.D2_BREATHING, 7, "complete", "transformed");
+                } else {
+                    PipelineTracer.trace(PipelineTracer.D1_BOBBING, 6, "matrix", "skipped-zero");
+                    PipelineTracer.trace(PipelineTracer.D2_BREATHING, 6, "matrix", "skipped-zero");
+                }
+            } else {
+                PipelineTracer.trace(PipelineTracer.D1_BOBBING, 5, "render", "null-modifiers");
+                PipelineTracer.trace(PipelineTracer.D2_BREATHING, 5, "render", "null-modifiers");
+            }
         
-        // === PHASE 2: Get Render Layer ===
-        RenderLayer renderLayer = FieldRenderLayers.solidTranslucent();
-        VertexConsumer consumer = consumers.getBuffer(renderLayer);
+            // === PHASE 4: Render Each Layer ===
+            // CP4: Layer-level segments (trace for first layer)
+            if (!definition.layers().isEmpty()) {
+                FieldLayer firstLayer = definition.layers().get(0);
+                PipelineTracer.trace(PipelineTracer.L1_LAYER_ALPHA, 4, "layer", String.valueOf(firstLayer.alpha()));
+                PipelineTracer.trace(PipelineTracer.L2_LAYER_VISIBLE, 4, "layer", String.valueOf(firstLayer.visible()));
+                PipelineTracer.trace(PipelineTracer.L3_BLEND_MODE, 4, "layer", firstLayer.blendMode() != null ? firstLayer.blendMode().name() : "null");
+            }
+            
+            // CP4: Field-level segments (D1-D4) - trace unconditionally
+            if (definition.modifiers() != null) {
+                var mods = definition.modifiers();
+                PipelineTracer.trace(PipelineTracer.D1_BOBBING, 4, "def", String.valueOf(mods.bobbing()));
+                PipelineTracer.trace(PipelineTracer.D2_BREATHING, 4, "def", String.valueOf(mods.breathing()));
+            }
+            // Note: Prediction and FollowMode affect field POSITIONING (before render),
+            // not the rendering itself. They're used by the field tracking system to 
+            // calculate the `position` parameter passed to this method.
+            if (definition.prediction() != null) {
+                PipelineTracer.trace(PipelineTracer.D3_PREDICTION, 4, "def", "enabled");
+                // Mark as complete - affects position calculation, not render
+                PipelineTracer.trace(PipelineTracer.D3_PREDICTION, 5, "position", "pre-calculated");
+                PipelineTracer.trace(PipelineTracer.D3_PREDICTION, 6, "position", "applied");
+                PipelineTracer.trace(PipelineTracer.D3_PREDICTION, 7, "position", "complete");
+            }
+            if (definition.followMode() != null) {
+                PipelineTracer.trace(PipelineTracer.D4_FOLLOW_MODE, 4, "def", definition.followMode().toString());
+                // Mark as complete - affects position calculation, not render
+                PipelineTracer.trace(PipelineTracer.D4_FOLLOW_MODE, 5, "position", "pre-calculated");
+                PipelineTracer.trace(PipelineTracer.D4_FOLLOW_MODE, 6, "position", "applied");
+                PipelineTracer.trace(PipelineTracer.D4_FOLLOW_MODE, 7, "position", "complete");
+            }
+            
+            // CP4-7: Beam segments (rendered separately if enabled)
+            if (definition.beam() != null) {
+                var b = definition.beam();
+                PipelineTracer.trace(PipelineTracer.B1_BEAM_ENABLED, 4, "def", String.valueOf(b.enabled()));
+                PipelineTracer.trace(PipelineTracer.B2_BEAM_INNER_RADIUS, 4, "def", String.valueOf(b.innerRadius()));
+                PipelineTracer.trace(PipelineTracer.B3_BEAM_OUTER_RADIUS, 4, "def", String.valueOf(b.outerRadius()));
+                PipelineTracer.trace(PipelineTracer.B4_BEAM_COLOR, 4, "def", b.color());
+                PipelineTracer.trace(PipelineTracer.B5_BEAM_HEIGHT, 4, "def", String.valueOf(b.height()));
+                PipelineTracer.trace(PipelineTracer.B6_BEAM_GLOW, 4, "def", String.valueOf(b.glow()));
+                PipelineTracer.trace(PipelineTracer.B7_BEAM_PULSE, 4, "def", b.pulse() != null ? "active" : "null");
+                
+                // Actually render the beam (CP5-7 traces are inside BeamRenderer)
+                if (b.enabled()) {
+                    scope.leaf("beam: rendering");
+                    // Beam needs world time and tick delta for scrolling animation
+                    net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
+                    long worldTime = client.world != null ? client.world.getTime() : 0L;
+                    float tickDelta = client.getRenderTickCounter().getTickProgress(false);
+                    BeamRenderer.render(matrices, consumers, b, resolver, worldTime, tickDelta, alpha);
+                }
+            }
         
-        // === PHASE 3: Position ===
-        matrices.push();
-        matrices.translate(position.x, position.y, position.z);
-        
-        // === PHASE 3.5: Apply Field Modifiers (bobbing, breathing) ===
-        if (definition.modifiers() != null && definition.modifiers().hasAnimationModifiers()) {
-            net.cyberpunk042.client.visual.animation.AnimationApplier.applyModifiers(
-                matrices, definition.modifiers(), time);
-        }
-        
-        // === PHASE 4: Render Each Layer ===
-        int layerCount = 0;
-        for (FieldLayer layer : definition.layers()) {
-            LayerRenderer.render(
-                matrices,
-                consumer,
-                layer,
-                resolver,
-                scale,
-                time,
-                alpha,
-                overrides
-            );
-            layerCount++;
-        }
-        
-        matrices.pop();
-        
-        Logging.FIELD.topic("render").trace(
-            "Rendered field '{}' with {} layers at {}", 
-            definition.id(), layerCount, position);
+            int layerCount = 0;
+            // Inner scope auto-nests into outer scope
+            try (LogScope layerScope = Logging.FIELD.topic("render").scope("process-layers", LogLevel.TRACE)) {
+                for (FieldLayer layer : definition.layers()) {
+                    layerScope.branch("layer").kv("index", layerCount).kv("id", layer.id());
+
+                    LayerRenderer.render(
+                        matrices,
+                        consumers,
+                        layer,
+                        resolver,
+                        scale,
+                        time,
+                        alpha,
+                        overrides
+                    );
+
+                    // CP5-7: Layer & Field-level segments rendered (trace once for first layer)
+                    if (layerCount == 0) {
+                        PipelineTracer.trace(PipelineTracer.L1_LAYER_ALPHA, 5, "render", "passed");
+                        PipelineTracer.trace(PipelineTracer.L2_LAYER_VISIBLE, 5, "render", "passed");
+                        PipelineTracer.trace(PipelineTracer.L3_BLEND_MODE, 5, "render", "passed");
+                        PipelineTracer.trace(PipelineTracer.L1_LAYER_ALPHA, 6, "vtx", "emitted");
+                        PipelineTracer.trace(PipelineTracer.L2_LAYER_VISIBLE, 6, "vtx", "emitted");
+                        PipelineTracer.trace(PipelineTracer.L3_BLEND_MODE, 6, "vtx", "emitted");
+                        PipelineTracer.trace(PipelineTracer.L1_LAYER_ALPHA, 7, "vtx", "complete");
+                        PipelineTracer.trace(PipelineTracer.L2_LAYER_VISIBLE, 7, "vtx", "complete");
+                        PipelineTracer.trace(PipelineTracer.L3_BLEND_MODE, 7, "vtx", "complete");
+                        // D1-D4 complete when layer renders
+                        PipelineTracer.trace(PipelineTracer.D1_BOBBING, 5, "render", "applied");
+                        PipelineTracer.trace(PipelineTracer.D2_BREATHING, 5, "render", "applied");
+                        PipelineTracer.trace(PipelineTracer.D1_BOBBING, 6, "vtx", "matrix");
+                        PipelineTracer.trace(PipelineTracer.D2_BREATHING, 6, "vtx", "matrix");
+                        PipelineTracer.trace(PipelineTracer.D1_BOBBING, 7, "vtx", "complete");
+                        PipelineTracer.trace(PipelineTracer.D2_BREATHING, 7, "vtx", "complete");
+                    }
+
+                    layerCount++;
+                }
+            }
+            
+            scope.count("layers-rendered", layerCount);
+            } finally {
+                matrices.pop();
+            }
+        } // End outer LogScope - emits single batched log
     }
     
     // =========================================================================

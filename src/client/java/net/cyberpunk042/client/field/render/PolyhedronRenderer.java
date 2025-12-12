@@ -31,14 +31,36 @@ public final class PolyhedronRenderer extends AbstractPrimitiveRenderer {
     
     @Override
     protected Mesh tessellate(Primitive primitive) {
+        net.cyberpunk042.log.Logging.RENDER.topic("tessellate")
+            .kv("primType", primitive.type())
+            .kv("shapeClass", primitive.shape() != null ? primitive.shape().getClass().getSimpleName() : "null")
+            .debug("[POLY] Entering tessellate");
+        
         if (!(primitive.shape() instanceof PolyhedronShape shape)) {
+            net.cyberpunk042.log.Logging.RENDER.topic("tessellate")
+                .reason("Shape mismatch")
+                .kv("expected", "PolyhedronShape")
+                .kv("actual", primitive.shape() != null ? primitive.shape().getClass().getName() : "null")
+                .warn("[POLY] Shape is not PolyhedronShape!");
             return null;
         }
         
+        net.cyberpunk042.log.Logging.RENDER.topic("tessellate")
+            .kv("polyType", shape.polyType())
+            .kv("radius", shape.radius())
+            .debug("[POLY] Tessellating polyhedron");
+        
         // Use PolyhedronTessellator's builder pattern
         // Detail level 0 = no subdivision (raw Platonic solid)
-        return PolyhedronTessellator
+        Mesh mesh = PolyhedronTessellator
             .fromShape(shape)
             .tessellate(0);
+        
+        net.cyberpunk042.log.Logging.RENDER.topic("tessellate")
+            .kv("vertexCount", mesh != null ? mesh.vertexCount() : 0)
+            .kv("isEmpty", mesh != null ? mesh.isEmpty() : true)
+            .debug("[POLY] Tessellation result");
+        
+        return mesh;
     }
 }

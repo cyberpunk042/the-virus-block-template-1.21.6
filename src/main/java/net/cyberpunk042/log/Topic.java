@@ -87,4 +87,53 @@ public class Topic implements ContextBuilder<Context> {
     public FormattedContext formatted() {
         return new FormattedContext(context());
     }
+    
+    // ========== SCOPED LOGGING ==========
+    
+    /**
+     * Creates a deferred hierarchical log scope under this topic.
+     * 
+     * @param name The scope name
+     * @return A new LogScope that emits at INFO level
+     */
+    public LogScope scope(String name) {
+        return scope(name, LogLevel.INFO);
+    }
+    
+    /**
+     * Creates a deferred hierarchical log scope at specified level.
+     * 
+     * @param name The scope name
+     * @param level The log level
+     * @return A new LogScope
+     */
+    public LogScope scope(String name, LogLevel level) {
+        if (!effectiveLevel().includes(level)) {
+            return LogScope.noop();
+        }
+        return new LogScope(channel, this.name, name, level);
+    }
+    
+    /**
+     * Executes a lambda within a log scope, auto-emitting on completion.
+     * 
+     * @param name The scope name
+     * @param consumer Lambda to execute
+     */
+    public void scoped(String name, java.util.function.Consumer<LogScope> consumer) {
+        scoped(name, LogLevel.INFO, consumer);
+    }
+    
+    /**
+     * Executes a lambda within a log scope at specified level.
+     * 
+     * @param name The scope name
+     * @param level The log level
+     * @param consumer Lambda to execute
+     */
+    public void scoped(String name, LogLevel level, java.util.function.Consumer<LogScope> consumer) {
+        try (LogScope scope = scope(name, level)) {
+            consumer.accept(scope);
+        }
+    }
 }

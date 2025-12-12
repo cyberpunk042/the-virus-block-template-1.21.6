@@ -5,6 +5,8 @@ import java.util.List;
 import net.cyberpunk042.log.Logging;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
+import net.cyberpunk042.log.LogScope;
+import net.cyberpunk042.log.LogLevel;
 
 /**
  * Handles spawning of virus guardian entities.
@@ -20,9 +22,11 @@ public final class GuardianSpawnService {
         }
         Logging.INFECTION.topic("guardians").info("Spawning core guardians for {} sources", sources.size());
         // Guardian spawn logic - implementation depends on game mechanics
-        for (BlockPos source : sources) {
-            // Spawn guardian near source
-            Logging.INFECTION.topic("guardians").debug("Guardian spawn near {}", source);
+        try (LogScope scope = Logging.INFECTION.topic("guardians").scope("process-sources", LogLevel.DEBUG)) {
+            for (BlockPos source : sources) {
+                // Spawn guardian near source
+                scope.branch("entry").kv("source", source);
+            }
         }
     }
 

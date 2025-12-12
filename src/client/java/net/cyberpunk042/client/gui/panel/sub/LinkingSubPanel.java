@@ -1,6 +1,8 @@
 package net.cyberpunk042.client.gui.panel.sub;
 
 import net.cyberpunk042.client.gui.panel.AbstractPanel;
+import net.cyberpunk042.client.gui.state.RendererCapabilities.Feature;
+import net.cyberpunk042.client.gui.state.RequiresFeature;
 import net.minecraft.client.gui.screen.Screen;
 
 import net.cyberpunk042.client.gui.state.FieldEditState;
@@ -31,7 +33,10 @@ import java.util.List;
  * - scaleWith: Scale with another primitive
  * 
  * @see <a href="GUI_CLASS_DIAGRAM.md §4.8">LinkingSubPanel specification</a>
+ * 
+ * <p><b>Requires Accurate renderer mode.</b></p>
  */
+@RequiresFeature(Feature.LINKING)
 public class LinkingSubPanel extends AbstractPanel {
 
     // ═══════════════════════════════════════════════════════════════════════════

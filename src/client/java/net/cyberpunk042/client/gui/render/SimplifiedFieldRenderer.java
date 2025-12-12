@@ -23,10 +23,11 @@ import net.minecraft.util.math.Vec3d;
 import org.joml.Matrix4f;
 
 /**
- * Client-side renderer for the test/preview field.
+ * Simplified client-side field renderer for preview and debug purposes.
  * 
  * <p>Renders a preview of the current {@link FieldEditState} following the player.
- * This is purely client-side and doesn't require server communication.</p>
+ * This is a lightweight renderer with partial feature support, designed for
+ * fast feedback during editing.</p>
  * 
  * <h2>Features</h2>
  * <ul>
@@ -35,9 +36,20 @@ import org.joml.Matrix4f;
  *   <li>Updates in real-time as GUI/commands change state</li>
  *   <li>Debounced to prevent performance issues</li>
  * </ul>
+ * 
+ * <h2>Limitations (vs FieldRenderer)</h2>
+ * <ul>
+ *   <li>No binding evaluation</li>
+ *   <li>No trigger effects</li>
+ *   <li>No lifecycle states</li>
+ *   <li>Limited animation support</li>
+ * </ul>
+ * 
+ * @see net.cyberpunk042.client.field.render.FieldRenderer
+ * @see net.cyberpunk042.client.gui.state.DefinitionBuilder
  */
 @Environment(EnvType.CLIENT)
-public final class TestFieldRenderer {
+public final class SimplifiedFieldRenderer {
     
     private static boolean initialized = false;
     private static long lastRenderTime = 0;
@@ -46,6 +58,10 @@ public final class TestFieldRenderer {
     // Debounce toggle (can be disabled for immediate updates in debug)
     private static boolean debounceEnabled = true;
     
+    // Advanced rendering mode (uses full FieldRenderer pipeline)
+    // Enabled by default to support fill mode, visibility mask, and other pipeline features
+    private static boolean advancedModeEnabled = true;
+    
     // Cached mesh data (rebuilt when state changes)
     private static boolean meshDirty = true;
     private static long stateVersion = 0;
@@ -53,7 +69,7 @@ public final class TestFieldRenderer {
     /** Enable/disable render debouncing. */
     public static void setDebounceEnabled(boolean enabled) {
         debounceEnabled = enabled;
-        Logging.GUI.topic("render").debug("TestFieldRenderer debounce: {}", enabled ? "ON" : "OFF");
+        Logging.GUI.topic("render").debug("SimplifiedFieldRenderer debounce: {}", enabled ? "ON" : "OFF");
     }
     
     /** Check if debouncing is enabled. */
@@ -61,7 +77,18 @@ public final class TestFieldRenderer {
         return debounceEnabled;
     }
     
-    private TestFieldRenderer() {}
+    /** Enable/disable advanced rendering mode (uses full pipeline). */
+    public static void setAdvancedModeEnabled(boolean enabled) {
+        advancedModeEnabled = enabled;
+        Logging.GUI.topic("render").debug("SimplifiedFieldRenderer advanced mode: {}", enabled ? "ON" : "OFF");
+    }
+    
+    /** Check if advanced rendering mode is enabled. */
+    public static boolean isAdvancedModeEnabled() {
+        return advancedModeEnabled;
+    }
+    
+    private SimplifiedFieldRenderer() {}
     
     /**
      * Registers the test field renderer with world render events.
@@ -71,8 +98,8 @@ public final class TestFieldRenderer {
         if (initialized) return;
         initialized = true;
         
-        WorldRenderEvents.AFTER_ENTITIES.register(TestFieldRenderer::render);
-        Logging.GUI.topic("render").info("TestFieldRenderer initialized");
+        WorldRenderEvents.AFTER_ENTITIES.register(SimplifiedFieldRenderer::render);
+        Logging.GUI.topic("render").info("SimplifiedFieldRenderer initialized");
     }
     
     /**
@@ -122,8 +149,46 @@ public final class TestFieldRenderer {
         Vec3d playerPos = player.getPos().add(0, 1.0, 0); // Center at chest height
         Vec3d renderPos = playerPos.subtract(camPos);
         
-        // Render the test field
-        renderTestField(matrices, consumers, state, renderPos, worldTime);
+        // Render using selected mode
+        if (advancedModeEnabled) {
+            // Advanced mode: Use full FieldRenderer pipeline
+            renderAdvanced(matrices, consumers, state, renderPos, worldTime);
+        } else {
+            // Fast mode: Use simplified inline rendering  
+            renderTestField(matrices, consumers, state, renderPos, worldTime);
+        }
+    }
+    
+    /**
+     * Renders using the full FieldRenderer pipeline.
+     * Converts FieldEditState to FieldDefinition and uses complete rendering.
+     */
+    private static void renderAdvanced(
+            MatrixStack matrices,
+            VertexConsumerProvider consumers,
+            FieldEditState state,
+            Vec3d pos,
+            float time) {
+        
+        // Convert state to definition
+        var definition = net.cyberpunk042.client.gui.state.DefinitionBuilder.fromState(state);
+        
+        if (definition.layers() == null || definition.layers().isEmpty()) {
+            Logging.GUI.topic("render").warn("[ACCURATE] No layers to render!");
+            return;
+        }
+        
+        // Use the FULL FieldRenderer pipeline (includes all CP4+ traces)
+        // No try-catch fallback - if this fails, we need to fix the renderer
+        net.cyberpunk042.client.field.render.FieldRenderer.render(
+            matrices,
+            consumers,
+            definition,
+            pos,
+            1.0f,  // scale
+            time,
+            0.8f   // alpha
+        );
     }
     
     /**
@@ -139,9 +204,60 @@ public final class TestFieldRenderer {
         matrices.push();
         matrices.translate(pos.x, pos.y, pos.z);
         
-        // Apply transform from state
+        // Get transform from state
+        var transform = state.transform();
+        
+        // Apply anchor offset (relative to player center at ~1 block height)
+        if (transform != null && transform.anchor() != null) {
+            var anchor = transform.anchor();
+            // Anchor offset is relative to player feet, adjust to center
+            matrices.translate(anchor.getX(), anchor.getY() - 1.0, anchor.getZ());
+        }
+        
+        // Apply custom offset
+        if (transform != null && transform.offset() != null) {
+            var offset = transform.offset();
+            matrices.translate(offset.x, offset.y, offset.z);
+        }
+        
+        // Apply billboard (face camera)
+        if (transform != null && transform.billboard() != net.cyberpunk042.visual.transform.Billboard.NONE) {
+            Camera camera = MinecraftClient.getInstance().gameRenderer.getCamera();
+            matrices.multiply(net.minecraft.util.math.RotationAxis.POSITIVE_Y.rotationDegrees(-camera.getYaw()));
+            if (transform.billboard() == net.cyberpunk042.visual.transform.Billboard.FULL) {
+                matrices.multiply(net.minecraft.util.math.RotationAxis.POSITIVE_X.rotationDegrees(-camera.getPitch()));
+            }
+        }
+        
+        // Apply base rotation
+        if (transform != null && transform.rotation() != null) {
+            var rot = transform.rotation();
+            matrices.multiply(net.minecraft.util.math.RotationAxis.POSITIVE_X.rotationDegrees(rot.x));
+            matrices.multiply(net.minecraft.util.math.RotationAxis.POSITIVE_Y.rotationDegrees(rot.y));
+            matrices.multiply(net.minecraft.util.math.RotationAxis.POSITIVE_Z.rotationDegrees(rot.z));
+        }
+        
+        // Apply scale
         float scale = state.getFloat("transform.scale");
         matrices.scale(scale, scale, scale);
+        
+        // Apply non-uniform scale
+        if (transform != null && transform.scaleXYZ() != null) {
+            var s = transform.scaleXYZ();
+            matrices.scale(s.x, s.y, s.z);
+        }
+        
+        // Apply orbit animation
+        if (transform != null && transform.orbit() != null && transform.orbit().isActive()) {
+            var orbit = transform.orbit();
+            float orbitAngle = (time * orbit.speed()) % 360f;
+            float orbitRadius = orbit.radius();
+            matrices.translate(
+                MathHelper.cos((float) Math.toRadians(orbitAngle)) * orbitRadius,
+                0,
+                MathHelper.sin((float) Math.toRadians(orbitAngle)) * orbitRadius
+            );
+        }
         
         // Apply spin animation
         if (state.spin().isActive()) {
@@ -252,7 +368,8 @@ public final class TestFieldRenderer {
      * 
      * <p>Supports all 5 algorithms:
      * <ul>
-     *   <li>LAT_LON, UV_SPHERE, ICO_SPHERE: Mesh-based tessellation</li>
+     *   <li>LAT_LON: Inline lat/lon tessellation</li>
+     *   <li>UV_SPHERE, ICO_SPHERE: Mesh-based tessellation via SphereTessellator</li>
      *   <li>TYPE_A: Direct overlapping cubes (accurate)</li>
      *   <li>TYPE_E: Direct rotated rectangles (efficient)</li>
      * </ul>
@@ -290,29 +407,61 @@ public final class TestFieldRenderer {
                 // Direct rendering with rotated rectangles
                 SphereRenderer.renderTypeE(matrices, consumer, radius, color, light);
             }
+            case UV_SPHERE, ICO_SPHERE -> {
+                // Proper mesh-based tessellation with mask support
+                var shape = net.cyberpunk042.visual.shape.SphereShape.builder()
+                    .radius(radius)
+                    .latSteps(latSteps)
+                    .lonSteps(lonSteps)
+                    .algorithm(algorithm)
+                    .build();
+                var mask = state.mask();
+                var mesh = net.cyberpunk042.client.visual.mesh.SphereTessellator.tessellate(shape, null, mask);
+                renderMesh(matrices, consumer, mesh, r, g, b, a);
+            }
             default -> {
-                // Mesh-based tessellation (LAT_LON, UV_SPHERE, ICO_SPHERE)
-                // For simplicity in the preview renderer, use the LAT_LON inline rendering
-                // The proper mesh-based rendering uses SphereTessellator in the full renderer
-                renderSphereLatLon(matrices, consumer, radius, r, g, b, a, latSteps, lonSteps);
+                // LAT_LON: Use inline rendering with mask support
+                var mask = state.mask();
+                renderSphereLatLon(matrices, consumer, radius, r, g, b, a, latSteps, lonSteps, mask);
             }
         }
     }
     
     /**
+     * Renders a tessellated mesh.
+     */
+    private static void renderMesh(
+            MatrixStack matrices,
+            VertexConsumer consumer,
+            net.cyberpunk042.client.visual.mesh.Mesh mesh,
+            int r, int g, int b, int a) {
+        
+        Matrix4f matrix = matrices.peek().getPositionMatrix();
+        
+        mesh.forEachTriangle((v0, v1, v2) -> {
+            vertexWithNormal(consumer, matrix, v0.x(), v0.y(), v0.z(), r, g, b, a, v0.nx(), v0.ny(), v0.nz());
+            vertexWithNormal(consumer, matrix, v1.x(), v1.y(), v1.z(), r, g, b, a, v1.nx(), v1.ny(), v1.nz());
+            vertexWithNormal(consumer, matrix, v2.x(), v2.y(), v2.z(), r, g, b, a, v2.nx(), v2.ny(), v2.nz());
+        });
+    }
+    
+    /**
      * Renders sphere using lat/lon tessellation (inline for preview).
+     * Applies visibility mask if provided.
      */
     private static void renderSphereLatLon(
             MatrixStack matrices,
             VertexConsumer consumer,
             float radius,
             int r, int g, int b, int a,
-            int latSteps, int lonSteps) {
+            int latSteps, int lonSteps,
+            net.cyberpunk042.visual.visibility.VisibilityMask mask) {
         
         Matrix4f matrix = matrices.peek().getPositionMatrix();
         
         for (int lat = 0; lat < latSteps; lat++) {
-            float lat0 = (float) Math.PI * (-0.5f + (float) lat / latSteps);
+            float latFrac = (float) lat / latSteps;  // For mask UV lookup
+            float lat0 = (float) Math.PI * (-0.5f + latFrac);
             float lat1 = (float) Math.PI * (-0.5f + (float) (lat + 1) / latSteps);
             
             float y0 = MathHelper.sin(lat0) * radius;
@@ -321,6 +470,13 @@ public final class TestFieldRenderer {
             float r1 = MathHelper.cos(lat1) * radius;
             
             for (int lon = 0; lon < lonSteps; lon++) {
+                float lonFrac = (float) lon / lonSteps;  // For mask UV lookup
+                
+                // Check visibility mask - skip if not visible
+                if (mask != null && mask.hasMask() && !mask.isVisible(lonFrac, latFrac)) {
+                    continue;
+                }
+                
                 float lon0 = 2 * (float) Math.PI * lon / lonSteps;
                 float lon1 = 2 * (float) Math.PI * (lon + 1) / lonSteps;
                 
@@ -333,15 +489,15 @@ public final class TestFieldRenderer {
                 float x11 = MathHelper.cos(lon1) * r1;
                 float z11 = MathHelper.sin(lon1) * r1;
                 
-                // Triangle 1
-                vertex(consumer, matrix, x00, y0, z00, r, g, b, a);
-                vertex(consumer, matrix, x10, y0, z10, r, g, b, a);
-                vertex(consumer, matrix, x01, y1, z01, r, g, b, a);
+                // Triangle 1 - with proper outward normals
+                sphereVertex(consumer, matrix, x00, y0, z00, radius, r, g, b, a);
+                sphereVertex(consumer, matrix, x10, y0, z10, radius, r, g, b, a);
+                sphereVertex(consumer, matrix, x01, y1, z01, radius, r, g, b, a);
                 
-                // Triangle 2
-                vertex(consumer, matrix, x10, y0, z10, r, g, b, a);
-                vertex(consumer, matrix, x11, y1, z11, r, g, b, a);
-                vertex(consumer, matrix, x01, y1, z01, r, g, b, a);
+                // Triangle 2 - with proper outward normals
+                sphereVertex(consumer, matrix, x10, y0, z10, radius, r, g, b, a);
+                sphereVertex(consumer, matrix, x11, y1, z11, radius, r, g, b, a);
+                sphereVertex(consumer, matrix, x01, y1, z01, radius, r, g, b, a);
             }
         }
     }
@@ -572,16 +728,37 @@ public final class TestFieldRenderer {
     }
 
     /**
-     * Helper to emit a vertex.
+     * Helper to emit a vertex with default normal.
      */
     private static void vertex(VertexConsumer consumer, Matrix4f matrix,
                                float x, float y, float z, int r, int g, int b, int a) {
+        vertexWithNormal(consumer, matrix, x, y, z, r, g, b, a, 0, 1, 0);
+    }
+    
+    /**
+     * Helper to emit a vertex with explicit normal.
+     */
+    private static void vertexWithNormal(VertexConsumer consumer, Matrix4f matrix,
+                               float x, float y, float z, int r, int g, int b, int a,
+                               float nx, float ny, float nz) {
         consumer.vertex(matrix, x, y, z)
             .color(r, g, b, a)
-            .normal(0, 1, 0)
+            .normal(nx, ny, nz)
             .texture(0, 0)
             .overlay(0)
             .light(15728880); // Full bright
+    }
+    
+    /**
+     * Helper to emit a sphere vertex with outward-facing normal.
+     */
+    private static void sphereVertex(VertexConsumer consumer, Matrix4f matrix,
+                               float x, float y, float z, float radius,
+                               int r, int g, int b, int a) {
+        // Normal points outward from center (normalize the position)
+        float invLen = 1.0f / radius;
+        vertexWithNormal(consumer, matrix, x, y, z, r, g, b, a, 
+                        x * invLen, y * invLen, z * invLen);
     }
 }
 

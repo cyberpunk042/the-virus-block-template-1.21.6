@@ -301,54 +301,54 @@ public final class PolyhedronTessellator implements Tessellator {
         };
         
         // Define each face using CubeVertex enum for clarity
-        // Each quad is split into 2 triangles (counter-clockwise winding)
+        // Each quad is split into 2 triangles (counter-clockwise winding when viewed from outside)
         
-        // BACK face (-Z): looking at it from outside
+        // BACK face (-Z): counter-clockwise when viewed from -Z
         emitCubeFace(builder, vertices, CubeFace.BACK, new int[]{
-            CubeVertex.BACK_BOTTOM_LEFT.index,
             CubeVertex.BACK_BOTTOM_RIGHT.index,
+            CubeVertex.BACK_BOTTOM_LEFT.index,
+            CubeVertex.BACK_TOP_LEFT.index,
+            CubeVertex.BACK_TOP_RIGHT.index
+        });
+        
+        // FRONT face (+Z): counter-clockwise when viewed from +Z
+        emitCubeFace(builder, vertices, CubeFace.FRONT, new int[]{
+            CubeVertex.FRONT_BOTTOM_LEFT.index,
+            CubeVertex.FRONT_BOTTOM_RIGHT.index,
+            CubeVertex.FRONT_TOP_RIGHT.index,
+            CubeVertex.FRONT_TOP_LEFT.index
+        });
+        
+        // LEFT face (-X): counter-clockwise when viewed from -X
+        emitCubeFace(builder, vertices, CubeFace.LEFT, new int[]{
+            CubeVertex.BACK_BOTTOM_LEFT.index,
+            CubeVertex.FRONT_BOTTOM_LEFT.index,
+            CubeVertex.FRONT_TOP_LEFT.index,
+            CubeVertex.BACK_TOP_LEFT.index
+        });
+        
+        // RIGHT face (+X): counter-clockwise when viewed from +X
+        emitCubeFace(builder, vertices, CubeFace.RIGHT, new int[]{
+            CubeVertex.FRONT_BOTTOM_RIGHT.index,
+            CubeVertex.BACK_BOTTOM_RIGHT.index,
+            CubeVertex.BACK_TOP_RIGHT.index,
+            CubeVertex.FRONT_TOP_RIGHT.index
+        });
+        
+        // TOP face (+Y): counter-clockwise when viewed from +Y
+        emitCubeFace(builder, vertices, CubeFace.TOP, new int[]{
+            CubeVertex.FRONT_TOP_LEFT.index,
+            CubeVertex.FRONT_TOP_RIGHT.index,
             CubeVertex.BACK_TOP_RIGHT.index,
             CubeVertex.BACK_TOP_LEFT.index
         });
         
-        // FRONT face (+Z): looking at it from outside
-        emitCubeFace(builder, vertices, CubeFace.FRONT, new int[]{
-            CubeVertex.FRONT_BOTTOM_RIGHT.index,
-            CubeVertex.FRONT_BOTTOM_LEFT.index,
-            CubeVertex.FRONT_TOP_LEFT.index,
-            CubeVertex.FRONT_TOP_RIGHT.index
-        });
-        
-        // LEFT face (-X)
-        emitCubeFace(builder, vertices, CubeFace.LEFT, new int[]{
-            CubeVertex.FRONT_BOTTOM_LEFT.index,
-            CubeVertex.BACK_BOTTOM_LEFT.index,
-            CubeVertex.BACK_TOP_LEFT.index,
-            CubeVertex.FRONT_TOP_LEFT.index
-        });
-        
-        // RIGHT face (+X)
-        emitCubeFace(builder, vertices, CubeFace.RIGHT, new int[]{
-            CubeVertex.BACK_BOTTOM_RIGHT.index,
-            CubeVertex.FRONT_BOTTOM_RIGHT.index,
-            CubeVertex.FRONT_TOP_RIGHT.index,
-            CubeVertex.BACK_TOP_RIGHT.index
-        });
-        
-        // TOP face (+Y)
-        emitCubeFace(builder, vertices, CubeFace.TOP, new int[]{
-            CubeVertex.BACK_TOP_LEFT.index,
-            CubeVertex.BACK_TOP_RIGHT.index,
-            CubeVertex.FRONT_TOP_RIGHT.index,
-            CubeVertex.FRONT_TOP_LEFT.index
-        });
-        
-        // BOTTOM face (-Y)
+        // BOTTOM face (-Y): counter-clockwise when viewed from -Y
         emitCubeFace(builder, vertices, CubeFace.BOTTOM, new int[]{
-            CubeVertex.FRONT_BOTTOM_LEFT.index,
-            CubeVertex.FRONT_BOTTOM_RIGHT.index,
+            CubeVertex.BACK_BOTTOM_LEFT.index,
             CubeVertex.BACK_BOTTOM_RIGHT.index,
-            CubeVertex.BACK_BOTTOM_LEFT.index
+            CubeVertex.FRONT_BOTTOM_RIGHT.index,
+            CubeVertex.FRONT_BOTTOM_LEFT.index
         });
         
         return builder.build();
@@ -366,14 +366,16 @@ public final class PolyhedronTessellator implements Tessellator {
         float[] n = face.normal();
         
         // Triangle 1: indices[0], indices[1], indices[2]
-        emitVertex(builder, vertices[indices[0]], n, 0, 0);
-        emitVertex(builder, vertices[indices[1]], n, 1, 0);
-        emitVertex(builder, vertices[indices[2]], n, 1, 1);
+        int i0 = emitVertex(builder, vertices[indices[0]], n, 0, 0);
+        int i1 = emitVertex(builder, vertices[indices[1]], n, 1, 0);
+        int i2 = emitVertex(builder, vertices[indices[2]], n, 1, 1);
+        builder.triangle(i0, i1, i2);
         
         // Triangle 2: indices[0], indices[2], indices[3]
-        emitVertex(builder, vertices[indices[0]], n, 0, 0);
-        emitVertex(builder, vertices[indices[2]], n, 1, 1);
-        emitVertex(builder, vertices[indices[3]], n, 0, 1);
+        int i3 = emitVertex(builder, vertices[indices[0]], n, 0, 0);
+        int i4 = emitVertex(builder, vertices[indices[2]], n, 1, 1);
+        int i5 = emitVertex(builder, vertices[indices[3]], n, 0, 1);
+        builder.triangle(i3, i4, i5);
     }
     
     // =========================================================================
@@ -565,6 +567,7 @@ public final class PolyhedronTessellator implements Tessellator {
     
     /**
      * Emits a pentagon as 5 triangles radiating from center.
+     * Ensures normal points outward from origin.
      */
     private void emitPentagon(MeshBuilder builder, float[][] vertices, int[] indices) {
         // Calculate pentagon center
@@ -584,14 +587,25 @@ public final class PolyhedronTessellator implements Tessellator {
         float[] normal = crossProduct(subtract(v1, v0), subtract(v2, v0));
         normalize(normal);
         
+        // Ensure normal points outward (dot product with center should be positive)
+        // For convex polyhedra at origin, the center vector points outward
+        float dot = normal[0] * cx + normal[1] * cy + normal[2] * cz;
+        if (dot < 0) {
+            // Normal points inward - flip it
+            normal[0] = -normal[0];
+            normal[1] = -normal[1];
+            normal[2] = -normal[2];
+        }
+        
         // Emit 5 triangles from center to each edge
         for (int i = 0; i < 5; i++) {
             int idx0 = indices[i];
             int idx1 = indices[(i + 1) % 5];
             
-            emitVertex(builder, center, normal, 0.5f, 0.5f);
-            emitVertex(builder, vertices[idx0], normal, 0, 0);
-            emitVertex(builder, vertices[idx1], normal, 1, 0);
+            int vi0 = emitVertex(builder, center, normal, 0.5f, 0.5f);
+            int vi1 = emitVertex(builder, vertices[idx0], normal, 0, 0);
+            int vi2 = emitVertex(builder, vertices[idx1], normal, 1, 0);
+            builder.triangle(vi0, vi1, vi2);
         }
     }
     
@@ -774,6 +788,7 @@ public final class PolyhedronTessellator implements Tessellator {
     
     /**
      * Emits a triangle with auto-calculated normal.
+     * Ensures normal points outward from origin (for convex polyhedra centered at origin).
      */
     private void emitTriangle(MeshBuilder builder, float[][] vertices, int[] face) {
         float[] v0 = vertices[face[0]];
@@ -784,17 +799,32 @@ public final class PolyhedronTessellator implements Tessellator {
         float[] normal = crossProduct(subtract(v1, v0), subtract(v2, v0));
         normalize(normal);
         
-        // Emit vertices with UV coordinates
-        emitVertex(builder, v0, normal, 0.5f, 0);
-        emitVertex(builder, v1, normal, 0, 1);
-        emitVertex(builder, v2, normal, 1, 1);
+        // Calculate face center (for convex polyhedra at origin, center points outward)
+        float cx = (v0[0] + v1[0] + v2[0]) / 3.0f;
+        float cy = (v0[1] + v1[1] + v2[1]) / 3.0f;
+        float cz = (v0[2] + v1[2] + v2[2]) / 3.0f;
+        
+        // Ensure normal points outward (dot product with center should be positive)
+        float dot = normal[0] * cx + normal[1] * cy + normal[2] * cz;
+        if (dot < 0) {
+            // Normal points inward - flip it
+            normal[0] = -normal[0];
+            normal[1] = -normal[1];
+            normal[2] = -normal[2];
+        }
+        
+        // Emit vertices with UV coordinates and add triangle
+        int i0 = emitVertex(builder, v0, normal, 0.5f, 0);
+        int i1 = emitVertex(builder, v1, normal, 0, 1);
+        int i2 = emitVertex(builder, v2, normal, 1, 1);
+        builder.triangle(i0, i1, i2);
     }
     
     /**
      * Emits a single vertex with position, normal, and UV.
      */
-    private void emitVertex(MeshBuilder builder, float[] pos, float[] normal, float u, float v) {
-        builder.vertex(pos[0], pos[1], pos[2], normal[0], normal[1], normal[2], u, v);
+    private int emitVertex(MeshBuilder builder, float[] pos, float[] normal, float u, float v) {
+        return builder.vertex(pos[0], pos[1], pos[2], normal[0], normal[1], normal[2], u, v);
     }
     
     // =========================================================================

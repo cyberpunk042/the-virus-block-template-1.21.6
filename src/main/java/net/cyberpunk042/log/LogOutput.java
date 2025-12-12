@@ -7,10 +7,13 @@ import org.slf4j.Logger;
  * Central output pipeline. All log messages flow through here.
  * 
  * Pipeline:
- * 1. Watchdog check (spam detection)
- * 2. Format message
- * 3. Output to TheVirusBlock.LOGGER
- * 4. Forward to chat if enabled
+ * 1. Override check (global mute, min level, force output)
+ * 2. Watchdog check (spam detection)
+ * 3. Level redirect (if configured)
+ * 4. Output to TheVirusBlock.LOGGER
+ * 5. Forward to chat if enabled
+ * 
+ * @see LogOverride
  */
 public final class LogOutput {
     
@@ -24,20 +27,33 @@ public final class LogOutput {
     public static void emit(Channel channel, String topic, LogLevel level, 
                            String message, Throwable exception, boolean forceChat) {
         
-        // 1. Watchdog check
+        // 0. Null safety
+        if (channel == null || level == null || level == LogLevel.OFF) {
+            return;
+        }
+        
+        // 1. Override check (mute, min level, force output)
+        if (!LogOverride.shouldEmit(channel, level)) {
+            return;
+        }
+        
+        // 2. Watchdog check
         WatchdogDecision decision = LogWatchdog.observe(channel.id(), topic, message);
         if (decision.suppress()) {
             if (decision.summary() != null) {
-                // Log suppression summary
+                // Log suppression summary (bypasses overrides)
                 doLog(LogLevel.WARN, "[Watchdog] " + decision.summary(), null);
             }
             return;
         }
         
-        // 2. Log to console
-        doLog(level, message, exception);
+        // 3. Apply level redirect
+        LogLevel outputLevel = LogOverride.effectiveOutputLevel(level);
         
-        // 3. Forward to chat if enabled OR forced
+        // 4. Log to console
+        doLog(outputLevel, message, exception);
+        
+        // 5. Forward to chat if enabled OR forced
         if ((channel.chatForward() || forceChat) && LogConfig.chatEnabled()) {
             LogChatBridge.forward(channel, topic, level, message);
         }

@@ -341,11 +341,22 @@ public final class FragmentRegistry {
 
     public static void applyFillFragment(FieldEditState state, String presetName) {
         ensureLoaded();
-        if ("Custom".equals(presetName)) return;
+        
+        if ("Custom".equals(presetName) || "Default".equals(presetName)) {
+            return;
+        }
 
         JsonObject json = fillPresets.get(presetName);
-        if (json == null) return;
+        if (json == null) {
+            LOGGER.warn("Fill preset '{}' not found. Available: {}", presetName, fillPresets.keySet());
+            return;
+        }
 
+        // Apply fill mode (critical for rendering)
+        if (json.has("mode")) {
+            state.set("fill.mode", json.get("mode").getAsString());
+        }
+        
         if (json.has("wireThickness")) state.set("fill.wireThickness", json.get("wireThickness").getAsFloat());
         if (json.has("doubleSided")) state.set("fill.doubleSided", json.get("doubleSided").getAsBoolean());
         if (json.has("depthTest")) state.set("fill.depthTest", json.get("depthTest").getAsBoolean());

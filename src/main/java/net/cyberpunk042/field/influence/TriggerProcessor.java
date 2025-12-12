@@ -4,6 +4,8 @@ import net.cyberpunk042.log.Logging;
 import net.minecraft.entity.player.PlayerEntity;
 
 import java.util.*;
+import net.cyberpunk042.log.LogScope;
+import net.cyberpunk042.log.LogLevel;
 
 /**
  * Processes trigger events and manages active triggers.
@@ -31,10 +33,12 @@ public class TriggerProcessor {
      * Fires an event, creating active triggers for any matching configs.
      */
     public void fireEvent(FieldEvent event) {
-        for (TriggerConfig config : triggers) {
-            if (config.event() == event) {
-                activeTriggers.add(new ActiveTrigger(config));
-                Logging.FIELD.topic("trigger").debug("Fired trigger: {} -> {}", event, config.effect());
+        try (LogScope scope = Logging.FIELD.topic("trigger").scope("process-triggers", LogLevel.DEBUG)) {
+            for (TriggerConfig config : triggers) {
+                if (config.event() == event) {
+                    activeTriggers.add(new ActiveTrigger(config));
+                    scope.branch("config").kv("event", event).kv("effect", config.effect());
+                }
             }
         }
     }

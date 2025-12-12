@@ -52,6 +52,39 @@ public class LogCommands {
                     .then(argument("perSec", IntegerArgumentType.integer(1))
                         .then(argument("perMin", IntegerArgumentType.integer(1))
                             .executes(LogCommands::setWatchdogThresholds))))
+                // Override commands
+                .then(literal("override")
+                    .executes(LogCommands::overrideStatus)
+                    .then(literal("mute").executes(LogCommands::overrideMute))
+                    .then(literal("unmute").executes(LogCommands::overrideUnmute))
+                    .then(literal("min")
+                        .then(argument("level", StringArgumentType.word())
+                            .suggests(LEVEL_SUGGESTIONS)
+                            .executes(LogCommands::overrideMinLevel)))
+                    .then(literal("clearmin").executes(LogCommands::overrideClearMin))
+                    .then(literal("pass")
+                        .then(argument("channel", StringArgumentType.word())
+                            .suggests(CHANNEL_SUGGESTIONS)
+                            .executes(LogCommands::overridePassthrough)))
+                    .then(literal("unpass")
+                        .then(argument("channel", StringArgumentType.word())
+                            .suggests(CHANNEL_SUGGESTIONS)
+                            .executes(LogCommands::overrideUnpassthrough)))
+                    .then(literal("force")
+                        .then(argument("channel", StringArgumentType.word())
+                            .suggests(CHANNEL_SUGGESTIONS)
+                            .executes(LogCommands::overrideForce)))
+                    .then(literal("unforce")
+                        .then(argument("channel", StringArgumentType.word())
+                            .suggests(CHANNEL_SUGGESTIONS)
+                            .executes(LogCommands::overrideUnforce)))
+                    .then(literal("redirect")
+                        .then(argument("from", StringArgumentType.word())
+                            .suggests(LEVEL_SUGGESTIONS)
+                            .then(argument("to", StringArgumentType.word())
+                                .suggests(LEVEL_SUGGESTIONS)
+                                .executes(LogCommands::overrideRedirect))))
+                    .then(literal("clear").executes(LogCommands::overrideClear)))
                 .then(literal("reload").executes(LogCommands::reload))
                 .then(literal("reset").executes(LogCommands::reset))
                 .then(literal("save").executes(LogCommands::save))
@@ -148,6 +181,92 @@ public class LogCommands {
     private static int save(CommandContext<ServerCommandSource> ctx) {
         LogConfig.save();
         ctx.getSource().sendFeedback(() -> Text.literal("§aSaved logging configuration"), false);
+        return 1;
+    }
+    
+    // ========== OVERRIDE COMMANDS ==========
+    
+    private static int overrideStatus(CommandContext<ServerCommandSource> ctx) {
+        ServerCommandSource src = ctx.getSource();
+        src.sendFeedback(() -> Text.literal("§6=== Log Overrides ==="), false);
+        
+        if (!LogOverride.hasOverrides()) {
+            src.sendFeedback(() -> Text.literal("§7No overrides active"), false);
+        } else {
+            src.sendFeedback(() -> Text.literal("§7" + LogOverride.summary()), false);
+        }
+        
+        src.sendFeedback(() -> Text.literal("§7Commands: mute, unmute, min <level>, clearmin, pass/unpass <ch>, force/unforce <ch>, redirect <from> <to>, clear"), false);
+        return 1;
+    }
+    
+    private static int overrideMute(CommandContext<ServerCommandSource> ctx) {
+        LogOverride.muteAll();
+        ctx.getSource().sendFeedback(() -> Text.literal("§c⊘ All logging MUTED §7(use 'pass <channel>' to allow specific channels)"), false);
+        return 1;
+    }
+    
+    private static int overrideUnmute(CommandContext<ServerCommandSource> ctx) {
+        LogOverride.unmuteAll();
+        ctx.getSource().sendFeedback(() -> Text.literal("§a✓ Logging unmuted"), false);
+        return 1;
+    }
+    
+    private static int overrideMinLevel(CommandContext<ServerCommandSource> ctx) {
+        String levelStr = StringArgumentType.getString(ctx, "level");
+        LogLevel level = LogLevel.parse(levelStr);
+        LogOverride.setMinLevel(level);
+        ctx.getSource().sendFeedback(() -> Text.literal("§aMinimum level set to §f" + level.name() + " §7(logs below this are hidden)"), false);
+        return 1;
+    }
+    
+    private static int overrideClearMin(CommandContext<ServerCommandSource> ctx) {
+        LogOverride.clearMinLevel();
+        ctx.getSource().sendFeedback(() -> Text.literal("§aMinimum level cleared"), false);
+        return 1;
+    }
+    
+    private static int overridePassthrough(CommandContext<ServerCommandSource> ctx) {
+        String channelId = StringArgumentType.getString(ctx, "channel");
+        LogOverride.addPassthrough(channelId);
+        ctx.getSource().sendFeedback(() -> Text.literal("§a+ §f" + channelId + "§a added to passthrough (bypasses mute)"), false);
+        return 1;
+    }
+    
+    private static int overrideUnpassthrough(CommandContext<ServerCommandSource> ctx) {
+        String channelId = StringArgumentType.getString(ctx, "channel");
+        LogOverride.removePassthrough(channelId);
+        ctx.getSource().sendFeedback(() -> Text.literal("§c- §f" + channelId + "§c removed from passthrough"), false);
+        return 1;
+    }
+    
+    private static int overrideForce(CommandContext<ServerCommandSource> ctx) {
+        String channelId = StringArgumentType.getString(ctx, "channel");
+        LogOverride.forceOutput(channelId);
+        ctx.getSource().sendFeedback(() -> Text.literal("§a! §f" + channelId + "§a forced ON (always outputs)"), false);
+        return 1;
+    }
+    
+    private static int overrideUnforce(CommandContext<ServerCommandSource> ctx) {
+        String channelId = StringArgumentType.getString(ctx, "channel");
+        LogOverride.unforceOutput(channelId);
+        ctx.getSource().sendFeedback(() -> Text.literal("§c! §f" + channelId + "§c unforced"), false);
+        return 1;
+    }
+    
+    private static int overrideRedirect(CommandContext<ServerCommandSource> ctx) {
+        String fromStr = StringArgumentType.getString(ctx, "from");
+        String toStr = StringArgumentType.getString(ctx, "to");
+        LogLevel from = LogLevel.parse(fromStr);
+        LogLevel to = LogLevel.parse(toStr);
+        LogOverride.redirect(from, to);
+        ctx.getSource().sendFeedback(() -> Text.literal("§a→ §f" + from.name() + "§a redirected to §f" + to.name()), false);
+        return 1;
+    }
+    
+    private static int overrideClear(CommandContext<ServerCommandSource> ctx) {
+        LogOverride.clearAll();
+        ctx.getSource().sendFeedback(() -> Text.literal("§aAll overrides cleared"), false);
         return 1;
     }
 }

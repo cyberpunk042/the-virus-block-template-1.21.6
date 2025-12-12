@@ -179,6 +179,114 @@ Logging.PROFILER.formatted()
     .info();
 ```
 
+### 10. Scoped Logging (Deferred/Batched)
+
+For loops and complex operations, use `scope()` to accumulate logs
+and emit them as a single structured tree:
+
+```java
+// With try-with-resources (auto-emits on close)
+try (LogScope frame = Logging.FIELD.scope("render-frame")) {
+    ScopeNode layer = frame.branch("layer:0");
+    layer.kv("primitives", 5).kv("visible", true);
+    
+    for (Primitive p : primitives) {
+        layer.branch("prim:" + p.id())
+             .kv("vertices", count)
+             .kv("color", color);
+    }
+} // Emits once here
+
+// With lambda style
+Logging.FIELD.scoped("render-frame", frame -> {
+    frame.branch("layer:0", layer -> {
+        layer.kv("primitives", 5);
+        layer.branch("prim:sphere").kv("vertices", 1089);
+    });
+});
+
+// With topic and timing
+try (LogScope scope = Logging.RENDER.topic("mesh").scope("tessellate").withTiming()) {
+    scope.kv("shape", "sphere");
+    scope.branch("vertices").count("total", 1089);
+}
+```
+
+**Output Example:**
+```
+[Field] render-frame
+├─ layer:0 {primitives=5, visible=true}
+│  ├─ prim:sphere {vertices=1089, color=#FF0000}
+│  └─ prim:cube {vertices=24, color=#00FF00}
+└─ layer:1 {primitives=1}
+   └─ prim:ring {vertices=256}
+```
+
+**ScopeNode Methods:**
+- `branch(name)` - Create child branch, returns the child
+- `leaf(text)` - Create leaf, returns parent (for chaining)
+- `kv(key, value)` - Add key-value pair
+- `kvs(k1, v1, k2, v2, ...)` - Add multiple pairs
+- `count(name, value)` - Add count summary
+- `timing(millis)` - Add timing info
+- `error(message)` - Mark as error
+- `skipped(reason)` - Mark as skipped
+- `up()` - Navigate to parent
+- `root()` - Navigate to root
+
+**LogScope Options:**
+- `.withTiming()` - Include elapsed time
+- `.disabled()` - Disable output (for conditional logging)
+- `.alwaysOutput()` - Output even if empty
+- `.independent()` - Don't auto-nest into parent scope
+
+### 11. Auto-Nesting Scopes (Cross-Class)
+
+LogScope automatically nests when scopes are opened inside each other,
+**even across method and class boundaries**:
+
+```java
+// In ServiceA.java
+public void processAll(List<Item> items) {
+    try (LogScope scope = Logging.SERVICE.scope("process-all")) {
+        for (Item item : items) {
+            processor.processItem(item);  // Calls ServiceB
+        }
+    }  // Emits combined tree here
+}
+
+// In ServiceB.java - scope auto-nests!
+public void processItem(Item item) {
+    try (LogScope scope = Logging.SERVICE.scope("item:" + item.id())) {
+        scope.kv("status", compute());
+        validator.validate(item);  // Can nest further
+    }  // Merges into parent, doesn't emit separately
+}
+
+// Output: ONE combined tree
+// [Service] process-all
+// ├─ item:1 {status=ok}
+// │  └─ validate {result=pass}
+// ├─ item:2 {status=ok}
+// │  └─ validate {result=pass}
+// └─ item:3 {status=skip}
+```
+
+**How it works:**
+- Each `LogScope` checks for an active parent via ThreadLocal
+- If parent exists, this scope becomes a child
+- On close, child tree merges into parent (no separate emit)
+- Only the outermost scope emits the combined tree
+
+**Static utilities:**
+```java
+// Check current scope
+LogScope current = LogScope.current();  // null if none
+
+// Add to current scope (if any)
+LogScope.currentOrNoop().branch("extra").kv("detail", value);
+```
+
 ---
 
 ## Configuration (logs.json)
@@ -246,6 +354,52 @@ Topics without explicit configuration inherit from their parent channel.
 /virus logs watchdog <perSec> <perMin>   → Set thresholds
 /virus logs reload                       → Reload from config file
 /virus logs reset                        → Reset all to defaults
+
+# Override commands (runtime control)
+/virus logs override                     → Show override status
+/virus logs override mute                → Mute all logging
+/virus logs override unmute              → Unmute all logging
+/virus logs override min <level>         → Set minimum level (hide below)
+/virus logs override clearmin            → Clear minimum level
+/virus logs override pass <channel>      → Add to passthrough (bypasses mute)
+/virus logs override unpass <channel>    → Remove from passthrough
+/virus logs override force <channel>     → Force channel ON (always outputs)
+/virus logs override unforce <channel>   → Remove force
+/virus logs override redirect <from> <to> → Redirect level (e.g., TRACE → INFO)
+/virus logs override clear               → Clear all overrides
+```
+
+---
+
+## Override System
+
+The override system provides runtime control that sits ABOVE channel/topic configurations:
+
+### Precedence (highest to lowest):
+1. **Force Output** - Always shows (bypasses everything)
+2. **Global Mute** - Blocks unless passthrough
+3. **Minimum Level** - Blocks below threshold
+4. **Level Redirect** - Changes output level
+5. **Channel/Topic level** - Normal config
+
+### Common Use Cases:
+
+```java
+// "Mute everything except my traces"
+LogOverride.muteAll();
+LogOverride.addPassthrough("field");
+
+// "Only show errors"
+LogOverride.setMinLevel(LogLevel.ERROR);
+
+// "Make TRACE visible in console"
+LogOverride.redirect(LogLevel.TRACE, LogLevel.INFO);
+
+// "Debug specific channel"
+LogOverride.forceOutput("render");
+
+// "Back to normal"
+LogOverride.clearAll();
 ```
 
 ---
@@ -334,7 +488,10 @@ LogFormat.table()
 | `Logging` | Static entry point with channel constants |
 | `Channel` | A log channel with level control |
 | `Topic` | A topic within a channel |
-| `Context` | Fluent message builder |
+| `Context` | Fluent message builder (immediate output) |
+| `LogScope` | Deferred hierarchical logger (batched output) |
+| `ScopeNode` | Tree node for LogScope |
+| `LogOverride` | Runtime override layer (mute, redirect, force) |
 | `FormattedContext` | Rich formatted output builder |
 | `LogFormat` | Static formatting utilities |
 | `LogLevel` | Level enum (OFF → TRACE) |

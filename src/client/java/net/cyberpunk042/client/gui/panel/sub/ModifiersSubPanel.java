@@ -104,8 +104,21 @@ public class ModifiersSubPanel extends AbstractPanel {    private int startY;
         
         colorCycleEnabled = GuiWidgets.checkbox(sliderX, currentY, "Color Cycle", state.colorCycle().isActive(),
             "Enable color cycling animation", textRenderer, v -> {
-                if (!v) state.set("colorCycle.speed", 0f);
-                else if (state.getFloat("colorCycle.speed") == 0f) state.set("colorCycle.speed", 1f);
+                if (!v) {
+                    state.set("colorCycle.speed", 0f);
+                } else {
+                    // Set default colors if enabling (required for colorCycle to be active)
+                    if (state.colorCycle().colors() == null || state.colorCycle().colors().isEmpty()) {
+                        // Create new ColorCycleConfig with default rainbow palette
+                        state.set("colorCycle", net.cyberpunk042.visual.animation.ColorCycleConfig.builder()
+                            .colors("#FF0000", "#FF7F00", "#FFFF00", "#00FF00", "#0000FF", "#8B00FF")
+                            .speed(1.0f)
+                            .blend(true)
+                            .build());
+                    } else if (state.getFloat("colorCycle.speed") == 0f) {
+                        state.set("colorCycle.speed", 1f);
+                    }
+                }
             });
         widgets.add(colorCycleEnabled);
         currentY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
@@ -137,7 +150,20 @@ public class ModifiersSubPanel extends AbstractPanel {    private int startY;
         float wobbleSpd = wobble != null ? wobble.speed() : 1.0f;
         
         wobbleEnabled = GuiWidgets.checkbox(sliderX, currentY, "Wobble", wobbleActive,
-            "Random position jitter", textRenderer, v -> { if (!v) state.set("wobble", WobbleConfig.NONE); });
+            "Random position jitter", textRenderer, v -> { 
+                if (!v) {
+                    state.set("wobble", WobbleConfig.NONE);
+                } else {
+                    // Set default amplitude if enabling and no amplitude is set
+                    WobbleConfig current = state.wobble();
+                    if (current == null || current.amplitude() == null || !current.isActive()) {
+                        state.set("wobble.amplitude", new org.joml.Vector3f(0.1f, 0.05f, 0.1f));
+                        if (current == null || current.speed() <= 0) {
+                            state.set("wobble.speed", 1.0f);
+                        }
+                    }
+                }
+            });
         widgets.add(wobbleEnabled);
         currentY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         

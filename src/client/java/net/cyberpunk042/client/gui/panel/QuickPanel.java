@@ -182,7 +182,10 @@ public class QuickPanel extends AbstractPanel {
     
     private void onColorChanged(int c) { state.set("appearance.primaryColor", c); }
     private void onAlphaChanged(float v) { state.set("appearance.alpha", v); }
-    private void onFillChanged(FillMode m) { state.set("fill.mode", m); }
+    private void onFillChanged(FillMode m) { 
+        net.cyberpunk042.log.Logging.GUI.topic("panel").debug("[FILL-DEBUG] QuickPanel changing fill.mode to: {}", m.name());
+        state.set("fill.mode", m); 
+    }
     private void onSpinChanged(float v) { state.set("spin.speed", v); }
     private void onFollowChanged(FollowMode m) { state.set("followMode", m); }
     private void onPredictionToggled(boolean e) { state.set("predictionEnabled", e); }

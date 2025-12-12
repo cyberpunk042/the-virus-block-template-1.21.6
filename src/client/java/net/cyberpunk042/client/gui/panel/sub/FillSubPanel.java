@@ -8,6 +8,7 @@ import net.cyberpunk042.client.gui.widget.LabeledSlider;
 import net.cyberpunk042.client.gui.util.FragmentRegistry;
 import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.visual.fill.CageOptionsAdapter;
+import net.cyberpunk042.visual.fill.FillMode;
 import java.util.List;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -33,6 +34,7 @@ public class FillSubPanel extends AbstractPanel {
     
     private int startY;
     private CyclingButtonWidget<String> fragmentDropdown;
+    private CyclingButtonWidget<FillMode> fillModeDropdown;
     private boolean applyingFragment = false;
     private String currentFragment = "Default";
     
@@ -86,6 +88,17 @@ public class FillSubPanel extends AbstractPanel {
             .build(x, y, w, GuiConstants.WIDGET_HEIGHT, net.minecraft.text.Text.literal("Variant"),
                 (btn, val) -> applyPreset(val));
         widgets.add(fragmentDropdown);
+        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        
+        // Fill Mode dropdown - manual selection of SOLID/WIREFRAME/CAGE/POINTS
+        fillModeDropdown = GuiWidgets.enumDropdown(
+            x, y, w,
+            "Mode", FillMode.class, state.fill().mode(), "Select fill render mode",
+            m -> onUserChange(() -> {
+                state.set("fill.mode", m);
+                Logging.GUI.topic("fill").info("[FILL-DEBUG] FillSubPanel changed fill.mode to: {}", m.name());
+            }));
+        widgets.add(fillModeDropdown);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
         // Wire thickness
@@ -260,6 +273,9 @@ public class FillSubPanel extends AbstractPanel {
     private void syncFromState() {
         // Refresh adapter for current shape
         cageAdapter = CageOptionsAdapter.forShape(state.shapeType, state.fill().cage());
+        
+        // Sync fill mode dropdown
+        if (fillModeDropdown != null) fillModeDropdown.setValue(state.fill().mode());
         
         if (wireThicknessSlider != null) wireThicknessSlider.setValue(state.fill().wireThickness());
         if (doubleSidedToggle != null) doubleSidedToggle.setValue(state.fill().doubleSided());

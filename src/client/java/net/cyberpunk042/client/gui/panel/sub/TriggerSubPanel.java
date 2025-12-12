@@ -2,6 +2,8 @@ package net.cyberpunk042.client.gui.panel.sub;
 
 import net.cyberpunk042.client.gui.panel.AbstractPanel;
 import net.cyberpunk042.client.gui.state.FieldEditState;
+import net.cyberpunk042.client.gui.state.RendererCapabilities.Feature;
+import net.cyberpunk042.client.gui.state.RequiresFeature;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.GuiWidgets;
 import net.cyberpunk042.client.gui.widget.ExpandableSection;
@@ -28,7 +30,10 @@ import java.util.List;
  *   <li>G89: Effect duration slider</li>
  *   <li>G90: Test trigger button</li>
  * </ul>
+ * 
+ * <p><b>Requires Accurate renderer mode.</b></p>
  */
+@RequiresFeature(Feature.TRIGGERS)
 public class TriggerSubPanel extends AbstractPanel {
     
     private int startY;    

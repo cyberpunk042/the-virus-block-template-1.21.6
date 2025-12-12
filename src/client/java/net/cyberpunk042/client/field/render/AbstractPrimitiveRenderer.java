@@ -1,5 +1,6 @@
 package net.cyberpunk042.client.field.render;
 
+import net.cyberpunk042.client.gui.state.PipelineTracer;
 import net.cyberpunk042.client.visual.animation.AnimationApplier;
 import net.cyberpunk042.client.visual.mesh.Mesh;
 import net.cyberpunk042.client.visual.mesh.Vertex;
@@ -45,16 +46,122 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
             ColorResolver resolver,
             RenderOverrides overrides) {
         
+        Logging.FIELD.topic("render").trace("[APR_ENTRY] primitive={}, type={}", 
+            primitive.id(), primitive.type());
+        
         // === PHASE 1: Tessellate ===
         Mesh mesh = tessellate(primitive);
         if (mesh == null || mesh.isEmpty()) {
-            Logging.FIELD.topic("render").trace(
-                "Empty mesh for primitive '{}', skipping", primitive.id());
+            Logging.FIELD.topic("render").warn(
+                "[APR_EXIT] Empty mesh for primitive '{}', skipping", primitive.id());
             return;
         }
         
+        Logging.FIELD.topic("render").trace("[APR] Mesh OK: {} vertices", mesh.vertexCount());
+        
         // === PHASE 2: Resolve Color (includes animation effects) ===
+        Appearance app = primitive.appearance();
+        
+        // CP4: ALL appearance segments
+        if (app != null) {
+            PipelineTracer.trace(PipelineTracer.A1_PRIMARY_COLOR, 4, "prim.color", app.color());
+            PipelineTracer.trace(PipelineTracer.A2_ALPHA, 4, "prim.alpha", app.alpha() != null ? String.valueOf(app.alpha().max()) : "1.0");
+            PipelineTracer.trace(PipelineTracer.A3_GLOW, 4, "prim.glow", String.valueOf(app.glow()));
+            PipelineTracer.trace(PipelineTracer.A4_EMISSIVE, 4, "prim.emissive", String.valueOf(app.emissive()));
+            PipelineTracer.trace(PipelineTracer.A5_SATURATION, 4, "prim.saturation", String.valueOf(app.saturation()));
+            PipelineTracer.trace(PipelineTracer.A6_SECONDARY_COLOR, 4, "prim.secondary", app.secondaryColor());
+        }
+        
+        // CP4: ALL shape segments
+        if (primitive.shape() != null) {
+            PipelineTracer.trace(PipelineTracer.S1_SHAPE_TYPE, 4, "prim.shape", primitive.shape().getClass().getSimpleName());
+            traceShapeAtCP4(primitive.shape());
+        }
+        
+        // CP4: ALL fill segments (F1-F6)
+        if (primitive.fill() != null) {
+            var f = primitive.fill();
+            PipelineTracer.trace(PipelineTracer.F1_FILL_MODE, 4, "prim.fill", f.mode().name());
+            PipelineTracer.trace(PipelineTracer.F2_WIRE_THICKNESS, 4, "prim.wire", String.valueOf(f.wireThickness()));
+            PipelineTracer.trace(PipelineTracer.F3_DOUBLE_SIDED, 4, "prim.double", String.valueOf(f.doubleSided()));
+            PipelineTracer.trace(PipelineTracer.F4_DEPTH_TEST, 4, "prim.depth", String.valueOf(f.depthTest()));
+            PipelineTracer.trace(PipelineTracer.F5_DEPTH_WRITE, 4, "prim.depthW", String.valueOf(f.depthWrite()));
+            PipelineTracer.trace(PipelineTracer.F6_CAGE_OPTIONS, 4, "prim.cage", f.cage() != null ? "present" : "null");
+        }
+        
+        // CP4: ALL transform segments (T1-T13)
+        if (primitive.transform() != null && primitive.transform() != net.cyberpunk042.visual.transform.Transform.IDENTITY) {
+            var t = primitive.transform();
+            PipelineTracer.trace(PipelineTracer.T1_OFFSET, 4, "prim.offset", t.offset() != null ? t.offset().toString() : "null");
+            PipelineTracer.trace(PipelineTracer.T2_ROTATION, 4, "prim.rotation", t.rotation() != null ? t.rotation().toString() : "null");
+            PipelineTracer.trace(PipelineTracer.T3_SCALE, 4, "prim.scale", String.valueOf(t.scale()));
+            PipelineTracer.trace(PipelineTracer.T4_SCALE_XYZ, 4, "prim.scaleXYZ", t.scaleXYZ() != null ? t.scaleXYZ().toString() : "null");
+            PipelineTracer.trace(PipelineTracer.T5_ANCHOR, 4, "prim.anchor", t.anchor() != null ? t.anchor().name() : "null");
+            PipelineTracer.trace(PipelineTracer.T6_BILLBOARD, 4, "prim.billboard", t.billboard() != null ? t.billboard().name() : "null");
+            PipelineTracer.trace(PipelineTracer.T7_ORBIT, 4, "prim.orbit", t.orbit() != null ? "active" : "null");
+            PipelineTracer.trace(PipelineTracer.T8_INHERIT_ROTATION, 4, "prim.inheritRot", String.valueOf(t.inheritRotation()));
+            PipelineTracer.trace(PipelineTracer.T9_SCALE_WITH_RADIUS, 4, "prim.scaleWithRad", String.valueOf(t.scaleWithRadius()));
+            PipelineTracer.trace(PipelineTracer.T10_FACING, 4, "prim.facing", t.facing() != null ? t.facing().name() : "null");
+            PipelineTracer.trace(PipelineTracer.T11_UP_VECTOR, 4, "prim.up", t.up() != null ? t.up().name() : "null");
+            if (t.orbit() != null) {
+                PipelineTracer.trace(PipelineTracer.T12_ORBIT_RADIUS, 4, "prim.orbitR", String.valueOf(t.orbit().radius()));
+                PipelineTracer.trace(PipelineTracer.T13_ORBIT_SPEED, 4, "prim.orbitS", String.valueOf(t.orbit().speed()));
+            }
+        }
+        
+        // CP4: ALL visibility segments (V1-V14)
+        if (primitive.visibility() != null) {
+            var v = primitive.visibility();
+            PipelineTracer.trace(PipelineTracer.V1_MASK_TYPE, 4, "prim.mask", v.mask().name());
+            PipelineTracer.trace(PipelineTracer.V2_MASK_COUNT, 4, "prim.count", String.valueOf(v.count()));
+            PipelineTracer.trace(PipelineTracer.V3_MASK_THICKNESS, 4, "prim.thick", String.valueOf(v.thickness()));
+            PipelineTracer.trace(PipelineTracer.V4_MASK_OFFSET, 4, "prim.offset", String.valueOf(v.offset()));
+            PipelineTracer.trace(PipelineTracer.V5_MASK_ANIMATE, 4, "prim.anim", String.valueOf(v.animate()));
+            PipelineTracer.trace(PipelineTracer.V6_MASK_ANIM_SPEED, 4, "prim.speed", String.valueOf(v.animSpeed()));
+            PipelineTracer.trace(PipelineTracer.V7_MASK_INVERT, 4, "prim.invert", String.valueOf(v.invert()));
+            PipelineTracer.trace(PipelineTracer.V8_MASK_FEATHER, 4, "prim.feather", String.valueOf(v.feather()));
+            PipelineTracer.trace(PipelineTracer.V9_MASK_DIRECTION, 4, "prim.dir", v.direction());
+            PipelineTracer.trace(PipelineTracer.V10_MASK_FALLOFF, 4, "prim.falloff", String.valueOf(v.falloff()));
+            PipelineTracer.trace(PipelineTracer.V11_GRADIENT_START, 4, "prim.gradStart", String.valueOf(v.gradientStart()));
+            PipelineTracer.trace(PipelineTracer.V12_GRADIENT_END, 4, "prim.gradEnd", String.valueOf(v.gradientEnd()));
+            PipelineTracer.trace(PipelineTracer.V13_CENTER_X, 4, "prim.centerX", String.valueOf(v.centerX()));
+            PipelineTracer.trace(PipelineTracer.V14_CENTER_Y, 4, "prim.centerY", String.valueOf(v.centerY()));
+        }
+        
+        // CP4: ALL animation segments
+        Animation anim = primitive.animation();
+        if (anim != null) {
+            if (anim.spin() != null) {
+                PipelineTracer.trace(PipelineTracer.N1_SPIN_SPEED, 4, "prim.spin", String.valueOf(anim.spin().speed()));
+                PipelineTracer.trace(PipelineTracer.N2_SPIN_AXIS, 4, "prim.axis", anim.spin().axis().name());
+            }
+            if (anim.pulse() != null) {
+                PipelineTracer.trace(PipelineTracer.N3_PULSE_SPEED, 4, "prim.pulse", String.valueOf(anim.pulse().speed()));
+                PipelineTracer.trace(PipelineTracer.N4_PULSE_SCALE, 4, "prim.pScale", String.valueOf(anim.pulse().scale()));
+                PipelineTracer.trace(PipelineTracer.N5_PULSE_MODE, 4, "prim.pMode", anim.pulse().mode().name());
+            }
+            if (anim.alphaPulse() != null) {
+                PipelineTracer.trace(PipelineTracer.N6_ALPHA_PULSE_SPEED, 4, "prim.aSpeed", String.valueOf(anim.alphaPulse().speed()));
+                PipelineTracer.trace(PipelineTracer.N7_ALPHA_PULSE_MIN, 4, "prim.aMin", String.valueOf(anim.alphaPulse().min()));
+                PipelineTracer.trace(PipelineTracer.N8_ALPHA_PULSE_MAX, 4, "prim.aMax", String.valueOf(anim.alphaPulse().max()));
+            }
+            if (anim.wave() != null) {
+                PipelineTracer.trace(PipelineTracer.N9_WAVE_SPEED, 4, "prim.wFreq", String.valueOf(anim.wave().frequency()));
+                PipelineTracer.trace(PipelineTracer.N10_WAVE_AMPLITUDE, 4, "prim.wAmp", String.valueOf(anim.wave().amplitude()));
+            }
+            if (anim.wobble() != null) {
+                PipelineTracer.trace(PipelineTracer.N11_WOBBLE_SPEED, 4, "prim.wobble", String.valueOf(anim.wobble().speed()));
+            }
+            if (anim.colorCycle() != null) {
+                PipelineTracer.trace(PipelineTracer.N12_COLOR_CYCLE, 4, "prim.cycle", anim.colorCycle().isActive() ? "active" : "inactive");
+                PipelineTracer.trace(PipelineTracer.N16_COLOR_CYCLE_SPEED, 4, "prim.cycleSpeed", String.valueOf(anim.colorCycle().speed()));
+            }
+        }
+        
         int color = resolveColor(primitive, resolver, overrides, time);
+        
+        // CP5: Renderer resolved value
+        PipelineTracer.trace(PipelineTracer.A1_PRIMARY_COLOR, 5, "resolved", "0x" + Integer.toHexString(color));
         
         // === PHASE 2.5: Apply Animated Mask Alpha ===
         // Note: For animated masks, we apply alpha modulation at render time
@@ -75,15 +182,21 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
         FillConfig fill = primitive.fill();
         FillMode mode = fill != null ? fill.mode() : FillMode.SOLID;
         
+        // CP5-CP6: Fill mode and emitter
+        PipelineTracer.trace(PipelineTracer.F1_FILL_MODE, 5, "renderer.mode", mode.name());
+        PipelineTracer.trace(PipelineTracer.A1_PRIMARY_COLOR, 6, "emitColor", "0x" + Integer.toHexString(color));
+        
         switch (mode) {
-            case SOLID -> emitSolid(matrices, consumer, mesh, color, light, waveConfig, time);
+            case SOLID -> {
+                PipelineTracer.trace(PipelineTracer.F1_FILL_MODE, 6, "emit", "SOLID");
+                emitSolid(matrices, consumer, mesh, color, light, waveConfig, time);
+            }
             case WIREFRAME -> emitWireframe(matrices, consumer, mesh, color, light, fill, waveConfig, time);
             case CAGE -> emitCage(matrices, consumer, mesh, color, light, fill, primitive, waveConfig, time);
             case POINTS -> emitPoints(matrices, consumer, mesh, color, light, waveConfig, time);
         }
         
-        Logging.FIELD.topic("render").trace(
-            "Rendered {} primitive '{}': vertices={}, mode={}",
+        Logging.FIELD.topic("render").trace("[APR] DONE: Rendered {} primitive '{}': vertices={}, mode={}",
             shapeType(), primitive.id(), mesh.vertexCount(), mode);
     }
     
@@ -98,6 +211,38 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
      * @return The tessellated mesh, or null if invalid
      */
     protected abstract Mesh tessellate(Primitive primitive);
+    
+    /**
+     * Traces shape-specific values at CP4.
+     */
+    private void traceShapeAtCP4(net.cyberpunk042.visual.shape.Shape shape) {
+        if (shape instanceof net.cyberpunk042.visual.shape.SphereShape s) {
+            PipelineTracer.trace(PipelineTracer.S2_RADIUS, 4, "sphere.r", String.valueOf(s.radius()));
+            PipelineTracer.trace(PipelineTracer.S3_LAT_STEPS, 4, "sphere.lat", String.valueOf(s.latSteps()));
+            PipelineTracer.trace(PipelineTracer.S4_LON_STEPS, 4, "sphere.lon", String.valueOf(s.lonSteps()));
+            PipelineTracer.trace(PipelineTracer.S5_ALGORITHM, 4, "sphere.algo", s.algorithm().name());
+        } else if (shape instanceof net.cyberpunk042.visual.shape.RingShape r) {
+            PipelineTracer.trace(PipelineTracer.S6_INNER_RADIUS, 4, "ring.inner", String.valueOf(r.innerRadius()));
+            PipelineTracer.trace(PipelineTracer.S7_OUTER_RADIUS, 4, "ring.outer", String.valueOf(r.outerRadius()));
+            PipelineTracer.trace(PipelineTracer.S8_HEIGHT, 4, "ring.h", String.valueOf(r.height()));
+            PipelineTracer.trace(PipelineTracer.S9_SEGMENTS, 4, "ring.seg", String.valueOf(r.segments()));
+        } else if (shape instanceof net.cyberpunk042.visual.shape.DiscShape d) {
+            PipelineTracer.trace(PipelineTracer.S2_RADIUS, 4, "disc.r", String.valueOf(d.radius()));
+            PipelineTracer.trace(PipelineTracer.S6_INNER_RADIUS, 4, "disc.inner", String.valueOf(d.innerRadius()));
+            PipelineTracer.trace(PipelineTracer.S9_SEGMENTS, 4, "disc.seg", String.valueOf(d.segments()));
+        } else if (shape instanceof net.cyberpunk042.visual.shape.CylinderShape c) {
+            PipelineTracer.trace(PipelineTracer.S2_RADIUS, 4, "cyl.r", String.valueOf(c.radius()));
+            PipelineTracer.trace(PipelineTracer.S8_HEIGHT, 4, "cyl.h", String.valueOf(c.height()));
+            PipelineTracer.trace(PipelineTracer.S9_SEGMENTS, 4, "cyl.seg", String.valueOf(c.segments()));
+        } else if (shape instanceof net.cyberpunk042.visual.shape.PrismShape p) {
+            PipelineTracer.trace(PipelineTracer.S2_RADIUS, 4, "prism.r", String.valueOf(p.radius()));
+            PipelineTracer.trace(PipelineTracer.S8_HEIGHT, 4, "prism.h", String.valueOf(p.height()));
+            PipelineTracer.trace(PipelineTracer.S10_SIDES, 4, "prism.sides", String.valueOf(p.sides()));
+        } else if (shape instanceof net.cyberpunk042.visual.shape.PolyhedronShape poly) {
+            PipelineTracer.trace(PipelineTracer.S2_RADIUS, 4, "poly.r", String.valueOf(poly.radius()));
+            PipelineTracer.trace(PipelineTracer.S11_POLY_TYPE, 4, "poly.type", poly.polyType().name());
+        }
+    }
     
     // =========================================================================
     // Color Resolution
@@ -139,13 +284,17 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
             
             if (colorRef != null && resolver != null) {
                 baseColor = resolver.resolve(colorRef);
+                Logging.FIELD.topic("color").debug("Resolved via resolver: {} → #{}", colorRef, Integer.toHexString(baseColor));
             } else if (colorRef != null && colorRef.startsWith("#")) {
                 // Direct hex color
                 baseColor = parseHexColor(colorRef);
+                Logging.FIELD.topic("color").debug("Parsed hex directly: {} → #{}", colorRef, Integer.toHexString(baseColor));
             } else if (colorRef != null && colorRef.startsWith("0x")) {
                 baseColor = Integer.parseUnsignedInt(colorRef.substring(2), 16);
+                Logging.FIELD.topic("color").debug("Parsed 0x format: {} → #{}", colorRef, Integer.toHexString(baseColor));
             } else {
                 baseColor = 0xFFFFFFFF;
+                Logging.FIELD.topic("color").debug("No valid colorRef (was: {}), using white", colorRef);
             }
             
             // Apply appearance color modifiers (saturation, brightness, hueShift)
@@ -274,6 +423,87 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
             int light,
             net.cyberpunk042.visual.animation.WaveConfig waveConfig,
             float time) {
+        
+        // CP7: Final vertex emission - ALL segments that reach the vertex stage
+        int a = (color >> 24) & 0xFF;
+        int r = (color >> 16) & 0xFF;
+        int g = (color >> 8) & 0xFF;
+        int b = color & 0xFF;
+        int vertexCount = mesh.vertexCount();
+        
+        // Appearance segments - trace actual vertex color
+        PipelineTracer.trace(PipelineTracer.A1_PRIMARY_COLOR, 7, "emitted", "0x" + Integer.toHexString(color));
+        PipelineTracer.trace(PipelineTracer.A2_ALPHA, 7, "emitted", String.valueOf((float)a / 255f));
+        PipelineTracer.trace(PipelineTracer.A3_GLOW, 7, "emitted", "post-process");
+        PipelineTracer.trace(PipelineTracer.A4_EMISSIVE, 7, "emitted", "post-process");
+        PipelineTracer.trace(PipelineTracer.A5_SATURATION, 7, "emitted", "applied");
+        PipelineTracer.trace(PipelineTracer.A6_SECONDARY_COLOR, 7, "emitted", "blend");
+        
+        // Shape segments - emitted as mesh
+        PipelineTracer.trace(PipelineTracer.S1_SHAPE_TYPE, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.S2_RADIUS, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.S3_LAT_STEPS, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.S4_LON_STEPS, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.S5_ALGORITHM, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.S6_INNER_RADIUS, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.S7_OUTER_RADIUS, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.S8_HEIGHT, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.S9_SEGMENTS, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.S10_SIDES, 7, "emitted", "mesh");
+        
+        // Fill segments - mode applied
+        PipelineTracer.trace(PipelineTracer.F1_FILL_MODE, 7, "emitted", "applied");
+        PipelineTracer.trace(PipelineTracer.F2_WIRE_THICKNESS, 7, "emitted", "applied");
+        PipelineTracer.trace(PipelineTracer.F3_DOUBLE_SIDED, 7, "emitted", "applied");
+        PipelineTracer.trace(PipelineTracer.F4_DEPTH_TEST, 7, "emitted", "applied");
+        PipelineTracer.trace(PipelineTracer.F5_DEPTH_WRITE, 7, "emitted", "applied");
+        PipelineTracer.trace(PipelineTracer.F6_CAGE_OPTIONS, 7, "emitted", "applied");
+        
+        // Transform segments - applied via matrix
+        PipelineTracer.trace(PipelineTracer.T1_OFFSET, 7, "emitted", "matrix");
+        PipelineTracer.trace(PipelineTracer.T2_ROTATION, 7, "emitted", "matrix");
+        PipelineTracer.trace(PipelineTracer.T3_SCALE, 7, "emitted", "matrix");
+        PipelineTracer.trace(PipelineTracer.T4_SCALE_XYZ, 7, "emitted", "matrix");
+        PipelineTracer.trace(PipelineTracer.T5_ANCHOR, 7, "emitted", "matrix");
+        PipelineTracer.trace(PipelineTracer.T6_BILLBOARD, 7, "emitted", "matrix");
+        PipelineTracer.trace(PipelineTracer.T7_ORBIT, 7, "emitted", "matrix");
+        PipelineTracer.trace(PipelineTracer.T8_INHERIT_ROTATION, 7, "emitted", "matrix");
+        PipelineTracer.trace(PipelineTracer.T9_SCALE_WITH_RADIUS, 7, "emitted", "matrix");
+        PipelineTracer.trace(PipelineTracer.T10_FACING, 7, "emitted", "matrix");
+        PipelineTracer.trace(PipelineTracer.T11_UP_VECTOR, 7, "emitted", "matrix");
+        PipelineTracer.trace(PipelineTracer.T12_ORBIT_RADIUS, 7, "emitted", "matrix");
+        PipelineTracer.trace(PipelineTracer.T13_ORBIT_SPEED, 7, "emitted", "matrix");
+        
+        // Visibility segments - applied to mesh
+        PipelineTracer.trace(PipelineTracer.V1_MASK_TYPE, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.V2_MASK_COUNT, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.V3_MASK_THICKNESS, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.V4_MASK_OFFSET, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.V5_MASK_ANIMATE, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.V6_MASK_ANIM_SPEED, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.V7_MASK_INVERT, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.V8_MASK_FEATHER, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.V9_MASK_DIRECTION, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.V10_MASK_FALLOFF, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.V11_GRADIENT_START, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.V12_GRADIENT_END, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.V13_CENTER_X, 7, "emitted", "mesh");
+        PipelineTracer.trace(PipelineTracer.V14_CENTER_Y, 7, "emitted", "mesh");
+        
+        // Animation segments - applied via matrix/color
+        PipelineTracer.trace(PipelineTracer.N1_SPIN_SPEED, 7, "emitted", "matrix");
+        PipelineTracer.trace(PipelineTracer.N2_SPIN_AXIS, 7, "emitted", "matrix");
+        PipelineTracer.trace(PipelineTracer.N3_PULSE_SPEED, 7, "emitted", "matrix");
+        PipelineTracer.trace(PipelineTracer.N4_PULSE_SCALE, 7, "emitted", "matrix");
+        PipelineTracer.trace(PipelineTracer.N5_PULSE_MODE, 7, "emitted", "matrix");
+        PipelineTracer.trace(PipelineTracer.N6_ALPHA_PULSE_SPEED, 7, "emitted", "alpha");
+        PipelineTracer.trace(PipelineTracer.N7_ALPHA_PULSE_MIN, 7, "emitted", "alpha");
+        PipelineTracer.trace(PipelineTracer.N8_ALPHA_PULSE_MAX, 7, "emitted", "alpha");
+        PipelineTracer.trace(PipelineTracer.N9_WAVE_SPEED, 7, "emitted", "wave");
+        PipelineTracer.trace(PipelineTracer.N10_WAVE_AMPLITUDE, 7, "emitted", "wave");
+        PipelineTracer.trace(PipelineTracer.N11_WOBBLE_SPEED, 7, "emitted", "matrix");
+        PipelineTracer.trace(PipelineTracer.N12_COLOR_CYCLE, 7, "emitted", "color");
+        PipelineTracer.trace(PipelineTracer.N16_COLOR_CYCLE_SPEED, 7, "emitted", "color");
         
         VertexEmitter emitter = new VertexEmitter(matrices, consumer);
         emitter.color(color).light(light);

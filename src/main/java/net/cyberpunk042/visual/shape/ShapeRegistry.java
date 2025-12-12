@@ -201,6 +201,51 @@ public final class ShapeRegistry {
             return PolyhedronShape.icosahedron(size);
         });
         
+        register("tetrahedron", params -> {
+            float size = getFloat(params, "size", 1.0f);
+            return PolyhedronShape.tetrahedron(size);
+        });
+        
+        register("dodecahedron", params -> {
+            float size = getFloat(params, "size", 1.0f);
+            return PolyhedronShape.dodecahedron(size);
+        });
+        
+        // Cylinder (plain, not beam-specific)
+        register("cylinder", params -> {
+            float radius = getFloat(params, "radius", 1.0f);
+            float height = getFloat(params, "height", 2.0f);
+            int segments = getInt(params, "segments", 32);
+            return new CylinderShape(radius, height, segments, radius, 1, true, true, 360f);
+        });
+        
+        // Torus (donut shape)
+        register("torus", params -> {
+            float majorRadius = getFloat(params, "majorRadius", 1.0f);
+            float minorRadius = getFloat(params, "minorRadius", 0.25f);
+            int majorSegments = getInt(params, "majorSegments", 32);
+            int minorSegments = getInt(params, "minorSegments", 16);
+            return new TorusShape(majorRadius, minorRadius, majorSegments, minorSegments, 0, 360);
+        });
+        
+        // Capsule (cylinder with hemispherical caps)
+        register("capsule", params -> {
+            float radius = getFloat(params, "radius", 0.5f);
+            float height = getFloat(params, "height", 2.0f);
+            int segments = getInt(params, "segments", 32);
+            int rings = getInt(params, "rings", 8);
+            return new CapsuleShape(radius, height, segments, rings);
+        });
+        
+        // Cone (or frustum if topRadius > 0)
+        register("cone", params -> {
+            float bottomRadius = getFloat(params, "bottomRadius", 1.0f);
+            float topRadius = getFloat(params, "topRadius", 0f);
+            float height = getFloat(params, "height", 2.0f);
+            int segments = getInt(params, "segments", 32);
+            return new ConeShape(bottomRadius, topRadius, height, segments, false, true);
+        });
+        
         Logging.REGISTRY.topic("shape").info(
             "Registered {} default shapes: {}", 
             FACTORIES.size(), FACTORIES.keySet());

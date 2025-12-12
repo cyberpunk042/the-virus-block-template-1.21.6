@@ -36,9 +36,7 @@ public final class PrismRenderer extends AbstractPrimitiveRenderer {
         if (arrangement != null) {
             // Validate pattern is compatible with prism's QUAD cells (sides)
             pattern = arrangement.resolvePattern("sides", shape.primaryCellType());
-            if (pattern == null) {
-                return null; // Mismatch logged to chat
-            }
+            // Don't fail on pattern mismatch - continue without pattern
         }
         
         // Get visibility mask

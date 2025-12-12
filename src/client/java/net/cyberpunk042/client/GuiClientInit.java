@@ -1,7 +1,8 @@
 package net.cyberpunk042.client;
 
 import net.cyberpunk042.client.command.FieldEditCommands;
-import net.cyberpunk042.client.gui.render.TestFieldRenderer;
+import net.cyberpunk042.client.command.LogViewerCommand;
+import net.cyberpunk042.client.gui.render.SimplifiedFieldRenderer;
 import net.cyberpunk042.client.network.GuiClientHandlers;
 import net.cyberpunk042.log.Logging;
 import net.fabricmc.api.ClientModInitializer;
@@ -44,11 +45,12 @@ public class GuiClientInit implements ClientModInitializer {
         // ProfileStorage.init();
         
         // G145: Register test field renderer (client-side preview)
-        TestFieldRenderer.init();
+        SimplifiedFieldRenderer.init();
         
         // G146: Register client-side /field edit commands
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, access) -> {
             FieldEditCommands.register(dispatcher);
+            LogViewerCommand.register(dispatcher);
         });
         
         Logging.GUI.topic("init").info("GUI client initialized");

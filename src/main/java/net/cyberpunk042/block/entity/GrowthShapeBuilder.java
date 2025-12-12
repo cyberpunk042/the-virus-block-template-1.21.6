@@ -18,6 +18,8 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.util.shape.VoxelShapes;
 import net.minecraft.world.World;
+import net.cyberpunk042.log.LogScope;
+import net.cyberpunk042.log.LogLevel;
 
 /**
  * Builds VoxelShapes for growth block outline and collision.
@@ -245,14 +247,12 @@ public class GrowthShapeBuilder {
                     }
                 }
                 int idx = 0;
-                for (Box worldBox : debugBoxes) {
-                    Logging.GROWTH.info("[GrowthShapeBounds] world={} def={} idx={} world={}",
-                            serverWorld.getRegistryKey().getValue(),
-                            definition.id(),
-                            idx++,
-                            worldBox);
-                    if (idx >= 6) {
-                        break;
+                try (LogScope scope = Logging.GROWTH.scope("process-debugBoxes", LogLevel.INFO)) {
+                    for (Box worldBox : debugBoxes) {
+                        scope.branch("box").kv("world", serverWorld.getRegistryKey().getValue()).kv("def", definition.id()).kv("idx", idx++).kv("box", worldBox);
+                        if (idx >= 6) {
+                            break;
+                        }
                     }
                 }
             }

@@ -33,7 +33,8 @@ public final class GuiClientHandlers {
                 Logging.GUI.topic("network").info("Received GUI open: profile={}, debug={}", 
                     payload.profileName(), payload.debugUnlocked());
                 
-                FieldEditState state = new FieldEditState();
+                // Use existing state if available, otherwise create new
+                FieldEditState state = FieldEditStateHolder.getOrCreate();
                 state.setCurrentProfileName(payload.profileName());
                 state.set("debugUnlocked", payload.debugUnlocked());
                 

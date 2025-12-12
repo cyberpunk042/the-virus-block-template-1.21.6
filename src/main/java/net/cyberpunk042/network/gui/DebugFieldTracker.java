@@ -70,6 +70,12 @@ public final class DebugFieldTracker {
             FieldRegistry.register(debugDef);
             Identifier defId = Identifier.of("the-virus-block", debugId);
             
+            // Sync the definition to client BEFORE spawning
+            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(
+                player,
+                new net.cyberpunk042.network.FieldDefinitionSyncPayload(defId.toString(), definitionJson)
+            );
+            
             // Remove existing debug field if any
             Long existingId = DEBUG_FIELDS.get(playerUuid);
             if (existingId != null) {

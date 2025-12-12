@@ -10,6 +10,7 @@ import net.cyberpunk042.log.Logging;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.client.gui.widget.CheckboxWidget;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
 
 import java.util.ArrayList;
@@ -17,6 +18,8 @@ import java.util.List;
 import net.cyberpunk042.client.network.GuiPacketSender;
 import net.cyberpunk042.client.gui.state.FieldEditStateHolder;
 import net.cyberpunk042.client.gui.widget.ToastNotification;
+import net.cyberpunk042.client.gui.render.SimplifiedFieldRenderer;
+import net.minecraft.client.MinecraftClient;
 
 /**
  * G82-G85: Lifecycle state controls for the Debug panel.
@@ -49,6 +52,8 @@ public class LifecycleSubPanel extends AbstractPanel {
     private ButtonWidget spawnBtn;
     private ButtonWidget despawnBtn;
     private ButtonWidget resetBtn;
+    private CheckboxWidget advancedPreviewCheckbox;
+    private CheckboxWidget debounceCheckbox;
     
     public LifecycleSubPanel(Screen parent, FieldEditState state, int startY) {
         super(parent, state);
@@ -126,6 +131,32 @@ public class LifecycleSubPanel extends AbstractPanel {
             ToastNotification.info("Lifecycle reset to defaults");
         });
         widgets.add(resetBtn);
+        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        
+        // Preview mode controls
+        advancedPreviewCheckbox = GuiWidgets.checkbox(
+            x, y, "Advanced Preview",
+            SimplifiedFieldRenderer.isAdvancedModeEnabled(),
+            "Use full rendering pipeline for accurate preview",
+            MinecraftClient.getInstance().textRenderer,
+            enabled -> {
+                SimplifiedFieldRenderer.setAdvancedModeEnabled(enabled);
+                ToastNotification.info("Advanced Preview: " + (enabled ? "ON" : "OFF"));
+            }
+        );
+        widgets.add(advancedPreviewCheckbox);
+        
+        debounceCheckbox = GuiWidgets.checkbox(
+            x + halfW + GuiConstants.PADDING, y, "Debounce",
+            SimplifiedFieldRenderer.isDebounceEnabled(),
+            "Enable render debouncing for performance",
+            MinecraftClient.getInstance().textRenderer,
+            enabled -> {
+                SimplifiedFieldRenderer.setDebounceEnabled(enabled);
+                ToastNotification.info("Debounce: " + (enabled ? "ON" : "OFF"));
+            }
+        );
+        widgets.add(debounceCheckbox);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
         contentHeight = y - startY + GuiConstants.PADDING;

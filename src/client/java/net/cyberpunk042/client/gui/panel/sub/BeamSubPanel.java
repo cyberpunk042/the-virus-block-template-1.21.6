@@ -1,6 +1,8 @@
 package net.cyberpunk042.client.gui.panel.sub;
 
 import net.cyberpunk042.client.gui.panel.AbstractPanel;
+import net.cyberpunk042.client.gui.state.RendererCapabilities.Feature;
+import net.cyberpunk042.client.gui.state.RequiresFeature;
 import net.minecraft.client.gui.screen.Screen;
 
 import net.cyberpunk042.visual.animation.PulseConfig;
@@ -31,7 +33,10 @@ import java.util.List;
  * - Pulse: enable, scale, speed, waveform, min/max
  * 
  * <p>NOTE: No ExpandableSection - content displays directly in sub-tab.</p>
+ * 
+ * <p><b>Requires Accurate renderer mode.</b></p>
  */
+@RequiresFeature(Feature.BEAM)
 public class BeamSubPanel extends AbstractPanel {
     private GuiLayout layout;
     private CyclingButtonWidget<String> fragmentDropdown;

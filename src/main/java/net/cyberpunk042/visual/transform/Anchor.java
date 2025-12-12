@@ -3,10 +3,10 @@ package net.cyberpunk042.visual.transform;
 import org.joml.Vector3f;
 
 /**
- * Defines anchor positions relative to the player or field origin.
+ * Defines anchor positions RELATIVE to player center (chest height).
  * 
- * <p>Anchors determine where a primitive is positioned before any
- * offset is applied. The offset is ADDITIONAL to the anchor position.</p>
+ * <p>The rendering origin is at player center (y+1 from feet).
+ * Anchor offsets are applied relative to this center position.</p>
  * 
  * <h3>Example</h3>
  * <pre>
@@ -16,32 +16,32 @@ import org.joml.Vector3f;
  * @see Transform
  */
 public enum Anchor {
-    /** Player chest/center height (0, 1, 0) - DEFAULT */
-    CENTER("Center", 0, 1, 0),
+    /** Player chest/center height (0, 0, 0) - DEFAULT (no offset) */
+    CENTER("Center", 0, 0, 0),
     
-    /** Player feet level (0, 0, 0) */
-    FEET("Feet", 0, 0, 0),
+    /** Player feet level (0, -1, 0) - 1 block below center */
+    FEET("Feet", 0, -1, 0),
     
-    /** Player head level (0, 2, 0) */
-    HEAD("Head", 0, 2, 0),
+    /** Player head level (0, 1, 0) - 1 block above center */
+    HEAD("Head", 0, 1, 0),
     
-    /** Above player head (0, 3, 0) */
-    ABOVE("Above Head", 0, 3, 0),
+    /** Above player head (0, 2, 0) - 2 blocks above center */
+    ABOVE("Above Head", 0, 2, 0),
     
-    /** Below feet / underground (0, -1, 0) */
-    BELOW("Below Feet", 0, -1, 0),
+    /** Below feet / underground (0, -2, 0) - 2 blocks below center */
+    BELOW("Below Feet", 0, -2, 0),
     
-    /** In front of player (0, 1, 1) */
-    FRONT("Front", 0, 1, 1),
+    /** In front of player (0, 0, 1) - at center height, 1 forward */
+    FRONT("Front", 0, 0, 1),
     
-    /** Behind player (0, 1, -1) */
-    BACK("Back", 0, 1, -1),
+    /** Behind player (0, 0, -1) - at center height, 1 back */
+    BACK("Back", 0, 0, -1),
     
-    /** Left side of player (-1, 1, 0) */
-    LEFT("Left", -1, 1, 0),
+    /** Left side of player (-1, 0, 0) - at center height, 1 left */
+    LEFT("Left", -1, 0, 0),
     
-    /** Right side of player (1, 1, 0) */
-    RIGHT("Right", 1, 1, 0);
+    /** Right side of player (1, 0, 0) - at center height, 1 right */
+    RIGHT("Right", 1, 0, 0);
     
     private final String label;
     private final float x, y, z;

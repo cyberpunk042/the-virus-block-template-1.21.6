@@ -12,6 +12,8 @@ import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 
 import java.util.List;
+import net.cyberpunk042.log.LogScope;
+import net.cyberpunk042.log.LogLevel;
 
 /**
  * Processes field effects on entities within range.
@@ -58,20 +60,20 @@ public class EffectProcessor {
         Box box = new Box(center.add(-radius, -radius, -radius), center.add(radius, radius, radius));
         List<Entity> entities = world.getOtherEntities(null, box, e -> e.isAlive());
         
-        for (Entity entity : entities) {
-            double distance = entity.getPos().distanceTo(center);
-            if (distance > radius) {
-                continue;
+        try (LogScope scope = Logging.REGISTRY.topic("effect").scope("process-entities", LogLevel.TRACE)) {
+            for (Entity entity : entities) {
+                double distance = entity.getPos().distanceTo(center);
+                if (distance > radius) {
+                    continue;
+                }
+
+                if (!effect.canApply(entity)) {
+                    continue;
+                }
+
+                applyEffect(effect, entity, center, distance, radius);
+                scope.branch("entity").kv("type", effect.getType()).kv("untranslatedName", entity.getType().getUntranslatedName()).kv("distance", distance);
             }
-            
-            if (!effect.canApply(entity)) {
-                continue;
-            }
-            
-            applyEffect(effect, entity, center, distance, radius);
-            Logging.REGISTRY.topic("effect").trace(
-                "Applied {} to {} at distance {:.2f}", 
-                effect.getType(), entity.getType().getUntranslatedName(), distance);
         }
         
         if (!entities.isEmpty()) {

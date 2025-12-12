@@ -61,7 +61,7 @@ import java.util.stream.Collectors;
  * </pre>
  * 
  * <p>All commands send S2C packets to update the client's FieldEditState,
- * which is then rendered by TestFieldRenderer.</p>
+ * which is then rendered by SimplifiedFieldRenderer.</p>
  */
 public final class FieldEditSubcommand {
     

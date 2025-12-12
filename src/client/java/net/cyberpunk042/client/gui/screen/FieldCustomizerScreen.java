@@ -4,7 +4,7 @@ import net.cyberpunk042.client.gui.layout.*;
 import net.cyberpunk042.client.gui.panel.*;
 import net.cyberpunk042.client.gui.panel.sub.*;
 import net.cyberpunk042.client.gui.preview.FieldPreviewRenderer;
-import net.cyberpunk042.client.gui.render.TestFieldRenderer;
+import net.cyberpunk042.client.gui.render.SimplifiedFieldRenderer;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.state.FieldEditStateHolder;
 import net.cyberpunk042.field.FieldLayer;
@@ -18,8 +18,14 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 
+import net.fabricmc.loader.api.FabricLoader;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 
 /**
  * G01: Main Field Customizer GUI screen with 2×2 grid layout.
@@ -50,8 +56,47 @@ public class FieldCustomizerScreen extends Screen {
     private static final int MARGIN = 8;
     private static final int SELECTOR_HEIGHT = 22;
     
+    // Config persistence
+    private static final Path GUI_CONFIG_PATH = FabricLoader.getInstance()
+        .getConfigDir()
+        .resolve("the-virus-block")
+        .resolve("gui_preferences.properties");
+    
     private final FieldEditState state;
-    private GuiMode mode = GuiMode.FULLSCREEN;  // Start fullscreen
+    private GuiMode mode;  // Loaded from config or default to FULLSCREEN
+    
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Config Persistence
+    // ─────────────────────────────────────────────────────────────────────────────
+    
+    private static GuiMode loadSavedMode() {
+        try {
+            if (Files.exists(GUI_CONFIG_PATH)) {
+                Properties props = new Properties();
+                try (var reader = Files.newBufferedReader(GUI_CONFIG_PATH)) {
+                    props.load(reader);
+                }
+                String modeStr = props.getProperty("gui.mode", "FULLSCREEN");
+                return GuiMode.valueOf(modeStr);
+            }
+        } catch (Exception e) {
+            Logging.GUI.topic("config").warn("Failed to load GUI preferences: {}", e.getMessage());
+        }
+        return GuiMode.FULLSCREEN;
+    }
+    
+    private static void saveMode(GuiMode mode) {
+        try {
+            Files.createDirectories(GUI_CONFIG_PATH.getParent());
+            Properties props = new Properties();
+            props.setProperty("gui.mode", mode.name());
+            try (var writer = Files.newBufferedWriter(GUI_CONFIG_PATH)) {
+                props.store(writer, "GUI Preferences");
+            }
+        } catch (IOException e) {
+            Logging.GUI.topic("config").warn("Failed to save GUI preferences: {}", e.getMessage());
+        }
+    }
     
     // Layout
     private GridPane grid;
@@ -60,8 +105,12 @@ public class FieldCustomizerScreen extends Screen {
     // Main tabs
     private TabType currentTab = TabType.QUICK;
     private ButtonWidget quickTabBtn, advancedTabBtn, debugTabBtn, profilesTabBtn;
-    private ButtonWidget modeToggleBtn, closeBtn, fieldToggleBtn;
-    private net.minecraft.client.gui.widget.CyclingButtonWidget<String> presetDropdown;
+    private ButtonWidget modeToggleBtn, closeBtn, fieldToggleBtn, resetBtn;
+    private ButtonWidget traceButton; // Pipeline tracing toggle
+    private DropdownWidget<String> presetDropdown;
+    private net.minecraft.client.gui.widget.CyclingButtonWidget<Boolean> previewModeCheckbox;
+    private net.minecraft.client.gui.widget.CyclingButtonWidget<Boolean> rendererModeToggle;
+    private boolean useFullPreviewRenderer = false; // For 3D preview pane only (separate from world renderer)
     private PresetConfirmDialog presetConfirmDialog;
     
     // Config flags
@@ -92,13 +141,14 @@ public class FieldCustomizerScreen extends Screen {
     private ModalDialog activeModal;
     
     public FieldCustomizerScreen() {
-        this(new FieldEditState());
+        this(FieldEditStateHolder.getOrCreate());  // Preserve state on reopen
     }
     
     public FieldCustomizerScreen(FieldEditState state) {
         super(Text.literal("Field Customizer"));
         this.state = state;
-        Logging.GUI.topic("screen").info("FieldCustomizerScreen created");
+        this.mode = loadSavedMode();  // Restore last mode
+        Logging.GUI.topic("screen").info("FieldCustomizerScreen created, mode={}", mode);
     }
     
     // State change listener for preview refresh
@@ -133,8 +183,8 @@ public class FieldCustomizerScreen extends Screen {
      * Called when FieldEditState changes. Refreshes preview and optionally syncs to server.
      */
     private void onStateChanged() {
-        // Mark TestFieldRenderer as dirty for world preview
-        TestFieldRenderer.markDirty();
+        // Mark SimplifiedFieldRenderer as dirty for world preview
+        SimplifiedFieldRenderer.markDirty();
         
         // If live preview is enabled, sync to server
         if (state.getBool("livePreviewEnabled")) {
@@ -160,6 +210,7 @@ public class FieldCustomizerScreen extends Screen {
         initSubTabs();
         initShapePanel();
         initStatusBar();
+        initPreviewModeCheckbox();
         
         registerWidgets();
     }
@@ -168,6 +219,10 @@ public class FieldCustomizerScreen extends Screen {
         // Windowed mode: two side panels with game world visible in center
         // Panels need to be wide enough to fit controls (~220px min), but not take too much screen
         int panelWidth = Math.min(200, Math.max(180, (width - MARGIN * 4) / 5));  // Narrower for more center space
+        
+        // Clear fullscreen-only widgets
+        previewModeCheckbox = null;
+        grid = null;
         int panelHeight = height - MARGIN * 2 - STATUS_HEIGHT;
         
         // Left panel bounds
@@ -220,24 +275,31 @@ public class FieldCustomizerScreen extends Screen {
         int tabH = 18;
         int padding = 4;
         
-        // Title bar with field toggle, mode toggle and close
+        // Title bar buttons (right to left): Close, Reset, Mode, Field visibility
+        // Each button is 14px wide with 2px gaps
+        closeBtn = addDrawableChild(ButtonWidget.builder(Text.literal("×"), btn -> close())
+            .dimensions(x + w - 16, y + 2, 14, 12)
+            .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Close")))
+            .build());
+        
+        resetBtn = addDrawableChild(ButtonWidget.builder(Text.literal("↺"), btn -> resetState())
+            .dimensions(x + w - 32, y + 2, 14, 12)
+            .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Reset to defaults")))
+            .build());
+        
+        modeToggleBtn = addDrawableChild(ButtonWidget.builder(Text.literal("⬜"), btn -> toggleMode())
+            .dimensions(x + w - 48, y + 2, 14, 12)
+            .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Fullscreen")))
+            .build());
+        
         fieldToggleBtn = addDrawableChild(ButtonWidget.builder(
                 Text.literal(FieldEditStateHolder.isTestFieldActive() ? "◉" : "○"),
                 btn -> {
                     FieldEditStateHolder.toggleTestField();
                     btn.setMessage(Text.literal(FieldEditStateHolder.isTestFieldActive() ? "◉" : "○"));
                 })
-            .dimensions(x + w - 48, y + 2, 14, 12)
+            .dimensions(x + w - 64, y + 2, 14, 12)
             .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Field visibility")))
-            .build());
-        
-        modeToggleBtn = addDrawableChild(ButtonWidget.builder(Text.literal("⬜"), btn -> toggleMode())
-            .dimensions(x + w - 32, y + 2, 14, 12)
-            .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Fullscreen")))
-            .build());
-        
-        closeBtn = addDrawableChild(ButtonWidget.builder(Text.literal("×"), btn -> close())
-            .dimensions(x + w - 16, y + 2, 14, 12)
             .build());
         
         y += titleH;
@@ -271,6 +333,54 @@ public class FieldCustomizerScreen extends Screen {
         
         updateMainTabButtons();
         y += tabH + padding;
+        
+        // Preset row (compact)
+        int presetRowH = 16;
+        PresetRegistry.loadAll();
+        List<String> presetNames = new ArrayList<>(PresetRegistry.listPresets());
+        final String presetPlaceholder = "Select…";
+        if (presetNames.isEmpty()) {
+            presetNames.add("No presets");
+        } else {
+            presetNames.add(0, presetPlaceholder);
+        }
+        
+        int presetW = w - padding * 2;
+        presetDropdown = new DropdownWidget<>(
+            textRenderer, x + padding, y, presetW, presetRowH,
+            presetNames,
+            name -> {
+                if (name.equals(presetPlaceholder)) return Text.literal("Select Preset...");
+                if (name.equals("No presets")) return Text.literal("No presets");
+                return Text.literal(PresetRegistry.getDisplayLabel(name));
+            },
+            name -> {
+                // Apply on selection
+                if (!name.equals(presetPlaceholder) && !name.equals("No presets")) {
+                    onPresetSelected(name);
+                }
+            }
+        );
+        addDrawableChild(presetDropdown);
+        
+        y += presetRowH + padding;
+        
+        // Renderer mode toggle (Fast/Accurate for debug field)
+        rendererModeToggle = net.minecraft.client.gui.widget.CyclingButtonWidget.<Boolean>builder(
+                advanced -> Text.literal(advanced ? "⚡ Accurate" : "⚡ Fast"))
+            .values(List.of(false, true))
+            .initially(SimplifiedFieldRenderer.isAdvancedModeEnabled())
+            .tooltip(value -> net.minecraft.client.gui.tooltip.Tooltip.of(
+                Text.literal(value ? "Full FieldRenderer (accurate)" : "SimplifiedFieldRenderer (fast)")))
+            .omitKeyText()
+            .build(x + padding, y, w - padding * 2, presetRowH, Text.literal(""),
+                (btn, advanced) -> {
+                    SimplifiedFieldRenderer.setAdvancedModeEnabled(advanced);
+                    refreshTabsForRendererMode();
+                    ToastNotification.info("Renderer: " + (advanced ? "Accurate" : "Fast"));
+                });
+        
+        y += presetRowH + padding;
         
         // Shape panel fills rest of left panel
         shapePanelBounds = new Bounds(x + padding, y, w - padding * 2, panelBounds.bottom() - y - padding);
@@ -372,6 +482,7 @@ public class FieldCustomizerScreen extends Screen {
             .addTab("Mod", createModifiersContent())
             .addTab("Arr", createArrangeContent())
             .addTab("Bind", createBindingsContent())
+            .addTab("Trace", createTraceContent())
             .onTabChange(idx -> refreshSubTabWidgets());
         debugSubTabs.setBounds(subTabBounds);
         
@@ -408,6 +519,12 @@ public class FieldCustomizerScreen extends Screen {
             .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Toggle field visibility")))
             .build());
         
+        // Reset button
+        resetBtn = addDrawableChild(ButtonWidget.builder(Text.literal("↺"), btn -> resetState())
+            .dimensions(width - MARGIN - 38, y, 18, 18)
+            .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Reset to defaults")))
+            .build());
+        
         // Close button
         closeBtn = addDrawableChild(ButtonWidget.builder(Text.literal("×"), btn -> close())
             .dimensions(width - MARGIN - 18, y, 18, 18)
@@ -438,9 +555,10 @@ public class FieldCustomizerScreen extends Screen {
             .dimensions(x, y, tabW, TAB_BAR_HEIGHT - 2)
             .build());
         
-        // Preset dropdown (floating right in tab bar)
-        int presetW = 120;
-        int presetX = width - MARGIN - presetW;
+        // Preset selector and apply button (floating right in tab bar)
+        int applyW = 50;
+        int presetW = 110;
+        int presetX = width - MARGIN - presetW - applyW - 2;
         PresetRegistry.loadAll();  // Ensure presets are loaded
         List<String> presetNames = new ArrayList<>(PresetRegistry.listPresets());
         final String presetPlaceholder = "Select Preset…";
@@ -450,16 +568,41 @@ public class FieldCustomizerScreen extends Screen {
             presetNames.add(0, presetPlaceholder);
         }
         
-        presetDropdown = addDrawableChild(
-            net.minecraft.client.gui.widget.CyclingButtonWidget.<String>builder(name -> {
-                    if (name.equals(presetPlaceholder)) return Text.literal("Select Preset");
-                    if (name.equals("No presets found")) return Text.literal("No presets found");
-                    return Text.literal(PresetRegistry.getDisplayLabel(name));
-                })
-                .values(presetNames)
-                .initially(presetNames.get(0))
-                .build(presetX, y, presetW, TAB_BAR_HEIGHT - 2, Text.literal(""),
-                    (btn, name) -> onPresetSelected(name))
+        // Preset dropdown - proper dropdown that shows list on click
+        presetDropdown = new DropdownWidget<>(
+            textRenderer, presetX, y, presetW + applyW + 2, TAB_BAR_HEIGHT - 2,
+            presetNames,
+            name -> {
+                if (name.equals(presetPlaceholder)) return Text.literal("Select Preset...");
+                if (name.equals("No presets found")) return Text.literal("No presets");
+                return Text.literal(PresetRegistry.getDisplayLabel(name));
+            },
+            name -> {
+                // Apply on selection
+                if (!name.equals(presetPlaceholder) && !name.equals("No presets found")) {
+                    onPresetSelected(name);
+                }
+            }
+        );
+        addDrawableChild(presetDropdown);
+        
+        // Renderer mode toggle (between tabs and preset)
+        int toggleW = 70;
+        int toggleX = presetX - toggleW - 8;
+        rendererModeToggle = addDrawableChild(
+            net.minecraft.client.gui.widget.CyclingButtonWidget.<Boolean>builder(
+                    advanced -> Text.literal(advanced ? "Accurate" : "Fast"))
+                .values(List.of(false, true))
+                .initially(SimplifiedFieldRenderer.isAdvancedModeEnabled())
+                .tooltip(value -> net.minecraft.client.gui.tooltip.Tooltip.of(
+                    Text.literal(value ? "Full renderer (all features)" : "Simplified (fast preview)")))
+                .omitKeyText()
+                .build(toggleX, y, toggleW, TAB_BAR_HEIGHT - 2, Text.literal(""),
+                    (btn, advanced) -> {
+                        SimplifiedFieldRenderer.setAdvancedModeEnabled(advanced);
+                        refreshTabsForRendererMode();
+                        ToastNotification.info("Renderer: " + (advanced ? "Accurate" : "Fast"));
+                    })
         );
         
         updateMainTabButtons();
@@ -481,7 +624,7 @@ public class FieldCustomizerScreen extends Screen {
                 ToastNotification.success("Applied preset: " + presetName);
             }
             // Reset dropdown to placeholder after handling
-            presetDropdown.setValue("Select Preset…");
+            presetDropdown.setSelectedIndex(0); // Reset to first item (placeholder)
         });
         presetConfirmDialog.show(width, height);
     }
@@ -537,6 +680,13 @@ public class FieldCustomizerScreen extends Screen {
     }
     
     private void initSubTabs() {
+        // In windowed mode, sub-tabs are already initialized in initWindowedRightPanel
+        if (grid == null) {
+            // Just refresh the tab content, don't reinitialize
+            refreshSubTabWidgets();
+            return;
+        }
+        
         // Sub-tab area: top-right, below selectors
         Bounds subTabArea = grid.topRight().withoutTop(SELECTOR_HEIGHT * 2 + 4);
         
@@ -558,7 +708,7 @@ public class FieldCustomizerScreen extends Screen {
             .onTabChange(idx -> refreshSubTabWidgets());
         advancedSubTabs.setBounds(subTabArea);
         
-        // Debug sub-tabs: Beam, Trigger, Lifecycle, Modifiers, Arrange, Bindings
+        // Debug sub-tabs: Beam, Trigger, Lifecycle, Modifiers, Arrange, Bindings, Trace
         debugSubTabs = new SubTabPane(textRenderer)
             .addTab("Beam", createBeamContent())
             .addTab("Trigger", createTriggerContent())
@@ -566,6 +716,7 @@ public class FieldCustomizerScreen extends Screen {
             .addTab("Mods", createModifiersContent())
             .addTab("Arr", createArrangeContent())
             .addTab("Bindings", createBindingsContent())
+            .addTab("Trace", createTraceContent())
             .onTabChange(idx -> refreshSubTabWidgets());
         debugSubTabs.setBounds(subTabArea);
         
@@ -609,6 +760,30 @@ public class FieldCustomizerScreen extends Screen {
         Bounds statusBounds = new Bounds(statusX, statusY, statusW, STATUS_HEIGHT);
         statusBar = new StatusBar(state, textRenderer);
         statusBar.setBounds(statusBounds);
+    }
+    
+    private void initPreviewModeCheckbox() {
+        // Only for fullscreen mode - checkbox in preview area (top-left quadrant)
+        if (grid == null) return;
+        
+        Bounds previewBounds = grid.topLeft();
+        int checkW = 60;
+        int checkH = 12;
+        int checkX = previewBounds.x() + 4;
+        int checkY = previewBounds.y() + 4;
+        
+        previewModeCheckbox = net.minecraft.client.gui.widget.CyclingButtonWidget.<Boolean>builder(
+                value -> Text.literal(value ? "☑ Full" : "☐ Fast"))
+            .values(List.of(false, true))
+            .initially(useFullPreviewRenderer)
+            .tooltip(value -> net.minecraft.client.gui.tooltip.Tooltip.of(
+                Text.literal(value ? "3D preview uses FieldRenderer (accurate)" : "3D preview uses SimplifiedFieldRenderer (fast)")))
+            .omitKeyText()
+            .build(checkX, checkY, checkW, checkH, Text.literal(""),
+                (btn, value) -> {
+                    // ONLY affects the 3D preview pane, NOT the menu tabs or world renderer
+                    useFullPreviewRenderer = value;
+                });
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -667,6 +842,10 @@ public class FieldCustomizerScreen extends Screen {
         return new PanelWrapper(new LinkingSubPanel(this, state, 0));
     }
     
+    private SubTabPane.ContentProvider createTraceContent() {
+        return new PanelWrapper(new net.cyberpunk042.client.gui.panel.sub.TraceSubPanel(this, state));
+    }
+    
     private SubTabPane.ContentProvider createBindingsContent() {
         return new PanelWrapper(new BindingsSubPanel(this, state, 0));
     }
@@ -677,10 +856,21 @@ public class FieldCustomizerScreen extends Screen {
     
     private void toggleMode() {
         mode = mode.toggle();
+        saveMode(mode);  // Persist preference
         // Reinitialize the entire screen for the new mode
         clearChildren();
         init();
         Logging.GUI.topic("screen").info("Toggled to {} mode", mode);
+    }
+    
+    private void resetState() {
+        // Reset the edit state to defaults
+        state.reset();
+        // Rebuild the UI to reflect the reset
+        clearChildren();
+        init();
+        Logging.GUI.topic("screen").info("State reset to defaults");
+        ToastNotification.info("Reset to defaults");
     }
     
     private void switchTab(TabType tab) {
@@ -720,6 +910,8 @@ public class FieldCustomizerScreen extends Screen {
         if (debugTabBtn != null) addDrawableChild(debugTabBtn);
         if (profilesTabBtn != null) addDrawableChild(profilesTabBtn);
         if (presetDropdown != null) addDrawableChild(presetDropdown);
+        if (rendererModeToggle != null) addDrawableChild(rendererModeToggle);
+        if (previewModeCheckbox != null) addDrawableChild(previewModeCheckbox);
         
         // For non-Profiles tabs: add selectors, sub-tabs, and shape panel
         if (currentTab != TabType.PROFILES) {
@@ -775,21 +967,65 @@ public class FieldCustomizerScreen extends Screen {
         registerWidgets();
     }
     
+    /**
+     * Refreshes all sub-tab panes when renderer mode changes.
+     * This updates the enabled/disabled state of tabs based on feature support.
+     */
+    private void refreshTabsForRendererMode() {
+        if (quickSubTabs != null) quickSubTabs.refreshTabs();
+        if (advancedSubTabs != null) advancedSubTabs.refreshTabs();
+        if (debugSubTabs != null) debugSubTabs.refreshTabs();
+        registerWidgets(); // Re-register to pick up button changes
+    }
+    
     // ═══════════════════════════════════════════════════════════════════════════
     // MODALS
     // ═══════════════════════════════════════════════════════════════════════════
     
     private void showLayerModal(String layerName) {
         int idx = state.getSelectedLayerIndex();
-        activeModal = ModalDialog.textInput("Rename Layer", layerName, textRenderer, width, height,
-            newName -> {
-                state.renameLayer(idx, newName);
-                refreshLayerSelector();
+        int layerCount = state.getFieldLayers().size();
+        final net.minecraft.client.gui.widget.TextFieldWidget[] fieldHolder = new net.minecraft.client.gui.widget.TextFieldWidget[1];
+        
+        activeModal = new ModalDialog("Rename Layer", textRenderer, width, height)
+            .size(300, layerCount > 1 ? 150 : 130)
+            .content((bounds, tr) -> {
+                var widgets = new java.util.ArrayList<net.minecraft.client.gui.widget.ClickableWidget>();
+                var field = new net.minecraft.client.gui.widget.TextFieldWidget(tr, 
+                    bounds.x(), bounds.y() + 10, bounds.width(), 20, Text.literal(""));
+                field.setText(layerName);
+                field.setMaxLength(64);
+                field.visible = true;
+                field.active = true;
+                field.setEditable(true);
+                fieldHolder[0] = field;
+                widgets.add(field);
+                return widgets;
             })
-            .onClose(() -> {
-                activeModal = null;
-                registerWidgets();
+            .addAction("Cancel", () -> {});
+        
+        // Add Delete button only if more than one layer
+        if (layerCount > 1) {
+            activeModal.addAction("§cDelete", () -> {
+                state.removeLayer(idx);
+                refreshLayerSelector();
+                layerSelector.selectIndex(Math.max(0, idx - 1));
+                ToastNotification.info("Layer deleted");
             });
+        }
+        
+        activeModal.addAction("OK", () -> {
+            if (fieldHolder[0] != null) {
+                state.renameLayer(idx, fieldHolder[0].getText());
+                refreshLayerSelector();
+            }
+        }, true);
+        
+        activeModal.onClose(() -> {
+            activeModal = null;
+            registerWidgets();
+        });
+        
         activeModal.show();
         registerWidgets();
         focusModalTextField();
@@ -798,15 +1034,48 @@ public class FieldCustomizerScreen extends Screen {
     private void showPrimitiveModal(String primName) {
         int layerIdx = state.getSelectedLayerIndex();
         int primIdx = state.getSelectedPrimitiveIndex();
-        activeModal = ModalDialog.textInput("Rename Primitive", primName, textRenderer, width, height,
-            newName -> {
-                state.renamePrimitive(layerIdx, primIdx, newName);
-                refreshPrimitiveSelector();
+        int primCount = getPrimitiveNames().size();
+        final net.minecraft.client.gui.widget.TextFieldWidget[] fieldHolder = new net.minecraft.client.gui.widget.TextFieldWidget[1];
+        
+        activeModal = new ModalDialog("Rename Primitive", textRenderer, width, height)
+            .size(300, primCount > 1 ? 150 : 130)
+            .content((bounds, tr) -> {
+                var widgets = new java.util.ArrayList<net.minecraft.client.gui.widget.ClickableWidget>();
+                var field = new net.minecraft.client.gui.widget.TextFieldWidget(tr, 
+                    bounds.x(), bounds.y() + 10, bounds.width(), 20, Text.literal(""));
+                field.setText(primName);
+                field.setMaxLength(64);
+                field.visible = true;
+                field.active = true;
+                field.setEditable(true);
+                fieldHolder[0] = field;
+                widgets.add(field);
+                return widgets;
             })
-            .onClose(() -> {
-                activeModal = null;
-                registerWidgets();
+            .addAction("Cancel", () -> {});
+        
+        // Add Delete button only if more than one primitive
+        if (primCount > 1) {
+            activeModal.addAction("§cDelete", () -> {
+                state.removePrimitive(layerIdx, primIdx);
+                refreshPrimitiveSelector();
+                primitiveSelector.selectIndex(Math.max(0, primIdx - 1));
+                ToastNotification.info("Primitive deleted");
             });
+        }
+        
+        activeModal.addAction("OK", () -> {
+            if (fieldHolder[0] != null) {
+                state.renamePrimitive(layerIdx, primIdx, fieldHolder[0].getText());
+                refreshPrimitiveSelector();
+            }
+        }, true);
+        
+        activeModal.onClose(() -> {
+            activeModal = null;
+            registerWidgets();
+        });
+        
         activeModal.show();
         registerWidgets();
         focusModalTextField();
@@ -820,8 +1089,18 @@ public class FieldCustomizerScreen extends Screen {
         if (activeModal == null) return;
         for (var w : activeModal.getWidgets()) {
             if (w instanceof net.minecraft.client.gui.widget.TextFieldWidget tf) {
-                setFocused(tf);
+                // Ensure widget is fully interactive
+                tf.visible = true;
+                tf.active = true;
+                tf.setEditable(true);
+                
+                // Set focus on both widget and screen
                 tf.setFocused(true);
+                this.setFocused(tf);
+                
+                // Select all text for easy replacement
+                tf.setCursorToStart(false);
+                tf.setCursorToEnd(true);
                 break;
             }
         }
@@ -888,6 +1167,11 @@ public class FieldCustomizerScreen extends Screen {
         
         // Widgets (buttons, etc.)
         super.render(context, mouseX, mouseY, delta);
+        
+        // Dropdown overlay (must be rendered after all other widgets for z-order)
+        if (presetDropdown != null && presetDropdown.isExpanded()) {
+            presetDropdown.renderOverlay(context, mouseX, mouseY);
+        }
         
         // Modal overlay + re-render modal widgets on top of overlay
         if (activeModal != null && activeModal.isVisible()) {
@@ -1065,14 +1349,25 @@ public class FieldCustomizerScreen extends Screen {
             rotationY = time * spinSpeed / 10f;
         }
         
-        // Use centralized renderer
-        FieldPreviewRenderer.drawField(context, state, 
-            bounds.x(), bounds.y(), bounds.right(), bounds.bottom(),
-            1.0f, 25f, rotationY);
+        // Use selected renderer for 3D preview
+        if (useFullPreviewRenderer) {
+            // Full/Accurate: Use FieldRenderer (accurate, all features)
+            // TODO: Implement proper 3D rendering with FieldRenderer in 2D context
+            // For now, fall back to FieldPreviewRenderer
+            FieldPreviewRenderer.drawField(context, state, 
+                bounds.x(), bounds.y(), bounds.right(), bounds.bottom(),
+                1.0f, 25f, rotationY);
+        } else {
+            // Fast: Use FieldPreviewRenderer (simplified 2D wireframe)
+            FieldPreviewRenderer.drawField(context, state, 
+                bounds.x(), bounds.y(), bounds.right(), bounds.bottom(),
+                1.0f, 25f, rotationY);
+        }
         
         // Shape label at bottom
         String shapeType = state.getString("shapeType").toLowerCase();
-        context.drawCenteredTextWithShadow(textRenderer, shapeType, bounds.centerX(), bounds.bottom() - 14, 0xFF666688);
+        String modeLabel = useFullPreviewRenderer ? " (Full)" : "";
+        context.drawCenteredTextWithShadow(textRenderer, shapeType + modeLabel, bounds.centerX(), bounds.bottom() - 14, 0xFF666688);
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -1082,6 +1377,13 @@ public class FieldCustomizerScreen extends Screen {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         if (activeModal != null && activeModal.isVisible()) return true;
+        
+        // Handle dropdown scroll
+        if (presetDropdown != null && presetDropdown.isExpanded()) {
+            if (presetDropdown.handleScroll(mouseX, mouseY, verticalAmount)) {
+                return true;
+            }
+        }
         
         switch (currentTab) {
             case QUICK -> { if (quickSubTabs.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount)) return true; }
@@ -1103,13 +1405,24 @@ public class FieldCustomizerScreen extends Screen {
         // Modal intercepts all clicks; pass through to its widgets
         if (activeModal != null && activeModal.isVisible()) {
             for (var w : activeModal.getWidgets()) {
-                if (w.mouseClicked(mouseX, mouseY, button)) return true;
+                if (w.mouseClicked(mouseX, mouseY, button)) {
+                    // CRITICAL: Set screen focus when widget is clicked (for TextFieldWidget)
+                    this.setFocused(w);
+                    return true;
+                }
             }
             // Click outside modal - close it (onClose callback handles cleanup)
             if (!activeModal.containsClick(mouseX, mouseY)) {
                 activeModal.hide();
             }
             return true;
+        }
+        
+        // Handle dropdown clicks (expanded dropdown intercepts clicks)
+        if (presetDropdown != null && presetDropdown.isExpanded()) {
+            if (presetDropdown.handleClick(mouseX, mouseY, button)) {
+                return true;
+            }
         }
         
         return super.mouseClicked(mouseX, mouseY, button);
@@ -1124,13 +1437,15 @@ public class FieldCustomizerScreen extends Screen {
         
         // Modal intercepts escape and other keys
         if (activeModal != null && activeModal.isVisible()) {
-            for (var w : activeModal.getWidgets()) {
-                if (w.keyPressed(keyCode, scanCode, modifiers)) return true;
+            // Let focused widget handle key first (critical for TextFieldWidget)
+            if (super.keyPressed(keyCode, scanCode, modifiers)) {
+                return true;
             }
             // Escape key closes modal (onClose callback handles cleanup)
             if (activeModal.keyPressed(keyCode)) {
                 return true;
             }
+            return true; // Consume other keys when modal is open
         }
         
         // Escape to close
@@ -1172,10 +1487,8 @@ public class FieldCustomizerScreen extends Screen {
             return false; // dialog has no text input
         }
         if (activeModal != null && activeModal.isVisible()) {
-            for (var w : activeModal.getWidgets()) {
-                if (w.charTyped(chr, modifiers)) return true;
-            }
-            return true; // consume to avoid leaking to screen
+            // Let the parent handle charTyped which routes to focused widget
+            return super.charTyped(chr, modifiers);
         }
         return super.charTyped(chr, modifiers);
     }
@@ -1262,6 +1575,14 @@ public class FieldCustomizerScreen extends Screen {
             }
             return false;
         }
+        
+        @Override public boolean isFeatureSupported() { 
+            return panel.isFeatureSupported(); 
+        }
+        
+        @Override public String getDisabledTooltip() { 
+            return panel.getDisabledTooltip(); 
+        }
     }
     
     /**
@@ -1283,7 +1604,7 @@ public class FieldCustomizerScreen extends Screen {
         @Override public void render(DrawContext context, int mouseX, int mouseY, float delta) {
             if (bounds == null) return;
             // Draw placeholder info
-            context.fill(bounds.x(), bounds.y(), bounds.right(), bounds.bottom(), 0x44333344);
+            context.fill(bounds.x(), bounds.y(), bounds.right(), bounds.bottom(), 0x44333333);
             context.drawCenteredTextWithShadow(textRenderer, title, 
                 bounds.x() + bounds.width() / 2, bounds.y() + 20, 0xFFAAAAAA);
             context.drawCenteredTextWithShadow(textRenderer, description,

@@ -1,6 +1,8 @@
 package net.cyberpunk042.client.gui.panel.sub;
 
 import net.cyberpunk042.client.gui.panel.AbstractPanel;
+import net.cyberpunk042.client.gui.state.RendererCapabilities.Feature;
+import net.cyberpunk042.client.gui.state.RequiresFeature;
 import net.minecraft.client.gui.screen.Screen;
 
 import net.cyberpunk042.client.gui.state.FieldEditState;
@@ -25,8 +27,12 @@ import java.util.List;
  * 
  * <p>Uses the actual {@link BindingSources} registry for available sources.</p>
  * 
+ * @see RequiresFeature
+ * 
  * <p>WARNING: This is a Level 3 Debug feature.
  * Requires: debugMenuEnabled=true AND operator permission >= 2</p>
+ * 
+ * <p><b>Requires Accurate renderer mode.</b></p>
  * 
  * <h2>Binding Structure</h2>
  * <ul>
@@ -40,6 +46,7 @@ import java.util.List;
  * @see BindingSources
  * @see net.cyberpunk042.field.influence.BindingConfig
  */
+@RequiresFeature(Feature.BINDINGS)
 public class BindingsSubPanel extends AbstractPanel {
     // ═══════════════════════════════════════════════════════════════════════════
     // ENUMS - Property targets (what to bind TO)

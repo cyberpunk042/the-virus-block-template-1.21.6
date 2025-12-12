@@ -33,6 +33,8 @@ import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.WorldEvents;
+import net.cyberpunk042.log.LogScope;
+import net.cyberpunk042.log.LogLevel;
 
 /**
  * Encapsulates the fusing phase countdown, fuse entity management, and shell-collapse triggers.
@@ -142,21 +144,23 @@ public final class SingularityFusingService {
 			Logging.FUSE.info("Removing dead fuse entity at {}", entry.getKey());
 			return true;
 		});
-		for (BlockPos source : host.getVirusSources()) {
-			if (!world.isChunkLoaded(ChunkPos.toLong(source))) {
-				continue;
-			}
-			clearBlockForFuse(world, source);
-			if (activeFuseEntities.containsKey(source)) {
-				continue;
-			}
-			VirusFuseEntity fuse = new VirusFuseEntity(world, source);
-			if (world.spawnEntity(fuse)) {
-				activeFuseEntities.put(source.toImmutable(), fuse.getUuid());
-				Logging.FUSE.info("Spawned fuse entity at {}", source);
-			} else {
-				Logging.SINGULARITY.topic("fusing").warn("[Fuse] Failed to spawn fuse entity at {}", source);
-			}
+		try (LogScope scope = Logging.FUSE.scope("process-getVirusSources", LogLevel.INFO)) {
+    		for (BlockPos source : host.getVirusSources()) {
+    			if (!world.isChunkLoaded(ChunkPos.toLong(source))) {
+    				continue;
+    			}
+    			clearBlockForFuse(world, source);
+    			if (activeFuseEntities.containsKey(source)) {
+    				continue;
+    			}
+    			VirusFuseEntity fuse = new VirusFuseEntity(world, source);
+    			if (world.spawnEntity(fuse)) {
+    				activeFuseEntities.put(source.toImmutable(), fuse.getUuid());
+    				scope.branch("entry").kv("source", source);
+    			} else {
+    				Logging.SINGULARITY.topic("fusing").warn("[Fuse] Failed to spawn fuse entity at {}", source);
+    			}
+    		}
 		}
 	}
 

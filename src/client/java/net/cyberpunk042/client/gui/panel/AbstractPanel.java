@@ -2,6 +2,8 @@ package net.cyberpunk042.client.gui.panel;
 
 import net.cyberpunk042.client.gui.layout.Bounds;
 import net.cyberpunk042.client.gui.state.FieldEditState;
+import net.cyberpunk042.client.gui.state.RendererCapabilities;
+import net.cyberpunk042.client.gui.state.RequiresFeature;
 import net.cyberpunk042.client.gui.widget.ExpandableSection;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -71,6 +73,61 @@ public abstract class AbstractPanel {
     protected AbstractPanel(Screen parent, FieldEditState state) {
         this.parent = parent;
         this.state = state;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // RENDERER CAPABILITY CHECKS
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Checks if this panel's required features are supported by the current renderer.
+     * 
+     * <p>Uses the {@link RequiresFeature} annotation on the class to determine
+     * which features are needed.</p>
+     * 
+     * @return true if all required features are supported
+     */
+    public boolean isFeatureSupported() {
+        RequiresFeature annotation = getClass().getAnnotation(RequiresFeature.class);
+        if (annotation == null) {
+            return true; // No requirements = always supported
+        }
+        
+        RendererCapabilities.Feature[] required = annotation.value();
+        if (required.length == 0) {
+            return true;
+        }
+        
+        if (annotation.requireAll()) {
+            return RendererCapabilities.areAllSupported(required);
+        } else {
+            return RendererCapabilities.isAnySupported(required);
+        }
+    }
+    
+    /**
+     * Gets the tooltip to show when this panel is disabled due to renderer mode.
+     * 
+     * @return Tooltip text, or null if panel is enabled
+     */
+    public String getDisabledTooltip() {
+        if (isFeatureSupported()) {
+            return null;
+        }
+        
+        RequiresFeature annotation = getClass().getAnnotation(RequiresFeature.class);
+        if (annotation == null || annotation.value().length == 0) {
+            return null;
+        }
+        
+        // Return tooltip for first unsupported feature
+        for (RendererCapabilities.Feature f : annotation.value()) {
+            String tooltip = RendererCapabilities.getDisabledTooltip(f);
+            if (tooltip != null) {
+                return tooltip;
+            }
+        }
+        return "§cRequires Accurate mode";
     }
     
     // ═══════════════════════════════════════════════════════════════════════════

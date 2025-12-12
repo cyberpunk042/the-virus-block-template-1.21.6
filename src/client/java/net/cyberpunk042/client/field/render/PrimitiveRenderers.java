@@ -44,10 +44,35 @@ public final class PrimitiveRenderers {
         register(new DiscRenderer());
         register(new PrismRenderer());
         register(new CylinderRenderer());
-        register(new PolyhedronRenderer());
+        
+        // Polyhedron renderer with aliases for specific types
+        PolyhedronRenderer polyRenderer = new PolyhedronRenderer();
+        register(polyRenderer);
+        registerAlias("cube", polyRenderer);
+        registerAlias("octahedron", polyRenderer);
+        registerAlias("icosahedron", polyRenderer);
+        registerAlias("tetrahedron", polyRenderer);
+        registerAlias("dodecahedron", polyRenderer);
+        
+        // Cylinder alias for CylinderRenderer (beam uses cylinder internally)
+        registerAlias("beam", RENDERERS.get("cylinder"));
+        
+        // New shape renderers
+        register(new TorusRenderer());
+        register(new CapsuleRenderer());
+        register(new ConeRenderer());
         
         Logging.FIELD.topic("init").debug(
             "Registered {} primitive renderers", RENDERERS.size());
+    }
+    
+    /**
+     * Registers a renderer alias (same renderer, different type name).
+     */
+    public static void registerAlias(String alias, PrimitiveRenderer renderer) {
+        RENDERERS.put(alias, renderer);
+        Logging.FIELD.topic("init").trace(
+            "Registered alias: {} → {}", alias, renderer.getClass().getSimpleName());
     }
     
     private PrimitiveRenderers() {}

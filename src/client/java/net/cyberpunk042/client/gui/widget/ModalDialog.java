@@ -161,9 +161,13 @@ public class ModalDialog {
         // Auto-focus the first text field if present
         for (ClickableWidget w : widgets) {
             if (w instanceof TextFieldWidget tf) {
-                tf.setFocused(true);
+                tf.visible = true;
+                tf.active = true;
                 tf.setEditable(true);
-                tf.setCursorToEnd(true); // select end
+                tf.setFocused(true);
+                // Select all text for easy replacement
+                tf.setCursorToStart(false);
+                tf.setCursorToEnd(true);
                 break;
             }
         }
@@ -193,28 +197,28 @@ public class ModalDialog {
         
         // Dialog border
         context.fill(dialogBounds.x() - 1, dialogBounds.y() - 1,
-                     dialogBounds.right() + 1, dialogBounds.bottom() + 1, 0xFF555566);
+                     dialogBounds.right() + 1, dialogBounds.bottom() + 1, 0xFF555555);
         
         // Dialog background
         context.fill(dialogBounds.x(), dialogBounds.y(),
-                     dialogBounds.right(), dialogBounds.bottom(), 0xFF1a1a24);
+                     dialogBounds.right(), dialogBounds.bottom(), 0xFF1a1a1a);
         
         // Title bar
         context.fill(dialogBounds.x(), dialogBounds.y(),
-                     dialogBounds.right(), dialogBounds.y() + TITLE_HEIGHT, 0xFF2a2a3a);
+                     dialogBounds.right(), dialogBounds.y() + TITLE_HEIGHT, 0xFF2a2a2a);
         
         // Title text
         context.drawTextWithShadow(textRenderer, title, 
-            dialogBounds.x() + PADDING, dialogBounds.y() + 6, 0xFF88CCFF);
+            dialogBounds.x() + PADDING, dialogBounds.y() + 6, 0xFFAAFFAA);
         
         // Separator
         context.fill(dialogBounds.x(), dialogBounds.y() + TITLE_HEIGHT,
-                     dialogBounds.right(), dialogBounds.y() + TITLE_HEIGHT + 1, 0xFF333344);
+                     dialogBounds.right(), dialogBounds.y() + TITLE_HEIGHT + 1, 0xFF333333);
         
         // Button area separator
         int buttonAreaY = dialogBounds.bottom() - BUTTON_HEIGHT - PADDING - 4;
         context.fill(dialogBounds.x() + PADDING, buttonAreaY,
-                     dialogBounds.right() - PADDING, buttonAreaY + 1, 0xFF333344);
+                     dialogBounds.right() - PADDING, buttonAreaY + 1, 0xFF333333);
     }
     
     /**
@@ -283,6 +287,11 @@ public class ModalDialog {
                     bounds.x(), bounds.y() + 10, bounds.width(), 20, Text.literal(""));
                 field.setText(initialValue);
                 field.setMaxLength(64);
+                // Ensure field is interactive from creation
+                field.visible = true;
+                field.active = true;
+                field.setEditable(true);
+                field.setFocused(true);
                 fieldHolder[0] = field;
                 return List.of(field);
             })

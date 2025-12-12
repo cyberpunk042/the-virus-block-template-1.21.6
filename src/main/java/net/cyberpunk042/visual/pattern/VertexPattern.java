@@ -139,11 +139,11 @@ public interface VertexPattern {
     
     /**
      * Resolves a pattern for a specific CellType.
-     * <p>If the pattern's cellType doesn't match, logs a mismatch error.</p>
+     * <p>If the pattern's cellType doesn't match, returns a default pattern for the expected type.</p>
      * 
      * @param patternName Pattern name
      * @param expectedCellType The CellType the shape expects
-     * @return The pattern, or null if mismatched (caller should skip rendering)
+     * @return The pattern, or a default pattern for the expected CellType if mismatched
      */
     static VertexPattern resolveForCellType(String patternName, CellType expectedCellType) {
         VertexPattern pattern = fromString(patternName);
@@ -151,13 +151,25 @@ public interface VertexPattern {
         if (pattern.cellType() != expectedCellType) {
             net.cyberpunk042.log.Logging.FIELD.topic("pattern")
                 .reason("celltype mismatch")
-                .alwaysChat()
-                .error("Pattern '{}' is for {} but shape expects {} - skipping render",
+                .debug("Pattern '{}' is for {} but shape expects {} - using default",
                     patternName, pattern.cellType(), expectedCellType);
-            return null;
+            return defaultForCellType(expectedCellType);
         }
         
         return pattern;
+    }
+    
+    /**
+     * Returns a default pattern for the given CellType.
+     */
+    static VertexPattern defaultForCellType(CellType cellType) {
+        return switch (cellType) {
+            case QUAD -> QuadPattern.DEFAULT;
+            case SEGMENT -> SegmentPattern.FULL;
+            case SECTOR -> SectorPattern.FULL;
+            case EDGE -> EdgePattern.FULL;
+            case TRIANGLE -> TrianglePattern.DEFAULT;
+        };
     }
     
     /**

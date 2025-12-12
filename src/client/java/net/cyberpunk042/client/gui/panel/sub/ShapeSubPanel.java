@@ -96,8 +96,7 @@ public class ShapeSubPanel extends AbstractPanel {
     // open-ended is derived: capTop=false && capBottom=false
     private net.minecraft.client.gui.widget.CheckboxWidget cylinderOpenEnded;
     
-    // G70: Polyhedron controls
-    private CyclingButtonWidget<PolyType> polyType;
+    // G70: Polyhedron controls (Type is determined by shape selection, not dropdown)
     private LabeledSlider polyRadius;
     private LabeledSlider polySubdivisions;
     
@@ -114,8 +113,13 @@ public class ShapeSubPanel extends AbstractPanel {
         PRISM("prism", "Prism"),
         CYLINDER("cylinder", "Cylinder"),
         CUBE("cube", "Cube"),
+        TETRAHEDRON("tetrahedron", "Tetrahedron"),
         OCTAHEDRON("octahedron", "Octahedron"),
-        ICOSAHEDRON("icosahedron", "Icosahedron");
+        DODECAHEDRON("dodecahedron", "Dodecahedron"),
+        ICOSAHEDRON("icosahedron", "Icosahedron"),
+        TORUS("torus", "Torus"),
+        CAPSULE("capsule", "Capsule"),
+        CONE("cone", "Cone");
         
         private final String id;
         private final String label;
@@ -224,7 +228,10 @@ public class ShapeSubPanel extends AbstractPanel {
             case "disc" -> buildDiscControls(x, y, w);
             case "prism" -> buildPrismControls(x, y, w);
             case "cylinder", "beam" -> buildCylinderControls(x, y, w);
-            case "cube", "octahedron", "icosahedron" -> buildPolyhedronControls(x, y, w);
+            case "cube", "tetrahedron", "octahedron", "dodecahedron", "icosahedron" -> buildPolyhedronControls(x, y, w);
+            case "torus" -> buildTorusControls(x, y, w);
+            case "capsule" -> buildCapsuleControls(x, y, w);
+            case "cone" -> buildConeControls(x, y, w);
             default -> Logging.GUI.topic("panel").warn("Unknown shape type: {}", shapeType);
         }
         
@@ -528,15 +535,8 @@ public class ShapeSubPanel extends AbstractPanel {
     // ═══════════════════════════════════════════════════════════════════════════
     
     private void buildPolyhedronControls(int x, int y, int w) {
-        polyType = GuiWidgets.enumDropdown(
-            x, y, w, "Type", PolyType.class, PolyType.CUBE,
-            "Polyhedron type", v -> onUserChange(() -> state.set("polyhedron.polyType", v.name()))
-        );
-        try {
-            polyType.setValue(PolyType.valueOf(state.getString("polyhedron.polyType")));
-        } catch (IllegalArgumentException ignored) {}
-        widgets.add(polyType);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        // No need for Type dropdown - the poly type is determined by which shape 
+        // the user selected (cube, tetrahedron, octahedron, dodecahedron, icosahedron)
         
         polyRadius = LabeledSlider.builder("Size")
             .position(x, y).width(w).range(0.5f, 10f).initial(state.getFloat("polyhedron.radius")).format("%.1f")
@@ -548,6 +548,103 @@ public class ShapeSubPanel extends AbstractPanel {
             .position(x, y).width(w).range(0, 4).initial(state.getInt("polyhedron.subdivisions")).format("%d").step(1)
             .onChange(v -> onUserChange(() -> state.set("polyhedron.subdivisions", Math.round(v)))).build();
         widgets.add(polySubdivisions);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // TORUS CONTROLS
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    private void buildTorusControls(int x, int y, int w) {
+        int step = GuiConstants.COMPACT_HEIGHT + GuiConstants.COMPACT_GAP;
+        
+        // Major radius (ring radius)
+        var majorRadius = LabeledSlider.builder("Ring Radius")
+            .position(x, y).width(w).range(0.5f, 5f).initial(state.getFloat("torus.majorRadius")).format("%.2f")
+            .onChange(v -> onUserChange(() -> state.set("torus.majorRadius", v))).build();
+        widgets.add(majorRadius);
+        y += step;
+        
+        // Minor radius (tube radius)
+        var minorRadius = LabeledSlider.builder("Tube Radius")
+            .position(x, y).width(w).range(0.1f, 2f).initial(state.getFloat("torus.minorRadius")).format("%.2f")
+            .onChange(v -> onUserChange(() -> state.set("torus.minorRadius", v))).build();
+        widgets.add(minorRadius);
+        y += step;
+        
+        // Segments
+        var majorSegments = LabeledSlider.builder("Ring Segments")
+            .position(x, y).width(w).range(8, 64).initial(state.getInt("torus.majorSegments")).format("%d").step(4)
+            .onChange(v -> onUserChange(() -> state.set("torus.majorSegments", Math.round(v)))).build();
+        widgets.add(majorSegments);
+        y += step;
+        
+        var minorSegments = LabeledSlider.builder("Tube Segments")
+            .position(x, y).width(w).range(4, 32).initial(state.getInt("torus.minorSegments")).format("%d").step(2)
+            .onChange(v -> onUserChange(() -> state.set("torus.minorSegments", Math.round(v)))).build();
+        widgets.add(minorSegments);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CAPSULE CONTROLS
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    private void buildCapsuleControls(int x, int y, int w) {
+        int step = GuiConstants.COMPACT_HEIGHT + GuiConstants.COMPACT_GAP;
+        
+        // Radius
+        var radius = LabeledSlider.builder("Radius")
+            .position(x, y).width(w).range(0.1f, 3f).initial(state.getFloat("capsule.radius")).format("%.2f")
+            .onChange(v -> onUserChange(() -> state.set("capsule.radius", v))).build();
+        widgets.add(radius);
+        y += step;
+        
+        // Height
+        var height = LabeledSlider.builder("Height")
+            .position(x, y).width(w).range(0.5f, 10f).initial(state.getFloat("capsule.height")).format("%.1f")
+            .onChange(v -> onUserChange(() -> state.set("capsule.height", v))).build();
+        widgets.add(height);
+        y += step;
+        
+        // Segments
+        var segments = LabeledSlider.builder("Segments")
+            .position(x, y).width(w).range(8, 64).initial(state.getInt("capsule.segments")).format("%d").step(4)
+            .onChange(v -> onUserChange(() -> state.set("capsule.segments", Math.round(v)))).build();
+        widgets.add(segments);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CONE CONTROLS
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    private void buildConeControls(int x, int y, int w) {
+        int step = GuiConstants.COMPACT_HEIGHT + GuiConstants.COMPACT_GAP;
+        
+        // Bottom radius
+        var bottomRadius = LabeledSlider.builder("Bottom Radius")
+            .position(x, y).width(w).range(0.1f, 5f).initial(state.getFloat("cone.bottomRadius")).format("%.2f")
+            .onChange(v -> onUserChange(() -> state.set("cone.bottomRadius", v))).build();
+        widgets.add(bottomRadius);
+        y += step;
+        
+        // Top radius (0 for pointed cone, > 0 for frustum)
+        var topRadius = LabeledSlider.builder("Top Radius")
+            .position(x, y).width(w).range(0f, 5f).initial(state.getFloat("cone.topRadius")).format("%.2f")
+            .onChange(v -> onUserChange(() -> state.set("cone.topRadius", v))).build();
+        widgets.add(topRadius);
+        y += step;
+        
+        // Height
+        var height = LabeledSlider.builder("Height")
+            .position(x, y).width(w).range(0.5f, 10f).initial(state.getFloat("cone.height")).format("%.1f")
+            .onChange(v -> onUserChange(() -> state.set("cone.height", v))).build();
+        widgets.add(height);
+        y += step;
+        
+        // Segments
+        var segments = LabeledSlider.builder("Segments")
+            .position(x, y).width(w).range(8, 64).initial(state.getInt("cone.segments")).format("%d").step(4)
+            .onChange(v -> onUserChange(() -> state.set("cone.segments", Math.round(v)))).build();
+        widgets.add(segments);
     }
     
     @Override
@@ -626,9 +723,6 @@ public class ShapeSubPanel extends AbstractPanel {
         if (cylinderHeight != null) cylinderHeight.setValue(state.getFloat("cylinder.height"));
         if (cylinderSegments != null) cylinderSegments.setValue(state.getInt("cylinder.segments"));
         if (cylinderTopRadius != null) cylinderTopRadius.setValue(state.getFloat("cylinder.topRadius"));
-        if (polyType != null) {
-            try { polyType.setValue(PolyType.valueOf(state.getString("polyhedron.polyType"))); } catch (IllegalArgumentException ignored) {}
-        }
         if (polyRadius != null) polyRadius.setValue(state.getFloat("polyhedron.radius"));
         if (polySubdivisions != null) polySubdivisions.setValue(state.getInt("polyhedron.subdivisions"));
     }

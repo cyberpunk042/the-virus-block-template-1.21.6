@@ -113,15 +113,33 @@ public class SubTabPane {
         return contentBounds;
     }
     
+    /**
+     * Refreshes tab states (e.g., after renderer mode change).
+     * Call this when feature availability might have changed.
+     */
+    public void refreshTabs() {
+        rebuildWidgets();
+    }
+    
     private void rebuildWidgets() {
         tabButtons.clear();
         
         if (bounds.isEmpty() || tabs.isEmpty()) return;
         
-        // Calculate tab widths
-        int totalGaps = (tabs.size() - 1) * TAB_GAP;
+        // Count supported tabs for width calculation
+        int supportedCount = 0;
+        for (TabEntry tab : tabs) {
+            if (tab.content.isFeatureSupported()) {
+                supportedCount++;
+            }
+        }
+        
+        if (supportedCount == 0) return; // All tabs hidden
+        
+        // Calculate tab widths based on VISIBLE tabs only
+        int totalGaps = (supportedCount - 1) * TAB_GAP;
         int availableWidth = tabBarBounds.width() - totalGaps;
-        int tabWidth = availableWidth / tabs.size();
+        int tabWidth = availableWidth / supportedCount;
         
         int x = tabBarBounds.x();
         int y = tabBarBounds.y();
@@ -129,6 +147,13 @@ public class SubTabPane {
         for (int i = 0; i < tabs.size(); i++) {
             final int tabIndex = i;
             TabEntry tab = tabs.get(i);
+            
+            // Skip unsupported tabs entirely (HIDE them)
+            if (!tab.content.isFeatureSupported()) {
+                // Add null placeholder to keep indices aligned
+                tabButtons.add(null);
+                continue;
+            }
             
             ButtonWidget btn = ButtonWidget.builder(Text.literal(tab.label), b -> setActiveTab(tabIndex))
                 .dimensions(x, y, tabWidth, TAB_HEIGHT)
@@ -138,13 +163,26 @@ public class SubTabPane {
             x += tabWidth + TAB_GAP;
         }
         
+        // If active tab is now hidden, switch to first visible tab
+        if (tabButtons.get(activeIndex) == null) {
+            for (int i = 0; i < tabButtons.size(); i++) {
+                if (tabButtons.get(i) != null) {
+                    activeIndex = i;
+                    break;
+                }
+            }
+        }
+        
         updateTabButtons();
         updateContentBounds();
     }
     
     private void updateTabButtons() {
         for (int i = 0; i < tabButtons.size(); i++) {
-            tabButtons.get(i).active = i != activeIndex;
+            ButtonWidget btn = tabButtons.get(i);
+            if (btn != null) {
+                btn.active = i != activeIndex;
+            }
         }
     }
     
@@ -159,8 +197,12 @@ public class SubTabPane {
     // ═══════════════════════════════════════════════════════════════════════════
     
     public List<ClickableWidget> getWidgets() {
-        List<ClickableWidget> all = new ArrayList<>(tabButtons);
-        if (activeIndex < tabs.size()) {
+        List<ClickableWidget> all = new ArrayList<>();
+        // Only add non-null buttons (hidden tabs have null placeholders)
+        for (ButtonWidget btn : tabButtons) {
+            if (btn != null) all.add(btn);
+        }
+        if (activeIndex < tabs.size() && tabs.get(activeIndex).content.isFeatureSupported()) {
             all.addAll(tabs.get(activeIndex).content.getWidgets());
         }
         return all;
@@ -183,27 +225,29 @@ public class SubTabPane {
         context.fill(tabBarBounds.x(), tabBarBounds.y(), 
                      tabBarBounds.right(), tabBarBounds.bottom(), 0xFF222233);
         
-        // Active tab indicator
+        // Active tab indicator (only if active tab is visible)
         if (!tabButtons.isEmpty() && activeIndex < tabButtons.size()) {
             ButtonWidget activeBtn = tabButtons.get(activeIndex);
-            context.fill(activeBtn.getX(), activeBtn.getY() + activeBtn.getHeight() - 2,
-                        activeBtn.getX() + activeBtn.getWidth(), activeBtn.getY() + activeBtn.getHeight(),
-                        0xFF4488FF);
+            if (activeBtn != null) {
+                context.fill(activeBtn.getX(), activeBtn.getY() + activeBtn.getHeight() - 2,
+                            activeBtn.getX() + activeBtn.getWidth(), activeBtn.getY() + activeBtn.getHeight(),
+                            0xFF4488FF);
+            }
         }
         
         // Content background (matches right column of grid)
         context.fill(contentBounds.x(), contentBounds.y(),
                      contentBounds.right(), contentBounds.bottom(), 0xFF12121a);
         
-        // Render active content
-        if (activeIndex < tabs.size()) {
+        // Render active content (only if tab is visible/supported)
+        if (activeIndex < tabs.size() && tabs.get(activeIndex).content.isFeatureSupported()) {
             tabs.get(activeIndex).content.render(context, mouseX, mouseY, delta);
         }
     }
     
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         if (!contentBounds.contains(mouseX, mouseY)) return false;
-        if (activeIndex < tabs.size()) {
+        if (activeIndex < tabs.size() && tabs.get(activeIndex).content.isFeatureSupported()) {
             return tabs.get(activeIndex).content.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
         }
         return false;
@@ -224,6 +268,12 @@ public class SubTabPane {
         void tick();
         void render(DrawContext context, int mouseX, int mouseY, float delta);
         default boolean mouseScrolled(double mouseX, double mouseY, double h, double v) { return false; }
+        
+        /** Check if this content's features are supported by current renderer. */
+        default boolean isFeatureSupported() { return true; }
+        
+        /** Get tooltip for when content is disabled due to renderer mode. */
+        default String getDisabledTooltip() { return null; }
     }
     
     /**
@@ -244,6 +294,12 @@ public class SubTabPane {
         }
         @Override public boolean mouseScrolled(double mouseX, double mouseY, double h, double v) {
             return panel.mouseScrolled(mouseX, mouseY, h, v);
+        }
+        @Override public boolean isFeatureSupported() { 
+            return panel.isFeatureSupported(); 
+        }
+        @Override public String getDisabledTooltip() { 
+            return panel.getDisabledTooltip(); 
         }
     }
     

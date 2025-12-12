@@ -1,5 +1,6 @@
 package net.cyberpunk042.client.field.render;
 
+import net.cyberpunk042.client.gui.state.PipelineTracer;
 import net.cyberpunk042.client.visual.mesh.Mesh;
 import net.cyberpunk042.client.visual.mesh.MeshBuilder;
 import net.cyberpunk042.client.visual.mesh.SphereTessellator;
@@ -11,9 +12,11 @@ import net.cyberpunk042.visual.fill.FillConfig;
 import net.cyberpunk042.visual.fill.SphereCageOptions;
 import net.cyberpunk042.visual.pattern.ArrangementConfig;
 import net.cyberpunk042.visual.pattern.VertexPattern;
+import net.cyberpunk042.visual.color.ColorResolver;
 import net.cyberpunk042.visual.shape.SphereAlgorithm;
 import net.cyberpunk042.visual.shape.SphereShape;
 import net.cyberpunk042.visual.visibility.VisibilityMask;
+import net.cyberpunk042.log.Logging;
 
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.util.math.MatrixStack;
@@ -51,29 +54,103 @@ public final class SphereRenderer extends AbstractPrimitiveRenderer {
         return "sphere";
     }
     
+    /**
+     * Override render to handle TYPE_A/TYPE_E direct rendering.
+     * 
+     * <p>TYPE_A and TYPE_E algorithms use direct vertex emission (overlapping cubes
+     * or rotated rectangles) rather than mesh tessellation, so we intercept the
+     * render call and use the specialized rendering methods.</p>
+     */
+    @Override
+    public void render(
+            Primitive primitive,
+            MatrixStack matrices,
+            VertexConsumer consumer,
+            int light,
+            float time,
+            ColorResolver resolver,
+            RenderOverrides overrides) {
+        
+        if (!(primitive.shape() instanceof SphereShape shape)) {
+            // Fall back to normal rendering for non-sphere shapes
+            super.render(primitive, matrices, consumer, light, time, resolver, overrides);
+            return;
+        }
+        
+        // Check if this algorithm requires direct rendering
+        if (requiresDirectRendering(shape)) {
+            Logging.FIELD.topic("render").trace("[SPHERE] Using direct rendering for algorithm: {}", 
+                shape.algorithm());
+            
+            // Resolve color
+            int color = resolveColor(primitive, resolver, overrides, time);
+            
+            // Use direct rendering methods
+            if (shape.algorithm() == SphereAlgorithm.TYPE_A) {
+                renderTypeA(matrices, consumer, shape.radius(), color, light);
+            } else if (shape.algorithm() == SphereAlgorithm.TYPE_E) {
+                renderTypeE(matrices, consumer, shape.radius(), color, light);
+            }
+            return;
+        }
+        
+        // Normal mesh-based rendering for LAT_LON, UV_SPHERE, ICO_SPHERE
+        super.render(primitive, matrices, consumer, light, time, resolver, overrides);
+    }
+    
     @Override
     protected Mesh tessellate(Primitive primitive) {
         if (!(primitive.shape() instanceof SphereShape shape)) {
+            Logging.FIELD.topic("render").warn("[SPHERE] Shape is NOT SphereShape: {}", 
+                primitive.shape() != null ? primitive.shape().getClass().getSimpleName() : "null");
             return null;
         }
+        
+        Logging.FIELD.topic("render").trace("[SPHERE] Tessellating: radius={}, algo={}", 
+            shape.radius(), shape.algorithm());
         
         // Get pattern from arrangement config with CellType validation
         VertexPattern pattern = null;
         ArrangementConfig arrangement = primitive.arrangement();
         if (arrangement != null) {
             // Validate pattern is compatible with sphere's QUAD cells
+            Logging.FIELD.topic("render").trace("[SPHERE] Arrangement: {}, resolving pattern for CellType={}", 
+                arrangement, shape.primaryCellType());
             pattern = arrangement.resolvePattern("main", shape.primaryCellType());
             if (pattern == null) {
-                // Pattern mismatch logged to chat - skip rendering
-                return null;
+                Logging.FIELD.topic("render").warn("[SPHERE] Pattern validation FAILED! Using null pattern (skip)");
+                // Don't return null - try without pattern
+                // return null;
             }
+        } else {
+            Logging.FIELD.topic("render").trace("[SPHERE] No arrangement config, using null pattern");
         }
         
         // Get visibility mask
         VisibilityMask visibility = primitive.visibility();
         
+        // CP5: Visibility/Mask values at tessellation
+        if (visibility != null) {
+            PipelineTracer.trace(PipelineTracer.V1_MASK_TYPE, 5, "tessellate", visibility.mask().name());
+            PipelineTracer.trace(PipelineTracer.V2_MASK_COUNT, 5, "tessellate", String.valueOf(visibility.count()));
+            PipelineTracer.trace(PipelineTracer.V5_MASK_ANIMATE, 5, "tessellate", String.valueOf(visibility.animate()));
+        }
+        
         // Tessellate with full config
-        return SphereTessellator.tessellate(shape, pattern, visibility);
+        Mesh mesh = SphereTessellator.tessellate(shape, pattern, visibility);
+        if (mesh == null || mesh.isEmpty()) {
+            Logging.FIELD.topic("render").warn("[SPHERE] Tessellation returned empty mesh!");
+        } else {
+            Logging.FIELD.topic("render").debug("[SPHERE] Mesh: {} vertices", mesh.vertices().size());
+            // CP6-CP7: Visibility applied to mesh
+            PipelineTracer.trace(PipelineTracer.V1_MASK_TYPE, 6, "mesh", "applied");
+            PipelineTracer.trace(PipelineTracer.V1_MASK_TYPE, 7, "vertices", String.valueOf(mesh.vertexCount()));
+            PipelineTracer.trace(PipelineTracer.V2_MASK_COUNT, 6, "mesh", "applied");
+            PipelineTracer.trace(PipelineTracer.V2_MASK_COUNT, 7, "vertices", String.valueOf(mesh.vertexCount()));
+            PipelineTracer.trace(PipelineTracer.V5_MASK_ANIMATE, 6, "mesh", "applied");
+            PipelineTracer.trace(PipelineTracer.V5_MASK_ANIMATE, 7, "vertices", String.valueOf(mesh.vertexCount()));
+        }
+        return mesh;
     }
     
     /**
@@ -171,15 +248,14 @@ public final class SphereRenderer extends AbstractPrimitiveRenderer {
             }
         }
         
-        // Emit the cage mesh with wave support
+        // Emit the cage mesh (already LINES type, so use emit() not emitWireframe())
         Mesh cageMesh = builder.build();
+        VertexEmitter emitter = new VertexEmitter(matrices, consumer);
+        emitter.color(color).light(light);
         if (waveConfig != null && waveConfig.isActive()) {
-            VertexEmitter emitter = new VertexEmitter(matrices, consumer);
-            emitter.color(color).light(light).wave(waveConfig, time);
-            emitter.emitWireframe(cageMesh, thickness);
-        } else {
-            VertexEmitter.emitWireframe(matrices.peek(), consumer, cageMesh, color, thickness, light);
+            emitter.wave(waveConfig, time);
         }
+        emitter.emit(cageMesh);  // emit() handles LINES meshes correctly
     }
     
     // =========================================================================

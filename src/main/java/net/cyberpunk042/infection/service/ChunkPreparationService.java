@@ -1,6 +1,8 @@
 package net.cyberpunk042.infection.service;
 
 
+import net.cyberpunk042.log.LogLevel;
+import net.cyberpunk042.log.LogScope;
 import net.cyberpunk042.log.Logging;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -83,6 +85,7 @@ public final class ChunkPreparationService {
 		boolean allowGeneration = host.collapseConfig().configuredChunkGenerationAllowed(world);
 		int budget = host.collapseConfig().configuredPreloadChunksPerTick();
 		int before = state.preloadQueue.size();
+	try (LogScope scope = Logging.SINGULARITY.scope("preload-chunks", LogLevel.INFO)) {
 		while (budget-- > 0 && !state.preloadQueue.isEmpty()) {
 			long packed = state.preloadQueue.pollFirst();
 			ChunkPos pos = new ChunkPos(packed);
@@ -91,7 +94,7 @@ public final class ChunkPreparationService {
 				if (world.isChunkLoaded(packed)) {
 					host.singularity().phase().pinSingularityChunk(pos);
 					if (SingularityDiagnostics.enabled()) {
-						Logging.SINGULARITY.info("preload chunk ready {} (already loaded)", pos);
+						scope.branch("chunk").kv("pos", pos).kv("status", "ready").kv("cached", true);
 					}
 					continue;
 				}
@@ -105,10 +108,9 @@ public final class ChunkPreparationService {
 						host.singularity().phase().pinSingularityChunk(pos);
 						if (SingularityDiagnostics.enabled()) {
 							if (allowGeneration) {
-								Logging.SINGULARITY.info("preload chunk loaded {}", pos);
+								scope.branch("chunk").kv("pos", pos).kv("status", "loaded");
 							} else {
-								Logging.SINGULARITY.info("preload chunk loaded {} (generation disabled, disk fetch only)",
-										pos);
+								scope.branch("chunk").kv("pos", pos).kv("status", "loaded").kv("mode", "diskOnly");
 							}
 						}
 					}
@@ -120,6 +122,7 @@ public final class ChunkPreparationService {
 				SingularityChunkContext.popChunkBypass(pos);
 			}
 		}
+	}
 		logPreloadProgress(before - state.preloadQueue.size(), state.preloadQueue.size());
 		if (state.preloadQueue.isEmpty()) {
 			finishChunkPreload(world);

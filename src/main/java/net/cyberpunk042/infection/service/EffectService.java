@@ -6,6 +6,8 @@ import java.util.List;
 import net.cyberpunk042.infection.api.EffectBus;
 import net.cyberpunk042.infection.scenario.ScenarioEffectSet;
 import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.log.LogScope;
+import net.cyberpunk042.log.LogLevel;
 
 /**
  * Tracks effect-set registrations per scenario so {@link EffectBus} usage stays
@@ -39,12 +41,14 @@ public final class EffectService {
 	}
 
 	public void clearSets() {
-		for (ScenarioEffectSet set : activeSets) {
-			try {
-				set.close();
-			} catch (Exception ignored) {
-			}
-			Logging.EFFECTS.info("[effectService] removed {}", set.getClass().getSimpleName());
+		try (LogScope scope = Logging.EFFECTS.scope("process-activeSets", LogLevel.INFO)) {
+    		for (ScenarioEffectSet set : activeSets) {
+    			try {
+    				set.close();
+    			} catch (Exception ignored) {
+    			}
+    			scope.branch("set").kv("simpleName", set.getClass().getSimpleName());
+    		}
 		}
 		activeSets.clear();
 	}

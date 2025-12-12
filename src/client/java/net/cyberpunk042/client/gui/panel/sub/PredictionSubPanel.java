@@ -1,6 +1,8 @@
 package net.cyberpunk042.client.gui.panel.sub;
 
 import net.cyberpunk042.client.gui.panel.AbstractPanel;
+import net.cyberpunk042.client.gui.state.RendererCapabilities.Feature;
+import net.cyberpunk042.client.gui.state.RequiresFeature;
 import net.minecraft.client.gui.screen.Screen;
 
 import net.cyberpunk042.client.gui.state.FieldEditState;
@@ -29,7 +31,10 @@ import java.util.List;
  *   - verticalBoost: Extra vertical compensation (0-2)
  * 
  * @see <a href="GUI_CLASS_DIAGRAM.md §4.9">PredictionSubPanel specification</a>
+ * 
+ * <p><b>Requires Accurate renderer mode.</b></p>
  */
+@RequiresFeature(Feature.PREDICTION)
 public class PredictionSubPanel extends AbstractPanel {
     // ═══════════════════════════════════════════════════════════════════════════
     // ENUMS

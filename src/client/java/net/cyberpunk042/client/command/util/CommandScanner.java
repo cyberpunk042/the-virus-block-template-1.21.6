@@ -10,6 +10,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.RecordComponent;
 import java.util.Locale;
+import net.cyberpunk042.log.LogScope;
+import net.cyberpunk042.log.LogLevel;
 
 /**
  * Scans record classes for @Range annotations and auto-generates FieldEditKnob commands.
@@ -53,70 +55,71 @@ public final class CommandScanner {
         int count = 0;
         Object defaultInstance = getDefaultInstance(recordClass);
         
-        for (RecordComponent component : recordClass.getRecordComponents()) {
-            Range range = component.getAnnotation(Range.class);
-            if (range == null) {
-                // Also check for @Range on the accessor method
-                try {
-                    Method accessor = recordClass.getMethod(component.getName());
-                    range = accessor.getAnnotation(Range.class);
-                } catch (NoSuchMethodException ignored) {}
-            }
-            
-            if (range == null) {
-                Logging.GUI.topic("scanner").trace("Skipping {} - no @Range", component.getName());
-                continue;
-            }
-            
-            String fieldName = component.getName();
-            String path = pathPrefix + "." + fieldName;
-            ValueRange vr = range.value();
-            Class<?> type = component.getType();
-            
-            // Get default value
-            Object defaultValue = getComponentValue(recordClass, defaultInstance, fieldName);
-            
-            // Generate display name: "innerRadius" → "Inner radius"
-            String displayName = humanize(fieldName);
-            
-            try {
-                if (type == float.class || type == Float.class) {
-                    float defVal = defaultValue != null ? ((Number) defaultValue).floatValue() : 0f;
-                    FieldEditKnob.floatValue(path, displayName)
-                        .range(vr.min(), vr.max())
-                        .unit(vr.unit())
-                        .defaultValue(defVal)
-                        .attach(parent);
-                    count++;
-                    
-                } else if (type == int.class || type == Integer.class) {
-                    int defVal = defaultValue != null ? ((Number) defaultValue).intValue() : 0;
-                    FieldEditKnob.intValue(path, displayName)
-                        .range((int) vr.min(), (int) vr.max())
-                        .defaultValue(defVal)
-                        .attach(parent);
-                    count++;
-                    
-                } else if (type == boolean.class || type == Boolean.class) {
-                    boolean defVal = defaultValue != null && (Boolean) defaultValue;
-                    FieldEditKnob.toggle(path, displayName)
-                        .defaultValue(defVal)
-                        .attach(parent);
-                    count++;
-                    
-                } else if (type.isEnum()) {
-                    @SuppressWarnings("unchecked")
-                    Class<? extends Enum<?>> enumClass = (Class<? extends Enum<?>>) type;
-                    scanEnum(path, displayName, enumClass, defaultValue, parent);
-                    count++;
-                    
-                } else {
-                    Logging.GUI.topic("scanner").debug("Skipping {} - unsupported type {}", 
-                        fieldName, type.getSimpleName());
+        try (LogScope scope = Logging.GUI.topic("scanner").scope("process-getRecordComponents", LogLevel.DEBUG)) {
+            for (RecordComponent component : recordClass.getRecordComponents()) {
+                Range range = component.getAnnotation(Range.class);
+                if (range == null) {
+                    // Also check for @Range on the accessor method
+                    try {
+                        Method accessor = recordClass.getMethod(component.getName());
+                        range = accessor.getAnnotation(Range.class);
+                    } catch (NoSuchMethodException ignored) {}
                 }
-            } catch (Exception e) {
-                Logging.GUI.topic("scanner").error("Failed to generate command for {}: {}", 
-                    path, e.getMessage());
+
+                if (range == null) {
+                    scope.branch("component").kv("name", component.getName()).kv("_s", "skip");
+                    continue;
+                }
+
+                String fieldName = component.getName();
+                String path = pathPrefix + "." + fieldName;
+                ValueRange vr = range.value();
+                Class<?> type = component.getType();
+
+                // Get default value
+                Object defaultValue = getComponentValue(recordClass, defaultInstance, fieldName);
+
+                // Generate display name: "innerRadius" → "Inner radius"
+                String displayName = humanize(fieldName);
+
+                try {
+                    if (type == float.class || type == Float.class) {
+                        float defVal = defaultValue != null ? ((Number) defaultValue).floatValue() : 0f;
+                        FieldEditKnob.floatValue(path, displayName)
+                            .range(vr.min(), vr.max())
+                            .unit(vr.unit())
+                            .defaultValue(defVal)
+                            .attach(parent);
+                        count++;
+
+                    } else if (type == int.class || type == Integer.class) {
+                        int defVal = defaultValue != null ? ((Number) defaultValue).intValue() : 0;
+                        FieldEditKnob.intValue(path, displayName)
+                            .range((int) vr.min(), (int) vr.max())
+                            .defaultValue(defVal)
+                            .attach(parent);
+                        count++;
+
+                    } else if (type == boolean.class || type == Boolean.class) {
+                        boolean defVal = defaultValue != null && (Boolean) defaultValue;
+                        FieldEditKnob.toggle(path, displayName)
+                            .defaultValue(defVal)
+                            .attach(parent);
+                        count++;
+
+                    } else if (type.isEnum()) {
+                        @SuppressWarnings("unchecked")
+                        Class<? extends Enum<?>> enumClass = (Class<? extends Enum<?>>) type;
+                        scanEnum(path, displayName, enumClass, defaultValue, parent);
+                        count++;
+
+                    } else {
+                        scope.branch("component").kv("fieldName", fieldName).kv("type", type.getSimpleName()).kv("_s", "skip");
+                    }
+                } catch (Exception e) {
+                    Logging.GUI.topic("scanner").error("Failed to generate command for {}: {}", 
+                        path, e.getMessage());
+                }
             }
         }
         

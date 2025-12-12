@@ -120,6 +120,68 @@ public class Channel implements ContextBuilder<Context> {
     
     public FormattedContext formatted() { return new FormattedContext(context()); }
     
+    // ========== SCOPED LOGGING ==========
+    
+    /**
+     * Creates a deferred hierarchical log scope.
+     * 
+     * <p>Use with try-with-resources for automatic emission on close:</p>
+     * <pre>
+     * try (LogScope frame = Logging.FIELD.scope("render-frame")) {
+     *     frame.branch("layer:0").kv("primitives", 5);
+     * }
+     * </pre>
+     * 
+     * @param name The scope name (root node name)
+     * @return A new LogScope that emits at INFO level
+     */
+    public LogScope scope(String name) {
+        return scope(name, LogLevel.INFO);
+    }
+    
+    /**
+     * Creates a deferred hierarchical log scope at specified level.
+     * 
+     * @param name The scope name (root node name)
+     * @param level The log level to emit at
+     * @return A new LogScope
+     */
+    public LogScope scope(String name, LogLevel level) {
+        if (!this.level.includes(level)) {
+            return LogScope.noop();
+        }
+        return new LogScope(this, name, level);
+    }
+    
+    /**
+     * Executes a lambda within a log scope, auto-emitting on completion.
+     * 
+     * <pre>
+     * Logging.FIELD.scoped("render-frame", frame -> {
+     *     frame.branch("layer:0").kv("primitives", 5);
+     * });
+     * </pre>
+     * 
+     * @param name The scope name
+     * @param consumer Lambda to execute with the scope
+     */
+    public void scoped(String name, java.util.function.Consumer<LogScope> consumer) {
+        scoped(name, LogLevel.INFO, consumer);
+    }
+    
+    /**
+     * Executes a lambda within a log scope at specified level.
+     * 
+     * @param name The scope name
+     * @param level The log level
+     * @param consumer Lambda to execute with the scope
+     */
+    public void scoped(String name, LogLevel level, java.util.function.Consumer<LogScope> consumer) {
+        try (LogScope scope = scope(name, level)) {
+            consumer.accept(scope);
+        }
+    }
+    
     // ========== RESET ==========
     
     public void reset() {

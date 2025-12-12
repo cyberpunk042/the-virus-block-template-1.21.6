@@ -6,7 +6,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
-import net.cyberpunk042.client.gui.render.TestFieldRenderer;
+import net.cyberpunk042.client.gui.render.SimplifiedFieldRenderer;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.state.FieldEditStateHolder;
 import net.cyberpunk042.visual.validation.ValueRange;
@@ -118,7 +118,7 @@ public final class FieldEditKnob {
         if (state != null) {
             state.set(path, value);
             state.markDirty();
-            TestFieldRenderer.markDirty();
+            SimplifiedFieldRenderer.markDirty();
         }
     }
     

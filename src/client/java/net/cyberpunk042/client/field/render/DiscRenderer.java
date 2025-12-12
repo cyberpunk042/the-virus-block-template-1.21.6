@@ -34,11 +34,9 @@ public final class DiscRenderer extends AbstractPrimitiveRenderer {
         VertexPattern pattern = null;
         ArrangementConfig arrangement = primitive.arrangement();
         if (arrangement != null) {
-            // Validate pattern is compatible with disc's SECTOR cells
+            // Try to resolve pattern - if it fails, continue without pattern
             pattern = arrangement.resolvePattern("surface", shape.primaryCellType());
-            if (pattern == null) {
-                return null; // Mismatch logged to chat
-            }
+            // Don't return null if pattern fails - render without pattern instead
         }
         
         // Get visibility mask

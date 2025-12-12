@@ -22,6 +22,8 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockBox;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
+import net.cyberpunk042.log.LogScope;
+import net.cyberpunk042.log.LogLevel;
 
 /**
  * Simple radius-based collapse processor.
@@ -193,36 +195,38 @@ public final class CollapseProcessor {
 		int ringsProcessed = 0;
 		if (state.inward) {
 			// Process from lastRing down to currentRing (exclusive of last, inclusive of current)
-			for (int ring = lastRing - 1; ring >= currentRing && ring >= 0; ring--) {
-				// Drain water ahead
-				int drainAheadRadius = ring - 2;
-				if (drainAheadRadius > 0) {
-					drainWaterAtRadius(world, drainAheadRadius, erosion);
-				}
-				// Fill/destroy the ring
-				fillSliceAtRadius(world, ring, erosion);
-				ringsProcessed++;
-				
-				// Log first few rings to verify processing
-				if (ring >= state.startRadius - 3 || ring <= 3) {
-					Logging.SINGULARITY.info("[CollapseProcessor] Processing ring {} (lastRing={}, currentRing={})", 
-							ring, lastRing, currentRing);
+			try (LogScope scope = Logging.SINGULARITY.scope("iterate-rings", LogLevel.INFO)) {
+				for (int ring = lastRing - 1; ring >= currentRing && ring >= 0; ring--) {
+					// Drain water ahead
+					int drainAheadRadius = ring - 2;
+					if (drainAheadRadius > 0) {
+						drainWaterAtRadius(world, drainAheadRadius, erosion);
+					}
+					// Fill/destroy the ring
+					fillSliceAtRadius(world, ring, erosion);
+					ringsProcessed++;
+
+					// Log first few rings to verify processing
+					if (ring >= state.startRadius - 3 || ring <= 3) {
+						scope.branch("entry").kv("ring", ring).kv("lastRing", lastRing).kv("currentRing", currentRing);
+					}
 				}
 			}
 		} else {
 			// Process from lastRing up to currentRing
-			for (int ring = lastRing + 1; ring <= currentRing && ring <= (int) state.startRadius; ring++) {
-				// Drain water ahead
-				int drainAheadRadius = ring + 2;
-				drainWaterAtRadius(world, drainAheadRadius, erosion);
-				// Fill/destroy the ring
-				fillSliceAtRadius(world, ring, erosion);
-				ringsProcessed++;
-				
-				// Log first few rings to verify processing
-				if (ring <= 3 || ring >= state.startRadius - 3) {
-					Logging.SINGULARITY.info("[CollapseProcessor] Processing ring {} (lastRing={}, currentRing={})", 
-							ring, lastRing, currentRing);
+			try (LogScope scope = Logging.SINGULARITY.scope("iterate-rings", LogLevel.INFO)) {
+				for (int ring = lastRing + 1; ring <= currentRing && ring <= (int) state.startRadius; ring++) {
+					// Drain water ahead
+					int drainAheadRadius = ring + 2;
+					drainWaterAtRadius(world, drainAheadRadius, erosion);
+					// Fill/destroy the ring
+					fillSliceAtRadius(world, ring, erosion);
+					ringsProcessed++;
+
+					// Log first few rings to verify processing
+					if (ring <= 3 || ring >= state.startRadius - 3) {
+						scope.branch("entry").kv("ring", ring).kv("lastRing", lastRing).kv("currentRing", currentRing);
+					}
 				}
 			}
 		}
