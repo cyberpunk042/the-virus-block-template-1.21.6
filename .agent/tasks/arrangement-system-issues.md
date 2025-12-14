@@ -1,14 +1,44 @@
-# Arrangement System - Critical Issues Report
+# Arrangement System - Issues Report
 
-**Date:** 2025-12-13  
-**Status:** BLOCKED - Fundamental algorithm/math errors identified  
-**Author:** AI Assistant (with caveats noted below)
+**Date:** 2025-12-13 (Updated: 2025-12-14)  
+**Status:** ✅ MOSTLY RESOLVED - Pattern system working for all shapes  
+**Author:** AI Assistant
 
 ---
 
-## Project Introduction
+## Session Update (2025-12-14)
 
-**the-virus-block** is a Minecraft mod that renders customizable 3D visual field effects around the player. The mod supports multiple shape types:
+### Issues Resolved This Session
+
+1. **Pattern not working for most shapes** - ✅ FIXED
+   - Root cause: GUI offered patterns from wrong CellType
+   - Fix: Updated PATTERN_OPTIONS to include patterns from ALL CellTypes
+   - Fix: Added `findPatternByNameForCellType()` to resolve by name in expected type
+
+2. **Subdivision causing empty faces** - ✅ FIXED
+   - Root cause: Pattern filtering applied BEFORE subdivision
+   - Fix: Skip pattern filtering when `subdivisions > 0`
+
+3. **Reset button not showing** - ✅ FIXED
+   - Root cause: `registerWidgets()` didn't re-add resetBtn
+   - Fix: Added resetBtn to the re-registration list
+
+4. **Button text with random ":"** - ✅ DOCUMENTED
+   - Cause: CyclingButtonWidget default behavior
+   - Fix: Always use `.omitKeyText()` 
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `ShapeSubPanel.java` | Updated PATTERN_OPTIONS, fixed onPatternChanged |
+| `VertexPattern.java` | Added findPatternByNameForCellType() |
+| `PolyhedronTessellator.java` | Skip pattern filter when subdividing |
+| `FieldCustomizerScreen.java` | Added resetBtn to registerWidgets() |
+
+---
+
+
 - **Sphere** (UV, Icosphere, Lat/Lon algorithms)
 - **Prism** (N-sided extruded polygons)
 - **Cylinder** (circular prisms)

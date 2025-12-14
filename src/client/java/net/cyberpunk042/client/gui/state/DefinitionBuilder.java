@@ -594,13 +594,13 @@ public final class DefinitionBuilder {
             case "disc" -> state.disc();
             case "cylinder" -> state.cylinder();
             case "prism" -> state.prism();
-            // Polyhedra - create the correct type based on shapeType, using radius from state.polyhedron()
+            // Polyhedra - create the correct type based on shapeType, using radius AND subdivisions from state
             case "polyhedron" -> state.polyhedron();
-            case "cube" -> PolyhedronShape.cube(state.polyhedron().radius());
-            case "octahedron" -> PolyhedronShape.octahedron(state.polyhedron().radius());
-            case "icosahedron" -> PolyhedronShape.icosahedron(state.polyhedron().radius());
-            case "tetrahedron" -> PolyhedronShape.tetrahedron(state.polyhedron().radius());
-            case "dodecahedron" -> PolyhedronShape.dodecahedron(state.polyhedron().radius());
+            case "cube" -> PolyhedronShape.subdivided(net.cyberpunk042.visual.shape.PolyType.CUBE, state.polyhedron().radius(), state.polyhedron().subdivisions());
+            case "octahedron" -> PolyhedronShape.subdivided(net.cyberpunk042.visual.shape.PolyType.OCTAHEDRON, state.polyhedron().radius(), state.polyhedron().subdivisions());
+            case "icosahedron" -> PolyhedronShape.subdivided(net.cyberpunk042.visual.shape.PolyType.ICOSAHEDRON, state.polyhedron().radius(), state.polyhedron().subdivisions());
+            case "tetrahedron" -> PolyhedronShape.subdivided(net.cyberpunk042.visual.shape.PolyType.TETRAHEDRON, state.polyhedron().radius(), state.polyhedron().subdivisions());
+            case "dodecahedron" -> PolyhedronShape.subdivided(net.cyberpunk042.visual.shape.PolyType.DODECAHEDRON, state.polyhedron().radius(), state.polyhedron().subdivisions());
             // New shapes
             case "torus" -> state.torus();
             case "capsule" -> state.capsule();

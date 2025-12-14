@@ -16,6 +16,8 @@ import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import java.util.ArrayList;
 import java.util.List;
 
+import net.cyberpunk042.visual.pattern.ArrangementConfig;
+
 /**
  * G62-G70: Shape-specific parameter controls.
  * 
@@ -99,6 +101,28 @@ public class ShapeSubPanel extends AbstractPanel {
     // G70: Polyhedron controls (Type is determined by shape selection, not dropdown)
     private LabeledSlider polyRadius;
     private LabeledSlider polySubdivisions;
+    
+    // Pattern controls (for face pattern selection)
+    private CyclingButtonWidget<String> patternFaces;
+    private CyclingButtonWidget<String> patternBody;
+    private CyclingButtonWidget<String> patternTop;
+    private CyclingButtonWidget<String> patternBottom;
+    
+    // Available pattern options - includes patterns from ALL CellTypes:
+    // SEGMENT (rings): full, alternating, sparse, quarter
+    // SECTOR (disc, caps): full, half, quarters, pinwheel
+    // TRIANGLE (polyhedra): full, alternating, sparse
+    // QUAD (spheres, cylinder sides): filled_1, triangle_1, tooth_1
+    private static final List<String> PATTERN_OPTIONS = List.of(
+        "full",         // Universal: SEGMENT, SECTOR, TRIANGLE
+        "alternating",  // SEGMENT, TRIANGLE
+        "sparse",       // SEGMENT, TRIANGLE
+        "half",         // SECTOR (disc, caps): every other
+        "pinwheel",     // SECTOR: alternating pattern
+        "filled_1",     // QUAD: standard filled
+        "triangle_1",   // QUAD: triangle variation
+        "tooth_1"       // QUAD: tooth/sawtooth
+    );
     
     // Shape type selector
     private CyclingButtonWidget<ShapeKind> shapeTypeDropdown;
@@ -221,6 +245,11 @@ public class ShapeSubPanel extends AbstractPanel {
                 (btn, val) -> applyPreset(val));
         widgets.add(fragmentDropdown);
         y += GuiConstants.COMPACT_HEIGHT + GuiConstants.COMPACT_GAP;
+        
+        // ═══════════════════════════════════════════════════════════════════════
+        // PATTERN SECTION - Per-part face patterns
+        // ═══════════════════════════════════════════════════════════════════════
+        y = buildPatternControls(x, y, w, shapeType);
         
         switch (shapeType.toLowerCase()) {
             case "sphere" -> buildSphereControls(x, y, w);
@@ -645,6 +674,107 @@ public class ShapeSubPanel extends AbstractPanel {
             .position(x, y).width(w).range(8, 64).initial(state.getInt("cone.segments")).format("%d").step(4)
             .onChange(v -> onUserChange(() -> state.set("cone.segments", Math.round(v)))).build();
         widgets.add(segments);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PATTERN CONTROLS - Face pattern selection per shape part
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Builds pattern controls based on shape type.
+     * @return Updated Y position after adding controls
+     */
+    private int buildPatternControls(int x, int y, int w, String shapeType) {
+        // Clear previous pattern widgets
+        patternFaces = null;
+        patternBody = null;
+        patternTop = null;
+        patternBottom = null;
+        
+        ArrangementConfig arr = state.arrangement();
+        String shape = shapeType.toLowerCase();
+        
+        // Shapes with per-part patterns (body, top, bottom)
+        if (shape.equals("cylinder") || shape.equals("prism") || shape.equals("beam")) {
+            // Three compact buttons in a row: [Body] [Top] [Bot]
+            int padding = 2;
+            int btnWidth = (w - padding * 2) / 3;
+            
+            patternBody = CyclingButtonWidget.<String>builder(v -> net.minecraft.text.Text.literal("B " + capitalize(v)))
+                .values(PATTERN_OPTIONS)
+                .initially(arr.getPattern("sides"))
+                .tooltip(v -> net.minecraft.client.gui.tooltip.Tooltip.of(net.minecraft.text.Text.literal("Body pattern: " + v)))
+                .omitKeyText()  // Prevents colon prefix
+                .build(x, y, btnWidth, GuiConstants.COMPACT_HEIGHT, net.minecraft.text.Text.empty(),
+                    (btn, val) -> onPatternChanged("sides", val));
+            widgets.add(patternBody);
+            
+            patternTop = CyclingButtonWidget.<String>builder(v -> net.minecraft.text.Text.literal("T " + capitalize(v)))
+                .values(PATTERN_OPTIONS)
+                .initially(arr.getPattern("capTop"))
+                .tooltip(v -> net.minecraft.client.gui.tooltip.Tooltip.of(net.minecraft.text.Text.literal("Top cap pattern: " + v)))
+                .omitKeyText()  // Prevents colon prefix
+                .build(x + btnWidth + padding, y, btnWidth, GuiConstants.COMPACT_HEIGHT, net.minecraft.text.Text.empty(),
+                    (btn, val) -> onPatternChanged("capTop", val));
+            widgets.add(patternTop);
+            
+            patternBottom = CyclingButtonWidget.<String>builder(v -> net.minecraft.text.Text.literal("B " + capitalize(v)))
+                .values(PATTERN_OPTIONS)
+                .initially(arr.getPattern("capBottom"))
+                .tooltip(v -> net.minecraft.client.gui.tooltip.Tooltip.of(net.minecraft.text.Text.literal("Bottom cap pattern: " + v)))
+                .omitKeyText()  // Prevents colon prefix
+                .build(x + (btnWidth + padding) * 2, y, btnWidth, GuiConstants.COMPACT_HEIGHT, net.minecraft.text.Text.empty(),
+                    (btn, val) -> onPatternChanged("capBottom", val));
+            widgets.add(patternBottom);
+            
+            y += GuiConstants.COMPACT_HEIGHT + GuiConstants.COMPACT_GAP;
+        } else {
+            // Single faces pattern button (full width)
+            patternFaces = CyclingButtonWidget.<String>builder(v -> net.minecraft.text.Text.literal("Pattern " + capitalize(v)))
+                .values(PATTERN_OPTIONS)
+                .initially(arr.getPattern("faces"))
+                .tooltip(v -> net.minecraft.client.gui.tooltip.Tooltip.of(net.minecraft.text.Text.literal("Face pattern: " + v)))
+                .omitKeyText()  // Prevents colon prefix
+                .build(x, y, w, GuiConstants.COMPACT_HEIGHT, net.minecraft.text.Text.empty(),
+                    (btn, val) -> onPatternChanged("faces", val));
+            widgets.add(patternFaces);
+            
+            y += GuiConstants.COMPACT_HEIGHT + GuiConstants.COMPACT_GAP;
+        }
+        
+        return y;
+    }
+    
+    /** Updates arrangement when pattern changes. */
+    private void onPatternChanged(String partName, String patternName) {
+        ArrangementConfig current = state.arrangement();
+        ArrangementConfig.Builder builder = current.toBuilder();
+        
+        switch (partName) {
+            case "faces" -> {
+                // Set ALL part keys that different renderers use so pattern works for ALL shapes:
+                // - defaultPattern: fallback for any unset part
+                // - faces: polyhedra (PolyhedronRenderer)
+                // - main: spheres (SphereRenderer)  
+                // - surface: rings, discs, cones, torus (RingRenderer, DiscRenderer, ConeRenderer, TorusRenderer)
+                builder.defaultPattern(patternName);
+                builder.faces(patternName);
+                builder.main(patternName);
+                builder.surface(patternName);
+            }
+            case "sides" -> builder.sides(patternName);
+            case "capTop" -> builder.capTop(patternName);
+            case "capBottom" -> builder.capBottom(patternName);
+        }
+        
+        state.set(builder.build());
+        Logging.GUI.topic("panel").debug("Pattern changed: {} = {}", partName, patternName);
+    }
+    
+    /** Capitalizes first letter of pattern name for display. */
+    private static String capitalize(String s) {
+        if (s == null || s.isEmpty()) return s;
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
     
     @Override

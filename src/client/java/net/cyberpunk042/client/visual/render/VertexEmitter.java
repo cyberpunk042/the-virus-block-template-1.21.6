@@ -174,9 +174,14 @@ public final class VertexEmitter {
     }
     
     private void emitQuads(Mesh mesh) {
+        // Render quads as 2 triangles (Minecraft expects triangles)
         mesh.forEachQuad((v0, v1, v2, v3) -> {
+            // First triangle: v0, v1, v2
             emitVertex(v0);
             emitVertex(v1);
+            emitVertex(v2);
+            // Second triangle: v0, v2, v3
+            emitVertex(v0);
             emitVertex(v2);
             emitVertex(v3);
         });
@@ -362,21 +367,36 @@ public final class VertexEmitter {
             return;
         }
         
-        // Note: Wireframe emission converts triangles to edge lines
+        PrimitiveType primType = mesh.primitiveType();
         
-        // For wireframe, we emit each edge as a line
-        // This is a simplified implementation - real wireframe would need edge extraction
-        mesh.forEachTriangle((v0, v1, v2) -> {
-            // Emit the three edges of each triangle
-            emitLineVertex(v0, v1);
-            emitLineVertex(v1, v0);
-            
-            emitLineVertex(v1, v2);
-            emitLineVertex(v2, v1);
-            
-            emitLineVertex(v2, v0);
-            emitLineVertex(v0, v2);
-        });
+        if (primType == PrimitiveType.QUADS) {
+            // For quads, draw only the 4 edges (not the internal diagonal)
+            mesh.forEachQuad((v0, v1, v2, v3) -> {
+                emitLineVertex(v0, v1);
+                emitLineVertex(v1, v0);
+                
+                emitLineVertex(v1, v2);
+                emitLineVertex(v2, v1);
+                
+                emitLineVertex(v2, v3);
+                emitLineVertex(v3, v2);
+                
+                emitLineVertex(v3, v0);
+                emitLineVertex(v0, v3);
+            });
+        } else {
+            // For triangles, draw all 3 edges per triangle
+            mesh.forEachTriangle((v0, v1, v2) -> {
+                emitLineVertex(v0, v1);
+                emitLineVertex(v1, v0);
+                
+                emitLineVertex(v1, v2);
+                emitLineVertex(v2, v1);
+                
+                emitLineVertex(v2, v0);
+                emitLineVertex(v0, v2);
+            });
+        }
     }
     
     /**
@@ -418,12 +438,25 @@ public final class VertexEmitter {
         int g = (argb >> 8) & 0xFF;
         int b = argb & 0xFF;
         
-        // Emit wireframe edges from triangles
-        mesh.forEachTriangle((v0, v1, v2) -> {
-            emitLineSegment(consumer, matrix, v0, v1, r, g, b, a);
-            emitLineSegment(consumer, matrix, v1, v2, r, g, b, a);
-            emitLineSegment(consumer, matrix, v2, v0, r, g, b, a);
-        });
+        // Handle different primitive types for proper wireframe
+        PrimitiveType primType = mesh.primitiveType();
+        
+        if (primType == PrimitiveType.QUADS) {
+            // For quads, draw only the 4 edges (not the internal diagonal)
+            mesh.forEachQuad((v0, v1, v2, v3) -> {
+                emitLineSegment(consumer, matrix, v0, v1, r, g, b, a);
+                emitLineSegment(consumer, matrix, v1, v2, r, g, b, a);
+                emitLineSegment(consumer, matrix, v2, v3, r, g, b, a);
+                emitLineSegment(consumer, matrix, v3, v0, r, g, b, a);
+            });
+        } else {
+            // For triangles, draw all 3 edges per triangle
+            mesh.forEachTriangle((v0, v1, v2) -> {
+                emitLineSegment(consumer, matrix, v0, v1, r, g, b, a);
+                emitLineSegment(consumer, matrix, v1, v2, r, g, b, a);
+                emitLineSegment(consumer, matrix, v2, v0, r, g, b, a);
+            });
+        }
     }
     
     private static void emitLineSegment(

@@ -67,18 +67,19 @@ public class ModifiersSubPanel extends AbstractPanel {    private int startY;
         this.panelW = width;
         
         int w = width - 2 * GuiConstants.PADDING;
-        int currentY = GuiConstants.TAB_HEIGHT + GuiConstants.PADDING;
+        // Start at y=0 since PanelWrapper handles positioning
+        int currentY = GuiConstants.PADDING;
         int sliderX = GuiConstants.PADDING;
         this.startY = currentY;
         
         var textRenderer = MinecraftClient.getInstance().textRenderer;
         
         // ═══════════════════════════════════════════════════════════════════════
-        // FIELD MODIFIERS
+        // FIELD MODIFIERS - Compact section
         // ═══════════════════════════════════════════════════════════════════════
         
         // Section label drawn in render()
-        currentY += 14; // Space for label
+        currentY += 12; // Compact space for label
         
         bobbingSlider = LabeledSlider.builder("Bobbing")
             .position(sliderX, currentY).width(w)
@@ -86,7 +87,7 @@ public class ModifiersSubPanel extends AbstractPanel {    private int startY;
             .onChange(v -> { state.set("modifiers.bobbing", v); })
             .build();
         widgets.add(bobbingSlider);
-        currentY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        currentY += GuiConstants.WIDGET_HEIGHT + 2;  // Tighter spacing
         
         breathingSlider = LabeledSlider.builder("Breathing")
             .position(sliderX, currentY).width(w)
@@ -94,13 +95,13 @@ public class ModifiersSubPanel extends AbstractPanel {    private int startY;
             .onChange(v -> { state.set("modifiers.breathing", v); })
             .build();
         widgets.add(breathingSlider);
-        currentY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING * 2;
+        currentY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
         // ═══════════════════════════════════════════════════════════════════════
-        // COLOR CYCLE
+        // COLOR CYCLE - Compact section
         // ═══════════════════════════════════════════════════════════════════════
         
-        currentY += 14; // Section label
+        currentY += 10; // Compact section label
         
         colorCycleEnabled = GuiWidgets.checkbox(sliderX, currentY, "Color Cycle", state.colorCycle().isActive(),
             "Enable color cycling animation", textRenderer, v -> {
@@ -134,13 +135,13 @@ public class ModifiersSubPanel extends AbstractPanel {    private int startY;
         colorCycleBlend = GuiWidgets.checkbox(sliderX, currentY, "Smooth Blend", state.getBool("colorCycle.blend"),
             "Smooth color transitions", textRenderer, v -> state.set("colorCycle.blend", v));
         widgets.add(colorCycleBlend);
-        currentY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING * 2;
+        currentY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
         // ═══════════════════════════════════════════════════════════════════════
-        // WOBBLE
+        // WOBBLE - Compact section
         // ═══════════════════════════════════════════════════════════════════════
         
-        currentY += 14; // Section label
+        currentY += 10; // Compact section label
         
         // Handle nullable wobble config
         WobbleConfig wobble = state.wobble();
@@ -184,13 +185,13 @@ public class ModifiersSubPanel extends AbstractPanel {    private int startY;
             .onChange(v -> { state.set("wobble.speed", v); })
             .build();
         widgets.add(wobbleSpeed);
-        currentY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING * 2;
+        currentY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
         // ═══════════════════════════════════════════════════════════════════════
-        // WAVE
+        // WAVE - Compact section
         // ═══════════════════════════════════════════════════════════════════════
         
-        currentY += 14; // Section label
+        currentY += 10; // Compact section label
         
         // Handle nullable wave config
         WaveConfig wave = state.wave();

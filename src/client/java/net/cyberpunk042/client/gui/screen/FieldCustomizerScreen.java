@@ -404,8 +404,8 @@ public class FieldCustomizerScreen extends Screen {
         int titleH = 16;
         int padding = 4;
         
-        // Title bar with Reset button on the right
-        ButtonWidget rightResetBtn = addDrawableChild(ButtonWidget.builder(Text.literal("R"), btn -> resetState())
+        // Title bar with Reset button on the right (uses class field for persistence)
+        resetBtn = addDrawableChild(ButtonWidget.builder(Text.literal("R"), btn -> resetState())
             .dimensions(x + w - 18, y + 2, 14, 12)
             .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Reset to defaults")))
             .build());
@@ -477,6 +477,7 @@ public class FieldCustomizerScreen extends Screen {
             .addTab("Anim", createAnimationContent())
             .addTab("Pred", createPredictionContent())
             .addTab("Link", createLinkingContent())
+            .addTab("Mod", createModifiersContent())  // Moved from Debug tab
             .onTabChange(idx -> refreshSubTabWidgets());
         advancedSubTabs.setBounds(subTabBounds);
         
@@ -484,8 +485,6 @@ public class FieldCustomizerScreen extends Screen {
             .addTab("Beam", createBeamContent())
             .addTab("Trig", createTriggerContent())
             .addTab("Life", createLifecycleContent())
-            .addTab("Mod", createModifiersContent())
-            .addTab("Arr", createArrangeContent())
             .addTab("Bind", createBindingsContent())
             .addTab("Trace", createTraceContent())
             .onTabChange(idx -> refreshSubTabWidgets());
@@ -704,21 +703,20 @@ public class FieldCustomizerScreen extends Screen {
             .onTabChange(idx -> refreshSubTabWidgets());
         quickSubTabs.setBounds(subTabArea);
         
-        // Advanced sub-tabs: Animation, Prediction, Linking
+        // Advanced sub-tabs: Animation, Prediction, Linking, Modifiers
         advancedSubTabs = new SubTabPane(textRenderer)
             .addTab("Anim", createAnimationContent())
             .addTab("Predict", createPredictionContent())
             .addTab("Linking", createLinkingContent())
+            .addTab("Mods", createModifiersContent())  // Moved from Debug tab
             .onTabChange(idx -> refreshSubTabWidgets());
         advancedSubTabs.setBounds(subTabArea);
         
-        // Debug sub-tabs: Beam, Trigger, Lifecycle, Modifiers, Arrange, Bindings, Trace
+        // Debug sub-tabs: Beam, Trigger, Lifecycle, Arrange, Bindings, Trace
         debugSubTabs = new SubTabPane(textRenderer)
             .addTab("Beam", createBeamContent())
             .addTab("Trigger", createTriggerContent())
             .addTab("Life", createLifecycleContent())
-            .addTab("Mods", createModifiersContent())
-            .addTab("Arr", createArrangeContent())
             .addTab("Bindings", createBindingsContent())
             .addTab("Trace", createTraceContent())
             .onTabChange(idx -> refreshSubTabWidgets());
@@ -914,6 +912,7 @@ public class FieldCustomizerScreen extends Screen {
         // Re-add fixed elements (buttons that are positioned absolutely)
         if (modeToggleBtn != null) addDrawableChild(modeToggleBtn);
         if (fieldToggleBtn != null) addDrawableChild(fieldToggleBtn);
+        if (resetBtn != null) addDrawableChild(resetBtn);  // Reset button in title bar
         if (closeBtn != null) addDrawableChild(closeBtn);
         if (quickTabBtn != null) addDrawableChild(quickTabBtn);
         if (advancedTabBtn != null) addDrawableChild(advancedTabBtn);

@@ -316,13 +316,14 @@ public final class PolyhedronTessellator implements Tessellator {
     // =========================================================================
     
     /**
-     * Generates a cube mesh.
+     * Generates a cube mesh using QUADS for cleaner wireframe.
      * 
-     * <p>A cube has 8 vertices and 6 square faces. Each face is tessellated
-     * into 2 triangles. Vertices are at distance R/√3 from center on each axis.</p>
+     * <p>A cube has 8 vertices and 6 square faces. Using QUADS means wireframe
+     * draws only the 4 edges per face (no diagonal cut). Solid rendering
+     * converts quads to triangles automatically.</p>
      */
     private Mesh tessellateCube() {
-        MeshBuilder builder = MeshBuilder.triangles();
+        MeshBuilder builder = MeshBuilder.quads();
         
         // Scale to inscribed radius (vertex distance from center)
         float r = radius / SQRT_3;
@@ -368,20 +369,20 @@ public final class PolyhedronTessellator implements Tessellator {
             if (!pattern.shouldRender(i, totalFaces)) {
                 continue;
             }
-            emitCubeFace(builder, vertices, faces[i], faceIndices[i]);
+            emitCubeQuad(builder, vertices, faces[i], faceIndices[i]);
         }
         
         return builder.build();
     }
     
     /**
-     * Emits a cube face as two triangles (BOTH windings for debugging).
+     * Emits a cube face as a quad (both windings for double-sided visibility).
      * @param builder Mesh builder
      * @param vertices Vertex array
      * @param face Face enum with normal
      * @param indices 4 vertex indices forming the quad
      */
-    private void emitCubeFace(MeshBuilder builder, float[][] vertices, 
+    private void emitCubeQuad(MeshBuilder builder, float[][] vertices, 
                                CubeFace face, int[] indices) {
         float[] n = face.normal();
         
@@ -391,28 +392,20 @@ public final class PolyhedronTessellator implements Tessellator {
         float[] v2 = vertices[indices[2]];
         float[] v3 = vertices[indices[3]];
         
-        // Emit front-facing triangles: v0→v1→v2 and v0→v2→v3
+        // Emit front-facing quad: v0→v1→v2→v3
         int i0 = emitVertex(builder, v0, n, 0, 0);
         int i1 = emitVertex(builder, v1, n, 1, 0);
         int i2 = emitVertex(builder, v2, n, 1, 1);
-        builder.triangle(i0, i1, i2);
+        int i3 = emitVertex(builder, v3, n, 0, 1);
+        builder.quad(i0, i1, i2, i3);
         
-        int i3 = emitVertex(builder, v0, n, 0, 0);
-        int i4 = emitVertex(builder, v2, n, 1, 1);
-        int i5 = emitVertex(builder, v3, n, 0, 1);
-        builder.triangle(i3, i4, i5);
-        
-        // Also emit back-facing triangles (reversed winding)
+        // Also emit back-facing quad (reversed winding)
         float[] invN = {-n[0], -n[1], -n[2]};
         int j0 = emitVertex(builder, v0, invN, 0, 0);
-        int j1 = emitVertex(builder, v2, invN, 1, 1);
-        int j2 = emitVertex(builder, v1, invN, 1, 0);
-        builder.triangle(j0, j1, j2);
-        
-        int j3 = emitVertex(builder, v0, invN, 0, 0);
-        int j4 = emitVertex(builder, v3, invN, 0, 1);
-        int j5 = emitVertex(builder, v2, invN, 1, 1);
-        builder.triangle(j3, j4, j5);
+        int j1 = emitVertex(builder, v3, invN, 0, 1);
+        int j2 = emitVertex(builder, v2, invN, 1, 1);
+        int j3 = emitVertex(builder, v1, invN, 1, 0);
+        builder.quad(j0, j1, j2, j3);
     }
     
     // =========================================================================
@@ -617,70 +610,56 @@ public final class PolyhedronTessellator implements Tessellator {
     private Mesh tessellateDodecahedron() {
         MeshBuilder builder = MeshBuilder.triangles();
         
-        // Dodecahedron vertices using golden ratio
-        // Using standard vertex ordering for correct face connectivity
+        // Dodecahedron vertices - mathematically verified via Python
         float s = radius / (float) Math.sqrt(3.0);
         float phi = PHI;         // ≈ 1.618
         float invPhi = INV_PHI;  // ≈ 0.618
         
-        // 20 vertices with cyclic permutations
-        // The key is using the correct vertex layout that produces valid pentagonal faces
+        // 20 vertices (computed via Python with numpy)
         float[][] vertices = {
-            // 8 cube vertices (indices 0-7)
-            { s,  s,  s},  // 0: +++
-            { s,  s, -s},  // 1: ++-
-            { s, -s,  s},  // 2: +-+
-            { s, -s, -s},  // 3: +--
-            {-s,  s,  s},  // 4: -++
-            {-s,  s, -s},  // 5: -+-
-            {-s, -s,  s},  // 6: --+
-            {-s, -s, -s},  // 7: ---
-            
-            // 4 vertices in YZ plane (x=0): (0, ±φ, ±1/φ)
-            {0,  phi * s,  invPhi * s},  // 8
-            {0,  phi * s, -invPhi * s},  // 9
-            {0, -phi * s,  invPhi * s},  // 10
-            {0, -phi * s, -invPhi * s},  // 11
-            
-            // 4 vertices in XZ plane (y=0): (±φ, 0, ±1/φ)
-            { phi * s, 0,  invPhi * s},  // 12
-            { phi * s, 0, -invPhi * s},  // 13
-            {-phi * s, 0,  invPhi * s},  // 14
-            {-phi * s, 0, -invPhi * s},  // 15
-            
-            // 4 vertices in XY plane (z=0): (±1/φ, ±φ, 0)
-            { invPhi * s,  phi * s, 0},  // 16
-            { invPhi * s, -phi * s, 0},  // 17
-            {-invPhi * s,  phi * s, 0},  // 18
-            {-invPhi * s, -phi * s, 0}   // 19
+            {-s, -s, -s},  // 0
+            {-s, -s,  s},  // 1
+            {-s,  s, -s},  // 2
+            {-s,  s,  s},  // 3
+            { s, -s, -s},  // 4
+            { s, -s,  s},  // 5
+            { s,  s, -s},  // 6
+            { s,  s,  s},  // 7
+            {0, -invPhi * s, -phi * s},  // 8
+            {0, -invPhi * s,  phi * s},  // 9
+            {0,  invPhi * s, -phi * s},  // 10
+            {0,  invPhi * s,  phi * s},  // 11
+            {-invPhi * s, -phi * s, 0},  // 12
+            {-invPhi * s,  phi * s, 0},  // 13
+            { invPhi * s, -phi * s, 0},  // 14
+            { invPhi * s,  phi * s, 0},  // 15
+            {-phi * s, 0, -invPhi * s},  // 16
+            {-phi * s, 0,  invPhi * s},  // 17
+            { phi * s, 0, -invPhi * s},  // 18
+            { phi * s, 0,  invPhi * s},  // 19
         };
         
-        // 12 pentagonal faces - derived from standard dodecahedron connectivity
-        // Each vertex appears in exactly 3 faces, each edge in exactly 2 faces
+        // 12 pentagonal faces (mathematically verified via Python DFS)
         int[][] pentagons = {
-            // Faces around +X vertices (0, 1, 2, 3)
-            {0, 2, 12, 13,  1},   // Face near +X, +Y
-            {2, 0, 16,  8, 12},  // Face near +X, +Z
-            {1, 3, 17, 11, 13},  // Face near +X, -Z
-            {3, 2, 10, 19, 17},  // Face near +X, -Y
-            
-            // Faces around -X vertices (4, 5, 6, 7)
-            {4, 5,  9,  8, 18},  // Face near -X, +Y
-            {6, 4, 18, 14, 10},  // Face near -X, +Z
-            {5, 7, 19, 15,  9},  // Face near -X, -Z
-            {7, 6, 10, 11, 19},  // Face near -X, -Y
-            
-            // Top and bottom faces
-            {0, 1, 16,  9,  8},  // Top-right
-            {4, 5, 18,  8,  9},  // Top-left
-            {2, 3, 17, 11, 10},  // Bottom-right
-            {6, 7, 19, 11, 10}   // Bottom-left
+            { 0,  8,  4, 14, 12},  // Face 0
+            { 0,  8, 10,  2, 16},  // Face 1
+            { 0, 12,  1, 17, 16},  // Face 2
+            { 1,  9,  5, 14, 12},  // Face 3
+            { 1,  9, 11,  3, 17},  // Face 4
+            { 2, 10,  6, 15, 13},  // Face 5
+            { 2, 13,  3, 17, 16},  // Face 6
+            { 3, 11,  7, 15, 13},  // Face 7
+            { 4,  8, 10,  6, 18},  // Face 8
+            { 4, 14,  5, 19, 18},  // Face 9
+            { 5,  9, 11,  7, 19},  // Face 10
+            { 6, 15,  7, 19, 18},  // Face 11
         };
         
         // Tessellate each pentagon from its center with pattern support
+        // Skip pattern filtering when subdividing - we want solid base mesh
         int totalPentagons = pentagons.length;
         for (int i = 0; i < totalPentagons; i++) {
-            if (!pattern.shouldRender(i, totalPentagons)) {
+            if (subdivisions == 0 && !pattern.shouldRender(i, totalPentagons)) {
                 continue;
             }
             emitPentagon(builder, vertices, pentagons[i]);
@@ -809,33 +788,49 @@ public final class PolyhedronTessellator implements Tessellator {
     private Mesh subdivideOnce(Mesh mesh) {
         MeshBuilder builder = MeshBuilder.triangles();
         
-        // Process each triangle
-        mesh.forEachTriangle((v0, v1, v2) -> {
-            // Calculate edge midpoints
-            Vertex m01 = midpoint(v0, v1);  // Midpoint of edge v0-v1
-            Vertex m12 = midpoint(v1, v2);  // Midpoint of edge v1-v2
-            Vertex m20 = midpoint(v2, v0);  // Midpoint of edge v2-v0
-            
-            // Project midpoints onto sphere surface (normalize to radius)
-            m01 = projectToSphere(m01);
-            m12 = projectToSphere(m12);
-            m20 = projectToSphere(m20);
-            
-            // Emit 4 new triangles
-            // Triangle 1: Top corner (v0, m01, m20)
-            emitSubdividedTriangle(builder, v0, m01, m20);
-            
-            // Triangle 2: Left corner (m01, v1, m12)
-            emitSubdividedTriangle(builder, m01, v1, m12);
-            
-            // Triangle 3: Center (m01, m12, m20)
-            emitSubdividedTriangle(builder, m01, m12, m20);
-            
-            // Triangle 4: Right corner (m20, m12, v2)
-            emitSubdividedTriangle(builder, m20, m12, v2);
-        });
+        // Handle QUADS by treating each quad as 2 triangles
+        if (mesh.primitiveType() == PrimitiveType.QUADS) {
+            mesh.forEachQuad((v0, v1, v2, v3) -> {
+                // Quad becomes 2 triangles: (v0,v1,v2) and (v0,v2,v3)
+                subdivideTriangle(builder, v0, v1, v2);
+                subdivideTriangle(builder, v0, v2, v3);
+            });
+        } else {
+            // Process each triangle
+            mesh.forEachTriangle((v0, v1, v2) -> {
+                subdivideTriangle(builder, v0, v1, v2);
+            });
+        }
         
         return builder.build();
+    }
+    
+    /**
+     * Subdivides a single triangle into 4 triangles.
+     */
+    private void subdivideTriangle(MeshBuilder builder, Vertex v0, Vertex v1, Vertex v2) {
+        // Calculate edge midpoints
+        Vertex m01 = midpoint(v0, v1);  // Midpoint of edge v0-v1
+        Vertex m12 = midpoint(v1, v2);  // Midpoint of edge v1-v2
+        Vertex m20 = midpoint(v2, v0);  // Midpoint of edge v2-v0
+        
+        // Project midpoints onto sphere surface (normalize to radius)
+        m01 = projectToSphere(m01);
+        m12 = projectToSphere(m12);
+        m20 = projectToSphere(m20);
+        
+        // Emit 4 new triangles
+        // Triangle 1: Top corner (v0, m01, m20)
+        emitSubdividedTriangle(builder, v0, m01, m20);
+        
+        // Triangle 2: Left corner (m01, v1, m12)
+        emitSubdividedTriangle(builder, m01, v1, m12);
+        
+        // Triangle 3: Center (m01, m12, m20)
+        emitSubdividedTriangle(builder, m01, m12, m20);
+        
+        // Triangle 4: Right corner (m20, m12, v2)
+        emitSubdividedTriangle(builder, m20, m12, v2);
     }
     
     /**
@@ -899,9 +894,10 @@ public final class PolyhedronTessellator implements Tessellator {
      * Emits a triangle from 3 vertices to the mesh builder.
      */
     private void emitSubdividedTriangle(MeshBuilder builder, Vertex v0, Vertex v1, Vertex v2) {
-        builder.vertex(v0.x(), v0.y(), v0.z(), v0.nx(), v0.ny(), v0.nz(), v0.u(), v0.v());
-        builder.vertex(v1.x(), v1.y(), v1.z(), v1.nx(), v1.ny(), v1.nz(), v1.u(), v1.v());
-        builder.vertex(v2.x(), v2.y(), v2.z(), v2.nx(), v2.ny(), v2.nz(), v2.u(), v2.v());
+        int i0 = builder.vertex(v0.x(), v0.y(), v0.z(), v0.nx(), v0.ny(), v0.nz(), v0.u(), v0.v());
+        int i1 = builder.vertex(v1.x(), v1.y(), v1.z(), v1.nx(), v1.ny(), v1.nz(), v1.u(), v1.v());
+        int i2 = builder.vertex(v2.x(), v2.y(), v2.z(), v2.nx(), v2.ny(), v2.nz(), v2.u(), v2.v());
+        builder.triangle(i0, i1, i2);  // Must create the triangle primitive!
     }
     
     // =========================================================================
@@ -914,8 +910,9 @@ public final class PolyhedronTessellator implements Tessellator {
      */
     private void emitTriangle(MeshBuilder builder, float[][] vertices, int[] face,
                                int faceIndex, int totalFaces) {
-        // Check pattern visibility for this face
-        if (!pattern.shouldRender(faceIndex, totalFaces)) {
+        // When subdividing, don't filter by pattern - we want a solid base mesh
+        // Pattern filtering only makes sense for non-subdivided meshes
+        if (subdivisions == 0 && !pattern.shouldRender(faceIndex, totalFaces)) {
             return;
         }
         

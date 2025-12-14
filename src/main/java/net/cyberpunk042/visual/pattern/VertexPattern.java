@@ -143,24 +143,52 @@ public interface VertexPattern {
     
     /**
      * Resolves a pattern for a specific CellType.
-     * <p>If the pattern's cellType doesn't match, returns a default pattern for the expected type.</p>
+     * <p>If the pattern's cellType doesn't match, first tries to find a pattern with
+     * the same name in the expected CellType. Falls back to default if not found.</p>
      * 
      * @param patternName Pattern name
      * @param expectedCellType The CellType the shape expects
-     * @return The pattern, or a default pattern for the expected CellType if mismatched
+     * @return The pattern, or equivalent pattern for the expected CellType
      */
     static VertexPattern resolveForCellType(String patternName, CellType expectedCellType) {
         VertexPattern pattern = fromString(patternName);
         
         if (pattern.cellType() != expectedCellType) {
+            // Try to find a pattern with the same name in the expected CellType
+            VertexPattern equivalentPattern = findPatternByNameForCellType(patternName, expectedCellType);
+            if (equivalentPattern != null) {
+                net.cyberpunk042.log.Logging.FIELD.topic("pattern")
+                    .debug("Pattern '{}' resolved to {} for cellType {}",
+                        patternName, equivalentPattern.id(), expectedCellType);
+                return equivalentPattern;
+            }
+            
+            // Fall back to default for this CellType
             net.cyberpunk042.log.Logging.FIELD.topic("pattern")
                 .reason("celltype mismatch")
-                .debug("Pattern '{}' is for {} but shape expects {} - using default",
-                    patternName, pattern.cellType(), expectedCellType);
+                .debug("Pattern '{}' not found for {} - using default",
+                    patternName, expectedCellType);
             return defaultForCellType(expectedCellType);
         }
         
         return pattern;
+    }
+    
+    /**
+     * Tries to find a pattern by name in a specific CellType.
+     * @return The pattern if found, or null
+     */
+    private static VertexPattern findPatternByNameForCellType(String patternName, CellType cellType) {
+        if (patternName == null) return null;
+        String lower = patternName.toLowerCase().trim();
+        
+        return switch (cellType) {
+            case QUAD -> QuadPattern.fromId(lower);
+            case SEGMENT -> SegmentPattern.fromId(lower);
+            case SECTOR -> SectorPattern.fromId(lower);
+            case EDGE -> EdgePattern.fromId(lower);
+            case TRIANGLE -> TrianglePattern.fromId(lower);
+        };
     }
     
     /**

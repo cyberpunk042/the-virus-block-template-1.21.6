@@ -1,6 +1,7 @@
 package net.cyberpunk042.client.gui.panel;
 
-import net.cyberpunk042.client.gui.panel.sub.ArrangeSubPanel;
+// COMMENTED OUT - Arrangement panel moved to Quick tab as simplified Pattern controls
+// import net.cyberpunk042.client.gui.panel.sub.ArrangeSubPanel;
 import net.cyberpunk042.client.gui.panel.sub.BindingsSubPanel;
 import net.cyberpunk042.client.gui.panel.sub.BeamSubPanel;
 import net.cyberpunk042.client.gui.panel.sub.LifecycleSubPanel;
@@ -37,7 +38,8 @@ public class DebugPanel extends AbstractPanel {
     private TriggerSubPanel triggerPanel;
     private BindingsSubPanel bindingsPanel;
     private BeamSubPanel beamPanel;
-    private ArrangeSubPanel arrangePanel;
+    // COMMENTED OUT - see init method for details
+    // private ArrangeSubPanel arrangePanel;
     
     private ButtonWidget testFieldBtn;
     private ButtonWidget debounceToggleBtn;
@@ -116,14 +118,20 @@ public class DebugPanel extends AbstractPanel {
         beamPanel.init(width, height);
         contentY += beamPanel.getHeight() + GuiConstants.SECTION_SPACING;
         
-        // Arrangement/Shuffle panel (uses setBounds which triggers init via reflow)
-        arrangePanel = new ArrangeSubPanel(parent, state, MinecraftClient.getInstance().textRenderer);
-        arrangePanel.setBounds(new net.cyberpunk042.client.gui.layout.Bounds(0, contentY, width, 300));
-        contentY += arrangePanel.getHeight() + GuiConstants.SECTION_SPACING;
+        // =========================================================================
+        // ARRANGEMENT PANEL - COMMENTED OUT
+        // The arrangement/shuffle system has been simplified. Pattern controls
+        // are now available in the Quick tab below Shape section.
+        // Keeping this code for reference in case advanced shuffle features
+        // are needed in the future.
+        // =========================================================================
+        // arrangePanel = new ArrangeSubPanel(parent, state, MinecraftClient.getInstance().textRenderer);
+        // arrangePanel.setBounds(new net.cyberpunk042.client.gui.layout.Bounds(0, contentY, width, 300));
+        // contentY += arrangePanel.getHeight() + GuiConstants.SECTION_SPACING;
         
         contentHeight = contentY;
         
-        Logging.GUI.topic("panel").debug("DebugPanel initialized with 5 sub-panels");
+        Logging.GUI.topic("panel").debug("DebugPanel initialized with 4 sub-panels");
     }
     
     @Override
@@ -183,9 +191,10 @@ public class DebugPanel extends AbstractPanel {
         if (beamPanel != null) {
             beamPanel.render(context, mouseX, mouseY + scrollOffset, delta);
         }
-        if (arrangePanel != null) {
-            arrangePanel.render(context, mouseX, mouseY + scrollOffset, delta);
-        }
+        // ARRANGEMENT PANEL - COMMENTED OUT (see init method for details)
+        // if (arrangePanel != null) {
+        //     arrangePanel.render(context, mouseX, mouseY + scrollOffset, delta);
+        // }
         
         context.disableScissor();
     }
