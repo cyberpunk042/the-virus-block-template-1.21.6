@@ -199,6 +199,62 @@ public final class MeshBuilder {
     }
     
     /**
+     * Emits triangles for a cell of ANY type using the pattern's vertex ordering.
+     * 
+     * <p>This is the <b>universal</b> method for pattern-based rendering. It works with:
+     * <ul>
+     *   <li>QUAD cells (4 vertices) -> pattern returns 2 triangles</li>
+     *   <li>SECTOR cells (3 vertices: center, edge0, edge1) -> pattern returns 1 triangle</li>
+     *   <li>TRIANGLE cells (3 vertices: A, B, C) -> pattern returns 1 triangle</li>
+     *   <li>SEGMENT cells (4 vertices: inner0, inner1, outer0, outer1) -> pattern returns 2 triangles</li>
+     * </ul>
+     * 
+     * <p>Usage example:
+     * <pre>
+     * // For a sector (disc slice)
+     * int[] cellVertices = {centerIdx, edge0Idx, edge1Idx};
+     * builder.emitCellFromPattern(cellVertices, sectorPattern);
+     * 
+     * // For a quad
+     * int[] cellVertices = {topLeft, topRight, bottomLeft, bottomRight};
+     * builder.emitCellFromPattern(cellVertices, quadPattern);
+     * </pre>
+     * 
+     * @param cellVertices Array of vertex indices for this cell (3 for triangles/sectors, 4 for quads/segments)
+     * @param pattern The pattern that defines how to triangulate this cell
+     * @return this builder for chaining
+     */
+    public MeshBuilder emitCellFromPattern(int[] cellVertices, net.cyberpunk042.visual.pattern.VertexPattern pattern) {
+        if (cellVertices == null || cellVertices.length < 3) {
+            return this;
+        }
+        
+        // Get vertex ordering from pattern (or use default if null)
+        int[][] vertexOrder;
+        if (pattern == null) {
+            // Default: single triangle using first 3 vertices
+            vertexOrder = new int[][] {{ 0, 1, 2 }};
+        } else {
+            vertexOrder = pattern.getVertexOrder();
+            if (vertexOrder == null || vertexOrder.length == 0) {
+                vertexOrder = new int[][] {{ 0, 1, 2 }};
+            }
+        }
+        
+        // Emit each triangle specified by the pattern
+        for (int[] tri : vertexOrder) {
+            if (tri.length >= 3) {
+                // Map pattern indices to actual vertex indices
+                int i0 = tri[0] < cellVertices.length ? cellVertices[tri[0]] : cellVertices[0];
+                int i1 = tri[1] < cellVertices.length ? cellVertices[tri[1]] : cellVertices[1];
+                int i2 = tri[2] < cellVertices.length ? cellVertices[tri[2]] : cellVertices[2];
+                triangle(i0, i1, i2);
+            }
+        }
+        return this;
+    }
+    
+    /**
      * Adds a quad connecting four vertices by index.
      * <p>Only valid for {@link PrimitiveType#QUADS} builders.
      * 
@@ -256,9 +312,13 @@ public final class MeshBuilder {
      * @return this builder for chaining
      */
     public MeshBuilder quadAsTriangles(int topLeft, int topRight, int bottomRight, int bottomLeft) {
-        // Two triangles forming a quad (DEFAULT pattern)
-        triangle(topLeft, bottomLeft, topRight);      // Upper-left triangle
-        triangle(topRight, bottomLeft, bottomRight);  // Lower-right triangle
+        // Use working sphere inline pattern: BL→BR→TL, BR→TR→TL (CCW from outside)
+        // Quad layout:
+        //   topLeft ─── topRight
+        //      │           │
+        //   bottomLeft ─ bottomRight
+        triangle(bottomLeft, bottomRight, topLeft);
+        triangle(bottomRight, topRight, topLeft);
         return this;
     }
     
@@ -331,6 +391,51 @@ public final class MeshBuilder {
                 int v0 = cornerToIndex(corners, tri[0]);
                 int v1 = cornerToIndex(corners, tri[1]);
                 int v2 = cornerToIndex(corners, tri[2]);
+                triangle(v0, v1, v2);
+            }
+        }
+        return this;
+    }
+    
+    /**
+     * Adds a quad as triangles using any VertexPattern.
+     * Uses getVertexOrder() which works for both QuadPattern and ShufflePattern.
+     *
+     * @param topLeft top-left vertex index
+     * @param topRight top-right vertex index
+     * @param bottomRight bottom-right vertex index
+     * @param bottomLeft bottom-left vertex index
+     * @param pattern any VertexPattern (QuadPattern, ShufflePattern, etc.)
+     * @return this builder for chaining
+     */
+    public MeshBuilder quadAsTrianglesFromPattern(int topLeft, int topRight, int bottomRight, int bottomLeft, 
+                                        net.cyberpunk042.visual.pattern.VertexPattern pattern) {
+        if (pattern == null) {
+            return quadAsTriangles(topLeft, topRight, bottomRight, bottomLeft);
+        }
+        
+        // If it's a QuadPattern, use the specialized method
+        if (pattern instanceof net.cyberpunk042.visual.pattern.QuadPattern qp) {
+            return quadAsTriangles(topLeft, topRight, bottomRight, bottomLeft, qp);
+        }
+        
+        // Map corner indices to match Corner enum: 0=TL, 1=TR, 2=BL, 3=BR
+        // Method takes (topLeft, topRight, bottomRight, bottomLeft) but 
+        // Corner enum has BL=2, BR=3, so we must reorder correctly
+        int[] corners = {topLeft, topRight, bottomLeft, bottomRight};
+        
+        // Get vertex order from pattern
+        int[][] vertexOrder = pattern.getVertexOrder();
+        if (vertexOrder == null || vertexOrder.length == 0) {
+            return quadAsTriangles(topLeft, topRight, bottomRight, bottomLeft);
+        }
+        
+        // Emit triangles based on vertex order
+        for (int[] tri : vertexOrder) {
+            if (tri.length >= 3) {
+                int v0 = corners[tri[0]];
+                int v1 = corners[tri[1]];
+                int v2 = corners[tri[2]];
                 triangle(v0, v1, v2);
             }
         }

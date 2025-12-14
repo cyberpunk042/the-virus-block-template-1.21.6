@@ -155,17 +155,20 @@ public final class LayerRenderer {
     
     /**
      * Gets the appropriate VertexConsumer for a primitive based on its fill mode.
-     * - SOLID → solidTranslucent (triangles)
+     * - SOLID → solidTranslucent or solidTranslucentNoCull (if doubleSided)
      * - WIREFRAME, CAGE → lines (line rendering)
      * - POINTS → solidTranslucent (uses tiny quads)
      */
     private static VertexConsumer getConsumerForPrimitive(VertexConsumerProvider consumers, Primitive primitive) {
         FillConfig fill = primitive.fill();
         FillMode mode = fill != null ? fill.mode() : FillMode.SOLID;
+        boolean doubleSided = fill != null && fill.doubleSided();
         
         return switch (mode) {
             case WIREFRAME, CAGE -> consumers.getBuffer(FieldRenderLayers.lines());
-            case SOLID, POINTS -> consumers.getBuffer(FieldRenderLayers.solidTranslucent());
+            case SOLID, POINTS -> consumers.getBuffer(
+                doubleSided ? FieldRenderLayers.solidTranslucentNoCull() : FieldRenderLayers.solidTranslucent()
+            );
         };
     }
     
@@ -509,35 +512,24 @@ public final class LayerRenderer {
     }
     
     /**
-     * Applies facing rotation based on player state.
-     * Facing makes the primitive orient in a specific direction.
+     * Applies facing rotation (static directional orientation).
+     * Facing makes the primitive orient in a specific direction (TOP, FRONT, BACK, etc.).
      */
     private static void applyFacing(MatrixStack matrices, Facing facing, net.minecraft.client.MinecraftClient client) {
-        if (client.player == null) return;
+        if (facing == Facing.FIXED || facing == Facing.TOP) {
+            // FIXED and TOP are default orientation - no rotation needed
+            return;
+        }
         
-        switch (facing) {
-            case PLAYER_LOOK -> {
-                // Rotate to face the same direction player is looking
-                float yaw = client.player.getYaw();
-                matrices.multiply(net.minecraft.util.math.RotationAxis.POSITIVE_Y.rotationDegrees(-yaw + 180));
-            }
-            case VELOCITY -> {
-                // Rotate to face player's movement direction
-                var velocity = client.player.getVelocity();
-                if (velocity.lengthSquared() > 0.001) {
-                    float angle = (float) Math.toDegrees(Math.atan2(velocity.x, velocity.z));
-                    matrices.multiply(net.minecraft.util.math.RotationAxis.POSITIVE_Y.rotationDegrees(-angle + 180));
-                }
-            }
-            case CAMERA -> {
-                // Face the camera (like billboard but for directional objects)
-                if (client.gameRenderer != null && client.gameRenderer.getCamera() != null) {
-                    var camera = client.gameRenderer.getCamera();
-                    matrices.multiply(net.minecraft.util.math.RotationAxis.POSITIVE_Y.rotationDegrees(180 - camera.getYaw()));
-                    matrices.multiply(net.minecraft.util.math.RotationAxis.POSITIVE_X.rotationDegrees(-camera.getPitch()));
-                }
-            }
-            case FIXED -> {} // No rotation
+        // Apply rotations from the Facing enum
+        if (facing.pitch() != 0) {
+            matrices.multiply(net.minecraft.util.math.RotationAxis.POSITIVE_X.rotationDegrees(facing.pitch()));
+        }
+        if (facing.yaw() != 0) {
+            matrices.multiply(net.minecraft.util.math.RotationAxis.POSITIVE_Y.rotationDegrees(facing.yaw()));
+        }
+        if (facing.roll() != 0) {
+            matrices.multiply(net.minecraft.util.math.RotationAxis.POSITIVE_Z.rotationDegrees(facing.roll()));
         }
     }
     

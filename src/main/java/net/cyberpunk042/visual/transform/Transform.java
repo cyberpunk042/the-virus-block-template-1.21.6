@@ -1,4 +1,5 @@
 package net.cyberpunk042.visual.transform;
+import net.cyberpunk042.visual.transform.Facing;
 
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3f;
@@ -104,7 +105,7 @@ public record Transform(
     /** Billboard transform (always faces camera). */
     public static final Transform BILLBOARD = new Transform(
         Anchor.CENTER, null, null, true, 1.0f, null, false,
-        Facing.CAMERA, UpVector.WORLD_UP, Billboard.FULL, null);
+        Facing.FIXED, UpVector.WORLD_UP, Billboard.FULL, null);
     
     // =========================================================================
     // Factory Methods

@@ -3,6 +3,7 @@ package net.cyberpunk042.client.visual.mesh;
 import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.visual.pattern.VertexPattern;
 import net.cyberpunk042.visual.pattern.QuadPattern;
+import net.cyberpunk042.visual.pattern.TrianglePattern;
 import net.cyberpunk042.visual.shape.SphereAlgorithm;
 import net.cyberpunk042.visual.shape.SphereShape;
 import net.cyberpunk042.visual.visibility.VisibilityMask;
@@ -183,13 +184,9 @@ public final class SphereTessellator {
                 int bottomLeft = vertexIndices[lat + 1][lon];
                 int bottomRight = vertexIndices[lat + 1][lon + 1];
                 
-                // Emit triangles using pattern's vertex order
-                if (pattern instanceof QuadPattern qp) {
-                    builder.quadAsTriangles(topLeft, topRight, bottomRight, bottomLeft, qp);
-                } else {
-                    builder.triangle(topLeft, topRight, bottomRight);
-                    builder.triangle(topLeft, bottomRight, bottomLeft);
-                }
+                // Use quadAsTrianglesFromPattern which works with any VertexPattern
+                // (QuadPattern, ShufflePattern, etc.)
+                builder.quadAsTrianglesFromPattern(topLeft, topRight, bottomRight, bottomLeft, pattern);
             }
         }
         
@@ -268,11 +265,12 @@ public final class SphereTessellator {
             }
         }
         
-        // Bottom cap triangles (last ring to pole)
+        // Bottom cap triangles (last ring to pole) - CCW when viewed from below
         int lastRing = ringStartIndices[ringStartIndices.length - 1];
         for (int seg = 0; seg < segments; seg++) {
             int nextSeg = (seg + 1) % segments;
-            builder.triangle(lastRing + seg, lastRing + nextSeg, bottomPole);
+            // From below, we need: ring[nextSeg] → ring[seg] → pole
+            builder.triangle(lastRing + nextSeg, lastRing + seg, bottomPole);
         }
         
         return logAndBuild(builder, "UV_SPHERE");
@@ -365,9 +363,10 @@ public final class SphereTessellator {
             triangles = newTriangles;
         }
         
-        // Add triangles to mesh
+        // Add triangles to mesh using emitCellFromPattern for proper vertex ordering
+        VertexPattern trianglePattern = TrianglePattern.DEFAULT;
         for (int[] tri : triangles) {
-            builder.triangle(tri[0], tri[1], tri[2]);
+            builder.emitCellFromPattern(tri, trianglePattern);
         }
         
         return logAndBuild(builder, "ICO_SPHERE (subdiv=" + subdivisions + ")");

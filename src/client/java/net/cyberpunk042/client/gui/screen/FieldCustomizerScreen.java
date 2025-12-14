@@ -282,7 +282,7 @@ public class FieldCustomizerScreen extends Screen {
             .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Close")))
             .build());
         
-        resetBtn = addDrawableChild(ButtonWidget.builder(Text.literal("↺"), btn -> resetState())
+        resetBtn = addDrawableChild(ButtonWidget.builder(Text.literal("R"), btn -> resetState())
             .dimensions(x + w - 32, y + 2, 14, 12)
             .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Reset to defaults")))
             .build());
@@ -404,7 +404,13 @@ public class FieldCustomizerScreen extends Screen {
         int titleH = 16;
         int padding = 4;
         
-        y += titleH; // Skip title area (we'll draw "Context" manually)
+        // Title bar with Reset button on the right
+        ButtonWidget rightResetBtn = addDrawableChild(ButtonWidget.builder(Text.literal("R"), btn -> resetState())
+            .dimensions(x + w - 18, y + 2, 14, 12)
+            .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Reset to defaults")))
+            .build());
+        
+        y += titleH; // Move past title area
         
         // Compact selectors
         Bounds layerBounds = new Bounds(x + padding, y, w - padding * 2, SELECTOR_HEIGHT);
@@ -463,14 +469,13 @@ public class FieldCustomizerScreen extends Screen {
             .addTab("Fill", createFillContent())
             .addTab("App", createAppearanceContent())
             .addTab("Vis", createVisibilityContent())
+            .addTab("Xfm", createUnifiedTransformContent())  // Transform + Orbit unified
             .onTabChange(idx -> refreshSubTabWidgets());
         quickSubTabs.setBounds(subTabBounds);
         
         advancedSubTabs = new SubTabPane(textRenderer)
             .addTab("Anim", createAnimationContent())
-            .addTab("Xfm", createTransformContent())
             .addTab("Pred", createPredictionContent())
-            .addTab("Orb", createOrbitContent())
             .addTab("Link", createLinkingContent())
             .onTabChange(idx -> refreshSubTabWidgets());
         advancedSubTabs.setBounds(subTabBounds);
@@ -519,9 +524,9 @@ public class FieldCustomizerScreen extends Screen {
             .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Toggle field visibility")))
             .build());
         
-        // Reset button
-        resetBtn = addDrawableChild(ButtonWidget.builder(Text.literal("↺"), btn -> resetState())
-            .dimensions(width - MARGIN - 38, y, 18, 18)
+        // Reset button - use text label for visibility
+        resetBtn = addDrawableChild(ButtonWidget.builder(Text.literal("RST"), btn -> resetState())
+            .dimensions(width - MARGIN - 60, y, 40, 18)
             .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Reset to defaults")))
             .build());
         
@@ -690,20 +695,19 @@ public class FieldCustomizerScreen extends Screen {
         // Sub-tab area: top-right, below selectors
         Bounds subTabArea = grid.topRight().withoutTop(SELECTOR_HEIGHT * 2 + 4);
         
-        // Quick sub-tabs: Fill, Appearance, Visibility
+        // Quick sub-tabs: Fill, Appearance, Visibility, Transform
         quickSubTabs = new SubTabPane(textRenderer)
             .addTab("Fill", createFillContent())
             .addTab("Appear", createAppearanceContent())
             .addTab("Visibility", createVisibilityContent())
+            .addTab("Xfm", createUnifiedTransformContent())  // Transform + Orbit unified
             .onTabChange(idx -> refreshSubTabWidgets());
         quickSubTabs.setBounds(subTabArea);
         
-        // Advanced sub-tabs: Animation, Transform, Prediction, Orbit, Linking
+        // Advanced sub-tabs: Animation, Prediction, Linking
         advancedSubTabs = new SubTabPane(textRenderer)
             .addTab("Anim", createAnimationContent())
-            .addTab("Transform", createTransformContent())
             .addTab("Predict", createPredictionContent())
-            .addTab("Orbit", createOrbitContent())
             .addTab("Linking", createLinkingContent())
             .onTabChange(idx -> refreshSubTabWidgets());
         advancedSubTabs.setBounds(subTabArea);
@@ -806,6 +810,10 @@ public class FieldCustomizerScreen extends Screen {
         return new PanelWrapper(new AnimationSubPanel(this, state, 0));
     }
     
+    private SubTabPane.ContentProvider createUnifiedTransformContent() {
+        return new PanelWrapper(new TransformQuickSubPanel(this, state, 0));
+    }
+    
     private SubTabPane.ContentProvider createTransformContent() {
         return new PanelWrapper(new TransformSubPanel(this, state, 0));
     }
@@ -835,7 +843,9 @@ public class FieldCustomizerScreen extends Screen {
     }
     
     private SubTabPane.ContentProvider createArrangeContent() {
-        return new PanelWrapper(new ArrangeSubPanel(this, state, textRenderer));
+        ArrangeSubPanel panel = new ArrangeSubPanel(this, state, textRenderer);
+        panel.setWidgetChangedCallback(this::registerWidgets);
+        return new PanelWrapper(panel);
     }
     
     private SubTabPane.ContentProvider createLinkingContent() {

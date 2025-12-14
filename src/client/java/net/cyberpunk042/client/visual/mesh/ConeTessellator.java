@@ -96,7 +96,9 @@ public final class ConeTessellator {
                 if (visibility != null && !visibility.isVisible(0.5f, segFrac)) continue;
                 if (!pattern.shouldRender(seg, segments)) continue;
                 
-                builder.triangle(bottomVerts[seg], apexIdx, bottomVerts[seg + 1]);
+                // Triangle from bottom edge to apex - CCW when viewed from outside
+                // bottom[seg+1] → apex → bottom[seg] for CCW
+                builder.triangle(bottomVerts[seg + 1], apexIdx, bottomVerts[seg]);
             }
         } else {
             // =============================================================
@@ -127,8 +129,9 @@ public final class ConeTessellator {
                 int t0 = topVerts[seg];
                 int t1 = topVerts[seg + 1];
                 
-                builder.triangle(b0, t0, t1);
-                builder.triangle(b0, t1, b1);
+                // Side quad with pattern support
+                // TL=t0, TR=t1, BR=b1, BL=b0
+                builder.quadAsTrianglesFromPattern(t0, t1, b1, b0, pattern);
             }
             
             // Top cap (if not open)
@@ -139,7 +142,9 @@ public final class ConeTessellator {
                     if (visibility != null && !visibility.isVisible(0f, segFrac)) continue;
                     if (!pattern.shouldRender(seg, segments)) continue;
                     
-                    builder.triangle(topVerts[seg], topCenterIdx, topVerts[seg + 1]);
+                    // Top cap - CCW when viewed from above
+                    // center → edge[seg+1] → edge[seg] for CCW (so edge[seg] is on the right)
+                    builder.triangle(topCenterIdx, topVerts[seg + 1], topVerts[seg]);
                 }
             }
         }

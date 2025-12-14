@@ -1,0 +1,41 @@
+{
+    "type": "shield",
+    "baseRadius": 12.0,
+    "theme": "cyber_green",
+    "layers": [
+        {
+            "id": "cone_layer",
+            "primitives": [
+                {
+                    "id": "main_cone",
+                    "type": "cone",
+                    "shape": {
+                        "bottomRadius": 0.6,
+                        "topRadius": 0.0,
+                        "height": 1.2,
+                        "segments": 24
+                    },
+                    "appearance": {
+                        "color": "primary",
+                        "alpha": {
+                            "min": 0.4,
+                            "max": 0.6
+                        },
+                        "glow": 0.3
+                    },
+                    "arrangement": "filled_1",
+                    "animation": {
+                        "spin": {
+                            "speed": 0.4,
+                            "axis": "Y"
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "modifiers": {
+        "visualScale": 1.0
+    },
+    "id": "shape_cone_default"
+}

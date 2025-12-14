@@ -30,10 +30,15 @@ public final class CylinderTessellator {
     private CylinderTessellator() {}
     
     /**
-     * Tessellates a cylinder shape into a mesh.
+     * Tessellates a cylinder shape into a mesh with separate patterns for parts.
+     * 
+     * @param shape The cylinder shape
+     * @param sidesPattern Pattern for side walls (QUAD)
+     * @param capPattern Pattern for top/bottom caps (SECTOR)
+     * @param visibility Visibility mask
      */
-    public static Mesh tessellate(CylinderShape shape, VertexPattern pattern,
-                                   VisibilityMask visibility) {
+    public static Mesh tessellate(CylinderShape shape, VertexPattern sidesPattern,
+                                   VertexPattern capPattern, VisibilityMask visibility) {
         if (shape == null) {
             throw new IllegalArgumentException("CylinderShape cannot be null");
         }
@@ -57,19 +62,27 @@ public final class CylinderTessellator {
         float yBase = -height / 2;
         float yTop = height / 2;
         
-        // === SIDE WALL ===
+        // === SIDE WALL (uses sidesPattern) ===
         tessellateSideWall(builder, segments, bottomR, topR, height, heightSegs,
-                           yBase, arc, pattern, visibility);
+                           yBase, arc, sidesPattern, visibility);
         
-        // === CAPS ===
+        // === CAPS (uses capPattern) ===
         if (shape.capBottom()) {
-            tessellateCap(builder, segments, bottomR, yBase, false, arc);
+            tessellateCap(builder, segments, bottomR, yBase, false, arc, capPattern);
         }
         if (shape.capTop()) {
-            tessellateCap(builder, segments, topR, yTop, true, arc);
+            tessellateCap(builder, segments, topR, yTop, true, arc, capPattern);
         }
         
         return builder.build();
+    }
+    
+    /**
+     * Tessellates with single pattern for all parts (legacy compatibility).
+     */
+    public static Mesh tessellate(CylinderShape shape, VertexPattern pattern,
+                                   VisibilityMask visibility) {
+        return tessellate(shape, pattern, pattern, visibility);
     }
     
     public static Mesh tessellate(CylinderShape shape) {
@@ -113,8 +126,10 @@ public final class CylinderTessellator {
                 int i01 = builder.addVertex(v01);
                 int i11 = builder.addVertex(v11);
                 
-                builder.triangle(i00, i10, i11);
-                builder.triangle(i00, i11, i01);
+                // Indices: i00=BL(bot,angle0), i10=BR(bot,angle1), i01=TL(top,angle0), i11=TR(top,angle1)
+                // Use quadAsTrianglesFromPattern for pattern support
+                // TL=i01, TR=i11, BR=i10, BL=i00
+                builder.quadAsTrianglesFromPattern(i01, i11, i10, i00, pattern);
             }
         }
     }
@@ -124,7 +139,8 @@ public final class CylinderTessellator {
     // =========================================================================
     
     private static void tessellateCap(MeshBuilder builder, int segments, 
-                                       float radius, float y, boolean isTop, float arc) {
+                                       float radius, float y, boolean isTop, float arc,
+                                       VertexPattern pattern) {
         // Center vertex
         Vertex center = GeometryMath.discCenter(y);
         center = new Vertex(center.x(), center.y(), center.z(), 
@@ -140,13 +156,29 @@ public final class CylinderTessellator {
             edgeIndices[s] = builder.addVertex(v);
         }
         
-        // Triangulate
+        // Triangulate with pattern support
         for (int s = 0; s < segments; s++) {
-            if (isTop) {
-                builder.triangle(centerIdx, edgeIndices[s], edgeIndices[s + 1]);
-            } else {
-                builder.triangle(centerIdx, edgeIndices[s + 1], edgeIndices[s]);
+            // Check pattern visibility for this sector
+            if (pattern != null && !pattern.shouldRender(s, segments)) {
+                continue;
             }
+            
+            // Build cell vertices array: [center, edge0, edge1]
+            // Winding order (same logic as PrismTessellator):
+            // - discPoint generates vertices CCW when viewed from BELOW (-Y)
+            // - For TOP cap (viewed from +Y), reverse order for CCW from above
+            // - For BOTTOM cap (viewed from -Y), natural order for CCW from below
+            int[] cellVertices;
+            if (isTop) {
+                // Top cap: reverse vertex order for CCW from above
+                cellVertices = new int[] { centerIdx, edgeIndices[s + 1], edgeIndices[s] };
+            } else {
+                // Bottom cap: natural order for CCW from below
+                cellVertices = new int[] { centerIdx, edgeIndices[s], edgeIndices[s + 1] };
+            }
+            
+            // Use generic pattern-based emission
+            builder.emitCellFromPattern(cellVertices, pattern);
         }
     }
 }

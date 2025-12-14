@@ -119,14 +119,19 @@ public final class RingTessellator {
                 continue;
             }
             
-            // Quad: inner[i], inner[i+1], outer[i+1], outer[i]
+            // Quad viewed from above (normal pointing up):
+            //   o0 (outer, angle i) ---- o1 (outer, angle i+1)
+            //          |                       |
+            //   i0 (inner, angle i) ---- i1 (inner, angle i+1)
+            // CCW from above: i0 → i1 → o1, and i0 → o1 → o0
             int i0 = innerIndices[i];
             int i1 = innerIndices[i + 1];
             int o0 = outerIndices[i];
             int o1 = outerIndices[i + 1];
             
-            builder.triangle(i0, o0, o1);
-            builder.triangle(i0, o1, i1);
+            // Use quadAsTrianglesFromPattern for pattern support
+            // TL=o0, TR=o1, BR=i1, BL=i0 (outer = top conceptually)
+            builder.quadAsTrianglesFromPattern(o0, o1, i1, i0, pattern);
         }
         
         return builder.build();
@@ -200,13 +205,13 @@ public final class RingTessellator {
                 continue;
             }
             
-            // Top face (CCW when viewed from above)
-            builder.triangle(topInner[i], topOuter[i], topOuter[i + 1]);
-            builder.triangle(topInner[i], topOuter[i + 1], topInner[i + 1]);
+            // Top face with pattern support
+            // TL=tO[i], TR=tO[i+1], BR=tI[i+1], BL=tI[i]
+            builder.quadAsTrianglesFromPattern(topOuter[i], topOuter[i + 1], topInner[i + 1], topInner[i], pattern);
             
-            // Bottom face (CCW when viewed from below = CW from above)
-            builder.triangle(bottomInner[i], bottomOuter[i + 1], bottomOuter[i]);
-            builder.triangle(bottomInner[i], bottomInner[i + 1], bottomOuter[i + 1]);
+            // Bottom face with pattern support 
+            // TL=bI[i], TR=bI[i+1], BR=bO[i+1], BL=bO[i]
+            builder.quadAsTrianglesFromPattern(bottomInner[i], bottomInner[i + 1], bottomOuter[i + 1], bottomOuter[i], pattern);
         }
         
         // =====================================================================
@@ -237,9 +242,9 @@ public final class RingTessellator {
             if (visibility != null && !visibility.isVisible(1.0f, segFrac)) continue;
             if (!pattern.shouldRender(i, segments)) continue;
             
-            // Outer wall quad (CCW when viewed from outside)
-            builder.triangle(outerWallBottom[i], outerWallTop[i], outerWallTop[i + 1]);
-            builder.triangle(outerWallBottom[i], outerWallTop[i + 1], outerWallBottom[i + 1]);
+            // Outer wall with pattern support
+            // TL=top[i], TR=top[i+1], BR=bot[i+1], BL=bot[i]
+            builder.quadAsTrianglesFromPattern(outerWallTop[i], outerWallTop[i + 1], outerWallBottom[i + 1], outerWallBottom[i], pattern);
         }
         
         // =====================================================================
@@ -270,9 +275,9 @@ public final class RingTessellator {
             if (visibility != null && !visibility.isVisible(0.0f, segFrac)) continue;
             if (!pattern.shouldRender(i, segments)) continue;
             
-            // Inner wall quad (CCW when viewed from inside = reversed winding)
-            builder.triangle(innerWallBottom[i], innerWallTop[i + 1], innerWallTop[i]);
-            builder.triangle(innerWallBottom[i], innerWallBottom[i + 1], innerWallTop[i + 1]);
+            // Inner wall with pattern support
+            // TL=top[i], TR=top[i+1], BR=bot[i+1], BL=bot[i]
+            builder.quadAsTrianglesFromPattern(innerWallTop[i], innerWallTop[i + 1], innerWallBottom[i + 1], innerWallBottom[i], pattern);
         }
         
         // =====================================================================

@@ -2,10 +2,12 @@ package net.cyberpunk042.client.gui.panel.sub;
 
 import net.cyberpunk042.client.gui.layout.Bounds;
 import net.cyberpunk042.client.gui.panel.AbstractPanel;
+import net.cyberpunk042.client.gui.render.SimplifiedFieldRenderer;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.FragmentRegistry;
-import net.cyberpunk042.client.gui.widget.ToastNotification;
+import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.visual.pattern.ArrangementConfig;
 import net.cyberpunk042.visual.pattern.CellType;
 import net.cyberpunk042.visual.pattern.ShuffleGenerator;
 import net.minecraft.client.font.TextRenderer;
@@ -16,7 +18,12 @@ import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+
+import net.cyberpunk042.visual.shape.Shape;
 
 /**
  * Debug sub-panel for Arrangement patterns and Shuffle exploration.
@@ -34,61 +41,68 @@ public class ArrangeSubPanel extends AbstractPanel {
     // Tab state
     private enum Tab { PATTERNS, EXPLORER }
     private Tab currentTab = Tab.PATTERNS;
-    private ButtonWidget patternsTabBtn;
-    private ButtonWidget explorerTabBtn;
     
-    // ═══════════════════════════════════════════════════════════════════════
-    // PATTERNS TAB CONTROLS
-    // ═══════════════════════════════════════════════════════════════════════
-    
-    private CyclingButtonWidget<CellType> patternsCellTypeDropdown;
-    private CyclingButtonWidget<String> patternDropdown;
-    private ButtonWidget perPartToggle;
-    private boolean showPerPartControls = false;
-    
-    // Per-part dropdowns (shown when expanded)
-    private CyclingButtonWidget<String> polesDropdown;
-    private CyclingButtonWidget<String> equatorDropdown;
-    private CyclingButtonWidget<String> capsDropdown;
-    private CyclingButtonWidget<String> sidesDropdown;
-    
-    // ═══════════════════════════════════════════════════════════════════════
-    // EXPLORER TAB CONTROLS
-    // ═══════════════════════════════════════════════════════════════════════
-    
-    private CyclingButtonWidget<CellType> explorerCellTypeDropdown;
-    private ButtonWidget prevBtn;
-    private ButtonWidget nextBtn;
-    private ButtonWidget randomBtn;
-    private TextFieldWidget jumpField;
-    private ButtonWidget jumpBtn;
-    private TextFieldWidget saveNameField;
-    private ButtonWidget saveBtn;
+    // Shared state
+    private String currentPart = "surface";  // Current part being shuffled (sides, capTop, etc.)
+    private CellType currentCellType = CellType.QUAD;
     
     // Explorer state
-    private CellType currentCellType = CellType.QUAD;
     private int currentPermutation = 0;
     private String currentDescription = "";
-    private String knownPatternName = null;  // Non-null if matches a known pattern
     private int[] currentMapping = new int[]{0, 1, 2, 3};
     
-    private int contentHeight = 0;
+    // Patterns tab state
+    private boolean showPerPartControls = false;
+    
+    // Text fields
+    private TextFieldWidget jumpField;
+    private TextFieldWidget saveNameField;
+    
+    // Callback for widget refresh (notifies parent to re-register widgets)
+    private Runnable widgetChangedCallback;
+    
+    public ArrangeSubPanel(Screen parent, FieldEditState state, TextRenderer textRenderer) {
+        super(parent, state);
+        this.textRenderer = textRenderer;
+        Logging.GUI.topic("panel").debug("ArrangeSubPanel created");
+    }
+    
+    /**
+     * Set callback to notify parent when widgets change (for re-registration).
+     */
+    public void setWidgetChangedCallback(Runnable callback) {
+        this.widgetChangedCallback = callback;
+    }
     
     /**
      * Returns the total height of this panel's content.
      */
     public int getHeight() {
-        return Math.max(contentHeight, 200);  // Minimum height
+        return Math.max(contentHeight, 200);
     }
     
-    public ArrangeSubPanel(Screen parent, FieldEditState state, TextRenderer textRenderer) {
-        super(parent, state);
-        this.textRenderer = textRenderer;
+    @Override
+    public void init(int width, int height) {
+        this.panelWidth = width;
+        this.panelHeight = height;
+        
+        if (bounds.isEmpty()) {
+            setBoundsQuiet(new Bounds(0, 0, width, height));
+        }
+        
+        initWidgets();
     }
     
     @Override
     protected void init() {
-        clearWidgets();
+        initWidgets();
+    }
+    
+    /**
+     * Creates all widgets based on current tab.
+     */
+    private void initWidgets() {
+        widgets.clear();
         
         int x = bounds.x();
         int y = bounds.y();
@@ -97,16 +111,16 @@ public class ArrangeSubPanel extends AbstractPanel {
         int tabW = (w - GuiConstants.PADDING) / 2;
         
         // ═══════════════════════════════════════════════════════════════════
-        // TAB BUTTONS
+        // TAB BUTTONS (always visible)
         // ═══════════════════════════════════════════════════════════════════
         
-        patternsTabBtn = addWidget(ButtonWidget.builder(
+        widgets.add(ButtonWidget.builder(
                 Text.literal(currentTab == Tab.PATTERNS ? "§e[Patterns]" : "Patterns"),
                 btn -> switchTab(Tab.PATTERNS))
             .dimensions(x, y, tabW, h - 2)
             .build());
         
-        explorerTabBtn = addWidget(ButtonWidget.builder(
+        widgets.add(ButtonWidget.builder(
                 Text.literal(currentTab == Tab.EXPLORER ? "§e[Explorer]" : "Explorer"),
                 btn -> switchTab(Tab.EXPLORER))
             .dimensions(x + tabW + GuiConstants.PADDING, y, tabW, h - 2)
@@ -115,20 +129,36 @@ public class ArrangeSubPanel extends AbstractPanel {
         y += h + 4;
         
         // ═══════════════════════════════════════════════════════════════════
-        // TAB CONTENT
+        // TAB CONTENT (mutually exclusive)
         // ═══════════════════════════════════════════════════════════════════
         
         if (currentTab == Tab.PATTERNS) {
-            initPatternsTab(x, y, w, h);
+            y = initPatternsTab(x, y, w, h);
         } else {
-            initExplorerTab(x, y, w, h);
+            y = initExplorerTab(x, y, w, h);
         }
+        
+        contentHeight = y - bounds.y() + GuiConstants.PADDING;
+        
+        Logging.GUI.topic("panel").debug("ArrangeSubPanel initialized, tab={}, widgets={}", 
+            currentTab, widgets.size());
     }
     
     private void switchTab(Tab tab) {
         if (currentTab != tab) {
             currentTab = tab;
-            reflow();
+            Logging.GUI.topic("panel").debug("ArrangeSubPanel switching to tab: {}", tab);
+            initWidgets();
+            notifyWidgetsChanged();
+        }
+    }
+    
+    /**
+     * Notify the parent that widgets have changed so it can re-register them.
+     */
+    private void notifyWidgetsChanged() {
+        if (widgetChangedCallback != null) {
+            widgetChangedCallback.run();
         }
     }
     
@@ -136,194 +166,311 @@ public class ArrangeSubPanel extends AbstractPanel {
     // PATTERNS TAB
     // ═══════════════════════════════════════════════════════════════════════════
     
-    private void initPatternsTab(int x, int y, int w, int h) {
+    private int initPatternsTab(int x, int y, int w, int h) {
         int labelW = 60;
         int controlW = w - labelW - GuiConstants.PADDING;
         
         // Cell Type selector
-        patternsCellTypeDropdown = addWidget(CyclingButtonWidget.<CellType>builder(ct -> Text.literal(ct.name()))
+        widgets.add(CyclingButtonWidget.<CellType>builder(ct -> Text.literal(ct.name()))
             .values(CellType.values())
             .initially(currentCellType)
             .build(x + labelW, y, controlW, h, Text.literal("Cell"),
                 (btn, val) -> {
                     currentCellType = val;
-                    reflow();  // Rebuild to show patterns for this cell type
+                    initWidgets();
+                    notifyWidgetsChanged();
                 }));
         y += h + 2;
         
-        // Pattern selector (shows patterns for current cell type)
+        // Pattern selector
         List<String> patterns = getPatternsForCellType(currentCellType);
-        String currentPattern = getStringOrDefault("arrangement.defaultPattern", patterns.get(0));
+        String currentPattern = getPatternFromState(patterns.get(0));
         
-        patternDropdown = addWidget(CyclingButtonWidget.<String>builder(Text::literal)
+        widgets.add(CyclingButtonWidget.<String>builder(Text::literal)
             .values(patterns)
             .initially(patterns.contains(currentPattern) ? currentPattern : patterns.get(0))
             .build(x + labelW, y, controlW, h, Text.literal("Pattern"),
-                (btn, val) -> state.set("arrangement.defaultPattern", val)));
+                (btn, val) -> applyPatternToState(val)));
         y += h + 4;
         
         // Per-Part toggle
-        perPartToggle = addWidget(ButtonWidget.builder(
-                Text.literal("Per-Part Overrides"),
+        widgets.add(ButtonWidget.builder(
+                Text.literal(showPerPartControls ? "▼ Per-Part Overrides" : "▶ Per-Part Overrides"),
                 btn -> {
                     showPerPartControls = !showPerPartControls;
-                    reflow();
+                    initWidgets();
+                    notifyWidgetsChanged();
                 })
             .dimensions(x, y, w, h)
             .build());
         y += h + 2;
         
-        // Per-Part dropdowns (only when expanded and shape has parts)
+        // Per-Part dropdowns (only when expanded)
         if (showPerPartControls) {
             String shapeType = state.getString("shapeType").toLowerCase();
             
-            // Show relevant per-part controls based on shape
             if (shapeType.equals("sphere")) {
-                // Poles
-                polesDropdown = addWidget(CyclingButtonWidget.<String>builder(Text::literal)
+                widgets.add(CyclingButtonWidget.<String>builder(Text::literal)
                     .values(patterns)
                     .initially(getStringOrDefault("arrangement.poles", patterns.get(0)))
                     .build(x + labelW, y, controlW, h, Text.literal("Poles"),
-                        (btn, val) -> state.set("arrangement.poles", val)));
+                        (btn, val) -> applyPartPattern("poles", val)));
                 y += h + 2;
                 
-                // Equator
-                equatorDropdown = addWidget(CyclingButtonWidget.<String>builder(Text::literal)
+                widgets.add(CyclingButtonWidget.<String>builder(Text::literal)
                     .values(patterns)
                     .initially(getStringOrDefault("arrangement.equator", patterns.get(0)))
                     .build(x + labelW, y, controlW, h, Text.literal("Equator"),
-                        (btn, val) -> state.set("arrangement.equator", val)));
+                        (btn, val) -> applyPartPattern("equator", val)));
                 y += h + 2;
             } else if (shapeType.equals("prism") || shapeType.equals("cylinder")) {
-                // Caps
-                capsDropdown = addWidget(CyclingButtonWidget.<String>builder(Text::literal)
+                widgets.add(CyclingButtonWidget.<String>builder(Text::literal)
                     .values(patterns)
-                    .initially(getStringOrDefault("arrangement.caps", patterns.get(0)))
+                    .initially(getStringOrDefault("arrangement.capTop", patterns.get(0)))
                     .build(x + labelW, y, controlW, h, Text.literal("Caps"),
-                        (btn, val) -> state.set("arrangement.caps", val)));
+                        (btn, val) -> applyPartPattern("caps", val)));
                 y += h + 2;
                 
-                // Sides
-                sidesDropdown = addWidget(CyclingButtonWidget.<String>builder(Text::literal)
+                widgets.add(CyclingButtonWidget.<String>builder(Text::literal)
                     .values(patterns)
                     .initially(getStringOrDefault("arrangement.sides", patterns.get(0)))
                     .build(x + labelW, y, controlW, h, Text.literal("Sides"),
-                        (btn, val) -> state.set("arrangement.sides", val)));
+                        (btn, val) -> applyPartPattern("sides", val)));
                 y += h + 2;
             }
         }
         
-        contentHeight = y - bounds.y() + GuiConstants.PADDING;
+        return y;
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
     // EXPLORER TAB
     // ═══════════════════════════════════════════════════════════════════════════
     
-    private void initExplorerTab(int x, int y, int w, int h) {
-        int labelW = 50;
-        int controlW = w - labelW - GuiConstants.PADDING;
+    private int initExplorerTab(int x, int y, int w, int h) {
+        // Initial update before building widgets
+        updateShuffleDisplay();
         
-        // Cell Type selector
-        explorerCellTypeDropdown = addWidget(CyclingButtonWidget.<CellType>builder(ct -> Text.literal(ct.name()))
-            .values(CellType.values())
-            .initially(currentCellType)
-            .build(x + labelW, y, controlW, h, Text.literal("Cell"),
+        // Get valid parts for current shape
+        String[] validParts = getValidPartsForShape();
+        
+        // Ensure currentPart is valid for this shape
+        boolean partFound = false;
+        for (String part : validParts) {
+            if (part.equals(currentPart)) {
+                partFound = true;
+                break;
+            }
+        }
+        if (!partFound && validParts.length > 0) {
+            currentPart = validParts[0];
+        }
+        
+        // Get CellType for current part
+        CellType partCellType = getCellTypeForPart(currentPart);
+        if (partCellType != null && partCellType != currentCellType) {
+            currentCellType = partCellType;
+            currentPermutation = 0;
+            updateShuffleDisplay();
+        }
+        
+        // Part selector with label
+        int labelW = 35;  // Width for "Part:" and "Cell:" labels
+        int fieldW = (w - labelW - GuiConstants.COMPACT_GAP) / 2;
+        
+        // Draw "Part:" label (will be rendered in render())
+        // Part selector button (shows "sides", "capTop", "capBottom", etc.)
+        widgets.add(CyclingButtonWidget.<String>builder(part -> Text.literal("Part: " + part))
+            .values(validParts)
+            .initially(currentPart)
+            .omitKeyText()
+            .build(x, y, w / 2 - 2, h, Text.literal(""),
                 (btn, val) -> {
-                    currentCellType = val;
+                    currentPart = val;
+                    // Update CellType to match this part
+                    CellType newCellType = getCellTypeForPart(val);
+                    if (newCellType != null) {
+                        currentCellType = newCellType;
+                    }
                     currentPermutation = 0;
                     updateShuffleDisplay();
-                    applyCurrentShuffle();
+                    initWidgets();
+                    notifyWidgetsChanged();
                 }));
+        
+        // CellType display button (shows "Cell: QUAD", etc.)
+        widgets.add(CyclingButtonWidget.<CellType>builder(ct -> Text.literal("Cell: " + ct.name()))
+            .values(currentCellType)  // Single value - effectively read-only
+            .initially(currentCellType)
+            .omitKeyText()
+            .build(x + w / 2 + 2, y, w / 2 - 2, h, Text.literal(""),
+                (btn, val) -> {}));  // No action - display only
         y += h + 8;
         
-        // Space for the visual diagram (rendered in render())
-        // Leave about 100px for the diagram area
+        // Space for visual diagram (rendered in render())
         y += 80;
         
-        // Navigation buttons
-        int btnW = (w - GuiConstants.PADDING * 2) / 3;
+        // Navigation buttons: ◀ | 🎲 | ▶ (compact)
+        int compactH = GuiConstants.COMPACT_HEIGHT;
+        int btnW = (w - GuiConstants.COMPACT_GAP * 2) / 3;
         
-        prevBtn = addWidget(ButtonWidget.builder(Text.literal("◀ Prev"), btn -> {
+        widgets.add(ButtonWidget.builder(Text.literal("◀"), btn -> {
                 currentPermutation--;
                 if (currentPermutation < 0) {
                     currentPermutation = getTotal() - 1;
                 }
                 updateShuffleDisplay();
-                applyCurrentShuffle();
+                applyCurrentPermutationAsPattern();
             })
-            .dimensions(x, y, btnW, h)
+            .dimensions(x, y, btnW, compactH)
             .build());
         
-        randomBtn = addWidget(ButtonWidget.builder(Text.literal("🎲"), btn -> {
+        widgets.add(ButtonWidget.builder(Text.literal("🎲"), btn -> {
                 currentPermutation = (int)(Math.random() * getTotal());
                 updateShuffleDisplay();
-                applyCurrentShuffle();
-                ToastNotification.info("Random: #" + (currentPermutation + 1));
+                applyCurrentPermutationAsPattern();
             })
-            .dimensions(x + btnW + GuiConstants.PADDING, y, btnW, h)
-            .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Random permutation")))
+            .dimensions(x + btnW + GuiConstants.COMPACT_GAP, y, btnW, compactH)
             .build());
         
-        nextBtn = addWidget(ButtonWidget.builder(Text.literal("Next ▶"), btn -> {
+        widgets.add(ButtonWidget.builder(Text.literal("▶"), btn -> {
                 currentPermutation++;
                 if (currentPermutation >= getTotal()) {
                     currentPermutation = 0;
                 }
                 updateShuffleDisplay();
-                applyCurrentShuffle();
+                applyCurrentPermutationAsPattern();
             })
-            .dimensions(x + (btnW + GuiConstants.PADDING) * 2, y, btnW, h)
+            .dimensions(x + (btnW + GuiConstants.COMPACT_GAP) * 2, y, btnW, compactH)
             .build());
         
-        y += h + 4;
+        y += compactH + GuiConstants.COMPACT_GAP;
         
-        // Jump to #
-        int jumpFieldW = w - 60;
-        jumpField = new TextFieldWidget(textRenderer, x, y, jumpFieldW, h, Text.literal("Jump"));
-        jumpField.setPlaceholder(Text.literal("Jump to #..."));
+        // Jump to # (compact)
+        int jumpFieldW = w - 40;
+        jumpField = new TextFieldWidget(textRenderer, x, y, jumpFieldW, compactH, Text.literal("Jump"));
+        jumpField.setPlaceholder(Text.literal("#..."));
         jumpField.setMaxLength(6);
-        addWidget(jumpField);
+        widgets.add(jumpField);
         
-        jumpBtn = addWidget(ButtonWidget.builder(Text.literal("Go"), btn -> {
+        widgets.add(ButtonWidget.builder(Text.literal("→"), btn -> {
+                if (jumpField == null) return;
                 try {
                     int target = Integer.parseInt(jumpField.getText()) - 1;
                     if (target >= 0 && target < getTotal()) {
                         currentPermutation = target;
                         updateShuffleDisplay();
-                        applyCurrentShuffle();
+                        applyCurrentPermutationAsPattern();
                     } else {
-                        ToastNotification.warning("Invalid: 1-" + getTotal());
+                        Logging.GUI.topic("arrange").warn("Jump target out of range: 1-{}", getTotal());
                     }
                 } catch (NumberFormatException e) {
-                    ToastNotification.warning("Enter a number");
+                    Logging.GUI.topic("arrange").warn("Invalid jump target - enter a number");
                 }
             })
-            .dimensions(x + jumpFieldW + GuiConstants.PADDING, y, 50, h)
+            .dimensions(x + jumpFieldW + GuiConstants.COMPACT_GAP, y, 30, compactH)
             .build());
         
-        y += h + 8;
+        y += compactH + GuiConstants.COMPACT_GAP;
         
-        // Save as pattern (only enabled for new permutations)
-        int saveFieldW = w - 70;
-        saveNameField = new TextFieldWidget(textRenderer, x, y, saveFieldW, h, Text.literal("Name"));
-        saveNameField.setPlaceholder(Text.literal("Pattern name..."));
+        // Save as pattern (compact)
+        int saveFieldW = w - 50;
+        saveNameField = new TextFieldWidget(textRenderer, x, y, saveFieldW, compactH, Text.literal("Name"));
+        saveNameField.setPlaceholder(Text.literal("name.."));
         saveNameField.setMaxLength(32);
-        saveNameField.setEditable(knownPatternName == null);  // Disabled if known pattern
-        addWidget(saveNameField);
+        widgets.add(saveNameField);
         
-        saveBtn = addWidget(ButtonWidget.builder(Text.literal("💾"), btn -> saveAsPattern())
-            .dimensions(x + saveFieldW + GuiConstants.PADDING, y, 60, h)
-            .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Save as named pattern")))
+        widgets.add(ButtonWidget.builder(Text.literal("💾"), btn -> saveAsPattern())
+            .dimensions(x + saveFieldW + GuiConstants.COMPACT_GAP, y, 40, compactH)
             .build());
-        saveBtn.active = (knownPatternName == null);  // Disabled if known pattern
         
-        y += h + 8;
+        y += compactH + 8;
         
-        contentHeight = y - bounds.y() + GuiConstants.PADDING;
+        return y;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // STATE HELPERS
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    private String getPatternFromState(String defaultValue) {
+        ArrangementConfig arr = state.arrangement();
+        if (arr != null && arr.defaultPattern() != null) {
+            return arr.defaultPattern();
+        }
+        return defaultValue;
+    }
+    
+    private void applyPatternToState(String patternName) {
+        ArrangementConfig current = state.arrangement();
+        ArrangementConfig updated = current.toBuilder()
+            .defaultPattern(patternName)
+            .build();
+        state.set(updated);
+        SimplifiedFieldRenderer.markDirty();  // Force mesh rebuild
+        Logging.GUI.topic("arrange").info("Pattern applied: {}", patternName);
+    }
+    
+    private void applyPartPattern(String part, String patternName) {
+        ArrangementConfig current = state.arrangement();
+        ArrangementConfig.Builder builder = current.toBuilder();
         
-        // Initial update
-        updateShuffleDisplay();
+        // Map part name to the correct builder method
+        switch (part) {
+            // Sphere parts
+            case "main" -> builder.main(patternName);
+            case "poles" -> builder.poles(patternName);
+            case "equator" -> builder.equator(patternName);
+            case "hemisphereTop" -> builder.hemisphereTop(patternName);
+            case "hemisphereBottom" -> builder.hemisphereBottom(patternName);
+            // Ring/Disc parts
+            case "surface" -> builder.surface(patternName);
+            case "innerEdge" -> builder.innerEdge(patternName);
+            case "outerEdge" -> builder.outerEdge(patternName);
+            case "edge", "discEdge" -> builder.discEdge(patternName);
+            // Prism/Cylinder parts
+            case "sides" -> builder.sides(patternName);
+            case "capTop" -> builder.capTop(patternName);
+            case "capBottom" -> builder.capBottom(patternName);
+            case "caps" -> builder.capTop(patternName).capBottom(patternName);  // Both caps
+            case "edges", "prismEdges" -> builder.prismEdges(patternName);
+            // Polyhedron parts
+            case "faces" -> builder.faces(patternName);
+            case "polyEdges" -> builder.polyEdges(patternName);
+            case "vertices" -> builder.vertices(patternName);
+            // Default: set as default pattern
+            default -> builder.defaultPattern(patternName);
+        }
+        
+        state.set(builder.build());
+        SimplifiedFieldRenderer.markDirty();  // Force mesh rebuild
+        Logging.GUI.topic("arrange").debug("Part pattern applied: {} = {}", part, patternName);
+    }
+    
+    private void applyCurrentPermutationAsPattern() {
+        String patternName = "shuffle_" + currentCellType.name().toLowerCase() + "_" + currentPermutation;
+        
+        // Apply to the specific part, not just default
+        applyPartPattern(currentPart, patternName);
+        
+        // Enhanced logging for easy tracking - format: [ARRANGE] Part:CellType:#N/Total = Description
+        Logging.GUI.topic("arrange").info("[ARRANGE] {}:{}:#{}/{} = {}", 
+            currentPart.toUpperCase(),
+            currentCellType.name(), 
+            currentPermutation + 1, 
+            getTotal(),
+            currentDescription);
+    }
+    
+    private void saveAsPattern() {
+        if (saveNameField == null) return;
+        String name = saveNameField.getText().trim();
+        if (name.isEmpty()) {
+            Logging.GUI.topic("arrange").warn("Cannot save pattern: name is empty");
+            return;
+        }
+        
+        Logging.GUI.topic("arrange").info("Pattern saved: {} = {}#{}", name, currentCellType, currentPermutation);
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -331,20 +478,87 @@ public class ArrangeSubPanel extends AbstractPanel {
     // ═══════════════════════════════════════════════════════════════════════════
     
     private List<String> getPatternsForCellType(CellType cellType) {
-        // Get patterns from FragmentRegistry, or fallback to defaults
         List<String> fromRegistry = FragmentRegistry.listArrangementFragments();
         if (!fromRegistry.isEmpty() && !fromRegistry.get(0).equals("Default")) {
             return fromRegistry;
         }
         
-        // Fallback defaults per cell type
-        return switch (cellType) {
-            case QUAD -> List.of("filled_1", "filled_2", "wave_1", "wave_2", "tooth_1", "parallelogram_1", "Custom");
-            case SEGMENT -> List.of("full", "alternating", "sparse", "dashed", "dotted", "Custom");
-            case SECTOR -> List.of("full", "half", "quarters", "pinwheel", "spiral", "Custom");
-            case EDGE -> List.of("full", "latitude", "longitude", "sparse", "minimal", "dashed", "Custom");
-            case TRIANGLE -> List.of("full", "alternating", "inverted", "sparse", "fan", "radial", "Custom");
+         return switch (cellType) {
+            // Use actual defined patterns from QuadPattern enum
+            case QUAD -> List.of("filled_1", "triangle_1", "triangle_2", "tooth_1", "parallelogram_1", "wave_1", "stripe_1");
+            case SEGMENT -> List.of("full", "alternating", "sparse");
+            case SECTOR -> List.of("full", "half", "quarters");
+            case EDGE -> List.of("full", "latitude", "longitude");
+            case TRIANGLE -> List.of("full", "alternating", "inverted");
         };
+    }
+    
+    /**
+     * Gets valid part names for the current shape.
+     * This populates the Part selector dropdown.
+     */
+    private String[] getValidPartsForShape() {
+        Shape shape = state.currentShape();
+        
+        if (shape != null && shape.getParts() != null && !shape.getParts().isEmpty()) {
+            String[] parts = shape.getParts().keySet().toArray(new String[0]);
+            Logging.GUI.topic("arrange").debug("[PARTS] Shape '{}' has parts: {}", 
+                state.getString("shapeType"), java.util.Arrays.toString(parts));
+            return parts;
+        }
+        
+        // Fallback for shapes without explicit parts
+        Logging.GUI.topic("arrange").debug("[PARTS] No parts defined, using 'surface'");
+        return new String[]{"surface"};
+    }
+    
+    /**
+     * Gets the CellType for a specific part name.
+     */
+    private CellType getCellTypeForPart(String partName) {
+        Shape shape = state.currentShape();
+        
+        if (shape != null && shape.getParts() != null) {
+            CellType ct = shape.getParts().get(partName);
+            if (ct != null) {
+                return ct;
+            }
+        }
+        
+        // Fallback to shape's primary cell type
+        if (shape != null) {
+            return shape.primaryCellType();
+        }
+        
+        return CellType.QUAD;  // Ultimate fallback
+    }
+    
+    /**
+     * Gets valid CellTypes for the current shape based on its parts.
+     * This filters the CellType selector to only show relevant options.
+     */
+    private CellType[] getValidCellTypesForShape() {
+        String shapeType = state.getString("shapeType");
+        Shape shape = state.currentShape();
+        
+        if (shape != null && shape.getParts() != null) {
+            // Collect unique cell types from shape's parts
+            Set<CellType> cellTypes = new HashSet<>();
+            for (CellType ct : shape.getParts().values()) {
+                cellTypes.add(ct);
+            }
+            // Also add primary cell type
+            cellTypes.add(shape.primaryCellType());
+            
+            // Log for debugging
+            Logging.GUI.topic("arrange").debug("[CELLTYPE] Shape '{}' supports: {}", shapeType, cellTypes);
+            
+            return cellTypes.toArray(new CellType[0]);
+        }
+        
+        // Fallback: return all cell types
+        Logging.GUI.topic("arrange").debug("[CELLTYPE] No shape, showing all CellTypes");
+        return CellType.values();
     }
     
     private int getTotal() {
@@ -358,7 +572,6 @@ public class ArrangeSubPanel extends AbstractPanel {
     }
     
     private void updateShuffleDisplay() {
-        // Get description and mapping
         currentDescription = switch (currentCellType) {
             case QUAD -> ShuffleGenerator.getQuad(currentPermutation).describe();
             case SEGMENT -> ShuffleGenerator.getSegment(currentPermutation).describe();
@@ -367,37 +580,16 @@ public class ArrangeSubPanel extends AbstractPanel {
             case TRIANGLE -> ShuffleGenerator.getTriangle(currentPermutation).describe();
         };
         
-        // Get mapping array for visual (extract from arrangement data)
         currentMapping = extractMapping(currentCellType, currentPermutation);
         
-        // Check if this matches a known pattern
-        knownPatternName = findKnownPatternName();
-        
-        // Update save button state
-        if (saveBtn != null) {
-            saveBtn.active = (knownPatternName == null);
-        }
-        if (saveNameField != null) {
-            saveNameField.setEditable(knownPatternName == null);
-        }
+        Logging.GUI.topic("arrange").debug("Shuffle: {}#{} = {}", 
+            currentCellType, currentPermutation, currentDescription);
     }
     
-    private String findKnownPatternName() {
-        // TODO: Check against FragmentRegistry for matching permutation
-        // For now, return null (treat all as new)
-        // This would compare currentMapping against stored pattern mappings
-        return null;
-    }
-    
-    /**
-     * Extracts vertex mapping from arrangement data.
-     * For QUAD: extracts corner indices from tri1 and tri2.
-     */
     private int[] extractMapping(CellType cellType, int permutation) {
         return switch (cellType) {
             case QUAD -> {
                 var quad = ShuffleGenerator.getQuad(permutation);
-                // Extract indices from tri1 and tri2 corners
                 int[] mapping = new int[4];
                 if (quad.tri1() != null) {
                     for (int i = 0; i < Math.min(3, quad.tri1().length); i++) {
@@ -409,46 +601,11 @@ public class ArrangeSubPanel extends AbstractPanel {
                 }
                 yield mapping;
             }
-            case TRIANGLE -> {
-                var tri = ShuffleGenerator.getTriangle(permutation);
-                // Triangle has 3 vertices
-                yield new int[]{0, 1, 2};  // Placeholder - would extract from tri data
-            }
-            case SEGMENT -> new int[]{0, 1};  // Line segment
-            case SECTOR -> new int[]{0, 1, 2};  // Sector (pie slice)
-            case EDGE -> new int[]{0, 1};  // Edge
+            case TRIANGLE -> new int[]{0, 1, 2};
+            case SEGMENT -> new int[]{0, 1};
+            case SECTOR -> new int[]{0, 1, 2};
+            case EDGE -> new int[]{0, 1};
         };
-    }
-    
-    private void applyCurrentShuffle() {
-        // Set the shuffle state so the renderer uses it
-        state.set("shuffle.cellType", currentCellType.name());
-        state.set("shuffle.permutation", currentPermutation);
-        
-        // Log for debugging
-        switch (currentCellType) {
-            case QUAD -> ShuffleGenerator.logQuad(currentPermutation);
-            case SEGMENT -> ShuffleGenerator.logSegment(currentPermutation);
-            case SECTOR -> ShuffleGenerator.logSector(currentPermutation);
-            case EDGE -> ShuffleGenerator.logEdge(currentPermutation);
-            case TRIANGLE -> ShuffleGenerator.logTriangle(currentPermutation);
-        }
-    }
-    
-    private void saveAsPattern() {
-        String name = saveNameField.getText().trim();
-        if (name.isEmpty()) {
-            ToastNotification.warning("Enter a pattern name");
-            return;
-        }
-        
-        // TODO: Save to FragmentRegistry
-        // FragmentRegistry.saveArrangementPattern(name, currentCellType, currentMapping, currentDescription);
-        
-        ToastNotification.success("Saved pattern: " + name);
-        knownPatternName = name;
-        saveBtn.active = false;
-        saveNameField.setEditable(false);
     }
     
     private String getStringOrDefault(String path, String defaultValue) {
@@ -462,23 +619,28 @@ public class ArrangeSubPanel extends AbstractPanel {
     
     @Override
     public void tick() {
-        // TextFieldWidget cursor blink handled internally
+        // TextFieldWidget handles cursor blink internally
     }
     
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        if (currentTab == Tab.EXPLORER) {
-            renderExplorerTab(context);
-        } else {
-            renderPatternsTab(context);
+        // Render widgets
+        for (var widget : widgets) {
+            widget.render(context, mouseX, mouseY, delta);
         }
-    }
-    
-    private void renderPatternsTab(DrawContext context) {
+        
+        // Render custom content
         int x = bounds.x();
         int y = bounds.y() + GuiConstants.WIDGET_HEIGHT + 6;
         
-        // Labels
+        if (currentTab == Tab.PATTERNS) {
+            renderPatternsLabels(context, x, y);
+        } else {
+            renderExplorerContent(context, x, y);
+        }
+    }
+    
+    private void renderPatternsLabels(DrawContext context, int x, int y) {
         context.drawTextWithShadow(textRenderer, "Cell:", x, y + 6, 0xFFAAAAAA);
         y += GuiConstants.WIDGET_HEIGHT + 2;
         context.drawTextWithShadow(textRenderer, "Pattern:", x, y + 6, 0xFFAAAAAA);
@@ -499,71 +661,45 @@ public class ArrangeSubPanel extends AbstractPanel {
         }
     }
     
-    private void renderExplorerTab(DrawContext context) {
-        int x = bounds.x();
-        int y = bounds.y() + GuiConstants.WIDGET_HEIGHT + 6;
+    private void renderExplorerContent(DrawContext context, int x, int y) {
         int w = bounds.width();
         
         // Cell label
         context.drawTextWithShadow(textRenderer, "Cell:", x, y + 6, 0xFFAAAAAA);
         y += GuiConstants.WIDGET_HEIGHT + 8;
         
-        // ═══════════════════════════════════════════════════════════════════
-        // VISUAL DIAGRAM + INFO PANEL (side by side)
-        // ═══════════════════════════════════════════════════════════════════
-        
+        // Visual diagram + info panel
         int diagramW = (w - 8) / 2;
         int diagramH = 70;
         int infoX = x + diagramW + 8;
         int infoW = w - diagramW - 8;
         
-        // Draw diagram background
+        // Diagram
         context.fill(x, y, x + diagramW, y + diagramH, 0x44222233);
         context.drawBorder(x, y, diagramW, diagramH, 0xFF444466);
-        
-        // Draw permutation visualization
         renderPermutationDiagram(context, x + 4, y + 4, diagramW - 8, diagramH - 8);
         
-        // Draw info panel
+        // Info panel
         context.fill(infoX, y, infoX + infoW, y + diagramH, 0x44223322);
         context.drawBorder(infoX, y, infoW, diagramH, 0xFF446644);
         
         int infoY = y + 4;
-        
-        // Pattern name or "New Permutation"
-        if (knownPatternName != null) {
-            context.drawTextWithShadow(textRenderer, "Name:", infoX + 4, infoY, 0xFFAAAAAA);
-            context.drawTextWithShadow(textRenderer, knownPatternName, infoX + 40, infoY, 0xFF66FF66);
-            infoY += 10;
-            context.drawTextWithShadow(textRenderer, "✓ Known", infoX + 4, infoY, 0xFF44AA44);
-        } else {
-            context.drawTextWithShadow(textRenderer, "○ New", infoX + 4, infoY, 0xFFFFAA44);
-            infoY += 10;
-            context.drawTextWithShadow(textRenderer, "Permutation", infoX + 4, infoY, 0xFFFFAA44);
-        }
-        infoY += 14;
-        
-        // Mapping
-        context.drawTextWithShadow(textRenderer, "Mapping:", infoX + 4, infoY, 0xFFAAAAAA);
-        infoY += 10;
         String mappingStr = formatMapping(currentMapping);
         context.drawTextWithShadow(textRenderer, mappingStr, infoX + 4, infoY, 0xFF88CCFF);
         infoY += 14;
         
-        // Description (truncated)
         String desc = currentDescription.length() > 20 
             ? currentDescription.substring(0, 18) + "..." 
             : currentDescription;
-        context.drawTextWithShadow(textRenderer, desc, infoX + 4, infoY, 0xFF888888);
+        context.drawTextWithShadow(textRenderer, desc, infoX + 4, infoY, 0xFFCCCCCC);
         
-        // Permutation counter (below diagram area)
+        // Counter
         y += diagramH + 4;
         String counter = String.format("#%d / %d", currentPermutation + 1, getTotal());
         context.drawCenteredTextWithShadow(textRenderer, counter, x + w / 2, y, 0xFFFFFFAA);
     }
     
     private void renderPermutationDiagram(DrawContext context, int x, int y, int w, int h) {
-        // Draw based on cell type
         int cx = x + w / 2;
         int cy = y + h / 2;
         int size = Math.min(w, h) / 2 - 4;
@@ -573,33 +709,20 @@ public class ArrangeSubPanel extends AbstractPanel {
         
         switch (currentCellType) {
             case QUAD -> {
-                // Draw quad with vertex numbers
                 int[] px = {cx - size, cx + size, cx + size, cx - size};
                 int[] py = {cy - size/2, cy - size/2, cy + size/2, cy + size/2};
                 
-                // Draw edges
                 for (int i = 0; i < 4; i++) {
                     int next = (i + 1) % 4;
                     drawLine(context, px[i], py[i], px[next], py[next], lineColor);
                 }
                 
-                // Draw mapping arrows
-                for (int i = 0; i < currentMapping.length && i < 4; i++) {
-                    int from = i;
-                    int to = currentMapping[i];
-                    if (from != to) {
-                        drawArrow(context, px[from], py[from], px[to], py[to], 0xFFFFAA00);
-                    }
-                }
-                
-                // Draw vertices with numbers
                 for (int i = 0; i < 4; i++) {
                     context.fill(px[i] - 6, py[i] - 6, px[i] + 6, py[i] + 6, color);
                     context.drawCenteredTextWithShadow(textRenderer, String.valueOf(i), px[i], py[i] - 3, 0xFFFFFFFF);
                 }
             }
             case TRIANGLE -> {
-                // Draw triangle
                 int[] px = {cx, cx - size, cx + size};
                 int[] py = {cy - size/2, cy + size/2, cy + size/2};
                 
@@ -614,7 +737,6 @@ public class ArrangeSubPanel extends AbstractPanel {
                 }
             }
             default -> {
-                // Simple text representation for other types
                 context.drawCenteredTextWithShadow(textRenderer, currentCellType.name(), cx, cy - 5, color);
                 context.drawCenteredTextWithShadow(textRenderer, formatMapping(currentMapping), cx, cy + 8, 0xFFAAAAAA);
             }
@@ -622,7 +744,6 @@ public class ArrangeSubPanel extends AbstractPanel {
     }
     
     private void drawLine(DrawContext context, int x1, int y1, int x2, int y2, int color) {
-        // Simple line drawing using fill
         float dx = x2 - x1;
         float dy = y2 - y1;
         float length = (float) Math.sqrt(dx * dx + dy * dy);
@@ -636,35 +757,6 @@ public class ArrangeSubPanel extends AbstractPanel {
         }
     }
     
-    private void drawArrow(DrawContext context, int x1, int y1, int x2, int y2, int color) {
-        // Draw line with arrow head
-        // Offset to not overlap vertices
-        float dx = x2 - x1;
-        float dy = y2 - y1;
-        float length = (float) Math.sqrt(dx * dx + dy * dy);
-        if (length < 20) return;
-        
-        float ndx = dx / length;
-        float ndy = dy / length;
-        
-        int startX = (int) (x1 + ndx * 10);
-        int startY = (int) (y1 + ndy * 10);
-        int endX = (int) (x2 - ndx * 10);
-        int endY = (int) (y2 - ndy * 10);
-        
-        drawLine(context, startX, startY, endX, endY, color);
-        
-        // Arrow head
-        int arrowSize = 5;
-        int ax1 = (int) (endX - ndx * arrowSize + ndy * arrowSize);
-        int ay1 = (int) (endY - ndy * arrowSize - ndx * arrowSize);
-        int ax2 = (int) (endX - ndx * arrowSize - ndy * arrowSize);
-        int ay2 = (int) (endY - ndy * arrowSize + ndx * arrowSize);
-        
-        drawLine(context, endX, endY, ax1, ay1, color);
-        drawLine(context, endX, endY, ax2, ay2, color);
-    }
-    
     private String formatMapping(int[] mapping) {
         if (mapping == null || mapping.length == 0) return "—";
         
@@ -674,5 +766,9 @@ public class ArrangeSubPanel extends AbstractPanel {
             sb.append(i).append("→").append(mapping[i]);
         }
         return sb.toString();
+    }
+    
+    public List<net.minecraft.client.gui.widget.ClickableWidget> getWidgets() {
+        return new ArrayList<>(widgets);
     }
 }

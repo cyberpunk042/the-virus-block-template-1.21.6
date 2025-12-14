@@ -97,7 +97,9 @@ public final class CapsuleTessellator {
             if (visibility != null && !visibility.isVisible(0f, segFrac)) continue;
             if (!pattern.shouldRender(seg, segments)) continue;
             
-            builder.triangle(topPoleIdx, topHemiVerts[0][seg], topHemiVerts[0][seg + 1]);
+            // Top pole triangle - CCW when viewed from outside
+            // pole → ring[seg+1] → ring[seg] for CCW
+            builder.triangle(topPoleIdx, topHemiVerts[0][seg + 1], topHemiVerts[0][seg]);
         }
         
         // Top hemisphere quads
@@ -108,13 +110,15 @@ public final class CapsuleTessellator {
                 if (visibility != null && !visibility.isVisible(ringFrac, segFrac)) continue;
                 if (!pattern.shouldRender(ring * segments + seg, rings * segments)) continue;
                 
+                // Same indices: i0=TL, i1=TR, i2=BR, i3=BL
                 int i0 = topHemiVerts[ring][seg];
                 int i1 = topHemiVerts[ring][seg + 1];
                 int i2 = topHemiVerts[ring + 1][seg + 1];
                 int i3 = topHemiVerts[ring + 1][seg];
                 
-                builder.triangle(i0, i3, i2);
-                builder.triangle(i0, i2, i1);
+                // Use quadAsTrianglesFromPattern for pattern support
+                // TL=i0, TR=i1, BR=i2, BL=i3
+                builder.quadAsTrianglesFromPattern(i0, i1, i2, i3, pattern);
             }
         }
         
@@ -152,8 +156,9 @@ public final class CapsuleTessellator {
                 int i2 = bottomRingVerts[seg + 1];
                 int i3 = bottomRingVerts[seg];
                 
-                builder.triangle(i0, i3, i2);
-                builder.triangle(i0, i2, i1);
+                // Use quadAsTrianglesFromPattern for pattern support
+                // TL=i0, TR=i1, BR=i2, BL=i3
+                builder.quadAsTrianglesFromPattern(i0, i1, i2, i3, pattern);
             }
         } else {
             bottomRingVerts = topRingVerts;
@@ -196,8 +201,9 @@ public final class CapsuleTessellator {
             int i2 = bottomHemiVerts[0][seg + 1];
             int i3 = bottomHemiVerts[0][seg];
             
-            builder.triangle(i0, i3, i2);
-            builder.triangle(i0, i2, i1);
+            // Use quadAsTrianglesFromPattern for pattern support
+            // TL=i0, TR=i1, BR=i2, BL=i3
+            builder.quadAsTrianglesFromPattern(i0, i1, i2, i3, pattern);
         }
         
         // Bottom hemisphere quads
@@ -213,8 +219,9 @@ public final class CapsuleTessellator {
                 int i2 = bottomHemiVerts[ring + 1][seg + 1];
                 int i3 = bottomHemiVerts[ring + 1][seg];
                 
-                builder.triangle(i0, i3, i2);
-                builder.triangle(i0, i2, i1);
+                // Use quadAsTrianglesFromPattern for pattern support
+                // TL=i0, TR=i1, BR=i2, BL=i3
+                builder.quadAsTrianglesFromPattern(i0, i1, i2, i3, pattern);
             }
         }
         
@@ -227,7 +234,9 @@ public final class CapsuleTessellator {
             if (visibility != null && !visibility.isVisible(1f, segFrac)) continue;
             if (!pattern.shouldRender(seg, segments)) continue;
             
-            builder.triangle(lastBottomRing[seg], bottomPoleIdx, lastBottomRing[seg + 1]);
+            // Bottom pole triangle - CCW when viewed from below
+            // ring[seg] → pole → ring[seg+1] is CCW from below, so flip it
+            builder.triangle(lastBottomRing[seg + 1], bottomPoleIdx, lastBottomRing[seg]);
         }
         
         Logging.RENDER.topic("tessellate")

@@ -116,15 +116,16 @@ public final class TorusTessellator {
                     continue;
                 }
                 
-                // Quad vertices
-                int i0 = vertexIndices[i][j];
-                int i1 = vertexIndices[i + 1][j];
-                int i2 = vertexIndices[i + 1][j + 1];
-                int i3 = vertexIndices[i][j + 1];
+                // Quad indices mapped to sphere naming:
+                //   topLeft     = [i][j], topRight = [i+1][j]
+                //   bottomLeft  = [i][j+1], bottomRight = [i+1][j+1]
+                int topLeft     = vertexIndices[i][j];
+                int topRight    = vertexIndices[i + 1][j];
+                int bottomLeft  = vertexIndices[i][j + 1];
+                int bottomRight = vertexIndices[i + 1][j + 1];
                 
-                // Two triangles per quad
-                builder.triangle(i0, i1, i2);
-                builder.triangle(i0, i2, i3);
+                // Use quadAsTrianglesFromPattern for pattern support
+                builder.quadAsTrianglesFromPattern(topLeft, topRight, bottomRight, bottomLeft, pattern);
             }
         }
         

@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.cyberpunk042.field.BeamConfig;
 import net.cyberpunk042.field.influence.BindingConfig;
+import net.cyberpunk042.field.influence.LifecycleConfig;
 import net.cyberpunk042.field.Modifiers;
 import net.cyberpunk042.field.instance.FollowMode;
 import net.cyberpunk042.field.instance.FollowModeConfig;
@@ -165,9 +166,8 @@ public class FieldEditState {
     // LIFECYCLE STATE
     // ═══════════════════════════════════════════════════════════════════════════
     
-    @StateField private String lifecycleState = "ACTIVE";
-    @StateField private int fadeInTicks = 0;
-    @StateField private int fadeOutTicks = 0;
+    @StateField @DefinitionField("lifecycle")
+    private LifecycleConfig lifecycle = LifecycleConfig.DEFAULT;
     
     // ═══════════════════════════════════════════════════════════════════════════
     // TRIGGER STATE

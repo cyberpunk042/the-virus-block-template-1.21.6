@@ -1,36 +1,71 @@
 package net.cyberpunk042.visual.transform;
 
 /**
- * Defines how a primitive orients itself in the world.
+ * Defines which direction a primitive's "front" (normal) faces.
  * 
- * <p>Facing determines the rotation of a primitive based on
- * player state, camera position, or fixed world orientation.</p>
+ * <p>Facing controls the static orientation of a shape. For example,
+ * a disc with FRONT facing will be vertical like a shield, while
+ * TOP facing makes it horizontal like a platform.</p>
+ * 
+ * <p>This is different from {@link Billboard} which dynamically
+ * rotates to face the camera.</p>
  * 
  * @see Transform
  * @see Billboard
+ * @see Anchor
  */
 public enum Facing {
-    /** Stays in world orientation - no rotation adjustment (DEFAULT) */
-    FIXED("Fixed"),
+    /** No rotation applied - shape uses its default orientation (DEFAULT) */
+    FIXED("Fixed", 0, 0, 0),
     
-    /** Rotates to match the player's look direction */
-    PLAYER_LOOK("Player Look"),
+    /** Shape normal points up (+Y) - e.g., disc flat like a platform */
+    TOP("Top", 0, 0, 0),
     
-    /** Points in the player's movement direction */
-    VELOCITY("Movement Direction"),
+    /** Shape normal points down (-Y) */
+    BOTTOM("Bottom", 180, 0, 0),
     
-    /** Always faces the camera (useful for 2D sprites in 3D space) */
-    CAMERA("Always Face Camera");
+    /** Shape normal points forward (+Z, player look direction) - e.g., disc vertical like a shield */
+    FRONT("Front", 90, 0, 0),
+    
+    /** Shape normal points backward (-Z) */
+    BACK("Back", -90, 0, 0),
+    
+    /** Shape normal points left (-X) */
+    LEFT("Left", 90, 90, 0),
+    
+    /** Shape normal points right (+X) */
+    RIGHT("Right", 90, -90, 0);
     
     private final String label;
+    private final float pitchDeg;  // X rotation
+    private final float yawDeg;    // Y rotation
+    private final float rollDeg;   // Z rotation
     
-    Facing(String label) {
+    Facing(String label, float pitch, float yaw, float roll) {
         this.label = label;
+        this.pitchDeg = pitch;
+        this.yawDeg = yaw;
+        this.rollDeg = roll;
     }
     
     /** Display label for GUI */
     public String label() {
         return label;
+    }
+    
+    /** X rotation (pitch) in degrees */
+    public float pitch() {
+        return pitchDeg;
+    }
+    
+    /** Y rotation (yaw) in degrees */
+    public float yaw() {
+        return yawDeg;
+    }
+    
+    /** Z rotation (roll) in degrees */
+    public float roll() {
+        return rollDeg;
     }
     
     @Override

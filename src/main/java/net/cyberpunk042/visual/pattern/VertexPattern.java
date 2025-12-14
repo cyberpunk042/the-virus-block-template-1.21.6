@@ -128,6 +128,10 @@ public interface VertexPattern {
         pattern = TrianglePattern.fromId(lower);
         if (pattern != null) return pattern;
         
+        // Try dynamic shuffle pattern (e.g., "shuffle_quad_42")
+        pattern = ShufflePattern.parse(value);
+        if (pattern != null) return pattern;
+        
         // Pattern not found - log error and notify player
         net.cyberpunk042.log.Logging.FIELD.topic("pattern")
             .reason("pattern lookup")

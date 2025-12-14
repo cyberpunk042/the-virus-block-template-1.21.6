@@ -22,6 +22,24 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import org.joml.Matrix4f;
 
+// ╔══════════════════════════════════════════════════════════════════════════════╗
+// ║  ⚠️  WARNING  ⚠️  WARNING  ⚠️  WARNING  ⚠️  WARNING  ⚠️  WARNING  ⚠️         ║
+// ╠══════════════════════════════════════════════════════════════════════════════╣
+// ║                                                                              ║
+// ║  THIS IS **NOT** THE MAIN FIELD RENDERER!                                    ║
+// ║                                                                              ║
+// ║  This is a SIMPLIFIED preview renderer for the GUI editor only.             ║
+// ║  It does NOT support all features like patterns, arrangements, etc.          ║
+// ║                                                                              ║
+// ║  The REAL field renderer is:                                                 ║
+// ║    net.cyberpunk042.client.field.render.FieldRenderer                        ║
+// ║    net.cyberpunk042.client.field.render.LayerRenderer                        ║
+// ║    net.cyberpunk042.client.field.render.PrimitiveRenderers                   ║
+// ║                                                                              ║
+// ║  DO NOT modify this file expecting it to affect actual field rendering!      ║
+// ║                                                                              ║
+// ╚══════════════════════════════════════════════════════════════════════════════╝
+
 /**
  * Simplified client-side field renderer for preview and debug purposes.
  * 
@@ -220,7 +238,24 @@ public final class SimplifiedFieldRenderer {
             matrices.translate(offset.x, offset.y, offset.z);
         }
         
-        // Apply billboard (face camera)
+        // Apply facing (static directional orientation)
+        if (transform != null && transform.facing() != null && 
+            transform.facing() != net.cyberpunk042.visual.transform.Facing.FIXED &&
+            transform.facing() != net.cyberpunk042.visual.transform.Facing.TOP) {  // TOP is default, no rotation
+            var facing = transform.facing();
+            // Apply rotations from the Facing enum
+            if (facing.pitch() != 0) {
+                matrices.multiply(net.minecraft.util.math.RotationAxis.POSITIVE_X.rotationDegrees(facing.pitch()));
+            }
+            if (facing.yaw() != 0) {
+                matrices.multiply(net.minecraft.util.math.RotationAxis.POSITIVE_Y.rotationDegrees(facing.yaw()));
+            }
+            if (facing.roll() != 0) {
+                matrices.multiply(net.minecraft.util.math.RotationAxis.POSITIVE_Z.rotationDegrees(facing.roll()));
+            }
+        }
+        
+        // Apply billboard (face camera) - applied after facing for correct orientation
         if (transform != null && transform.billboard() != net.cyberpunk042.visual.transform.Billboard.NONE) {
             Camera camera = MinecraftClient.getInstance().gameRenderer.getCamera();
             matrices.multiply(net.minecraft.util.math.RotationAxis.POSITIVE_Y.rotationDegrees(-camera.getYaw()));

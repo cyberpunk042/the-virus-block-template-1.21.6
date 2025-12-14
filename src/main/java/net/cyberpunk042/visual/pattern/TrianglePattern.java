@@ -58,10 +58,15 @@ public enum TrianglePattern implements VertexPattern {
     /** Fan pattern (alternating skip): A → B → C */
     FAN("fan", 2,
         new Vertex[]{Vertex.A, Vertex.B, Vertex.C}
+    ),
+    
+    /** Standard CCW winding for polyhedra: B → A → C */
+    STANDARD("standard", 1,
+        new Vertex[]{Vertex.B, Vertex.A, Vertex.C}
     );
     
-    /** Default pattern (alias for FULL). */
-    public static final TrianglePattern DEFAULT = FULL;
+    /** Default pattern - STANDARD works correctly for polyhedra faces. */
+    public static final TrianglePattern DEFAULT = STANDARD;
     
     // =========================================================================
     // Fields and Constructor

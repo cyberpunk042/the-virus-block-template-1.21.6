@@ -30,10 +30,15 @@ public final class PrismTessellator {
     private PrismTessellator() {}
     
     /**
-     * Tessellates a prism shape into a mesh.
+     * Tessellates a prism shape into a mesh with separate patterns for parts.
+     * 
+     * @param shape The prism shape
+     * @param sidesPattern Pattern for side walls (QUAD)
+     * @param capPattern Pattern for top/bottom caps (SECTOR)
+     * @param visibility Visibility mask
      */
-    public static Mesh tessellate(PrismShape shape, VertexPattern pattern,
-                                   VisibilityMask visibility) {
+    public static Mesh tessellate(PrismShape shape, VertexPattern sidesPattern,
+                                   VertexPattern capPattern, VisibilityMask visibility) {
         if (shape == null) {
             throw new IllegalArgumentException("PrismShape cannot be null");
         }
@@ -57,23 +62,31 @@ public final class PrismTessellator {
         float yBase = -height / 2;
         float yTop = height / 2;
         
-        // === SIDE FACES ===
+        // === SIDE FACES (uses sidesPattern) ===
         tessellateSides(builder, sides, bottomR, topR, height, twist, heightSegs, 
-                        yBase, pattern, visibility);
+                        yBase, sidesPattern, visibility);
         
-        // === CAPS ===
+        // === CAPS (uses capPattern) ===
         if (shape.capBottom()) {
-            tessellateCap(builder, sides, bottomR, yBase, false, twist, height, yBase);
+            tessellateCap(builder, sides, bottomR, yBase, false, twist, height, yBase, capPattern);
         }
         if (shape.capTop()) {
-            tessellateCap(builder, sides, topR, yTop, true, twist, height, yBase);
+            tessellateCap(builder, sides, topR, yTop, true, twist, height, yBase, capPattern);
         }
         
         return builder.build();
     }
     
+    /**
+     * Tessellates with single pattern for all parts (legacy compatibility).
+     */
+    public static Mesh tessellate(PrismShape shape, VertexPattern pattern,
+                                   VisibilityMask visibility) {
+        return tessellate(shape, pattern, pattern, visibility);
+    }
+    
     public static Mesh tessellate(PrismShape shape) {
-        return tessellate(shape, null, null);
+        return tessellate(shape, null, null, null);
     }
     
     // =========================================================================
@@ -117,9 +130,10 @@ public final class PrismTessellator {
                 int i01 = builder.addVertex(v01);
                 int i11 = builder.addVertex(v11);
                 
-                // Two triangles per quad
-                builder.triangle(i00, i10, i11);
-                builder.triangle(i00, i11, i01);
+                // Indices: i00=BL(bot,s), i10=BR(bot,s+1), i01=TL(top,s), i11=TR(top,s+1)
+                // Use quadAsTrianglesFromPattern for pattern support
+                // TL=i01, TR=i11, BR=i10, BL=i00
+                builder.quadAsTrianglesFromPattern(i01, i11, i10, i00, pattern);
             }
         }
     }
@@ -130,7 +144,7 @@ public final class PrismTessellator {
     
     private static void tessellateCap(MeshBuilder builder, int sides, float radius,
                                        float y, boolean isTop, float twist, 
-                                       float height, float yBase) {
+                                       float height, float yBase, VertexPattern pattern) {
         // Center vertex
         Vertex center = GeometryMath.prismFaceCenter(sides, y, radius);
         int centerIdx = builder.addVertex(center);
@@ -144,14 +158,33 @@ public final class PrismTessellator {
             edgeIndices[s] = builder.addVertex(v);
         }
         
-        // Triangulate from center
+        // Triangulate from center using pattern
         for (int s = 0; s < sides; s++) {
-            int next = (s + 1) % sides;
-            if (isTop) {
-                builder.triangle(centerIdx, edgeIndices[s], edgeIndices[next]);
-            } else {
-                builder.triangle(centerIdx, edgeIndices[next], edgeIndices[s]);
+            // Check pattern visibility for this sector
+            if (pattern != null && !pattern.shouldRender(s, sides)) {
+                continue;
             }
+            
+            int next = (s + 1) % sides;
+            
+            // Build cell vertices array: [center, edge0, edge1]
+            // Winding order explanation:
+            // - prismCorner generates vertices CCW when viewed from BELOW (-Y)
+            // - For TOP cap (viewed from +Y), we need CCW from above
+            // - Therefore: center → edge[next] → edge[s] (reverse order)
+            // - For BOTTOM cap (viewed from -Y), CCW from below is what prismCorner gives
+            // - Therefore: center → edge[s] → edge[next] (natural order)
+            int[] cellVertices;
+            if (isTop) {
+                // Top cap: reverse vertex order for CCW from above
+                cellVertices = new int[] { centerIdx, edgeIndices[next], edgeIndices[s] };
+            } else {
+                // Bottom cap: natural order for CCW from below
+                cellVertices = new int[] { centerIdx, edgeIndices[s], edgeIndices[next] };
+            }
+            
+            // Use generic pattern-based emission
+            builder.emitCellFromPattern(cellVertices, pattern);
         }
     }
 }

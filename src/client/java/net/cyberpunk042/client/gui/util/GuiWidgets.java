@@ -216,6 +216,73 @@ public final class GuiWidgets {
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
+    // LABELED CYCLING BUTTON - THE FOOLPROOF HELPER
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Creates a cycling button where the label is INSIDE the button text.
+     * 
+     * <p><b>USE THIS METHOD</b> when you want buttons like "Face: FIXED" or "Orbit: ON"
+     * where the label is part of the displayed text. This method ALWAYS includes
+     * omitKeyText() to prevent the ": " prefix bug.</p>
+     * 
+     * <p>Example usage:</p>
+     * <pre>
+     * GuiWidgets.labeledCycler(x, y, width, height,
+     *     "Face", Facing.values(), currentFacing, f -> f.name(),
+     *     val -> state.set("facing", val.name()));
+     * </pre>
+     * 
+     * <p>This will display: "Face: FIXED", "Face: TOP", etc. with NO extra colon prefix.</p>
+     * 
+     * @param <T> The value type
+     * @param x X position
+     * @param y Y position
+     * @param width Button width
+     * @param height Button height
+     * @param label The label prefix (e.g., "Face", "Orbit", "Axis")
+     * @param values Array of possible values
+     * @param initial Initial value
+     * @param formatter Function to convert value to display string
+     * @param onChange Callback when value changes
+     * @return The cycling button widget
+     */
+    public static <T> CyclingButtonWidget<T> labeledCycler(
+            int x, int y, int width, int height,
+            String label, T[] values, T initial,
+            java.util.function.Function<T, String> formatter,
+            Consumer<T> onChange) {
+        
+        return CyclingButtonWidget.<T>builder(val -> Text.literal(label + ": " + formatter.apply(val)))
+            .values(values)
+            .initially(initial)
+            .omitKeyText()  // <-- THIS IS THE KEY! Always included to prevent ": " prefix
+            .build(x, y, width, height, Text.literal(""), (btn, val) -> {
+                onChange.accept(val);
+            });
+    }
+    
+    /**
+     * Creates a labeled cycling button for boolean values (ON/OFF style).
+     * 
+     * <p>Example: "Orbit: ON" or "Orbit: OFF"</p>
+     */
+    public static CyclingButtonWidget<Boolean> labeledBoolCycler(
+            int x, int y, int width, int height,
+            String label, boolean initial, String trueText, String falseText,
+            Consumer<Boolean> onChange) {
+        
+        return CyclingButtonWidget.<Boolean>builder(val -> 
+                Text.literal(label + ": " + (val ? trueText : falseText)))
+            .values(Boolean.TRUE, Boolean.FALSE)
+            .initially(initial)
+            .omitKeyText()  // <-- ALWAYS prevents ": " prefix
+            .build(x, y, width, height, Text.literal(""), (btn, val) -> {
+                onChange.accept(val);
+            });
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
     // SLIDERS
     // ═══════════════════════════════════════════════════════════════════════════
     

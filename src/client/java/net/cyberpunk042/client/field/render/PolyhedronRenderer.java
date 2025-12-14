@@ -3,6 +3,8 @@ package net.cyberpunk042.client.field.render;
 import net.cyberpunk042.client.visual.mesh.Mesh;
 import net.cyberpunk042.client.visual.mesh.PolyhedronTessellator;
 import net.cyberpunk042.field.primitive.Primitive;
+import net.cyberpunk042.visual.pattern.ArrangementConfig;
+import net.cyberpunk042.visual.pattern.VertexPattern;
 import net.cyberpunk042.visual.shape.PolyhedronShape;
 
 /**
@@ -50,10 +52,24 @@ public final class PolyhedronRenderer extends AbstractPrimitiveRenderer {
             .kv("radius", shape.radius())
             .debug("[POLY] Tessellating polyhedron");
         
-        // Use PolyhedronTessellator's builder pattern
+        // Get pattern from arrangement config
+        VertexPattern pattern = null;
+        ArrangementConfig arrangement = primitive.arrangement();
+        if (arrangement != null) {
+            pattern = arrangement.resolvePattern("faces", shape.primaryCellType());
+            net.cyberpunk042.log.Logging.RENDER.topic("tessellate")
+                .kv("pattern", pattern != null ? pattern.toString() : "null")
+                .debug("[POLY] Resolved pattern for faces");
+        }
+        
+        // Use PolyhedronTessellator's builder pattern with pattern support
         // Detail level 0 = no subdivision (raw Platonic solid)
-        Mesh mesh = PolyhedronTessellator
-            .fromShape(shape)
+        Mesh mesh = PolyhedronTessellator.builder()
+            .polyType(shape.polyType())
+            .radius(shape.radius())
+            .subdivisions(shape.subdivisions())
+            .pattern(pattern)
+            .build()
             .tessellate(0);
         
         net.cyberpunk042.log.Logging.RENDER.topic("tessellate")

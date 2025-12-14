@@ -40,13 +40,29 @@ public final class FieldRenderLayers extends RenderPhase {
         Identifier.of("minecraft", "textures/misc/white.png")
     );
     
+    // For double-sided geometry, we use the same layer but rely on emitting 
+    // both triangle windings in the tessellator. This avoids the need for
+    // a custom render layer with non-standard culling.
+    private static final RenderLayer SOLID_TRANSLUCENT_NO_CULL = SOLID_TRANSLUCENT;
+    
     private static final RenderLayer LINES_LAYER = RenderLayer.getLines();
     
     /**
-     * Translucent solid layer for field geometry.
+     * Translucent solid layer for field geometry (with backface culling).
      */
     public static RenderLayer solidTranslucent() {
         return SOLID_TRANSLUCENT;
+    }
+    
+    /**
+     * Translucent solid layer for double-sided geometry.
+     * <p>Note: This currently returns the same layer as solidTranslucent().
+     * Double-sided visibility is achieved by emitting both triangle windings
+     * in the tessellator. A future improvement could use GlStateManager to
+     * disable culling during rendering.</p>
+     */
+    public static RenderLayer solidTranslucentNoCull() {
+        return SOLID_TRANSLUCENT_NO_CULL;
     }
     
     /**

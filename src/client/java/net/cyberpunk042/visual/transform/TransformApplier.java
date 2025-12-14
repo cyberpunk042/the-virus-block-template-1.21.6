@@ -8,7 +8,7 @@ import net.cyberpunk042.visual.transform.Transform;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.util.math.Vec3d;
+
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
@@ -87,10 +87,9 @@ public final class TransformApplier {
             matrices.multiply(new Quaternionf().rotateZ((float) Math.toRadians(rot.z)));
         }
         
-        // 5. Facing rotation
-        if (transform.facing() != Facing.FIXED) {
-            Vec3d pos = getWorldPos(matrices);
-            Quaternionf facingRot = FacingResolver.resolve(transform.facing(), pos, player, camera);
+        // 5. Facing rotation (static directional orientation)
+        if (FacingResolver.needsRotation(transform.facing())) {
+            Quaternionf facingRot = FacingResolver.resolve(transform.facing());
             matrices.multiply(facingRot);
         }
         
@@ -120,16 +119,4 @@ public final class TransformApplier {
         apply(matrices, transform, null, null, 0);
     }
     
-    // =========================================================================
-    // Helpers
-    // =========================================================================
-    
-    /**
-     * Extracts approximate world position from matrix stack.
-     * Used for facing calculations.
-     */
-    private static Vec3d getWorldPos(MatrixStack matrices) {
-        var pos = matrices.peek().getPositionMatrix();
-        return new Vec3d(pos.m30(), pos.m31(), pos.m32());
-    }
 }

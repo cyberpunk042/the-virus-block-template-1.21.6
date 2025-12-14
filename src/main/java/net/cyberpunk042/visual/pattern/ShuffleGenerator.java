@@ -397,15 +397,24 @@ public final class ShuffleGenerator {
     
     private static void generateTriangleArrangements() {
         int idx = 0;
+        Vertex[] allVertices = Vertex.values();
         
-        // Standard winding: A → B → C
-        Vertex[] normal = {Vertex.A, Vertex.B, Vertex.C};
-        // Inverted winding: A → C → B
-        Vertex[] inverted = {Vertex.A, Vertex.C, Vertex.B};
-        
-        for (int skip = 1; skip <= 8; skip++) {
-            TRIANGLE_ARRANGEMENTS.add(new TriangleArrangement(normal.clone(), skip, idx++, 0));
-            TRIANGLE_ARRANGEMENTS.add(new TriangleArrangement(inverted.clone(), skip, idx++, 0));
+        // Generate ALL 6 vertex permutations (3! = 6)
+        // This gives full control over triangle winding
+        for (Vertex a : allVertices) {
+            for (Vertex b : allVertices) {
+                if (b == a) continue;
+                for (Vertex c : allVertices) {
+                    if (c == a || c == b) continue;
+                    
+                    Vertex[] winding = {a, b, c};
+                    
+                    // Combine with skip intervals 1-8
+                    for (int skip = 1; skip <= 8; skip++) {
+                        TRIANGLE_ARRANGEMENTS.add(new TriangleArrangement(winding.clone(), skip, idx++, 0));
+                    }
+                }
+            }
         }
         
         int total = TRIANGLE_ARRANGEMENTS.size();

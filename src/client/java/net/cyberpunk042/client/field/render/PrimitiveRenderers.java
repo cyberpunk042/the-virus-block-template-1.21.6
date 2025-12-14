@@ -127,6 +127,9 @@ public final class PrimitiveRenderers {
             case PrismShape p -> "prism";
             case CylinderShape c -> "cylinder";
             case PolyhedronShape p -> "polyhedron";
+            case TorusShape t -> "torus";
+            case CapsuleShape c -> "capsule";
+            case ConeShape c -> "cone";
             default -> null;
         };
         
