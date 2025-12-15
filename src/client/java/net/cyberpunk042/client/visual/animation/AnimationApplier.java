@@ -55,6 +55,9 @@ public final class AnimationApplier {
         // Apply phase offset
         float effectiveTime = time + (animation.phase() * 100);  // phase is 0-1
         
+        Logging.ANIMATION.topic("apply").info("[APPLY] animation: hasSpin={}, hasPulse={}, hasWobble={}, hasWave={}, time={}",
+            animation.hasSpin(), animation.hasPulse(), animation.hasWobble(), animation.hasWave(), effectiveTime);
+        
         // 1. Spin
         if (animation.hasSpin()) {
             applySpin(matrices, animation.spin(), effectiveTime);
@@ -65,14 +68,15 @@ public final class AnimationApplier {
             applyPulse(matrices, animation.pulse(), effectiveTime);
         }
         
-        // 3. Wobble (future)
+        // 3. Wobble
         if (animation.hasWobble()) {
+            Logging.ANIMATION.topic("apply").info("[APPLY] Calling applyWobble with wobble={}", animation.wobble());
             applyWobble(matrices, animation.wobble(), effectiveTime);
         }
         
-        // 4. Wave (future)
+        // 4. Wave - affects vertices, not matrix transform. Would need shader or tessellation changes.
         if (animation.hasWave()) {
-            // Wave affects vertices, not matrix - handled in renderer
+            Logging.ANIMATION.topic("apply").debug("[APPLY] Wave animation detected but NOT IMPLEMENTED - wave affects vertices, not matrix");
         }
     }
     
@@ -196,18 +200,18 @@ public final class AnimationApplier {
         
         Vector3f amplitude = wobble.amplitude();
         if (amplitude == null) {
-            Logging.ANIMATION.topic("wobble").debug("[WOBBLE-DEBUG] amplitude is null after isActive check");
             return;
         }
         
+        // Use modulo to prevent integer overflow in sin lookup table
+        float safeTime = time % 1000f;
+        
         // Generate pseudo-random wobble using MathHelper.sin (fast lookup table)
-        float wobbleX = MathHelper.sin(time * wobble.speed() * 1.0f) * amplitude.x;
-        float wobbleY = MathHelper.sin(time * wobble.speed() * 1.3f) * amplitude.y;
-        float wobbleZ = MathHelper.sin(time * wobble.speed() * 0.7f) * amplitude.z;
+        float wobbleX = MathHelper.sin(safeTime * wobble.speed() * 1.0f) * amplitude.x;
+        float wobbleY = MathHelper.sin(safeTime * wobble.speed() * 1.3f) * amplitude.y;
+        float wobbleZ = MathHelper.sin(safeTime * wobble.speed() * 0.7f) * amplitude.z;
         
-        Logging.ANIMATION.topic("wobble").info("[WOBBLE-DEBUG] APPLYING wobble: ({}, {}, {}), time={}", 
-            wobbleX, wobbleY, wobbleZ, time);
-        
+        System.out.println("[WOBBLE] x=" + wobbleX + ", y=" + wobbleY + ", z=" + wobbleZ);
         matrices.translate(wobbleX, wobbleY, wobbleZ);
     }
     
@@ -225,12 +229,16 @@ public final class AnimationApplier {
     public static void applyBobbing(MatrixStack matrices, float bobbing, float time) {
         if (bobbing <= 0) return;
         
-        // Slow, gentle bob - 0.5 Hz base frequency, amplitude based on strength
-        float amplitude = bobbing * 0.15f;  // Max 0.15 blocks at full strength
-        float y = MathHelper.sin(time * 0.1f) * amplitude;
+        // Use modulo to prevent integer overflow in sin lookup table
+        // 1000 gives us ~157 seconds of unique values before repeating
+        float safeTime = time % 1000f;
         
+        // Visible bob - ~3 second cycle at 20 tps, up to 0.4 blocks movement
+        float amplitude = bobbing * 0.4f;  // Max 0.4 blocks at full strength
+        float y = MathHelper.sin(safeTime * 0.4f) * amplitude;
+        
+        System.out.println("[BOBBING] y=" + y + ", amp=" + amplitude + ", safeTime=" + safeTime);
         matrices.translate(0, y, 0);
-        Logging.ANIMATION.topic("modifiers").trace("Bobbing: y={}", y);
     }
     
     /**
@@ -243,13 +251,16 @@ public final class AnimationApplier {
     public static void applyBreathing(MatrixStack matrices, float breathing, float time) {
         if (breathing <= 0) return;
         
-        // Slow breathing - 0.3 Hz, scale range based on strength
-        float normalizedWave = (MathHelper.sin(time * 0.06f) + 1) / 2;  // 0-1
-        float scaleVariation = breathing * 0.1f;  // Max ±10% at full strength
+        // Use modulo to prevent integer overflow in sin lookup table
+        float safeTime = time % 1000f;
+        
+        // Visible breathing - ~4 second cycle, up to ±25% scale change
+        float normalizedWave = (MathHelper.sin(safeTime * 0.2f) + 1) / 2;  // 0-1
+        float scaleVariation = breathing * 0.25f;  // Max ±25% at full strength
         float scale = 1.0f + (normalizedWave - 0.5f) * scaleVariation * 2;
         
+        System.out.println("[BREATHING] scale=" + scale + ", breathing=" + breathing + ", safeTime=" + safeTime);
         matrices.scale(scale, scale, scale);
-        Logging.ANIMATION.topic("modifiers").trace("Breathing: scale={}", scale);
     }
     
     /**
@@ -261,17 +272,11 @@ public final class AnimationApplier {
      */
     public static void applyModifiers(MatrixStack matrices, net.cyberpunk042.field.Modifiers modifiers, float time) {
         if (modifiers == null) {
-            Logging.ANIMATION.topic("modifiers").debug("[BOBBING-DEBUG] modifiers is null");
-            return;
-        }
-        if (!modifiers.hasAnimationModifiers()) {
-            Logging.ANIMATION.topic("modifiers").debug("[BOBBING-DEBUG] hasAnimationModifiers=false, bobbing={}, breathing={}", 
-                modifiers.bobbing(), modifiers.breathing());
             return;
         }
         
-        Logging.ANIMATION.topic("modifiers").info("[BOBBING-DEBUG] APPLYING modifiers: bobbing={}, breathing={}, time={}", 
-            modifiers.bobbing(), modifiers.breathing(), time);
+        // Apply bobbing and breathing directly - caller already verified values
+        System.out.println("[APPLYMODS] bobbing=" + modifiers.bobbing() + ", breathing=" + modifiers.breathing() + ", time=" + time);
         
         applyBobbing(matrices, modifiers.bobbing(), time);
         applyBreathing(matrices, modifiers.breathing(), time);

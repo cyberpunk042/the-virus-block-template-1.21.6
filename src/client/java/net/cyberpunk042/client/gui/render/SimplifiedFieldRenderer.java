@@ -203,6 +203,9 @@ public final class SimplifiedFieldRenderer {
         
         // Use the FULL FieldRenderer pipeline with smooth follow
         // renderWithFollow computes position offset at render-time using lerped values
+        Logging.GUI.topic("render").info("[ADVANCED] About to call FieldRenderer.renderWithFollow, modifiers.bobbing={}",
+            definition.modifiers() != null ? definition.modifiers().bobbing() : "null-modifiers");
+        
         net.cyberpunk042.client.field.render.FieldRenderer.renderWithFollow(
             matrices,
             consumers,

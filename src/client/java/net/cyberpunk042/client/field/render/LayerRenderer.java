@@ -266,9 +266,16 @@ public final class LayerRenderer {
         }
         
         // F184: Apply primitive animation with link phase offset
-        if (primitive.animation() != null && primitive.animation().isActive()) {
+        var anim = primitive.animation();
+        if (anim != null) {
+            // Debug: Log animation state to trace wobble
+            Logging.FIELD.topic("render").info("[WOBBLE-CHECK] primitive={}, anim.isActive()={}, hasWobble={}, wobble={}",
+                primitive.id(), anim.isActive(), anim.hasWobble(), 
+                anim.wobble() != null ? "amp=" + anim.wobble().amplitude() + ",speed=" + anim.wobble().speed() : "null");
+        }
+        
+        if (anim != null && anim.isActive()) {
             float effectiveTime = time + getLinkPhaseOffset(primitive);
-            var anim = primitive.animation();
             
             // CP5: ALL animation segments applied
             if (anim.spin() != null) {

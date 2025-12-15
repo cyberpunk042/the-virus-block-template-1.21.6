@@ -475,6 +475,13 @@ public final class FieldRenderer {
             float alpha,
             RenderOverrides overrides) {
         
+        // DEBUG: Log at INFO level to confirm render() is called (using GUI logger since it's confirmed working)
+        Logging.GUI.topic("render").info("[FIELDRENDERER-ENTRY] id={}, modifiers={}, bobbing={}, breathing={}",
+            definition != null ? definition.id() : "null",
+            definition != null ? (definition.modifiers() != null ? "present" : "null") : "no-def",
+            definition != null && definition.modifiers() != null ? definition.modifiers().bobbing() : 0,
+            definition != null && definition.modifiers() != null ? definition.modifiers().breathing() : 0);
+        
         // Outer scope: batches all logging into single TRACE output
         try (LogScope scope = Logging.FIELD.topic("render").scope("field:" + (definition != null ? definition.id() : "null"), LogLevel.TRACE)) {
             scope.kv("alpha", alpha)
@@ -508,13 +515,21 @@ public final class FieldRenderer {
             matrices.translate(position.x, position.y, position.z);
         
             // === PHASE 3.5: Apply Field Modifiers (bobbing, breathing) ===
-            if (definition.modifiers() != null) {
-                var mods = definition.modifiers();
+            var mods = definition.modifiers();
+            
+            // DEBUG: Force print to console to confirm this code is reached
+            System.out.println("[FIELDRENDERER] modifiers=" + (mods != null) + 
+                ", bobbing=" + (mods != null ? mods.bobbing() : 0) + 
+                ", breathing=" + (mods != null ? mods.breathing() : 0));
+            
+            if (mods != null) {
                 // CP5: Values reaching renderer
                 PipelineTracer.trace(PipelineTracer.D1_BOBBING, 5, "render", String.valueOf(mods.bobbing()));
                 PipelineTracer.trace(PipelineTracer.D2_BREATHING, 5, "render", String.valueOf(mods.breathing()));
                 
-                if (mods.hasAnimationModifiers()) {
+                // ALWAYS apply modifiers if any value is non-zero
+                if (mods.bobbing() > 0 || mods.breathing() > 0) {
+                    System.out.println("[FIELDRENDERER] APPLYING bobbing=" + mods.bobbing() + ", breathing=" + mods.breathing());
                     scope.branch("modifiers").kv("bobbing", mods.bobbing()).kv("breathing", mods.breathing());
                     net.cyberpunk042.client.visual.animation.AnimationApplier.applyModifiers(
                         matrices, mods, time);
@@ -543,8 +558,7 @@ public final class FieldRenderer {
             }
             
             // CP4: Field-level segments (D1-D4) - trace unconditionally
-            if (definition.modifiers() != null) {
-                var mods = definition.modifiers();
+            if (mods != null) {
                 PipelineTracer.trace(PipelineTracer.D1_BOBBING, 4, "def", String.valueOf(mods.bobbing()));
                 PipelineTracer.trace(PipelineTracer.D2_BREATHING, 4, "def", String.valueOf(mods.breathing()));
             }
