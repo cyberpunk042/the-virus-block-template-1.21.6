@@ -1,0 +1,201 @@
+package net.cyberpunk042.client.gui.component;
+
+import net.cyberpunk042.client.gui.layout.Bounds;
+import net.cyberpunk042.client.gui.screen.TabType;
+import net.cyberpunk042.client.gui.widget.SubTabPane;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.widget.ClickableWidget;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Content area component that manages the main content display.
+ * 
+ * <p>Contains sub-tab panes for each main tab:</p>
+ * <ul>
+ *   <li><b>Quick:</b> Fill, Appearance, Visibility, Transform</li>
+ *   <li><b>Advanced:</b> Animation, Prediction, Linking, Modifiers</li>
+ *   <li><b>Debug:</b> Beam, Trigger, Lifecycle, Bindings, Trace</li>
+ * </ul>
+ * 
+ * <p>The Profiles tab uses a separate panel and is handled by the main screen.</p>
+ */
+public class ContentArea implements ScreenComponent {
+    
+    private Bounds bounds;
+    private final TextRenderer textRenderer;
+    private final VisibilityController visibility;
+    private final Runnable onSubTabChange;
+    
+    // Sub-tab panes (one per main tab)
+    private SubTabPane quickSubTabs;
+    private SubTabPane advancedSubTabs;
+    private SubTabPane debugSubTabs;
+    
+    // Content provider factory
+    private final ContentProviderFactory contentFactory;
+    
+    // Current state
+    private TabType currentMainTab = TabType.QUICK;
+    
+    /**
+     * Creates a content area.
+     * 
+     * @param textRenderer Font renderer
+     * @param visibility Visibility controller
+     * @param contentFactory Factory for creating sub-tab content
+     * @param onSubTabChange Called when a sub-tab changes
+     */
+    public ContentArea(
+            TextRenderer textRenderer,
+            VisibilityController visibility,
+            ContentProviderFactory contentFactory,
+            Runnable onSubTabChange) {
+        
+        this.textRenderer = textRenderer;
+        this.visibility = visibility;
+        this.contentFactory = contentFactory;
+        this.onSubTabChange = onSubTabChange;
+    }
+    
+    @Override
+    public void setBounds(Bounds bounds) {
+        this.bounds = bounds;
+        rebuild();
+    }
+    
+    @Override
+    public void rebuild() {
+        if (bounds == null || contentFactory == null) return;
+        
+        initQuickSubTabs();
+        initAdvancedSubTabs();
+        initDebugSubTabs();
+    }
+    
+    private void initQuickSubTabs() {
+        quickSubTabs = new SubTabPane(textRenderer)
+            .addTab("Fill", contentFactory.fill())
+            .addTab("Appear", contentFactory.appearance())
+            .addTab("Visibility", contentFactory.visibility())
+            .addTab("Xfm", contentFactory.transform())
+            .onTabChange(idx -> onSubTabChange.run());
+        quickSubTabs.setBounds(bounds);
+    }
+    
+    private void initAdvancedSubTabs() {
+        advancedSubTabs = new SubTabPane(textRenderer)
+            .addTab("Anim", contentFactory.animation())
+            .addTab("Predict", contentFactory.prediction())
+            .addTab("Linking", contentFactory.linking())
+            .addTab("Mods", contentFactory.modifiers())
+            .onTabChange(idx -> onSubTabChange.run());
+        advancedSubTabs.setBounds(bounds);
+    }
+    
+    private void initDebugSubTabs() {
+        debugSubTabs = new SubTabPane(textRenderer)
+            .addTab("Beam", contentFactory.beam())
+            .addTab("Trigger", contentFactory.trigger())
+            .addTab("Life", contentFactory.lifecycle())
+            .addTab("Bindings", contentFactory.bindings())
+            .addTab("Trace", contentFactory.trace())
+            .onTabChange(idx -> onSubTabChange.run());
+        debugSubTabs.setBounds(bounds);
+    }
+    
+    /**
+     * Sets the active main tab and switches content.
+     */
+    public void setActiveMainTab(TabType tab) {
+        this.currentMainTab = tab;
+    }
+    
+    /**
+     * Returns the active sub-tab pane for the current main tab.
+     */
+    public SubTabPane getActiveSubTabPane() {
+        return switch (currentMainTab) {
+            case QUICK -> quickSubTabs;
+            case ADVANCED -> advancedSubTabs;
+            case DEBUG -> debugSubTabs;
+            case PROFILES -> null; // Profiles uses separate panel
+        };
+    }
+    
+    @Override
+    public List<ClickableWidget> getWidgets() {
+        SubTabPane active = getActiveSubTabPane();
+        if (active != null) {
+            return active.getWidgets();
+        }
+        return List.of();
+    }
+    
+    @Override
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        SubTabPane active = getActiveSubTabPane();
+        if (active != null) {
+            active.render(context, mouseX, mouseY, delta);
+        }
+    }
+    
+    @Override
+    public void tick() {
+        SubTabPane active = getActiveSubTabPane();
+        if (active != null) {
+            active.tick();
+        }
+    }
+    
+    @Override
+    public boolean isVisible() {
+        // Not visible when on Profiles tab
+        return currentMainTab != TabType.PROFILES;
+    }
+    
+    /**
+     * Handles mouse scroll for the active sub-tab.
+     */
+    public boolean mouseScrolled(double mouseX, double mouseY, double h, double v) {
+        SubTabPane active = getActiveSubTabPane();
+        if (active != null) {
+            return active.mouseScrolled(mouseX, mouseY, h, v);
+        }
+        return false;
+    }
+    
+    /**
+     * Refreshes for renderer mode changes.
+     * Rebuilds sub-tabs to update visibility of mode-dependent panels.
+     */
+    public void refreshForRendererMode() {
+        // Re-set bounds triggers rebuild of the sub-tab pane
+        if (bounds != null) {
+            rebuild();
+        }
+    }
+    
+    /**
+     * Returns the Quick sub-tabs pane.
+     */
+    public SubTabPane getQuickSubTabs() {
+        return quickSubTabs;
+    }
+    
+    /**
+     * Returns the Advanced sub-tabs pane.
+     */
+    public SubTabPane getAdvancedSubTabs() {
+        return advancedSubTabs;
+    }
+    
+    /**
+     * Returns the Debug sub-tabs pane.
+     */
+    public SubTabPane getDebugSubTabs() {
+        return debugSubTabs;
+    }
+}

@@ -207,9 +207,10 @@ public final class DefinitionBuilder {
     private static FieldLayer rebuildLayerWithCurrentState(FieldLayer original, FieldEditState state) throws Exception {
         List<Primitive> newPrimitives = new ArrayList<>();
         var origPrimitives = original.primitives();
+        int selectedPrimIdx = state.getSelectedPrimitiveIndex();
         
         for (int i = 0; i < origPrimitives.size(); i++) {
-            if (i == state.getSelectedPrimitiveIndex()) {
+            if (i == selectedPrimIdx) {
                 // Replace with current editor state
                 newPrimitives.add(buildCurrentPrimitive(state));
             } else {
@@ -267,15 +268,8 @@ public final class DefinitionBuilder {
         Logging.GUI.topic("builder").debug("[FILL-DEBUG] Collected fill.mode={}, components.containsKey('fill')={}", 
             fill.mode().name(), components.containsKey("fill"));
         
-        // Merge orbit config from state into transform if present
-        OrbitConfig orbit = state.orbit();
+        // Transform already contains orbit (no separate orbit field anymore)
         Transform transform = baseTransform;
-        if (orbit != null && orbit.isActive() && baseTransform.orbit() == null) {
-            // Build new transform with orbit from state
-            transform = baseTransform.toBuilder().orbit(orbit).build();
-            Logging.GUI.topic("builder").debug("Merged OrbitConfig into Transform: radius={}, speed={}", 
-                orbit.radius(), orbit.speed());
-        }
         
         // CP2-CP3: Fill segments (ALL)
         traceFillDetails(fill);

@@ -358,11 +358,28 @@ public class PresetRegistry {
     // ═══════════════════════════════════════════════════════════════════════
     
     private static void applyAppearance(FieldEditState state, JsonObject json) {
-        if (json.has("glow")) state.set("appearance.glow", json.get("glow").getAsFloat());
-        if (json.has("emissive")) state.set("appearance.emissive", json.get("emissive").getAsFloat());
-        if (json.has("saturation")) state.set("appearance.saturation", json.get("saturation").getAsFloat());
-        if (json.has("primaryColor")) state.set("appearance.primaryColor", json.get("primaryColor").getAsInt());
-        if (json.has("secondaryColor")) state.set("appearance.secondaryColor", json.get("secondaryColor").getAsInt());
+        if (json.has("glow") && json.get("glow").isJsonPrimitive()) {
+            try { state.set("appearance.glow", json.get("glow").getAsFloat()); } catch (Exception e) {}
+        }
+        if (json.has("emissive") && json.get("emissive").isJsonPrimitive()) {
+            var prim = json.get("emissive").getAsJsonPrimitive();
+            try {
+                if (prim.isBoolean()) {
+                    state.set("appearance.emissive", prim.getAsBoolean() ? 1.0f : 0.0f);
+                } else {
+                    state.set("appearance.emissive", prim.getAsFloat());
+                }
+            } catch (Exception e) {}
+        }
+        if (json.has("saturation") && json.get("saturation").isJsonPrimitive()) {
+            try { state.set("appearance.saturation", json.get("saturation").getAsFloat()); } catch (Exception e) {}
+        }
+        if (json.has("primaryColor") && json.get("primaryColor").isJsonPrimitive()) {
+            try { state.set("appearance.primaryColor", json.get("primaryColor").getAsInt()); } catch (Exception e) {}
+        }
+        if (json.has("secondaryColor") && json.get("secondaryColor").isJsonPrimitive()) {
+            try { state.set("appearance.secondaryColor", json.get("secondaryColor").getAsInt()); } catch (Exception e) {}
+        }
     }
     
     private static void applyAnimation(FieldEditState state, JsonObject json) {

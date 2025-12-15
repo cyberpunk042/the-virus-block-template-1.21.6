@@ -205,11 +205,11 @@ public final class GuiClientHandlers {
     }
     
     private static void applyOrbitUpdate(FieldEditState state, JsonObject json) {
-        if (json.has("enabled")) state.set("orbit.enabled", json.get("enabled").getAsBoolean());
-        if (json.has("radius")) state.set("orbit.radius", json.get("radius").getAsFloat());
-        if (json.has("speed")) state.set("orbit.speed", json.get("speed").getAsFloat());
-        if (json.has("axis")) state.set("orbit.axis", json.get("axis").getAsString());
-        if (json.has("phase")) state.set("orbit.phase", json.get("phase").getAsFloat());
+        if (json.has("enabled")) state.set("transform.orbit.enabled", json.get("enabled").getAsBoolean());
+        if (json.has("radius")) state.set("transform.orbit.radius", json.get("radius").getAsFloat());
+        if (json.has("speed")) state.set("transform.orbit.speed", json.get("speed").getAsFloat());
+        if (json.has("axis")) state.set("transform.orbit.axis", json.get("axis").getAsString());
+        if (json.has("phase")) state.set("transform.orbit.phase", json.get("phase").getAsFloat());
     }
     
     private static void applyFillUpdate(FieldEditState state, JsonObject json) {

@@ -1,43 +1,37 @@
 package net.cyberpunk042.client.gui.layout;
 
+import net.cyberpunk042.client.gui.widget.GridPane;
 /**
- * Fullscreen layout: Immersive editor with 3D viewport.
+ * Fullscreen layout: 2×2 grid layout matching OLD working code.
  * 
  * <pre>
- * ┌─────────────────────────────────────────────────────────────────┐
- * │ [≡] Field Customizer                                    [─][×] │ ← Title bar
- * ├─────────────────────────────────────────────────────────────────┤
- * │                                                                 │
- * │                    3D VIEWPORT (PREVIEW)                        │
- * │                                                                 │
- * │                         ████████                                │
- * │                        ██████████                               │
- * │                       ████████████                              │
- * │                        ██████████                               │
- * │                         ████████                                │
- * │                                                                 │
- * │   [orbit with mouse]  [zoom with scroll]                        │
- * ├─────────────────────────────────────────────────────────────────┤
- * │ [Quick] [Advanced] [Debug] [Profiles]                           │ ← Tab bar
- * ├─────────────────────────────────────────────────────────────────┤
- * │                                                                 │
- * │                    CONTENT PANEL                                │
- * │              (scrollable, shows active tab)                     │
- * │                                                                 │
- * ├─────────────────────────────────────────────────────────────────┤
- * │ Layer: base | Primitive: sphere | Dirty: ●                      │ ← Status bar
- * └─────────────────────────────────────────────────────────────────┘
+ * ┌─────────────────────────────────────────────────────────────────────────┐
+ * │ [⬜] Field Customizer                                            [×]    │ ← Title bar
+ * ├─────────────────────────────────────────────────────────────────────────┤
+ * │ [Quick] [Advanced] [Debug] [Profiles]      [Fast/Acc] [Select Preset…] │ ← Tab bar
+ * ├─────────────────────────────┬───────────────────────────────────────────┤
+ * │                             │ LAYER: [+] ◀ base ▶ [+]                   │
+ * │       3D PREVIEW            │ PRIM:  [◀] sphere_main [+]                │
+ * │      (top-left)             ├───────────────────────────────────────────┤
+ * │                             │ [Fill] [Appear] [Visibility] [Xfm]        │
+ * │                             │ (sub-tab content area - top-right)        │
+ * ├─────────────────────────────┼───────────────────────────────────────────┤
+ * │       SHAPE                 │                                           │
+ * │   Type: [Sphere ▼]          │   (sub-tab content continues)             │
+ * │   (bottom-left)             │   (bottom-right)                          │
+ * └─────────────────────────────┴───────────────────────────────────────────┘
+ * │ Layer: 0  Prim: 0  | Status bar                                         │
+ * └─────────────────────────────────────────────────────────────────────────┘
  * </pre>
  */
 public class FullscreenLayout implements LayoutManager {
     
-    // Configuration
-    private static final int TITLE_BAR_HEIGHT = 24;
-    private static final int TAB_BAR_HEIGHT = 28;
-    private static final int STATUS_BAR_HEIGHT = 24;
-    private static final int MARGIN = 12;
-    private static final int PREVIEW_MIN_HEIGHT = 200;
-    private static final float PREVIEW_RATIO = 0.45f;  // 45% of available height for preview
+    // Configuration - must match old working code constants
+    private static final int TITLE_BAR_HEIGHT = 20;
+    private static final int TAB_BAR_HEIGHT = 22;
+    private static final int STATUS_BAR_HEIGHT = 18;
+    private static final int MARGIN = 8;
+    private static final int SELECTOR_HEIGHT = 22;
     
     // Calculated bounds
     private Bounds panel = Bounds.EMPTY;
@@ -46,6 +40,7 @@ public class FullscreenLayout implements LayoutManager {
     private Bounds tabBar = Bounds.EMPTY;
     private Bounds content = Bounds.EMPTY;
     private Bounds statusBar = Bounds.EMPTY;
+    private GridPane grid;  // 2x2 grid for content quadrants
     
     @Override
     public GuiMode getMode() {
@@ -61,20 +56,21 @@ public class FullscreenLayout implements LayoutManager {
         titleBar = panel.sliceTop(TITLE_BAR_HEIGHT);
         Bounds remaining = panel.withoutTop(TITLE_BAR_HEIGHT);
         
+        // Tab bar below title (NOT at bottom!)
+        tabBar = remaining.sliceTop(TAB_BAR_HEIGHT);
+        remaining = remaining.withoutTop(TAB_BAR_HEIGHT);
+        
         // Status bar at bottom
         statusBar = remaining.sliceBottom(STATUS_BAR_HEIGHT);
         remaining = remaining.withoutBottom(STATUS_BAR_HEIGHT);
         
-        // Tab bar above status
-        tabBar = remaining.sliceBottom(TAB_BAR_HEIGHT);
-        remaining = remaining.withoutBottom(TAB_BAR_HEIGHT);
+        // Content area uses 2x2 grid (40% left, 50% top)
+        content = remaining;
+        grid = GridPane.grid2x2(0.4f, 0.5f);
+        grid.setBounds(content);
         
-        // Split remaining between preview and content
-        int availableHeight = remaining.height();
-        int previewHeight = Math.max(PREVIEW_MIN_HEIGHT, (int)(availableHeight * PREVIEW_RATIO));
-        
-        preview = remaining.sliceTop(previewHeight).inset(MARGIN);
-        content = remaining.withoutTop(previewHeight).inset(MARGIN, 0);
+        // Preview is top-left quadrant
+        preview = grid.topLeft().inset(4);
     }
     
     @Override
@@ -99,12 +95,80 @@ public class FullscreenLayout implements LayoutManager {
     
     @Override
     public Bounds getContentBounds() {
-        return content;
+        // ContentArea only goes in right column below selectors
+        return grid.topRight().withoutTop(SELECTOR_HEIGHT * 2 + 4);
     }
     
     @Override
     public Bounds getStatusBarBounds() {
         return statusBar;
+    }
+    
+    @Override
+    public Bounds getSelectorBounds() {
+        // Selectors at top of right column
+        return grid.topRight().sliceTop(SELECTOR_HEIGHT * 2 + 4);
+    }
+    
+    @Override
+    public Bounds getShapePanelBounds() {
+        // Shape panel is bottom-left quadrant
+        return grid.bottomLeft().inset(4);
+    }
+    
+    /** Returns the sub-tab content bounds (right column below selectors) */
+    public Bounds getSubTabBounds() {
+        return grid.topRight().withoutTop(SELECTOR_HEIGHT * 2 + 4);
+    }
+    
+    @Override
+    public void renderBackground(net.minecraft.client.gui.DrawContext context, int screenWidth, int screenHeight) {
+        // Solid dark background - fullscreen blocks game world entirely
+        context.fill(0, 0, screenWidth, screenHeight, 0xFF0a0a0a);
+    }
+    
+    @Override
+    public void renderFrame(net.minecraft.client.gui.DrawContext context) {
+        // Main panel frame (border)
+        context.fill(panel.x() - 1, panel.y() - 1, panel.right() + 1, panel.bottom() + 1, 0xFF333333);
+        context.fill(panel.x(), panel.y(), panel.right(), panel.bottom(), 0xDD1a1a1a);
+        
+        // Title bar background
+        context.fill(titleBar.x(), titleBar.y(), titleBar.right(), titleBar.bottom(), 0xFF2a2a2a);
+        
+        // Tab bar background  
+        context.fill(tabBar.x(), tabBar.y(), tabBar.right(), tabBar.bottom(), 0xFF222222);
+        
+        // Quadrant backgrounds
+        renderQuadrantBackgrounds(context);
+    }
+    
+    private void renderQuadrantBackgrounds(net.minecraft.client.gui.DrawContext context) {
+        // Top-left: Preview area
+        Bounds tl = grid.topLeft();
+        context.fill(tl.x(), tl.y(), tl.right(), tl.bottom(), 0xFF0a0a0a);
+        context.drawBorder(tl.x(), tl.y(), tl.width(), tl.height(), 0xFF333333);
+        
+        // Bottom-left: Shape area
+        Bounds bl = grid.bottomLeft();
+        context.fill(bl.x(), bl.y(), bl.right(), bl.bottom(), 0xFF151515);
+        context.drawBorder(bl.x(), bl.y(), bl.width(), bl.height(), 0xFF333333);
+        
+        // Right column background (both cells)
+        Bounds rightCol = grid.rightColumn();
+        context.fill(rightCol.x(), rightCol.y(), rightCol.right(), rightCol.bottom(), 0xFF121212);
+    }
+    
+    @Override
+    public Bounds getProfilesLeftBounds() {
+        // Fullscreen: left column
+        return grid.getSpan(0, 0, 1, 2);
+    }
+    
+    @Override
+    public Bounds getProfilesRightBounds() {
+        // Fullscreen: right column  
+        return grid.getSpan(1, 0, 1, 2);
     }
     
     @Override
@@ -118,5 +182,10 @@ public class FullscreenLayout implements LayoutManager {
     
     @Override
     public boolean hasPreviewWidget() { return true; }
+    
+    /** Returns the grid for direct quadrant access (needed for rendering). */
+    public GridPane getGrid() {
+        return grid;
+    }
 }
 

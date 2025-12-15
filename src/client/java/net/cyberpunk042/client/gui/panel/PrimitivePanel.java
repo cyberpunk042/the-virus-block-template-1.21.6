@@ -41,11 +41,26 @@ public class PrimitivePanel extends AbstractPanel {
     private ButtonWidget moveDownBtn;
 
     private final int startY;
+    
+    /** Callback fired when the selected primitive changes (for UI rebuild) */
+    private Runnable onPrimitiveChanged;
 
     public PrimitivePanel(Screen parent, FieldEditState state, int startY) {
         super(parent, state);
         this.startY = startY;
         Logging.GUI.topic("panel").debug("PrimitivePanel created");
+    }
+    
+    /** Sets the callback for when primitive selection changes. */
+    public void setOnPrimitiveChanged(Runnable callback) {
+        this.onPrimitiveChanged = callback;
+    }
+    
+    /** Notifies that the primitive selection has changed. */
+    private void notifyPrimitiveChanged() {
+        if (onPrimitiveChanged != null) {
+            onPrimitiveChanged.run();
+        }
     }
 
     @Override
@@ -85,6 +100,7 @@ public class PrimitivePanel extends AbstractPanel {
             state.setSelectedPrimitiveIndex(current - 1);
             updateIndicator();
             updateButtonStates();
+            notifyPrimitiveChanged();
             Logging.GUI.topic("primitive").debug("Selected primitive: {}", current - 1);
         }
     }
@@ -97,6 +113,7 @@ public class PrimitivePanel extends AbstractPanel {
             state.setSelectedPrimitiveIndex(current + 1);
             updateIndicator();
             updateButtonStates();
+            notifyPrimitiveChanged();
             Logging.GUI.topic("primitive").debug("Selected primitive: {}", current + 1);
         }
     }
@@ -108,6 +125,7 @@ public class PrimitivePanel extends AbstractPanel {
             state.setSelectedPrimitiveIndex(newIndex);
             updateIndicator();
             updateButtonStates();
+            notifyPrimitiveChanged();
             ToastNotification.success("Primitive added");
             Logging.GUI.topic("primitive").info("Added primitive {} to layer {}", newIndex, layer);
         } else {
@@ -135,6 +153,7 @@ public class PrimitivePanel extends AbstractPanel {
         if (state.removePrimitive(layer, index)) {
             updateIndicator();
             updateButtonStates();
+            notifyPrimitiveChanged();
             ToastNotification.info("Primitive removed");
             Logging.GUI.topic("primitive").info("Removed primitive {} from layer {}", index, layer);
         }
@@ -147,6 +166,7 @@ public class PrimitivePanel extends AbstractPanel {
             state.setSelectedPrimitiveIndex(index - 1);
             updateIndicator();
             updateButtonStates();
+            notifyPrimitiveChanged();
             Logging.GUI.topic("primitive").debug("Moved primitive {} up", index);
         }
     }
@@ -159,6 +179,7 @@ public class PrimitivePanel extends AbstractPanel {
             state.setSelectedPrimitiveIndex(index + 1);
             updateIndicator();
             updateButtonStates();
+            notifyPrimitiveChanged();
             Logging.GUI.topic("primitive").debug("Moved primitive {} down", index);
         }
     }

@@ -187,8 +187,10 @@ public class SubTabPane {
     }
     
     private void updateContentBounds() {
-        if (activeIndex < tabs.size()) {
-            tabs.get(activeIndex).content.setBounds(contentBounds);
+        // Initialize ALL tabs, not just the active one
+        // This ensures all panels have fresh state values when selection changes
+        for (int i = 0; i < tabs.size(); i++) {
+            tabs.get(i).content.setBounds(contentBounds);
         }
     }
     

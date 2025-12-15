@@ -334,6 +334,15 @@ public final class StateAccessor {
                 var getter = record.getClass().getMethod(propertyName);
                 Object nestedRecord = getter.invoke(record);
                 
+                // If nested record is null, try to create a default instance
+                if (nestedRecord == null) {
+                    Class<?> nestedType = getter.getReturnType();
+                    nestedRecord = createDefaultRecord(nestedType);
+                    if (nestedRecord == null) {
+                        throw new RuntimeException("Cannot create default for null nested record: " + propertyName);
+                    }
+                }
+                
                 // Recursively update the nested record
                 Object updatedNested = updateRecordProperty(nestedRecord, remaining, value);
                 
@@ -353,6 +362,28 @@ public final class StateAccessor {
         } catch (Exception e) {
             throw new RuntimeException("Cannot update record property: " + path + " on " + record.getClass().getSimpleName(), e);
         }
+    }
+    
+    /**
+     * Creates a default instance of a record type if it has a NONE/DEFAULT/IDENTITY constant.
+     */
+    private static Object createDefaultRecord(Class<?> recordType) {
+        // Try common default constant names
+        String[] defaultNames = {"NONE", "DEFAULT", "IDENTITY", "EMPTY"};
+        for (String name : defaultNames) {
+            try {
+                var field = recordType.getField(name);
+                return field.get(null);
+            } catch (Exception ignored) {}
+        }
+        // Try builder pattern with build()
+        try {
+            var builderMethod = recordType.getMethod("builder");
+            Object builder = builderMethod.invoke(null);
+            var buildMethod = builder.getClass().getMethod("build");
+            return buildMethod.invoke(builder);
+        } catch (Exception ignored) {}
+        return null;
     }
     
     /**

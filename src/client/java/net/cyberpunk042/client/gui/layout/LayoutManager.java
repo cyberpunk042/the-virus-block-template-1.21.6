@@ -57,6 +57,36 @@ public interface LayoutManager {
     Bounds getStatusBarBounds();
     
     // ═══════════════════════════════════════════════════════════════════════════
+    // SELECTOR AND SHAPE BOUNDS (for unified component placement)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * @return Bounds for the layer/primitive selector area.
+     */
+    default Bounds getSelectorBounds() { return Bounds.EMPTY; }
+    
+    /**
+     * @return Bounds for the shape panel.
+     */
+    default Bounds getShapePanelBounds() { return Bounds.EMPTY; }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // RENDERING
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Renders the background for this layout.
+     * Called first in render sequence.
+     */
+    default void renderBackground(net.minecraft.client.gui.DrawContext context, int screenWidth, int screenHeight) {}
+    
+    /**
+     * Renders the frame/borders for this layout.
+     * Called after background, before component rendering.
+     */
+    default void renderFrame(net.minecraft.client.gui.DrawContext context) {}
+    
+    // ═══════════════════════════════════════════════════════════════════════════
     // WINDOWED-SPECIFIC (optional, may return EMPTY in fullscreen)
     // ═══════════════════════════════════════════════════════════════════════════
     
@@ -73,6 +103,28 @@ public interface LayoutManager {
      *         Returns EMPTY in fullscreen mode.
      */
     default Bounds getRightPanelBounds() {
+        return Bounds.EMPTY;
+    }
+    
+    /**
+     * @return Bounds for right panel title bar in windowed mode.
+     *         Returns EMPTY in fullscreen mode.
+     */
+    default Bounds getRightTitleBarBounds() {
+        return Bounds.EMPTY;
+    }
+    
+    /**
+     * @return Bounds for profiles list panel (left side).
+     */
+    default Bounds getProfilesLeftBounds() {
+        return Bounds.EMPTY;
+    }
+    
+    /**
+     * @return Bounds for profiles details panel (right side).
+     */
+    default Bounds getProfilesRightBounds() {
         return Bounds.EMPTY;
     }
     

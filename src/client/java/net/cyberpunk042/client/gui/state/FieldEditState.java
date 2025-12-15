@@ -80,12 +80,11 @@ public class FieldEditState {
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
-    // TRANSFORM & ORBIT
+    // TRANSFORM (orbit is part of transform, not separate)
     // ═══════════════════════════════════════════════════════════════════════════
     
     @StateField @PrimitiveComponent("transform")
     private Transform transform = Transform.IDENTITY;
-    @StateField private OrbitConfig orbit = OrbitConfig.NONE;
     
     // ═══════════════════════════════════════════════════════════════════════════
     // APPEARANCE & FILL
@@ -239,6 +238,21 @@ public class FieldEditState {
     private List<FieldLayer> fieldLayers = new ArrayList<>();
     private List<Integer> selectedPrimitivePerLayer = new ArrayList<>();
     
+    /** Listener called when layer or primitive selection changes */
+    private Runnable selectionChangeListener;
+    
+    /** Sets the listener to be notified when selection changes. */
+    public void setSelectionChangeListener(Runnable listener) {
+        this.selectionChangeListener = listener;
+    }
+    
+    /** Notifies that the selection has changed. Called after save/load completes. */
+    private void notifySelectionChanged() {
+        if (selectionChangeListener != null) {
+            selectionChangeListener.run();
+        }
+    }
+    
     {
         // Initialize with one default layer containing one default primitive
         Shape defaultShape = SphereShape.builder().radius(1.0f).latSteps(32).lonSteps(64).build();
@@ -333,7 +347,6 @@ public class FieldEditState {
         
         // Reset transform & orbit
         this.transform = Transform.IDENTITY;
-        this.orbit = OrbitConfig.NONE;
         
         // Reset appearance & fill
         this.fill = FillConfig.SOLID;
@@ -729,7 +742,6 @@ public class FieldEditState {
     public ConeShape cone() { return cone; }
 
     public Transform transform() { return transform; }
-    public OrbitConfig orbit() { return orbit; }
 
     public FillConfig fill() { return fill; }
     public VisibilityMask mask() { return mask; }
@@ -754,8 +766,17 @@ public class FieldEditState {
     
     public int getSelectedLayerIndex() { return selectedLayerIndex; }
     public void setSelectedLayerIndex(int index) { 
+        // Save current primitive first (persist any edits)
+        saveSelectedPrimitive();
+        
         this.selectedLayerIndex = Math.max(0, Math.min(index, fieldLayers.size() - 1));
+        // Ensure selectedPrimitivePerLayer has an entry for this layer
+        while (selectedPrimitivePerLayer.size() <= selectedLayerIndex) {
+            selectedPrimitivePerLayer.add(0);
+        }
         clampPrimitiveSelection(selectedLayerIndex);
+        loadSelectedPrimitive();
+        notifySelectionChanged();
     }
     
     public int getLayerCount() { return fieldLayers.size(); }
@@ -776,6 +797,183 @@ public class FieldEditState {
         return layer.primitives().get(primIdx);
     }
     
+    /**
+     * Saves the current global state back to the currently selected primitive.
+     * Must be called BEFORE switching selection to persist edits.
+     */
+    public void saveSelectedPrimitive() {
+        int layerIdx = selectedLayerIndex;
+        int primIdx = getSelectedPrimitiveIndex();
+        
+        if (layerIdx < 0 || layerIdx >= fieldLayers.size()) return;
+        FieldLayer layer = fieldLayers.get(layerIdx);
+        if (primIdx < 0 || primIdx >= layer.primitives().size()) return;
+        
+        Primitive oldPrim = layer.primitives().get(primIdx);
+        
+        // Build new primitive from current global state
+        // (orbit is part of transform, not separate)
+        SimplePrimitive newPrim = new SimplePrimitive(
+            oldPrim.id(),
+            shapeType,
+            currentShape(),
+            transform,
+            fill,
+            mask,
+            arrangement,
+            buildAppearanceFromState(),
+            buildAnimationFromState(),
+            link
+        );
+        
+        // Replace in layer
+        List<Primitive> updatedPrimitives = new ArrayList<>(layer.primitives());
+        updatedPrimitives.set(primIdx, newPrim);
+        
+        FieldLayer updatedLayer = new FieldLayer(
+            layer.id(), updatedPrimitives, layer.transform(), layer.animation(),
+            layer.alpha(), layer.visible(), layer.blendMode()
+        );
+        fieldLayers.set(layerIdx, updatedLayer);
+    }
+    
+    /** Builds Appearance from current AppearanceState */
+    private net.cyberpunk042.visual.appearance.Appearance buildAppearanceFromState() {
+        String colorHex = String.format("#%06X", appearance.primaryColor() & 0xFFFFFF);
+        String secondaryHex = appearance.secondaryColor() != 0 
+            ? String.format("#%06X", appearance.secondaryColor() & 0xFFFFFF) 
+            : null;
+        return net.cyberpunk042.visual.appearance.Appearance.builder()
+            .color(colorHex)
+            .alpha(net.cyberpunk042.visual.appearance.AlphaRange.of(appearance.alpha()))
+            .glow(appearance.glow())
+            .emissive(appearance.emissive())
+            .saturation(appearance.saturation())
+            .secondaryColor(secondaryHex)
+            .build();
+    }
+    
+    /** Builds Animation from current animation configs */
+    private Animation buildAnimationFromState() {
+        return Animation.builder()
+            .spin(spin)
+            .pulse(pulse)
+            .alphaPulse(alphaPulse)
+            .wobble(wobble)
+            .wave(wave)
+            .colorCycle(colorCycle)
+            .build();
+    }
+    
+    /**
+     * Loads the selected primitive's values into the global editor state.
+     * Call this when switching layers or primitives to sync the UI with the new selection.
+     */
+    public void loadSelectedPrimitive() {
+        Primitive prim = getSelectedPrimitive();
+        if (prim == null) {
+            Logging.GUI.topic("state").warn("No primitive selected to load");
+            return;
+        }
+        
+        // Load primitive id
+        this.primitiveId = prim.id();
+        
+        // Update shapeType from primitive
+        this.shapeType = prim.type();
+        
+        // Load shape parameters
+        Shape shape = prim.shape();
+        if (shape != null) {
+            switch (shape) {
+                case net.cyberpunk042.visual.shape.SphereShape s -> this.sphere = s;
+                case net.cyberpunk042.visual.shape.RingShape r -> this.ring = r;
+                case net.cyberpunk042.visual.shape.DiscShape d -> this.disc = d;
+                case net.cyberpunk042.visual.shape.PrismShape p -> this.prism = p;
+                case net.cyberpunk042.visual.shape.CylinderShape c -> this.cylinder = c;
+                case net.cyberpunk042.visual.shape.PolyhedronShape p -> this.polyhedron = p;
+                case net.cyberpunk042.visual.shape.TorusShape t -> this.torus = t;
+                case net.cyberpunk042.visual.shape.CapsuleShape c -> this.capsule = c;
+                case net.cyberpunk042.visual.shape.ConeShape c -> this.cone = c;
+                default -> {}
+            }
+        }
+        
+        // Load fill (use default if null to avoid keeping old primitive's value)
+        this.fill = prim.fill() != null ? prim.fill() : FillConfig.SOLID;
+        
+        // Load visibility mask (use default if null)
+        this.mask = prim.visibility() != null ? prim.visibility() : VisibilityMask.FULL;
+        
+        // Load arrangement (use default if null)
+        this.arrangement = prim.arrangement() != null ? prim.arrangement() : ArrangementConfig.DEFAULT;
+        
+        // Load transform (use default if null - orbit is part of transform)
+        this.transform = prim.transform() != null ? prim.transform() : Transform.IDENTITY;
+        
+        // Load appearance (use default if null)
+        if (prim.appearance() != null) {
+            var app = prim.appearance();
+            int colorInt = parseColorToInt(app.color());
+            int secondaryColorInt = parseColorToInt(app.secondaryColor());
+            float alpha = app.alpha() != null ? app.alpha().average() : 1.0f;
+            this.appearance = new AppearanceState(
+                colorInt,          // color
+                alpha,             // alpha
+                app.glow(),        // glow
+                app.emissive(),    // emissive
+                app.saturation(),  // saturation
+                colorInt,          // primaryColor (same as color)
+                secondaryColorInt  // secondaryColor
+            );
+        } else {
+            this.appearance = AppearanceState.DEFAULT;
+        }
+        
+        // Load animation (use defaults for missing components)
+        if (prim.animation() != null) {
+            Animation anim = prim.animation();
+            this.spin = anim.spin() != null ? anim.spin() : SpinConfig.NONE;
+            this.pulse = anim.pulse() != null ? anim.pulse() : PulseConfig.NONE;
+            this.alphaPulse = anim.alphaPulse() != null ? anim.alphaPulse() : AlphaPulseConfig.NONE;
+            this.wobble = anim.wobble() != null ? anim.wobble() : WobbleConfig.NONE;
+            this.wave = anim.wave() != null ? anim.wave() : WaveConfig.NONE;
+            this.colorCycle = anim.colorCycle() != null ? anim.colorCycle() : ColorCycleConfig.NONE;
+        } else {
+            // Reset all animation to defaults
+            this.spin = SpinConfig.NONE;
+            this.pulse = PulseConfig.NONE;
+            this.alphaPulse = AlphaPulseConfig.NONE;
+            this.wobble = WobbleConfig.NONE;
+            this.wave = WaveConfig.NONE;
+            this.colorCycle = ColorCycleConfig.NONE;
+        }
+        
+        Logging.GUI.topic("state").debug("Loaded primitive '{}' (type={}) into global state", prim.id(), prim.type());
+    }
+    
+    /**
+     * Parses a color string (like "#FF0000" or "@primary") to an int.
+     */
+    private int parseColorToInt(String color) {
+        if (color == null || color.isEmpty()) return 0xFFFFFFFF;
+        if (color.startsWith("#")) {
+            try {
+                // Parse hex color: #RRGGBB or #AARRGGBB
+                String hex = color.substring(1);
+                if (hex.length() == 6) {
+                    return 0xFF000000 | Integer.parseInt(hex, 16);
+                } else if (hex.length() == 8) {
+                    return (int) Long.parseLong(hex, 16);
+                }
+            } catch (NumberFormatException e) {
+                Logging.GUI.topic("state").warn("Invalid hex color: {}", color);
+            }
+        }
+        // Handle color references like "@primary" - return default cyan
+        return 0xFF00FFFF;
+    }
+    
     public int addLayer() {
         if (fieldLayers.size() >= 10) return -1;
         String name = "Layer " + (fieldLayers.size() + 1);
@@ -792,7 +990,15 @@ public class FieldEditState {
     public boolean removeLayer(int index) {
         if (fieldLayers.size() <= 1 || index < 0 || index >= fieldLayers.size()) return false;
         fieldLayers.remove(index);
-        selectedPrimitivePerLayer.remove(index);
+        if (index < selectedPrimitivePerLayer.size()) {
+            selectedPrimitivePerLayer.remove(index);
+        }
+        // Adjust selected layer index if needed
+        if (selectedLayerIndex >= fieldLayers.size()) {
+            selectedLayerIndex = Math.max(0, fieldLayers.size() - 1);
+        } else if (selectedLayerIndex > index) {
+            selectedLayerIndex--;
+        }
         markDirty();
         return true;
     }
@@ -905,13 +1111,30 @@ public class FieldEditState {
 
     public int getSelectedPrimitiveIndex() {
         if (selectedPrimitivePerLayer.isEmpty()) return 0;
+        // Clamp layer index to valid range
+        if (selectedLayerIndex < 0 || selectedLayerIndex >= selectedPrimitivePerLayer.size()) {
+            return 0;
+        }
+        // Just return the stored value - do NOT auto-correct here
+        // Auto-correction was causing the selection to silently reset to 0
         return selectedPrimitivePerLayer.get(selectedLayerIndex);
     }
 
     public void setSelectedPrimitiveIndex(int index) {
-        if (selectedPrimitivePerLayer.isEmpty()) return;
+        // Save current primitive first (persist any edits)
+        saveSelectedPrimitive();
+        
+        if (selectedPrimitivePerLayer.isEmpty()) {
+            selectedPrimitivePerLayer.add(0);
+        }
+        // Ensure we have an entry for the current layer
+        while (selectedPrimitivePerLayer.size() <= selectedLayerIndex) {
+            selectedPrimitivePerLayer.add(0);
+        }
         int clamped = clampPrimitiveIndex(selectedLayerIndex, index);
         selectedPrimitivePerLayer.set(selectedLayerIndex, clamped);
+        loadSelectedPrimitive();
+        notifySelectionChanged();
     }
 
     public int addPrimitive(int layerIndex) {
@@ -935,7 +1158,8 @@ public class FieldEditState {
         );
         fieldLayers.set(layerIndex, updatedLayer);
         
-        selectedPrimitivePerLayer.set(layerIndex, updatedPrimitives.size() - 1);
+        // Note: Do NOT update selectedPrimitivePerLayer here.
+        // The caller should use setSelectedPrimitiveIndex() which handles save/load properly.
         markDirty();
         return updatedPrimitives.size() - 1;
     }
@@ -996,7 +1220,8 @@ public class FieldEditState {
         );
         fieldLayers.set(layerIndex, updatedLayer);
         
-        selectedPrimitivePerLayer.set(layerIndex, updatedPrimitives.size() - 1);
+        // Note: Do NOT update selectedPrimitivePerLayer here.
+        // The caller should use setSelectedPrimitiveIndex() which handles save/load properly.
         markDirty();
         return updatedPrimitives.size() - 1;
     }

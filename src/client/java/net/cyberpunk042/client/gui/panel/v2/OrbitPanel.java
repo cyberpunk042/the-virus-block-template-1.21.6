@@ -30,27 +30,30 @@ public class OrbitPanel extends LayoutPanel {
         int w = contentWidth();
         int h = 20;
         
+        // Get orbit from transform
+        var orbit = state.transform() != null ? state.transform().orbit() : null;
+        
         // Radius
         radiusSlider = new LabeledSlider(0, 0, w, "Radius",
-            0.1f, 20.0f, state.getFloat("orbit.radius"),
+            0.1f, 20.0f, orbit != null ? orbit.radius() : 2.0f,
             "%.1f", null,
-            v -> state.set("orbit.radius", v)
+            v -> state.set("transform.orbit.radius", v)
         );
         layout.add(radiusSlider, p -> p.marginTop(4).marginLeft(4));
 
         // Speed
         speedSlider = new LabeledSlider(0, 0, w, "Speed",
-            -5.0f, 5.0f, state.getFloat("orbit.speed"),
+            -5.0f, 5.0f, orbit != null ? orbit.speed() : 0.5f,
             "%.2f rot/s", null,
-            v -> state.set("orbit.speed", v)
+            v -> state.set("transform.orbit.speed", v)
         );
         layout.add(speedSlider, p -> p.marginTop(4).marginLeft(4));
 
         // Phase
         phaseSlider = new LabeledSlider(0, 0, w, "Phase",
-            0.0f, 360.0f, state.getFloat("orbit.phase"),
+            0.0f, 360.0f, orbit != null ? orbit.phase() : 0f,
             "%.0f°", null,
-            v -> state.set("orbit.phase", v)
+            v -> state.set("transform.orbit.phase", v)
         );
         layout.add(phaseSlider, p -> p.marginTop(4).marginLeft(4));
     }

@@ -76,9 +76,9 @@ public final class SimplifiedFieldRenderer {
     // Debounce toggle (can be disabled for immediate updates in debug)
     private static boolean debounceEnabled = true;
     
-    // Advanced rendering mode (uses full FieldRenderer pipeline)
+    // Standard rendering mode (uses full FieldRenderer pipeline)
     // Enabled by default to support fill mode, visibility mask, and other pipeline features
-    private static boolean advancedModeEnabled = true;
+    private static boolean standardModeEnabled = true;
     
     // Cached mesh data (rebuilt when state changes)
     private static boolean meshDirty = true;
@@ -95,15 +95,15 @@ public final class SimplifiedFieldRenderer {
         return debounceEnabled;
     }
     
-    /** Enable/disable advanced rendering mode (uses full pipeline). */
-    public static void setAdvancedModeEnabled(boolean enabled) {
-        advancedModeEnabled = enabled;
-        Logging.GUI.topic("render").debug("SimplifiedFieldRenderer advanced mode: {}", enabled ? "ON" : "OFF");
+    /** Enable/disable standard rendering mode (uses full pipeline). */
+    public static void setStandardModeEnabled(boolean enabled) {
+        standardModeEnabled = enabled;
+        Logging.GUI.topic("render").debug("SimplifiedFieldRenderer standard mode: {}", enabled ? "ON" : "OFF");
     }
     
-    /** Check if advanced rendering mode is enabled. */
-    public static boolean isAdvancedModeEnabled() {
-        return advancedModeEnabled;
+    /** Check if standard rendering mode is enabled. */
+    public static boolean isStandardModeEnabled() {
+        return standardModeEnabled;
     }
     
     private SimplifiedFieldRenderer() {}
@@ -168,11 +168,11 @@ public final class SimplifiedFieldRenderer {
         Vec3d renderPos = playerPos.subtract(camPos);
         
         // Render using selected mode
-        if (advancedModeEnabled) {
-            // Advanced mode: Use full FieldRenderer pipeline
+        if (standardModeEnabled) {
+            // Standard mode: Use full FieldRenderer pipeline
             renderAdvanced(matrices, consumers, state, renderPos, worldTime);
         } else {
-            // Fast mode: Use simplified inline rendering  
+            // Simplified mode: Use simplified inline rendering  
             renderTestField(matrices, consumers, state, renderPos, worldTime);
         }
     }

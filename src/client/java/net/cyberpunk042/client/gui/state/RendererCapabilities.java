@@ -99,7 +99,7 @@ public final class RendererCapabilities {
      * @return true if the feature is supported and will be rendered
      */
     public static boolean isSupported(Feature feature) {
-        if (SimplifiedFieldRenderer.isAdvancedModeEnabled()) {
+        if (SimplifiedFieldRenderer.isStandardModeEnabled()) {
             return FULL_FEATURES.contains(feature);
         }
         return SIMPLIFIED_FEATURES.contains(feature);
@@ -129,7 +129,7 @@ public final class RendererCapabilities {
      * Returns the set of features supported in the current mode.
      */
     public static Set<Feature> getSupportedFeatures() {
-        if (SimplifiedFieldRenderer.isAdvancedModeEnabled()) {
+        if (SimplifiedFieldRenderer.isStandardModeEnabled()) {
             return EnumSet.copyOf(FULL_FEATURES);
         }
         return EnumSet.copyOf(SIMPLIFIED_FEATURES);
@@ -140,7 +140,7 @@ public final class RendererCapabilities {
      * Useful for showing "disabled because..." tooltips.
      */
     public static Set<Feature> getUnsupportedFeatures() {
-        if (SimplifiedFieldRenderer.isAdvancedModeEnabled()) {
+        if (SimplifiedFieldRenderer.isStandardModeEnabled()) {
             return EnumSet.noneOf(Feature.class);
         }
         EnumSet<Feature> unsupported = EnumSet.allOf(Feature.class);
@@ -155,28 +155,28 @@ public final class RendererCapabilities {
         if (isSupported(feature)) {
             return null; // Not disabled
         }
-        return "§7" + feature.description() + "\n§cRequires Accurate mode";
+        return "§7" + feature.description() + "\n§cRequires Standard mode";
     }
     
     /**
      * Returns the current mode name for display.
      */
     public static String getCurrentModeName() {
-        return SimplifiedFieldRenderer.isAdvancedModeEnabled() ? "Accurate" : "Fast";
+        return SimplifiedFieldRenderer.isStandardModeEnabled() ? "Standard" : "Simplified";
     }
     
     /**
-     * Returns true if currently in accurate/full mode.
+     * Returns true if currently in standard/full mode.
      */
-    public static boolean isAccurateMode() {
-        return SimplifiedFieldRenderer.isAdvancedModeEnabled();
+    public static boolean isStandardMode() {
+        return SimplifiedFieldRenderer.isStandardModeEnabled();
     }
     
     /**
-     * Returns true if currently in fast/simplified mode.
+     * Returns true if currently in simplified mode.
      */
-    public static boolean isFastMode() {
-        return !SimplifiedFieldRenderer.isAdvancedModeEnabled();
+    public static boolean isSimplifiedMode() {
+        return !SimplifiedFieldRenderer.isStandardModeEnabled();
     }
 }
 

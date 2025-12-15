@@ -228,33 +228,33 @@ public class TransformQuickSubPanel extends AbstractPanel {
             .omitKeyText()
             .build(x, y, halfW, COMPACT_H, Text.literal(""),
                 (btn, val) -> {
-                    state.set("orbit.enabled", val);
+                    state.set("transform.orbit.enabled", val);
                     Logging.GUI.topic("transform").debug("Orbit: {}", val);
                 });
         widgets.add(orbitToggle);
         
         // Orbit axis (Y axis default)
-        String currentAxis = state.getString("orbit.axis");
+        String currentAxis = orbit != null ? orbit.axis().name() : "Y";
         var orbitAxisToggle = CyclingButtonWidget.<String>builder(v -> Text.literal("Axis: " + v))
             .values("X", "Y", "Z")
             .initially(currentAxis != null && !currentAxis.isEmpty() ? currentAxis : "Y")
             .omitKeyText()
             .build(x + halfW + GAP, y, halfW, COMPACT_H, Text.literal(""),
-                (btn, val) -> state.set("orbit.axis", val));
+                (btn, val) -> state.set("transform.orbit.axis", val));
         widgets.add(orbitAxisToggle);
         y += COMPACT_H + GAP;
         
         orbitRadius = LabeledSlider.builder("Radius")
             .position(x, y).width(halfW)
             .range(0.1f, 10f).initial(orbitR).format("%.1f")
-            .onChange(v -> state.set("orbit.radius", v))
+            .onChange(v -> state.set("transform.orbit.radius", v))
             .build();
         widgets.add(orbitRadius);
         
         orbitSpeed = LabeledSlider.builder("Speed")
             .position(x + halfW + GAP, y).width(halfW)
             .range(-2f, 2f).initial(orbitS).format("%.2f")
-            .onChange(v -> state.set("orbit.speed", v))
+            .onChange(v -> state.set("transform.orbit.speed", v))
             .build();
         widgets.add(orbitSpeed);
         y += COMPACT_H + GAP;

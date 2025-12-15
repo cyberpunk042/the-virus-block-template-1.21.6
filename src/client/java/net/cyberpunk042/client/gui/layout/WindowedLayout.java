@@ -24,14 +24,13 @@ package net.cyberpunk042.client.gui.layout;
  */
 public class WindowedLayout implements LayoutManager {
     
-    // Configuration
-    private static final int SIDE_PANEL_WIDTH = 180;
-    private static final int SIDE_PANEL_HEIGHT = 300;
-    private static final int STATUS_BAR_HEIGHT = 20;
-    private static final int TITLE_BAR_HEIGHT = 16;
-    private static final int TAB_HEIGHT = 18;
-    private static final int MARGIN = 8;
-    private static final int GAP = 6;
+    // Configuration - match OLD working code
+    private static final int STATUS_BAR_HEIGHT = 18;  // OLD: STATUS_HEIGHT = 18
+    private static final int TITLE_BAR_HEIGHT = 16;   // OLD: titleH = 16
+    private static final int TAB_HEIGHT = 18;         // OLD: tabH = 18
+    private static final int SELECTOR_HEIGHT = 22;    // OLD: SELECTOR_HEIGHT = 22
+    private static final int MARGIN = 8;              // OLD: MARGIN = 8
+    private static final int PADDING = 4;             // OLD: padding = 4
     
     // Calculated bounds
     private Bounds leftPanel = Bounds.EMPTY;
@@ -57,35 +56,38 @@ public class WindowedLayout implements LayoutManager {
         this.screenWidth = screenWidth;
         this.screenHeight = screenHeight;
         
-        // Left panel: anchored to left side
-        int leftX = MARGIN;
-        int panelY = (screenHeight - SIDE_PANEL_HEIGHT) / 2;
-        leftPanel = new Bounds(leftX, panelY, SIDE_PANEL_WIDTH, SIDE_PANEL_HEIGHT);
+        // OLD: Dynamic panel sizing - narrower for more center space
+        int panelWidth = Math.min(200, Math.max(180, (screenWidth - MARGIN * 4) / 5));
+        int panelHeight = screenHeight - MARGIN * 2 - STATUS_BAR_HEIGHT;
         
-        // Right panel: anchored to right side
-        int rightX = screenWidth - MARGIN - SIDE_PANEL_WIDTH;
-        rightPanel = new Bounds(rightX, panelY, SIDE_PANEL_WIDTH, SIDE_PANEL_HEIGHT);
+        // Left panel: anchored to left side, full height
+        int leftX = MARGIN;
+        int panelY = MARGIN;
+        leftPanel = new Bounds(leftX, panelY, panelWidth, panelHeight);
+        
+        // Right panel: anchored to right side, full height
+        int rightX = screenWidth - MARGIN - panelWidth;
+        rightPanel = new Bounds(rightX, panelY, panelWidth, panelHeight);
         
         // Status bar: spans bottom, between the panels
         int statusY = screenHeight - MARGIN - STATUS_BAR_HEIGHT;
         statusBar = new Bounds(
-            leftX + SIDE_PANEL_WIDTH + GAP,
+            leftX + panelWidth + MARGIN,  // After left panel + margin
             statusY,
-            rightX - leftX - SIDE_PANEL_WIDTH - GAP * 2,
+            screenWidth - panelWidth * 2 - MARGIN * 4,  // Width between panels
             STATUS_BAR_HEIGHT
         );
         
-        // Sub-regions within left panel
+        // Sub-regions within left panel (OLD: lines 271-305)
         leftTitleBar = leftPanel.sliceTop(TITLE_BAR_HEIGHT);
         Bounds leftRemaining = leftPanel.withoutTop(TITLE_BAR_HEIGHT);
         leftTabBar = leftRemaining.sliceTop(TAB_HEIGHT);
-        leftContent = leftRemaining.withoutTop(TAB_HEIGHT).inset(GAP);
+        leftContent = leftRemaining.withoutTop(TAB_HEIGHT).inset(PADDING);
         
-        // Sub-regions within right panel
+        // Sub-regions within right panel (OLD: lines 400-498)
         rightTitleBar = rightPanel.sliceTop(TITLE_BAR_HEIGHT);
         Bounds rightRemaining = rightPanel.withoutTop(TITLE_BAR_HEIGHT);
-        rightTabBar = rightRemaining.sliceTop(TAB_HEIGHT);
-        rightContent = rightRemaining.withoutTop(TAB_HEIGHT).inset(GAP);
+        rightContent = rightRemaining.inset(PADDING);
     }
     
     @Override
@@ -115,8 +117,8 @@ public class WindowedLayout implements LayoutManager {
     
     @Override
     public Bounds getContentBounds() {
-        // Left panel content is the main content
-        return leftContent;
+        // In windowed mode, sub-tabs/content are in the RIGHT panel, below selectors (OLD: lines 464-491)
+        return rightContent.withoutTop(SELECTOR_HEIGHT * 2 + PADDING);
     }
     
     @Override
@@ -134,6 +136,11 @@ public class WindowedLayout implements LayoutManager {
         return rightPanel;
     }
     
+    @Override
+    public Bounds getRightTitleBarBounds() {
+        return rightTitleBar;
+    }
+    
     // ═══════════════════════════════════════════════════════════════════════════
     // WINDOWED-SPECIFIC ACCESSORS
     // ═══════════════════════════════════════════════════════════════════════════
@@ -144,6 +151,59 @@ public class WindowedLayout implements LayoutManager {
     public Bounds getRightTabBar() { return rightTabBar; }
     public Bounds getLeftContent() { return leftContent; }
     public Bounds getRightContent() { return rightContent; }
+    
+    @Override
+    public Bounds getSelectorBounds() {
+        // In windowed mode, selectors are in the right panel content area
+        return rightContent.sliceTop(SELECTOR_HEIGHT * 2 + 4);
+    }
+    
+    @Override
+    public Bounds getShapePanelBounds() {
+        // Shape panel is in the left panel content area
+        return leftContent;
+    }
+    
+    @Override
+    public Bounds getProfilesLeftBounds() {
+        // Profiles list uses the left panel content area
+        return leftContent.inset(0, 0);
+    }
+    
+    @Override
+    public Bounds getProfilesRightBounds() {
+        // Profiles details uses the right panel content area
+        return rightContent.inset(0, 0);
+    }
+    
+    @Override
+    public void renderBackground(net.minecraft.client.gui.DrawContext context, int screenWidth, int screenHeight) {
+        // Windowed mode: transparent - game world is visible
+        // No background fill
+    }
+    
+    @Override
+    public void renderFrame(net.minecraft.client.gui.DrawContext context) {
+        // Left panel frame + title bar + tab bar
+        renderPanelFrame(context, leftPanel);
+        context.fill(leftTitleBar.x(), leftTitleBar.y(), leftTitleBar.right(), leftTitleBar.bottom(), 0xFF2a2a2a);
+        context.fill(leftTabBar.x(), leftTabBar.y(), leftTabBar.right(), leftTabBar.bottom(), 0xFF222222);
+        // Note: Title text "⬡ Field" is rendered by HeaderBar component
+        
+        // Right panel frame + title bar
+        renderPanelFrame(context, rightPanel);
+        context.fill(rightTitleBar.x(), rightTitleBar.y(), rightTitleBar.right(), rightTitleBar.bottom(), 0xFF2a2a2a);
+        // Note: Title text "Context" should be rendered by a component or FieldCustomizerScreen
+    }
+    
+    private void renderPanelFrame(net.minecraft.client.gui.DrawContext context, Bounds panel) {
+        // Shadow
+        context.fill(panel.x() + 2, panel.y() + 2, panel.right() + 2, panel.bottom() + 2, 0x44000000);
+        // Border
+        context.fill(panel.x() - 1, panel.y() - 1, panel.right() + 1, panel.bottom() + 1, 0xFF444444);
+        // Background
+        context.fill(panel.x(), panel.y(), panel.right(), panel.bottom(), 0xDD1a1a1a);
+    }
     
     @Override
     public boolean shouldPauseGame() { return false; }

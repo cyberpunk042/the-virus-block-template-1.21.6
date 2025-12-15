@@ -7,6 +7,7 @@ import net.minecraft.client.gui.widget.*;
 import net.minecraft.text.Text;
 
 import java.util.List;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 /**
@@ -19,6 +20,7 @@ import java.util.function.Consumer;
  *   <li><b>Dropdowns:</b> enumDropdown()</li>
  *   <li><b>Layout:</b> grid(), horizontalLayout(), verticalLayout()</li>
  *   <li><b>Display:</b> icon(), label()</li>
+ *   <li><b>Visibility:</b> visibleWhen()</li>
  * </ul>
  * 
  * All widgets use {@link GuiConstants} for consistent theming.
@@ -26,6 +28,35 @@ import java.util.function.Consumer;
 public final class GuiWidgets {
     
     private GuiWidgets() {}
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // VISIBILITY HELPERS
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Wraps a widget with a visibility condition.
+     * 
+     * <p>The widget will be registered with {@link WidgetVisibility} and its
+     * visibility will be automatically updated when {@link WidgetVisibility#refreshAll()}
+     * is called.</p>
+     * 
+     * <h3>Usage</h3>
+     * <pre>
+     * var slider = GuiWidgets.visibleWhen(
+     *     GuiWidgets.slider("Wave Amplitude", ...),
+     *     () -> RendererCapabilities.isStandardMode()
+     * );
+     * </pre>
+     * 
+     * @param <W> Widget type
+     * @param widget The widget to wrap
+     * @param condition Visibility predicate
+     * @return The same widget (for chaining)
+     */
+    public static <W extends ClickableWidget> W visibleWhen(W widget, BooleanSupplier condition) {
+        WidgetVisibility.register(widget, condition);
+        return widget;
+    }
     
     // ═══════════════════════════════════════════════════════════════════════════
     // BUTTONS
@@ -276,6 +307,106 @@ public final class GuiWidgets {
                 Text.literal(label + ": " + (val ? trueText : falseText)))
             .values(Boolean.TRUE, Boolean.FALSE)
             .initially(initial)
+            .omitKeyText()  // <-- ALWAYS prevents ": " prefix
+            .build(x, y, width, height, Text.literal(""), (btn, val) -> {
+                onChange.accept(val);
+            });
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // VALUE-ONLY CYCLERS - NO LABEL PREFIX
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Creates a cycling button that shows ONLY the value (no label prefix).
+     * 
+     * <p>Use this when you want buttons like "SOLID" or "WIREFRAME" without
+     * any "Mode: " prefix. Always includes omitKeyText().</p>
+     * 
+     * <p>Example: Shows "SOLID", "WIREFRAME", "CAGE" - not "Mode: SOLID"</p>
+     * 
+     * @param <T> The value type
+     * @param x X position
+     * @param y Y position
+     * @param width Button width
+     * @param height Button height
+     * @param values List of possible values
+     * @param initial Initial value
+     * @param formatter Function to convert value to display string
+     * @param onChange Callback when value changes
+     * @return The cycling button widget
+     */
+    public static <T> CyclingButtonWidget<T> valueCycler(
+            int x, int y, int width, int height,
+            List<T> values, T initial,
+            java.util.function.Function<T, String> formatter,
+            Consumer<T> onChange) {
+        
+        return CyclingButtonWidget.<T>builder(val -> Text.literal(formatter.apply(val)))
+            .values(values)
+            .initially(initial)
+            .omitKeyText()  // <-- ALWAYS prevents ": " prefix
+            .build(x, y, width, height, Text.literal(""), (btn, val) -> {
+                onChange.accept(val);
+            });
+    }
+    
+    /**
+     * Creates a boolean cycling button showing only the value (no label).
+     * 
+     * <p>Use this for standalone ON/OFF toggles without a label prefix.</p>
+     * 
+     * @param x X position
+     * @param y Y position
+     * @param width Button width
+     * @param height Button height
+     * @param initial Initial value
+     * @param trueText Text when true (e.g., "ON", "Enabled", "⚙ Standard")
+     * @param falseText Text when false (e.g., "OFF", "Disabled", "⚡ Simplified")
+     * @param onChange Callback when value changes
+     * @return The cycling button widget
+     */
+    public static CyclingButtonWidget<Boolean> boolCycler(
+            int x, int y, int width, int height,
+            boolean initial, String trueText, String falseText,
+            Consumer<Boolean> onChange) {
+        
+        return CyclingButtonWidget.<Boolean>builder(val -> 
+                Text.literal(val ? trueText : falseText))
+            .values(Boolean.TRUE, Boolean.FALSE)
+            .initially(initial)
+            .omitKeyText()  // <-- ALWAYS prevents ": " prefix
+            .build(x, y, width, height, Text.literal(""), (btn, val) -> {
+                onChange.accept(val);
+            });
+    }
+    
+    /**
+     * Creates an enum cycling button showing only the value (no label).
+     * 
+     * <p>Use this for standalone enum selectors without a label prefix.
+     * The enum value name is formatted (lowercase, spaces instead of underscores).</p>
+     * 
+     * @param <E> The enum type
+     * @param x X position
+     * @param y Y position
+     * @param width Button width
+     * @param height Button height
+     * @param enumClass The enum class
+     * @param initial Initial value
+     * @param tooltip Tooltip text
+     * @param onChange Callback when value changes
+     * @return The cycling button widget
+     */
+    public static <E extends Enum<E>> CyclingButtonWidget<E> enumCycler(
+            int x, int y, int width, int height,
+            Class<E> enumClass, E initial, String tooltip,
+            Consumer<E> onChange) {
+        
+        return CyclingButtonWidget.<E>builder(val -> Text.literal(formatEnumName(val)))
+            .values(enumClass.getEnumConstants())
+            .initially(initial)
+            .tooltip(val -> Tooltip.of(Text.literal(tooltip)))
             .omitKeyText()  // <-- ALWAYS prevents ": " prefix
             .build(x, y, width, height, Text.literal(""), (btn, val) -> {
                 onChange.accept(val);

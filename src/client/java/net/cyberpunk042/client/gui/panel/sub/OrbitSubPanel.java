@@ -59,23 +59,27 @@ public class OrbitSubPanel extends AbstractPanel {    private int startY;
         // Section header drawn in render()
         currentY += 14;
         
-        enabledCheckbox = GuiWidgets.checkbox(sliderX, currentY, "Enable Orbit", state.getBool("orbit.enabled"),
-            "Shape orbits around anchor point", textRenderer, v -> state.set("orbit.enabled", v));
+        // Get orbit from transform
+        var orbit = state.transform() != null ? state.transform().orbit() : null;
+        boolean orbitEnabled = orbit != null && orbit.isActive();
+        
+        enabledCheckbox = GuiWidgets.checkbox(sliderX, currentY, "Enable Orbit", orbitEnabled,
+            "Shape orbits around anchor point", textRenderer, v -> state.set("transform.orbit.enabled", v));
         widgets.add(enabledCheckbox);
         currentY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
         radiusSlider = LabeledSlider.builder("Radius")
             .position(sliderX, currentY).width(w)
-            .range(0.1f, 20f).initial(state.getFloat("orbit.radius")).format("%.1f")
-            .onChange(v -> state.set("orbit.radius", v))
+            .range(0.1f, 20f).initial(orbit != null ? orbit.radius() : 2.0f).format("%.1f")
+            .onChange(v -> state.set("transform.orbit.radius", v))
             .build();
         widgets.add(radiusSlider);
         currentY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
         speedSlider = LabeledSlider.builder("Speed")
             .position(sliderX, currentY).width(w)
-            .range(-5f, 5f).initial(state.getFloat("orbit.speed")).format("%.2f rot/s")
-            .onChange(v -> state.set("orbit.speed", v))
+            .range(-5f, 5f).initial(orbit != null ? orbit.speed() : 0.5f).format("%.2f rot/s")
+            .onChange(v -> state.set("transform.orbit.speed", v))
             .build();
         widgets.add(speedSlider);
         currentY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
@@ -83,18 +87,20 @@ public class OrbitSubPanel extends AbstractPanel {    private int startY;
         axisDropdown = GuiWidgets.enumDropdown(
             sliderX, currentY, w, "Axis", OrbitAxis.class, OrbitAxis.Y,
             "Orbit rotation axis",
-            v -> state.set("orbit.axis", v.name())
+            v -> state.set("transform.orbit.axis", v.name())
         );
         try {
-            axisDropdown.setValue(OrbitAxis.valueOf(state.getString("orbit.axis")));
+            if (orbit != null) {
+                axisDropdown.setValue(OrbitAxis.valueOf(orbit.axis().name()));
+            }
         } catch (IllegalArgumentException ignored) {}
         widgets.add(axisDropdown);
         currentY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
         phaseSlider = LabeledSlider.builder("Phase")
             .position(sliderX, currentY).width(w)
-            .range(0f, 360f).initial(state.getFloat("orbit.phase")).format("%.0f°")
-            .onChange(v -> state.set("orbit.phase", v))
+            .range(0f, 360f).initial(orbit != null ? orbit.phase() : 0f).format("%.0f°")
+            .onChange(v -> state.set("transform.orbit.phase", v))
             .build();
         widgets.add(phaseSlider);
     }
