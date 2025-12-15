@@ -105,7 +105,7 @@ public class FillSubPanel extends AbstractPanel {
         // Wire thickness
         wireThicknessSlider = LabeledSlider.builder("Wire Thickness")
             .position(x, y).width(w)
-            .range(0.1f, 5f).initial(state.fill().wireThickness()).format("%.1f")
+            .range(0.1f, 2f).initial(state.fill().wireThickness()).format("%.1f")
             .onChange(v -> onUserChange(() -> {
                 state.set("fill.wireThickness", v);
                 Logging.GUI.topic("fill").trace("Wire thickness: {}", v);

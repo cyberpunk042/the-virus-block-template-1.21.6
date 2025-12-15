@@ -82,17 +82,19 @@ public final class FieldRenderLayers extends RenderPhase {
     /**
      * Lines layer for wireframe rendering with custom width.
      * 
-     * <p>Uses Minecraft's getDebugLineStrip with RenderPhase.LineWidth support.
-     * For width <= 1.0, uses the standard LINES layer.</p>
+     * <p>Uses two rendering modes:
+     * - width >= 1.0: LINES_LAYER (THICK lines)
+     * - width < 1.0: getDebugLineStrip (THIN lines)</p>
      * 
-     * @param width Line width in pixels (1.0 = thin, 5.0 = thick)
-     * @return RenderLayer configured for the specified line width
+     * @param width Line width slider value (0.1 = thin, 1.0+ = thick)
+     * @return RenderLayer configured for line rendering
      */
     public static RenderLayer lines(float width) {
-        if (width <= 1.0f) {
+        if (width >= 1.0f) {
+            // Higher values = THICK lines (using LINES_LAYER)
             return LINES_LAYER;
         }
-        // Use getDebugLineStrip which supports RenderPhase.LineWidth
+        // Lower values = THIN lines (using getDebugLineStrip)
         return RenderLayer.getDebugLineStrip(width);
     }
     
