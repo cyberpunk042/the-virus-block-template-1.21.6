@@ -154,7 +154,9 @@ public class AnimationSubPanel extends AbstractPanel {
         });
         widgets.add(pulseToggle);
         
-        pulseMode = GuiWidgets.compactEnumDropdown(x + halfW + GuiConstants.PADDING, y, halfW, PulseMode.class, PulseMode.SCALE, "Pulse effect", mode -> {
+        // Get current pulse mode from state (default to SCALE if not set)
+        PulseMode currentPulseMode = pulse != null ? pulse.mode() : PulseMode.SCALE;
+        pulseMode = GuiWidgets.compactEnumDropdown(x + halfW + GuiConstants.PADDING, y, halfW, PulseMode.class, currentPulseMode, "Pulse effect", mode -> {
             onUserChange(() -> {
                 state.set("pulse.mode", mode.name());
                 Logging.GUI.topic("animation").trace("Pulse mode: {}", mode);

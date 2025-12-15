@@ -169,7 +169,8 @@ public final class SphereTessellator {
                 float lonFrac = lon / (float) lonSteps;
                 
                 // Check visibility mask
-                if (visibility != null && !visibility.isVisible(latFrac, lonFrac)) {
+                // isVisible(u, v) where u=horizontal (longitude), v=vertical (latitude)
+                if (visibility != null && !visibility.isVisible(lonFrac, latFrac)) {
                     continue;
                 }
                 

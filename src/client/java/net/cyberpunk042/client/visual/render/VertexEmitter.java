@@ -359,8 +359,11 @@ public final class VertexEmitter {
     /**
      * Emits a mesh as wireframe (edges only).
      * 
+     * <p>Line thickness is handled by the render layer via RenderPhase.LineWidth.
+     * This method just emits proper line vertices.</p>
+     * 
      * @param mesh the mesh to render as wireframe
-     * @param thickness line thickness (visual only, actual thickness depends on render layer)
+     * @param thickness line thickness (handled by render layer, passed for API compatibility)
      */
     public void emitWireframe(Mesh mesh, float thickness) {
         if (mesh.isEmpty()) {
@@ -398,6 +401,7 @@ public final class VertexEmitter {
             });
         }
     }
+    
     
     /**
      * Static convenience method for emitting wireframe.

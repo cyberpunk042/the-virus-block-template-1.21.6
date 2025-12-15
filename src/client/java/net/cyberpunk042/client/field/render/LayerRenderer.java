@@ -126,8 +126,9 @@ public final class LayerRenderer {
                     }
                 }
                 
-                // Get appropriate consumer based on fill mode
+                // Get appropriate consumer based on fill mode (line width handled by render layer)
                 VertexConsumer consumer = getConsumerForPrimitive(consumers, primitive);
+                
                 renderPrimitive(matrices, consumer, primitive, resolver, light, time, effectiveAlpha, overrides);
                 primCount++;
             }
@@ -155,17 +156,19 @@ public final class LayerRenderer {
     
     /**
      * Gets the appropriate VertexConsumer for a primitive based on its fill mode.
+     * 
      * - SOLID → solidTranslucent or solidTranslucentNoCull (if doubleSided)
-     * - WIREFRAME, CAGE → lines (line rendering)
+     * - WIREFRAME, CAGE → lines with custom thickness via RenderPhase.LineWidth
      * - POINTS → solidTranslucent (uses tiny quads)
      */
     private static VertexConsumer getConsumerForPrimitive(VertexConsumerProvider consumers, Primitive primitive) {
         FillConfig fill = primitive.fill();
         FillMode mode = fill != null ? fill.mode() : FillMode.SOLID;
         boolean doubleSided = fill != null && fill.doubleSided();
+        float wireThickness = fill != null ? fill.wireThickness() : 1.0f;
         
         return switch (mode) {
-            case WIREFRAME, CAGE -> consumers.getBuffer(FieldRenderLayers.lines());
+            case WIREFRAME, CAGE -> consumers.getBuffer(FieldRenderLayers.lines(wireThickness));
             case SOLID, POINTS -> consumers.getBuffer(
                 doubleSided ? FieldRenderLayers.solidTranslucentNoCull() : FieldRenderLayers.solidTranslucent()
             );

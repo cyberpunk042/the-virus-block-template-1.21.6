@@ -47,6 +47,7 @@ public final class FieldRenderLayers extends RenderPhase {
     
     private static final RenderLayer LINES_LAYER = RenderLayer.getLines();
     
+    
     /**
      * Translucent solid layer for field geometry (with backface culling).
      */
@@ -71,12 +72,28 @@ public final class FieldRenderLayers extends RenderPhase {
     public static RenderLayer solidTranslucent(Identifier texture) {
         return RenderLayer.getEntityTranslucent(texture);
     }
-    
     /**
-     * Lines layer for wireframe rendering.
+     * Lines layer for wireframe rendering with default width (1.0).
      */
     public static RenderLayer lines() {
         return LINES_LAYER;
+    }
+    
+    /**
+     * Lines layer for wireframe rendering with custom width.
+     * 
+     * <p>Uses Minecraft's getDebugLineStrip with RenderPhase.LineWidth support.
+     * For width <= 1.0, uses the standard LINES layer.</p>
+     * 
+     * @param width Line width in pixels (1.0 = thin, 5.0 = thick)
+     * @return RenderLayer configured for the specified line width
+     */
+    public static RenderLayer lines(float width) {
+        if (width <= 1.0f) {
+            return LINES_LAYER;
+        }
+        // Use getDebugLineStrip which supports RenderPhase.LineWidth
+        return RenderLayer.getDebugLineStrip(width);
     }
     
     // Legacy aliases
