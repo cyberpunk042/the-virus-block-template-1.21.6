@@ -77,6 +77,7 @@ public class PredictionSubPanel extends AbstractPanel {
     // Widgets
     private CyclingButtonWidget<PredictionPreset> presetButton;
     private CyclingButtonWidget<Boolean> enabledButton;
+    private CyclingButtonWidget<net.cyberpunk042.field.instance.FollowMode> followModeButton;
     private LabeledSlider leadTicksSlider;
     private LabeledSlider maxDistanceSlider;
     private LabeledSlider lookAheadSlider;
@@ -148,16 +149,39 @@ public class PredictionSubPanel extends AbstractPanel {
         rowY = layout.getCurrentY();
         enabledButton = CyclingButtonWidget.<Boolean>builder(v -> Text.literal(v ? "Enabled" : "Disabled"))
             .values(List.of(false, true))
-            .initially(state.getBool("predictionEnabled"))
+            .initially(state.getBool("prediction.enabled"))
             .build(
                 layout.getStartX() + GuiConstants.PADDING,
                 rowY,
                 controlWidth,
                 GuiConstants.ELEMENT_HEIGHT,
                 Text.literal("Prediction"),
-                (button, value) -> onUserChange(() -> state.set("predictionEnabled", value))
+                (button, value) -> onUserChange(() -> state.set("prediction.enabled", value))
             );
         widgets.add(enabledButton);
+        layout.nextRow();
+        
+        // ─────────────────────────────────────────────────────────────────────────
+        // Follow Mode - how the field follows the player (SNAP/SMOOTH/GLIDE)
+        // ─────────────────────────────────────────────────────────────────────────
+        rowY = layout.getCurrentY();
+        net.cyberpunk042.field.instance.FollowMode initialMode = 
+            state.getTyped("followConfig.mode", net.cyberpunk042.field.instance.FollowMode.class);
+        if (initialMode == null) initialMode = net.cyberpunk042.field.instance.FollowMode.SMOOTH;
+        followModeButton = CyclingButtonWidget.<net.cyberpunk042.field.instance.FollowMode>builder(
+                mode -> Text.literal(mode.id().substring(0, 1).toUpperCase() + mode.id().substring(1) + " - " + mode.description())
+            )
+            .values(net.cyberpunk042.field.instance.FollowMode.values())
+            .initially(initialMode)
+            .build(
+                layout.getStartX() + GuiConstants.PADDING,
+                rowY,
+                controlWidth,
+                GuiConstants.ELEMENT_HEIGHT,
+                Text.literal("Follow Mode"),
+                (button, value) -> onUserChange(() -> state.set("followConfig.mode", value))
+            );
+        widgets.add(followModeButton);
         layout.nextRow();
         
         // ─────────────────────────────────────────────────────────────────────────
@@ -241,7 +265,7 @@ public class PredictionSubPanel extends AbstractPanel {
         applyingFragment = true;
         currentFragment = preset;
         if (preset != PredictionPreset.CUSTOM) {
-            state.set("predictionEnabled", preset.enabled);
+            state.set("prediction.enabled", preset.enabled);
             state.set("prediction.leadTicks", preset.leadTicks);
             state.set("prediction.maxDistance", preset.maxDistance);
             state.set("prediction.lookAhead", preset.lookAhead);
@@ -277,7 +301,13 @@ public class PredictionSubPanel extends AbstractPanel {
     }
 
     private void syncFromState() {
-        if (enabledButton != null) enabledButton.setValue(state.getBool("predictionEnabled"));
+        if (enabledButton != null) enabledButton.setValue(state.getBool("prediction.enabled"));
+        if (followModeButton != null) {
+            net.cyberpunk042.field.instance.FollowMode mode = 
+                state.getTyped("followConfig.mode", net.cyberpunk042.field.instance.FollowMode.class);
+            if (mode == null) mode = net.cyberpunk042.field.instance.FollowMode.SMOOTH;
+            followModeButton.setValue(mode);
+        }
         if (leadTicksSlider != null) leadTicksSlider.setValue(state.getInt("prediction.leadTicks"));
         if (maxDistanceSlider != null) maxDistanceSlider.setValue(state.getFloat("prediction.maxDistance"));
         if (lookAheadSlider != null) lookAheadSlider.setValue(state.getFloat("prediction.lookAhead"));

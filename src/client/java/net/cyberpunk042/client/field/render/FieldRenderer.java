@@ -97,6 +97,129 @@ public final class FieldRenderer {
     }
     
     /**
+     * Renders a field definition with smooth prediction applied at render-time.
+     * 
+     * <p>This method computes prediction using the player's LERPED (interpolated) position
+     * and rotation, eliminating the flickering caused by tick-rate position updates.</p>
+     * 
+     * @param matrices Matrix stack
+     * @param consumers Vertex consumer provider  
+     * @param definition Field definition to render
+     * @param basePosition Base world position (camera-relative, typically player center)
+     * @param player Player entity for velocity/rotation (can be null to skip prediction)
+     * @param tickDelta Partial tick for smooth interpolation (0-1)
+     * @param camPos Camera position (for computing render position)
+     * @param scale Overall scale
+     * @param time Animation time (world time + tick delta)
+     * @param alpha Overall alpha (0-1)
+     */
+    public static void renderWithPrediction(
+            MatrixStack matrices,
+            VertexConsumerProvider consumers,
+            FieldDefinition definition,
+            Vec3d basePosition,
+            PlayerEntity player,
+            float tickDelta,
+            Vec3d camPos,
+            float scale,
+            float time,
+            float alpha) {
+        
+        Vec3d renderPos = basePosition;
+        
+        // Apply prediction if enabled and player available
+        if (player != null && definition.prediction() != null && definition.prediction().isActive()) {
+            renderPos = applyRenderTimePrediction(player, basePosition, definition.prediction(), tickDelta);
+        }
+        
+        // Convert to camera-relative
+        Vec3d finalPos = renderPos.subtract(camPos);
+        
+        render(matrices, consumers, definition, finalPos, scale, time, alpha, null);
+    }
+    
+    /**
+     * Computes prediction at render-time using player's lerped position/rotation.
+     * This eliminates flickering by computing smooth prediction values every frame.
+     * 
+     * <p>Note: The base position is already smoothly interpolated via getLerpedPos(tickDelta).
+     * Prediction adds a velocity-based offset that should be CONSTANT, not oscillating.</p>
+     * 
+     * <p>IMPORTANT: Ignores Y velocity when player is on ground to prevent gravity-induced
+     * flickering. Minecraft's gravity causes ~-0.0784 Y velocity even when standing still.</p>
+     */
+    private static Vec3d applyRenderTimePrediction(
+            PlayerEntity player, 
+            Vec3d base, 
+            net.cyberpunk042.field.instance.PredictionConfig pred,
+            float tickDelta) {
+        
+        // Get player velocity - this is the per-tick velocity
+        Vec3d velocity = player.getVelocity();
+        
+        // When on ground, ignore Y velocity (gravity causes ~-0.0784 even when standing)
+        // This prevents the field from flickering up/down due to ground collision physics
+        if (player.isOnGround()) {
+            velocity = new Vec3d(velocity.x, 0.0, velocity.z);
+        }
+        
+        // Check HORIZONTAL velocity for "stationary" detection
+        // Even when standing still, there can be micro-velocities
+        double horizontalSpeed = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
+        
+        if (horizontalSpeed < 0.01 && Math.abs(velocity.y) < 0.1) {
+            // Player is effectively stationary, only apply look-ahead and vertical boost
+            Vec3d predicted = base;
+            
+            // Apply look-ahead with interpolated rotation
+            float lookAhead = pred.lookAhead();
+            if (Math.abs(lookAhead) > 0.001f) {
+                Vec3d look = player.getRotationVec(tickDelta);
+                predicted = predicted.add(look.multiply(lookAhead));
+            }
+            
+            // Apply vertical boost
+            float verticalBoost = pred.verticalBoost();
+            if (Math.abs(verticalBoost) > 0.001f) {
+                predicted = predicted.add(0.0, verticalBoost, 0.0);
+            }
+            
+            return predicted;
+        }
+        
+        // Use constant leadTicks - the base position is already lerped, so prediction
+        // offset should be CONSTANT to avoid oscillating back and forth
+        int leadTicks = pred.leadTicks();
+        Vec3d predicted = base.add(velocity.multiply(leadTicks));
+        
+        // Apply look-ahead with interpolated rotation
+        float lookAhead = pred.lookAhead();
+        if (Math.abs(lookAhead) > 0.001f) {
+            // getRotationVec(tickDelta) handles interpolation internally
+            Vec3d look = player.getRotationVec(tickDelta);
+            predicted = predicted.add(look.multiply(lookAhead));
+        }
+        
+        // Apply vertical boost
+        float verticalBoost = pred.verticalBoost();
+        if (Math.abs(verticalBoost) > 0.001f) {
+            predicted = predicted.add(0.0, verticalBoost, 0.0);
+        }
+        
+        // Clamp to max distance
+        float maxDist = pred.maxDistance();
+        if (maxDist > 0) {
+            Vec3d offset = predicted.subtract(base);
+            if (offset.length() > maxDist) {
+                offset = offset.normalize().multiply(maxDist);
+                predicted = base.add(offset);
+            }
+        }
+        
+        return predicted;
+    }
+    
+    /**
      * Renders a field instance with lifecycle-aware alpha.
      * 
      * <p>F181: Applies fadeProgress from the instance's lifecycle state:

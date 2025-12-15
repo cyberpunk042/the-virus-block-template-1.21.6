@@ -219,6 +219,60 @@ public final class ClientFieldManager {
         return predicted;
     }
     
+    /**
+     * Applies prediction at render time using smoothed values.
+     * 
+     * <p>Unlike tick-time prediction, this uses the player's lerped position
+     * and interpolated velocity estimation to avoid sudden jumps between frames.
+     * 
+     * @param player The player entity
+     * @param base Base position (already lerped to tickDelta)
+     * @param state Field state with prediction config
+     * @param tickDelta Partial tick progress
+     * @return Smoothly predicted position
+     */
+    private Vec3d applyRenderTimePrediction(net.minecraft.entity.player.PlayerEntity player, 
+                                             Vec3d base, ClientFieldState state, float tickDelta) {
+        // Get velocity - this is still tick-based, but we'll scale it smoothly
+        Vec3d velocity = player.getVelocity();
+        
+        // For smoother velocity, lerp between 0 velocity and current based on tickDelta
+        // This dampens sudden velocity changes mid-tick
+        int leadTicks = state.predictionLeadTicks();
+        
+        // Scale lead by tickDelta to smoothly ramp prediction as tick progresses
+        // This prevents "jumps" at tick boundaries
+        float smoothLead = leadTicks * (0.5f + tickDelta * 0.5f);
+        Vec3d predicted = base.add(velocity.multiply(smoothLead));
+        
+        // Apply look-ahead with interpolated rotation
+        float lookAhead = state.predictionLookAhead();
+        if (Math.abs(lookAhead) > 0.001f) {
+            // getRotationVec(tickDelta) handles interpolation internally
+            Vec3d look = player.getRotationVec(tickDelta);
+            predicted = predicted.add(look.multiply(lookAhead));
+        }
+        
+        // Apply vertical boost
+        float verticalBoost = state.predictionVerticalBoost();
+        if (Math.abs(verticalBoost) > 0.001f) {
+            predicted = predicted.add(0.0, verticalBoost, 0.0);
+        }
+        
+        // Clamp to max distance
+        float maxDist = state.predictionMaxDistance();
+        if (maxDist > 0) {
+            Vec3d delta = predicted.subtract(base);
+            double dist = delta.length();
+            if (dist > maxDist) {
+                predicted = base.add(delta.normalize().multiply(maxDist));
+            }
+        }
+        
+        return predicted;
+    }
+
+    
     // =========================================================================
     // Rendering
     // =========================================================================
@@ -244,12 +298,12 @@ public final class ClientFieldManager {
         
         // Render synced states (includes fields spawned via /fieldtest)
         for (ClientFieldState state : states.values()) {
-            renderState(matrices, consumers, state, camPos, worldTime);
+            renderState(matrices, consumers, state, camPos, worldTime, tickDelta);
         }
         
         // Render personal field
         if (personalTracker.isVisible()) {
-            renderPersonalField(matrices, consumers, camPos, worldTime);
+            renderPersonalField(matrices, consumers, camPos, worldTime, tickDelta);
         }
     }
     
@@ -258,7 +312,8 @@ public final class ClientFieldManager {
             VertexConsumerProvider consumers,
             ClientFieldState state,
             Vec3d camPos,
-            float worldTime) {
+            float worldTime,
+            float tickDelta) {
         
         FieldDefinition def = FieldRegistry.get(state.definitionId());
         if (def == null) {
@@ -267,16 +322,36 @@ public final class ClientFieldManager {
             return;
         }
         
-        // Use interpolated position if follow mode is active (includes snap with prediction)
+        // Calculate field position - use render-time computation for smoothness
         String followMode = state.followMode();
         Vec3d fieldPos;
-        Vec3d interpPos = state.interpolatedPosition();
-        if (interpPos != null && !interpPos.equals(Vec3d.ZERO) && 
-            (followMode != null && !followMode.isEmpty())) {
-            // Use interpolated position for all follow modes (snap/smooth/glide)
-            fieldPos = interpPos;
+        
+        if (followMode != null && !followMode.isEmpty()) {
+            MinecraftClient client = MinecraftClient.getInstance();
+            if (client.player != null) {
+                // Use the player's RENDER position (lerped between ticks) for smooth tracking
+                Vec3d playerRenderPos = client.player.getLerpedPos(tickDelta);
+                Vec3d playerCenter = playerRenderPos.add(0, client.player.getHeight() / 2.0, 0);
+                
+                // Apply prediction at render-time for smooth results
+                if (state.predictionEnabled()) {
+                    fieldPos = applyRenderTimePrediction(client.player, playerCenter, state, tickDelta);
+                } else {
+                    fieldPos = playerCenter;
+                }
+                
+                // For smooth/glide modes, still apply tick-rate interpolation on top
+                if (!"snap".equals(followMode)) {
+                    // Blend between tick-interpolated and render-computed position
+                    Vec3d tickInterp = state.getRenderPosition(tickDelta);
+                    float blendFactor = "glide".equals(followMode) ? 0.3f : 0.5f;
+                    fieldPos = tickInterp.lerp(fieldPos, blendFactor);
+                }
+            } else {
+                fieldPos = state.getRenderPosition(tickDelta);
+            }
         } else {
-            // Use raw position if no follow mode or no interpolation yet
+            // Use raw position if no follow mode
             fieldPos = state.position();
         }
         
@@ -362,14 +437,36 @@ public final class ClientFieldManager {
             MatrixStack matrices,
             VertexConsumerProvider consumers,
             Vec3d camPos,
-            float worldTime) {
+            float worldTime,
+            float tickDelta) {
         
         FieldDefinition def = personalTracker.definition();
         if (def == null) {
             return;
         }
         
-        Vec3d pos = personalTracker.position().subtract(camPos);
+        MinecraftClient client = MinecraftClient.getInstance();
+        Vec3d fieldPos;
+        
+        if (client.player != null) {
+            // Use the player's RENDER position (lerped between ticks) for smooth tracking
+            Vec3d playerRenderPos = client.player.getLerpedPos(tickDelta);
+            Vec3d playerCenter = playerRenderPos.add(0, client.player.getHeight() / 2.0 - 0.1, 0);
+            
+            // Check if prediction is enabled in the definition
+            net.cyberpunk042.field.instance.PredictionConfig pred = def.prediction();
+            if (pred != null && pred.enabled()) {
+                // Use render-time prediction for smooth results
+                fieldPos = applyRenderTimePredictionPersonal(client.player, playerCenter, pred, tickDelta);
+            } else {
+                fieldPos = playerCenter;
+            }
+        } else {
+            // Fallback to interpolated position
+            fieldPos = personalTracker.getRenderPosition(tickDelta);
+        }
+        
+        Vec3d pos = fieldPos.subtract(camPos);
         float time = worldTime + personalTracker.phase();
         
         FieldRenderer.render(
@@ -381,5 +478,44 @@ public final class ClientFieldManager {
             time,
             1.0f
         );
+    }
+    
+    /**
+     * Applies prediction at render time for personal fields using smoothed values.
+     */
+    private Vec3d applyRenderTimePredictionPersonal(net.minecraft.entity.player.PlayerEntity player,
+                                                     Vec3d base, 
+                                                     net.cyberpunk042.field.instance.PredictionConfig pred,
+                                                     float tickDelta) {
+        Vec3d velocity = player.getVelocity();
+        int leadTicks = pred.leadTicks();
+        
+        // Scale lead by tickDelta to smoothly ramp prediction
+        float smoothLead = leadTicks * (0.5f + tickDelta * 0.5f);
+        Vec3d predicted = base.add(velocity.multiply(smoothLead));
+        
+        // Apply look-ahead with interpolated rotation
+        float lookAhead = pred.lookAhead();
+        if (Math.abs(lookAhead) > 0.001f) {
+            // getRotationVec(tickDelta) handles interpolation internally
+            Vec3d look = player.getRotationVec(tickDelta);
+            predicted = predicted.add(look.multiply(lookAhead));
+        }
+        
+        // Apply vertical boost
+        if (Math.abs(pred.verticalBoost()) > 0.001f) {
+            predicted = predicted.add(0.0, pred.verticalBoost(), 0.0);
+        }
+        
+        // Clamp to max distance
+        if (pred.maxDistance() > 0) {
+            Vec3d delta = predicted.subtract(base);
+            double dist = delta.length();
+            if (dist > pred.maxDistance()) {
+                predicted = base.add(delta.normalize().multiply(pred.maxDistance()));
+            }
+        }
+        
+        return predicted;
     }
 }

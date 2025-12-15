@@ -31,9 +31,10 @@ public final class PersonalFieldTracker {
     private boolean enabled = false;
     private boolean visible = true;
     
-    // State
-    private Vec3d currentPosition = Vec3d.ZERO;
-    private Vec3d targetPosition = Vec3d.ZERO;
+    // State - position tracking for render-frame interpolation
+    private Vec3d previousPosition = Vec3d.ZERO;  // Position from last tick (for interpolation)
+    private Vec3d currentPosition = Vec3d.ZERO;   // Position updated this tick
+    private Vec3d targetPosition = Vec3d.ZERO;    // Target we're moving toward
     private float phase = 0;
     private int age = 0;
     
@@ -78,9 +79,29 @@ public final class PersonalFieldTracker {
     public float phase() { return phase; }
     public int age() { return age; }
     
+    /**
+     * Gets the interpolated render position for smooth frame-by-frame movement.
+     * 
+     * <p>This interpolates between the position from the last tick and the current
+     * tick position, eliminating visual stuttering when rendering at higher FPS
+     * than the tick rate.
+     * 
+     * @param tickDelta Partial tick progress (0.0 = start of tick, 1.0 = end of tick)
+     * @return Smoothly interpolated position for rendering
+     */
+    public Vec3d getRenderPosition(float tickDelta) {
+        // First frame: no previous position yet
+        if (previousPosition.equals(Vec3d.ZERO) && !currentPosition.equals(Vec3d.ZERO)) {
+            return currentPosition;
+        }
+        // Lerp between previous and current based on partial tick
+        return previousPosition.lerp(currentPosition, tickDelta);
+    }
+    
     public FieldDefinition definition() {
         return definitionId != null ? FieldRegistry.get(definitionId) : null;
     }
+
     
     // =========================================================================
     // Update
@@ -104,10 +125,13 @@ public final class PersonalFieldTracker {
         
         age++;
         
+        // Save previous position for render-frame interpolation
+        previousPosition = currentPosition;
+        
         // Calculate target position
         targetPosition = calculateTargetPosition(player);
         
-        // Interpolate current position
+        // Interpolate current position (tick-rate smoothing)
         currentPosition = followMode.interpolate(currentPosition, targetPosition);
     }
     
@@ -167,8 +191,10 @@ public final class PersonalFieldTracker {
     public void reset() {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player != null) {
-            currentPosition = client.player.getBoundingBox().getCenter();
-            targetPosition = currentPosition;
+            Vec3d startPos = client.player.getBoundingBox().getCenter();
+            currentPosition = startPos;
+            previousPosition = startPos;  // Initialize both to prevent interpolation glitch
+            targetPosition = startPos;
         }
         phase = (float) (Math.random() * Math.PI * 2);
         age = 0;

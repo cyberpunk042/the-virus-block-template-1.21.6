@@ -61,8 +61,10 @@ public final class ClientFieldState {
     private float predictionLookAhead = 0;
     private float predictionVerticalBoost = 0;
     
-    // Interpolated position (for smooth/glide modes)
-    private Vec3d interpolatedPosition;
+    // Interpolated position (for smooth/glide modes) - with prev for render-frame interpolation
+    private Vec3d previousInterpolatedPosition;  // Position from last tick
+    private Vec3d interpolatedPosition;          // Position updated this tick
+
     
     // =========================================================================
     // Constructors
@@ -139,6 +141,30 @@ public final class ClientFieldState {
     public float predictionVerticalBoost() { return predictionVerticalBoost; }
     public Vec3d interpolatedPosition() { return interpolatedPosition != null ? interpolatedPosition : position; }
     
+    /**
+     * Gets the interpolated render position for smooth frame-by-frame movement.
+     * 
+     * <p>This interpolates between the position from the last tick and the current
+     * tick position, eliminating visual stuttering when rendering at higher FPS
+     * than the tick rate.
+     * 
+     * @param tickDelta Partial tick progress (0.0 = start of tick, 1.0 = end of tick)
+     * @return Smoothly interpolated position for rendering
+     */
+    public Vec3d getRenderPosition(float tickDelta) {
+        Vec3d current = interpolatedPosition != null ? interpolatedPosition : position;
+        Vec3d previous = previousInterpolatedPosition != null ? previousInterpolatedPosition : current;
+        
+        // First frame or no previous: use current directly
+        if (previous.equals(Vec3d.ZERO) && !current.equals(Vec3d.ZERO)) {
+            return current;
+        }
+        
+        // Lerp between previous and current for smooth sub-tick movement
+        return previous.lerp(current, tickDelta);
+    }
+
+    
     public boolean hasLifetime() { return maxLifeTicks > 0; }
     public boolean isPlayerAttached() { return ownerUuid != null; }
     public boolean isBlockAttached() { return blockPos != null; }
@@ -194,6 +220,8 @@ public final class ClientFieldState {
     }
     
     public ClientFieldState withInterpolatedPosition(Vec3d pos) {
+        // Save previous for render-frame interpolation
+        this.previousInterpolatedPosition = this.interpolatedPosition;
         this.interpolatedPosition = pos;
         return this;
     }

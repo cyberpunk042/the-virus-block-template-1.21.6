@@ -163,29 +163,34 @@ public final class SimplifiedFieldRenderer {
         float tickDelta = client.getRenderTickCounter().getTickProgress(false);
         float worldTime = context.world().getTime() + tickDelta;
         
-        // Calculate position (follow player with offset)
-        Vec3d playerPos = player.getPos().add(0, 1.0, 0); // Center at chest height
-        Vec3d renderPos = playerPos.subtract(camPos);
+        // Calculate base position - use LERPED position for smooth rendering!
+        // player.getPos() returns discrete tick position → causes flickering
+        // player.getLerpedPos(tickDelta) returns interpolated render position → smooth
+        Vec3d playerPos = player.getLerpedPos(tickDelta).add(0, 1.0, 0); // Center at chest height
         
         // Render using selected mode
         if (standardModeEnabled) {
-            // Standard mode: Use full FieldRenderer pipeline
-            renderAdvanced(matrices, consumers, state, renderPos, worldTime);
+            // Standard mode: Use full FieldRenderer pipeline with prediction
+            renderAdvanced(matrices, consumers, state, playerPos, player, tickDelta, camPos, worldTime);
         } else {
             // Simplified mode: Use simplified inline rendering  
+            Vec3d renderPos = playerPos.subtract(camPos);
             renderTestField(matrices, consumers, state, renderPos, worldTime);
         }
     }
     
     /**
-     * Renders using the full FieldRenderer pipeline.
-     * Converts FieldEditState to FieldDefinition and uses complete rendering.
+     * Renders using the full FieldRenderer pipeline with smooth prediction.
+     * Converts FieldEditState to FieldDefinition and uses complete rendering with prediction.
      */
     private static void renderAdvanced(
             MatrixStack matrices,
             VertexConsumerProvider consumers,
             FieldEditState state,
-            Vec3d pos,
+            Vec3d playerPos,
+            PlayerEntity player,
+            float tickDelta,
+            Vec3d camPos,
             float time) {
         
         // Convert state to definition
@@ -196,16 +201,19 @@ public final class SimplifiedFieldRenderer {
             return;
         }
         
-        // Use the FULL FieldRenderer pipeline (includes all CP4+ traces)
-        // No try-catch fallback - if this fails, we need to fix the renderer
-        net.cyberpunk042.client.field.render.FieldRenderer.render(
+        // Use the FULL FieldRenderer pipeline with smooth prediction
+        // renderWithPrediction computes prediction at render-time using lerped values
+        net.cyberpunk042.client.field.render.FieldRenderer.renderWithPrediction(
             matrices,
             consumers,
             definition,
-            pos,
-            1.0f,  // scale
+            playerPos,     // Base position (world coords, player-centered)
+            player,        // For velocity/rotation prediction
+            tickDelta,     // For smooth interpolation
+            camPos,        // For camera-relative position
+            1.0f,          // scale
             time,
-            0.8f   // alpha
+            0.8f           // alpha
         );
     }
     

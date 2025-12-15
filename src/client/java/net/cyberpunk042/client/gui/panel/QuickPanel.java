@@ -127,14 +127,14 @@ public class QuickPanel extends AbstractPanel {
         // G48: Follow mode
         followDropdown = GuiWidgets.enumDropdown(
             x, layout.nextRow(), widgetWidth,
-            "Follow", FollowMode.class, FollowMode.valueOf(state.getString("followMode")), "Follow mode",
+            "Follow", FollowMode.class, getFollowMode(), "Follow mode",
             this::onFollowChanged
         );
         
         // G49: Prediction toggle (fixed order: label, initial, tooltip, onChange)
         predictionToggle = GuiWidgets.toggle(
             x, layout.nextRow(), widgetWidth,
-            "Prediction", state.getBool("predictionEnabled"), "Enable prediction",
+            "Prediction", state.getBool("prediction.enabled"), "Enable prediction",
             this::onPredictionToggled
         );
         
@@ -187,8 +187,13 @@ public class QuickPanel extends AbstractPanel {
         state.set("fill.mode", m); 
     }
     private void onSpinChanged(float v) { state.set("spin.speed", v); }
-    private void onFollowChanged(FollowMode m) { state.set("followMode", m); }
-    private void onPredictionToggled(boolean e) { state.set("predictionEnabled", e); }
+    private void onFollowChanged(FollowMode m) { state.set("followConfig.mode", m); }
+    private void onPredictionToggled(boolean e) { state.set("prediction.enabled", e); }
+    
+    private FollowMode getFollowMode() {
+        FollowMode mode = state.getTyped("followConfig.mode", FollowMode.class);
+        return mode != null ? mode : FollowMode.SMOOTH;
+    }
     private void onPresetChanged(PredictionPreset p) { /* TODO */ }
     
     @Override
