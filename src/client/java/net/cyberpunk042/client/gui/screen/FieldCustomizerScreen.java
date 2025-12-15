@@ -460,6 +460,8 @@ public class FieldCustomizerScreen extends Screen {
         shapePanelBounds = layout.getShapePanelBounds();
         shapePanel = new ShapeSubPanel(this, state, 0);
         shapePanel.setWarningCallback((w, c) -> { if (statusBar != null) { if (w != null) statusBar.setWarning(w, c); else statusBar.clearWarning(); }});
+        // IMPORTANT: Re-register widgets when shape type changes via dropdown
+        shapePanel.setShapeChangedCallback(this::registerWidgets);
         shapePanel.init(shapePanelBounds.width(), shapePanelBounds.height());
         shapePanel.setBoundsQuiet(shapePanelBounds);
         shapePanel.applyBoundsOffset();

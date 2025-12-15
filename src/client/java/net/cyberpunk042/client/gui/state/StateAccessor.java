@@ -410,12 +410,31 @@ public final class StateAccessor {
         
         // String to Enum conversion
         if (targetType.isEnum() && value instanceof String strValue) {
+            // First try: use fromId() method if available (many enums have this for flexible parsing)
+            try {
+                var fromIdMethod = targetType.getMethod("fromId", String.class);
+                return fromIdMethod.invoke(null, strValue);
+            } catch (NoSuchMethodException ignored) {
+                // No fromId method, fall through to standard conversion
+            } catch (Exception e) {
+                Logging.GUI.topic("state").warn("fromId() failed for {}: {}", targetType.getSimpleName(), e.getMessage());
+            }
+            
+            // Second try: exact match
             try {
                 return Enum.valueOf((Class<Enum>) targetType, strValue);
             } catch (IllegalArgumentException e) {
-                // Try case-insensitive match
+                // Third try: case-insensitive match
                 for (Object constant : targetType.getEnumConstants()) {
                     if (((Enum<?>) constant).name().equalsIgnoreCase(strValue)) {
+                        return constant;
+                    }
+                }
+                // Fourth try: normalized match (remove underscores, spaces, dashes)
+                String normalized = strValue.toLowerCase().replaceAll("[_\\-\\s]", "");
+                for (Object constant : targetType.getEnumConstants()) {
+                    String enumNormalized = ((Enum<?>) constant).name().toLowerCase().replaceAll("[_\\-\\s]", "");
+                    if (enumNormalized.equals(normalized)) {
                         return constant;
                     }
                 }

@@ -69,8 +69,9 @@ public class VisibilitySubPanel extends AbstractPanel {
         int w = width - GuiConstants.PADDING * 2;
         int halfW = (w - GuiConstants.PADDING) / 2;
 
-        // Preset dropdown
+        // Preset dropdown - show "Custom" since we're loading existing primitive values
         List<String> visPresets = FragmentRegistry.listVisibilityFragments();
+        currentFragment = "Custom";  // Loaded primitives have custom values
 
         fragmentDropdown = CyclingButtonWidget.<String>builder(v -> net.minecraft.text.Text.literal(v))
             .values(visPresets)
@@ -80,8 +81,9 @@ public class VisibilitySubPanel extends AbstractPanel {
         widgets.add(fragmentDropdown);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
-        // Mask type
-        maskTypeDropdown = GuiWidgets.enumDropdown(x, y, w, "Mask Type", MaskType.class, MaskType.FULL,
+        // Mask type - read current value from state
+        MaskType currentMaskType = state.mask() != null ? state.mask().mask() : MaskType.FULL;
+        maskTypeDropdown = GuiWidgets.enumDropdown(x, y, w, "Mask Type", MaskType.class, currentMaskType,
             "Pattern visibility mask", v -> {
                 onUserChange(() -> {
                     state.set("mask.mask", v.name());  // Field is named 'mask', not 'type'

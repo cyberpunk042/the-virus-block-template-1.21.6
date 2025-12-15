@@ -96,8 +96,9 @@ public class ArrangementSubPanel extends AbstractPanel {
         int y = startY + GuiConstants.PADDING;
         int w = width - GuiConstants.PADDING * 2;
 
-        // Preset dropdown
+        // Preset dropdown - show "Custom" since we're loading existing primitive values
         List<String> arrPresets = FragmentRegistry.listArrangementFragments();
+        currentFragment = "Custom";  // Loaded primitives have custom values
 
         fragmentDropdown = CyclingButtonWidget.<String>builder(v -> net.minecraft.text.Text.literal(v))
             .values(arrPresets)
@@ -107,28 +108,30 @@ public class ArrangementSubPanel extends AbstractPanel {
         widgets.add(fragmentDropdown);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
-        // Quad pattern
+        // Quad pattern - sets the default pattern used for rendering
         quadDropdown = GuiWidgets.enumDropdown(x, y, w, "Quad Pattern", QuadPattern.class, QuadPattern.FILLED,
             "Pattern for filled quads", v -> onUserChange(() -> {
-                state.set("arrangement.quadPattern", v.name());
-                Logging.GUI.topic("arrangement").debug("Quad: {}", v);
+                // Convert enum to pattern name (e.g., FILLED -> "filled_1", TRIANGLE_1 -> "triangle_1")
+                String patternName = v.name().toLowerCase() + "_1";
+                state.set("arrangement.defaultPattern", patternName);
+                Logging.GUI.topic("arrangement").debug("Quad: {} -> {}", v, patternName);
             }));
         widgets.add(quadDropdown);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
-        // Segment pattern
+        // Segment pattern - for wire/line modes (not directly stored in ArrangementConfig currently)
         segmentDropdown = GuiWidgets.enumDropdown(x, y, w, "Line Pattern", SegmentPattern.class, SegmentPattern.FULL,
             "Pattern for line segments", v -> onUserChange(() -> {
-                state.set("arrangement.segmentPattern", v.name());
+                // Currently display-only - segment patterns need separate implementation
                 Logging.GUI.topic("arrangement").debug("Segment: {}", v);
             }));
         widgets.add(segmentDropdown);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
-        // Sector pattern
+        // Sector pattern - for pie/radial fills (not directly stored in ArrangementConfig currently)
         sectorDropdown = GuiWidgets.enumDropdown(x, y, w, "Sector Pattern", SectorPattern.class, SectorPattern.FULL,
             "Pattern for pie sectors", v -> onUserChange(() -> {
-                state.set("arrangement.sectorPattern", v.name());
+                // Currently display-only - sector patterns need separate implementation
                 Logging.GUI.topic("arrangement").debug("Sector: {}", v);
             }));
         widgets.add(sectorDropdown);

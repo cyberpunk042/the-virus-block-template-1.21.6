@@ -193,7 +193,7 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
             }
             case WIREFRAME -> emitWireframe(matrices, consumer, mesh, color, light, fill, waveConfig, time);
             case CAGE -> emitCage(matrices, consumer, mesh, color, light, fill, primitive, waveConfig, time);
-            case POINTS -> emitPoints(matrices, consumer, mesh, color, light, waveConfig, time);
+            case POINTS -> emitPoints(matrices, consumer, mesh, color, light, fill, waveConfig, time);
         }
         
         Logging.FIELD.topic("render").trace("[APR] DONE: Rendered {} primitive '{}': vertices={}, mode={}",
@@ -573,6 +573,7 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
      * @param mesh Source mesh (only vertices used)
      * @param color ARGB color
      * @param light Light value
+     * @param fill Fill config containing pointSize
      * @param waveConfig Wave animation config (null for no wave)
      * @param time Current time for wave animation
      */
@@ -582,9 +583,12 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
             Mesh mesh,
             int color,
             int light,
+            FillConfig fill,
             net.cyberpunk042.visual.animation.WaveConfig waveConfig,
             float time) {
-        emitPoints(matrices, consumer, mesh, color, light, 0.02f, waveConfig, time);
+        // Get point size from fill config (convert from GUI units to rendering units)
+        float pointSize = fill != null ? fill.pointSize() / 100f : 0.02f;
+        emitPoints(matrices, consumer, mesh, color, light, pointSize, waveConfig, time);
     }
     
     /**

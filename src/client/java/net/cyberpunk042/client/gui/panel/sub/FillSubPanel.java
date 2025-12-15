@@ -79,8 +79,9 @@ public class FillSubPanel extends AbstractPanel {
         int w = width - GuiConstants.PADDING * 2;
         int halfW = (w - GuiConstants.PADDING) / 2;
 
-        // Preset dropdown
+        // Preset dropdown - show "Custom" since we're loading existing primitive values
         List<String> fillPresets = FragmentRegistry.listFillFragments();
+        currentFragment = "Custom";  // Loaded primitives have custom values
 
         fragmentDropdown = CyclingButtonWidget.<String>builder(v -> net.minecraft.text.Text.literal(v))
             .values(fillPresets)
@@ -217,9 +218,9 @@ public class FillSubPanel extends AbstractPanel {
         // Point size
         pointSizeSlider = LabeledSlider.builder("Point Size")
             .position(x, y).width(w)
-            .range(1f, 10f).initial(state.pointSize).format("%.1f")
+            .range(1f, 10f).initial(state.fill().pointSize()).format("%.1f")
             .onChange(v -> onUserChange(() -> {
-                state.set("pointSize", v);
+                state.set("fill.pointSize", v);
                 Logging.GUI.topic("fill").trace("Point size: {}", v);
             })).build();
         widgets.add(pointSizeSlider);
@@ -295,7 +296,7 @@ public class FillSubPanel extends AbstractPanel {
         if (allEdgesToggle != null) allEdgesToggle.setValue(cageAdapter.allEdges());
         if (faceOutlinesToggle != null) faceOutlinesToggle.setValue(cageAdapter.faceOutlines());
         
-        if (pointSizeSlider != null) pointSizeSlider.setValue(state.pointSize);
+        if (pointSizeSlider != null) pointSizeSlider.setValue(state.fill().pointSize());
     }
     
     /** Called when shape type changes - rebuilds widgets with new labels. */

@@ -91,8 +91,9 @@ public class FollowModeSubPanel extends AbstractPanel {
         int controlWidth = layout.getPanelWidth() - GuiConstants.PADDING * 2;
         int halfWidth = (controlWidth - GuiConstants.ELEMENT_SPACING) / 2;
 
-        // Preset dropdown
+        // Preset dropdown - show "Custom" since we're loading existing values
         List<String> followPresets = FragmentRegistry.listFollowFragments();
+        currentFragment = "Custom";  // Loaded values are custom
 
         fragmentDropdown = CyclingButtonWidget.<String>builder(v -> Text.literal(v))
             .values(followPresets)

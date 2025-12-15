@@ -79,7 +79,9 @@ public class BeamSubPanel extends AbstractPanel {
         int controlWidth = layout.getPanelWidth();
         int halfWidth = (controlWidth - GuiConstants.ELEMENT_SPACING) / 2;
 
+        // Preset dropdown - show "Custom" since we're loading existing values
         List<String> beamPresets = FragmentRegistry.listBeamFragments();
+        currentFragment = "Custom";  // Loaded values are custom
 
         fragmentDropdown = CyclingButtonWidget.<String>builder(v -> net.minecraft.text.Text.literal(v))
             .values(beamPresets)

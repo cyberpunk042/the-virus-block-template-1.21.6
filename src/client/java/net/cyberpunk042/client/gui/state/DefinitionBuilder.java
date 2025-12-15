@@ -643,7 +643,10 @@ public final class DefinitionBuilder {
             .glow(appState.glow())
             .emissive(appState.emissive())
             .saturation(appState.saturation())
+            .brightness(appState.brightness())
+            .hueShift(appState.hueShift())
             .secondaryColor(secondaryHex)
+            .colorBlend(appState.colorBlend())
             .build();
     }
     

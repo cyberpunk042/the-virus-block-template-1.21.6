@@ -83,8 +83,9 @@ public class AnimationSubPanel extends AbstractPanel {
         int w = width - GuiConstants.PADDING * 2;
         int halfW = (w - GuiConstants.PADDING) / 2;
 
-        // Preset dropdown
+        // Preset dropdown - show "Custom" since we're loading existing primitive values
         List<String> animPresets = FragmentRegistry.listAnimationFragments();
+        currentFragment = "Custom";  // Loaded primitives have custom values
 
         fragmentDropdown = CyclingButtonWidget.<String>builder(v -> net.minecraft.text.Text.literal(v))
             .values(animPresets)

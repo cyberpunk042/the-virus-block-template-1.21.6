@@ -49,6 +49,7 @@ import net.cyberpunk042.util.json.JsonSerializer;
 public record FillConfig(
     @JsonField(skipIfEqualsConstant = "SOLID") FillMode mode,
     @Range(ValueRange.POSITIVE_NONZERO) @JsonField(skipIfDefault = true, defaultValue = "1.0") float wireThickness,
+    @Range(ValueRange.POSITIVE_NONZERO) @JsonField(skipIfDefault = true, defaultValue = "2.0") float pointSize,
     @JsonField(skipIfDefault = true) boolean doubleSided,
     @JsonField(skipIfDefault = true, defaultValue = "true") boolean depthTest,
     @JsonField(skipIfDefault = true) boolean depthWrite,
@@ -56,27 +57,27 @@ public record FillConfig(
 ){
     /** Default solid fill. */
     public static final FillConfig SOLID = new FillConfig(
-        FillMode.SOLID, 1.0f, false, true, false, null);
+        FillMode.SOLID, 1.0f, 2.0f, false, true, false, null);
     
     /** Default wireframe fill. */
     public static final FillConfig WIREFRAME = new FillConfig(
-        FillMode.WIREFRAME, 1.0f, true, true, false, null);
+        FillMode.WIREFRAME, 1.0f, 2.0f, true, true, false, null);
     
     /** Sphere cage fill. */
     public static final FillConfig SPHERE_CAGE = new FillConfig(
-        FillMode.CAGE, 1.0f, true, true, false, SphereCageOptions.DEFAULT);
+        FillMode.CAGE, 1.0f, 2.0f, true, true, false, SphereCageOptions.DEFAULT);
     
     /** Prism cage fill. */
     public static final FillConfig PRISM_CAGE = new FillConfig(
-        FillMode.CAGE, 1.0f, true, true, false, PrismCageOptions.DEFAULT);
+        FillMode.CAGE, 1.0f, 2.0f, true, true, false, PrismCageOptions.DEFAULT);
     
     /** Cylinder cage fill. */
     public static final FillConfig CYLINDER_CAGE = new FillConfig(
-        FillMode.CAGE, 1.0f, true, true, false, CylinderCageOptions.DEFAULT);
+        FillMode.CAGE, 1.0f, 2.0f, true, true, false, CylinderCageOptions.DEFAULT);
     
     /** Polyhedron cage fill. */
     public static final FillConfig POLYHEDRON_CAGE = new FillConfig(
-        FillMode.CAGE, 1.0f, true, true, false, PolyhedronCageOptions.DEFAULT);
+        FillMode.CAGE, 1.0f, 2.0f, true, true, false, PolyhedronCageOptions.DEFAULT);
     
     // =========================================================================
     // Convenience Checks
@@ -128,7 +129,7 @@ public record FillConfig(
                 case "SOLID" -> SOLID;
                 case "WIREFRAME" -> WIREFRAME;
                 case "CAGE" -> SPHERE_CAGE;
-                case "POINTS" -> new FillConfig(FillMode.POINTS, 1.0f, false, true, false, null);
+                case "POINTS" -> new FillConfig(FillMode.POINTS, 1.0f, 2.0f, false, true, false, null);
                 default -> SOLID;
             };
         }
@@ -169,6 +170,7 @@ public record FillConfig(
         return new Builder()
             .mode(mode)
             .wireThickness(wireThickness)
+            .pointSize(pointSize)
             .doubleSided(doubleSided)
             .depthTest(depthTest)
             .depthWrite(depthWrite)
@@ -186,6 +188,7 @@ public record FillConfig(
     public static class Builder {
         private FillMode mode = FillMode.SOLID;
         private @Range(ValueRange.POSITIVE_NONZERO) float wireThickness = 1.0f;
+        private @Range(ValueRange.POSITIVE_NONZERO) float pointSize = 2.0f;
         private boolean doubleSided = false;
         private boolean depthTest = true;
         private boolean depthWrite = false;
@@ -193,6 +196,7 @@ public record FillConfig(
         
         public Builder mode(FillMode m) { this.mode = m; return this; }
         public Builder wireThickness(float t) { this.wireThickness = t; return this; }
+        public Builder pointSize(float s) { this.pointSize = s; return this; }
         public Builder doubleSided(boolean d) { this.doubleSided = d; return this; }
         public Builder depthTest(boolean d) { this.depthTest = d; return this; }
         public Builder depthWrite(boolean d) { this.depthWrite = d; return this; }
@@ -221,7 +225,7 @@ public record FillConfig(
         }
         
         public FillConfig build() {
-            return new FillConfig(mode, wireThickness, doubleSided, depthTest, depthWrite, cage);
+            return new FillConfig(mode, wireThickness, pointSize, doubleSided, depthTest, depthWrite, cage);
         }
     }
 }

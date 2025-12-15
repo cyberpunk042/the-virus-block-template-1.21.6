@@ -916,15 +916,20 @@ public class FieldEditState {
             var app = prim.appearance();
             int colorInt = parseColorToInt(app.color());
             int secondaryColorInt = parseColorToInt(app.secondaryColor());
-            float alpha = app.alpha() != null ? app.alpha().average() : 1.0f;
+            float alphaMin = app.alpha() != null ? app.alpha().min() : 1.0f;
+            float alphaMax = app.alpha() != null ? app.alpha().max() : 1.0f;
             this.appearance = new AppearanceState(
-                colorInt,          // color
-                alpha,             // alpha
-                app.glow(),        // glow
-                app.emissive(),    // emissive
-                app.saturation(),  // saturation
-                colorInt,          // primaryColor (same as color)
-                secondaryColorInt  // secondaryColor
+                colorInt,           // color
+                alphaMin,           // alphaMin
+                alphaMax,           // alphaMax
+                app.glow(),         // glow
+                app.emissive(),     // emissive
+                app.saturation(),   // saturation
+                app.brightness(),   // brightness
+                app.hueShift(),     // hueShift
+                colorInt,           // primaryColor (same as color)
+                secondaryColorInt,  // secondaryColor
+                app.colorBlend()    // colorBlend
             );
         } else {
             this.appearance = AppearanceState.DEFAULT;
