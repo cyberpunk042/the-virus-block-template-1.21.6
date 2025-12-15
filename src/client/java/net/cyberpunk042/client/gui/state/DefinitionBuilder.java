@@ -79,10 +79,6 @@ public final class DefinitionBuilder {
             net.cyberpunk042.field.instance.FollowConfig follow = 
                 (net.cyberpunk042.field.instance.FollowConfig) defFields.get("follow");
             
-            // DEBUG: Log modifiers at INFO level
-            Logging.GUI.topic("builder").info("[DEF-BUILD] modifiers: bobbing={}, breathing={}, hasAnimationModifiers={}",
-                modifiers.bobbing(), modifiers.breathing(), modifiers.hasAnimationModifiers());
-            
             // CP2: State values
             PipelineTracer.trace(PipelineTracer.D1_BOBBING, 2, "state", String.valueOf(modifiers.bobbing()));
             PipelineTracer.trace(PipelineTracer.D2_BREATHING, 2, "state", String.valueOf(modifiers.breathing()));
@@ -654,25 +650,12 @@ public final class DefinitionBuilder {
      * Builds Animation from spin, pulse, wave, wobble configs.
      */
     private static Animation buildAnimation(FieldEditState state) {
-        WobbleConfig wobble = state.wobble();
-        WaveConfig wave = state.wave();
-        
-        // Debug: Log wobble being built
-        Logging.GUI.topic("builder").info("[ANIM-BUILD] wobble: amp={}, speed={}, isActive={}",
-            wobble != null && wobble.amplitude() != null ? wobble.amplitude() : "null",
-            wobble != null ? wobble.speed() : 0,
-            wobble != null ? wobble.isActive() : false);
-        Logging.GUI.topic("builder").info("[ANIM-BUILD] wave: amp={}, freq={}, isActive={}",
-            wave != null ? wave.amplitude() : 0,
-            wave != null ? wave.frequency() : 0,
-            wave != null ? wave.isActive() : false);
-        
         return Animation.builder()
             .spin(state.spin())
             .pulse(state.pulse())
             .alphaPulse(state.alphaPulse())
-            .wobble(wobble)
-            .wave(wave)
+            .wobble(state.wobble())
+            .wave(state.wave())
             .colorCycle(state.colorCycle())
             .build();
     }

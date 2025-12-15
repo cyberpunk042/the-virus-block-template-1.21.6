@@ -2,6 +2,7 @@ package net.cyberpunk042.client.gui.panel.sub;
 
 import net.cyberpunk042.visual.animation.WobbleConfig;
 import net.cyberpunk042.visual.animation.WaveConfig;
+import net.cyberpunk042.visual.animation.WaveConfig.WaveMode;
 import net.cyberpunk042.client.gui.panel.AbstractPanel;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
@@ -49,7 +50,9 @@ public class ModifiersSubPanel extends AbstractPanel {
     private CheckboxWidget waveEnabled;
     private LabeledSlider waveAmplitude;
     private LabeledSlider waveFrequency;
+    private LabeledSlider waveSpeed;
     private CyclingButtonWidget<WaveDirection> waveDirection;
+    private CyclingButtonWidget<WaveMode> waveMode;
     
     public enum WaveDirection {
         X("X Axis"), Y("Y Axis"), Z("Z Axis"), RADIAL("Radial");
@@ -68,7 +71,7 @@ public class ModifiersSubPanel extends AbstractPanel {
         this.panelW = width;
         
         int fullW = width - 2 * GuiConstants.PADDING;
-        int halfW = (fullW - GuiConstants.PADDING) / 2;  // Two sliders with gap
+        int halfW = (fullW - GuiConstants.PADDING) / 2;
         int leftX = GuiConstants.PADDING;
         int rightX = leftX + halfW + GuiConstants.PADDING;
         
@@ -76,33 +79,32 @@ public class ModifiersSubPanel extends AbstractPanel {
         this.startY = currentY;
         
         var textRenderer = MinecraftClient.getInstance().textRenderer;
+        int gap = GuiConstants.COMPACT_GAP;
+        int sliderH = GuiConstants.COMPACT_HEIGHT;
+        int widgetH = GuiConstants.WIDGET_HEIGHT;
         
         // ═══════════════════════════════════════════════════════════════════════
         // FIELD MODIFIERS - Bobbing & Breathing side by side
         // ═══════════════════════════════════════════════════════════════════════
         
-        currentY += 12; // Section label space
-        
         bobbingSlider = LabeledSlider.builder("Bobbing")
-            .position(leftX, currentY).width(halfW)
+            .position(leftX, currentY).width(halfW).compact()
             .range(0f, 1f).initial(state.getFloat("modifiers.bobbing")).format("%.2f")
             .onChange(v -> { state.set("modifiers.bobbing", v); })
             .build();
         widgets.add(bobbingSlider);
         
         breathingSlider = LabeledSlider.builder("Breathing")
-            .position(rightX, currentY).width(halfW)
+            .position(rightX, currentY).width(halfW).compact()
             .range(0f, 1f).initial(state.getFloat("modifiers.breathing")).format("%.2f")
             .onChange(v -> { state.set("modifiers.breathing", v); })
             .build();
         widgets.add(breathingSlider);
-        currentY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        currentY += sliderH + gap;
         
         // ═══════════════════════════════════════════════════════════════════════
         // COLOR CYCLE - Two checkboxes on one line, slider below
         // ═══════════════════════════════════════════════════════════════════════
-        
-        currentY += 10; // Section label
         
         colorCycleEnabled = GuiWidgets.checkbox(leftX, currentY, "Color Cycle", state.colorCycle().isActive(),
             "Enable color cycling animation", textRenderer, v -> {
@@ -125,21 +127,19 @@ public class ModifiersSubPanel extends AbstractPanel {
         colorCycleBlend = GuiWidgets.checkbox(rightX, currentY, "Smooth Blend", state.getBool("colorCycle.blend"),
             "Smooth color transitions", textRenderer, v -> state.set("colorCycle.blend", v));
         widgets.add(colorCycleBlend);
-        currentY += GuiConstants.WIDGET_HEIGHT + 2;
+        currentY += widgetH + gap;
         
         colorCycleSpeed = LabeledSlider.builder("Speed")
-            .position(leftX, currentY).width(fullW)
+            .position(leftX, currentY).width(fullW).compact()
             .range(0.1f, 5f).initial(state.getFloat("colorCycle.speed")).format("%.1f")
             .onChange(v -> { state.set("colorCycle.speed", v); })
             .build();
         widgets.add(colorCycleSpeed);
-        currentY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        currentY += sliderH + gap;
         
         // ═══════════════════════════════════════════════════════════════════════
         // WOBBLE - Checkbox + amplitude/speed sliders side by side
         // ═══════════════════════════════════════════════════════════════════════
-        
-        currentY += 10; // Section label
         
         WobbleConfig wobble = state.wobble();
         boolean wobbleActive = wobble != null && wobble.isActive();
@@ -162,10 +162,10 @@ public class ModifiersSubPanel extends AbstractPanel {
                 }
             });
         widgets.add(wobbleEnabled);
-        currentY += GuiConstants.WIDGET_HEIGHT + 2;
+        currentY += widgetH + gap;
         
         wobbleAmplitude = LabeledSlider.builder("Amplitude")
-            .position(leftX, currentY).width(halfW)
+            .position(leftX, currentY).width(halfW).compact()
             .range(0f, 1f).initial(wobbleAmp).format("%.2f")
             .onChange(v -> { 
                 state.set("wobble.amplitude", new org.joml.Vector3f(v, v * 0.5f, v)); 
@@ -174,45 +174,52 @@ public class ModifiersSubPanel extends AbstractPanel {
         widgets.add(wobbleAmplitude);
         
         wobbleSpeed = LabeledSlider.builder("Speed")
-            .position(rightX, currentY).width(halfW)
+            .position(rightX, currentY).width(halfW).compact()
             .range(0.1f, 5f).initial(wobbleSpd).format("%.1f")
             .onChange(v -> { state.set("wobble.speed", v); })
             .build();
         widgets.add(wobbleSpeed);
-        currentY += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        currentY += sliderH + gap;
         
         // ═══════════════════════════════════════════════════════════════════════
-        // WAVE - Checkbox, then amplitude/frequency side by side, then direction
+        // WAVE - Checkbox, amplitude/frequency, speed/direction, mode
         // ═══════════════════════════════════════════════════════════════════════
-        
-        currentY += 10; // Section label
         
         WaveConfig wave = state.wave();
         boolean waveActive = wave != null && wave.isActive();
         float waveAmp = wave != null ? wave.amplitude() : 0.1f;
+        float waveSpd = wave != null ? wave.speed() : 1.0f;
         
         waveEnabled = GuiWidgets.checkbox(leftX, currentY, "Wave Deformation", waveActive,
             "Surface wave animation", textRenderer, v -> { if (!v) state.set("wave", WaveConfig.NONE); });
         widgets.add(waveEnabled);
-        currentY += GuiConstants.WIDGET_HEIGHT + 2;
+        currentY += widgetH + gap;
         
         waveAmplitude = LabeledSlider.builder("Amplitude")
-            .position(leftX, currentY).width(halfW)
+            .position(leftX, currentY).width(halfW).compact()
             .range(0f, 1f).initial(waveAmp).format("%.2f")
             .onChange(v -> { state.set("wave.amplitude", v); })
             .build();
         widgets.add(waveAmplitude);
         
         waveFrequency = LabeledSlider.builder("Frequency")
-            .position(rightX, currentY).width(halfW)
+            .position(rightX, currentY).width(halfW).compact()
             .range(0.1f, 10f).initial(state.getFloat("wave.frequency")).format("%.1f")
             .onChange(v -> { state.set("wave.frequency", v); })
             .build();
         widgets.add(waveFrequency);
-        currentY += GuiConstants.WIDGET_HEIGHT + 2;
+        currentY += sliderH + gap;
         
+        waveSpeed = LabeledSlider.builder("Speed")
+            .position(leftX, currentY).width(halfW).compact()
+            .range(0.1f, 5f).initial(waveSpd).format("%.1f")
+            .onChange(v -> { state.set("wave.speed", v); })
+            .build();
+        widgets.add(waveSpeed);
+        
+        // Direction dropdown (right side)
         waveDirection = GuiWidgets.enumDropdown(
-            leftX, currentY, fullW, "Direction", WaveDirection.class, WaveDirection.Y,
+            rightX, currentY, halfW, "Direction", WaveDirection.class, WaveDirection.Y,
             "Wave propagation direction",
             v -> state.set("wave.direction", v.name())
         );
@@ -220,6 +227,22 @@ public class ModifiersSubPanel extends AbstractPanel {
             waveDirection.setValue(WaveDirection.valueOf(state.getString("wave.direction")));
         } catch (IllegalArgumentException ignored) {}
         widgets.add(waveDirection);
+        currentY += widgetH + gap;
+        
+        // Mode dropdown (full width)
+        WaveMode currentMode = wave != null && wave.mode() != null ? wave.mode() : WaveMode.GPU;
+        waveMode = CyclingButtonWidget.<WaveMode>builder(m -> net.minecraft.text.Text.literal(m.displayName()))
+            .values(WaveMode.values())
+            .initially(currentMode)
+            .build(
+                leftX,
+                currentY,
+                fullW,
+                widgetH,
+                net.minecraft.text.Text.literal("Mode"),
+                (btn, v) -> state.set("wave.mode", v.name())
+            );
+        widgets.add(waveMode);
     }
 
     @Override
@@ -229,31 +252,6 @@ public class ModifiersSubPanel extends AbstractPanel {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        var textRenderer = MinecraftClient.getInstance().textRenderer;
-        
-        // Section labels
-        int labelX = GuiConstants.PADDING + 4;
-        int labelY = startY;
-        context.drawText(textRenderer, "§e§lField Modifiers", labelX, labelY, GuiConstants.TEXT_PRIMARY, false);
-        
-        // Find color cycle section
-        if (colorCycleEnabled != null) {
-            int ccY = colorCycleEnabled.getY() - 12;
-            context.drawText(textRenderer, "§b§lColor Cycle", labelX, ccY, GuiConstants.TEXT_PRIMARY, false);
-        }
-        
-        // Find wobble section
-        if (wobbleEnabled != null) {
-            int wobbleY = wobbleEnabled.getY() - 12;
-            context.drawText(textRenderer, "§d§lWobble", labelX, wobbleY, GuiConstants.TEXT_PRIMARY, false);
-        }
-        
-        // Find wave section
-        if (waveEnabled != null) {
-            int waveY = waveEnabled.getY() - 12;
-            context.drawText(textRenderer, "§a§lWave", labelX, waveY, GuiConstants.TEXT_PRIMARY, false);
-        }
-        
         // Render all widgets
         for (var widget : widgets) {
             widget.render(context, mouseX, mouseY, delta);
@@ -265,13 +263,27 @@ public class ModifiersSubPanel extends AbstractPanel {
     }
 
     public int getContentHeight() {
-        // More compact calculation:
-        // 4 sections: each section header (12) + rows
-        // Modifiers: 1 row (sliders)
-        // ColorCycle: 2 rows (checkboxes + slider)
-        // Wobble: 2 rows (checkbox + sliders)
-        // Wave: 3 rows (checkbox + sliders + dropdown)
-        int rows = 1 + 2 + 2 + 3;
-        return 4 * 12 + rows * (GuiConstants.WIDGET_HEIGHT + 2) + 3 * GuiConstants.PADDING;
+        // Compact layout calculation:
+        // Using COMPACT_HEIGHT (14) for sliders, WIDGET_HEIGHT (20) for checkboxes/dropdowns
+        // Gap is COMPACT_GAP (2)
+        int sliderH = GuiConstants.COMPACT_HEIGHT;
+        int widgetH = GuiConstants.WIDGET_HEIGHT;
+        int gap = GuiConstants.COMPACT_GAP;
+        
+        // Modifiers: bobbing/breathing row
+        // ColorCycle: checkbox row + speed slider
+        // Wobble: checkbox row + amp/speed row
+        // Wave: checkbox row + amp/freq row + speed/dir row + mode row
+        return GuiConstants.PADDING 
+            + sliderH + gap  // bobbing/breathing
+            + widgetH + gap  // color cycle checkboxes
+            + sliderH + gap  // color cycle speed
+            + widgetH + gap  // wobble checkbox
+            + sliderH + gap  // wobble sliders
+            + widgetH + gap  // wave checkbox
+            + sliderH + gap  // wave amp/freq
+            + widgetH + gap  // wave speed/direction (direction is widget height)
+            + widgetH        // wave mode
+            + GuiConstants.PADDING;
     }
 }

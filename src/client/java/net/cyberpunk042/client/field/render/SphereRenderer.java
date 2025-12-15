@@ -99,15 +99,15 @@ public final class SphereRenderer extends AbstractPrimitiveRenderer {
     }
     
     @Override
-    protected Mesh tessellate(Primitive primitive) {
+    protected Mesh tessellate(Primitive primitive, net.cyberpunk042.visual.animation.WaveConfig wave, float time) {
         if (!(primitive.shape() instanceof SphereShape shape)) {
             Logging.FIELD.topic("render").warn("[SPHERE] Shape is NOT SphereShape: {}", 
                 primitive.shape() != null ? primitive.shape().getClass().getSimpleName() : "null");
             return null;
         }
         
-        Logging.FIELD.topic("render").trace("[SPHERE] Tessellating: radius={}, algo={}", 
-            shape.radius(), shape.algorithm());
+        Logging.FIELD.topic("render").trace("[SPHERE] Tessellating: radius={}, algo={}, wave={}", 
+            shape.radius(), shape.algorithm(), wave != null && wave.isActive() ? "active" : "none");
         
         // Get pattern from arrangement config with CellType validation
         VertexPattern pattern = null;
@@ -136,8 +136,8 @@ public final class SphereRenderer extends AbstractPrimitiveRenderer {
             PipelineTracer.trace(PipelineTracer.V5_MASK_ANIMATE, 5, "tessellate", String.valueOf(visibility.animate()));
         }
         
-        // Tessellate with full config
-        Mesh mesh = SphereTessellator.tessellate(shape, pattern, visibility);
+        // Tessellate with full config including wave deformation
+        Mesh mesh = SphereTessellator.tessellate(shape, pattern, visibility, wave, time);
         if (mesh == null || mesh.isEmpty()) {
             Logging.FIELD.topic("render").warn("[SPHERE] Tessellation returned empty mesh!");
         } else {
@@ -196,6 +196,9 @@ public final class SphereRenderer extends AbstractPrimitiveRenderer {
         int lonCount = cageOptions.longitudeCount();
         float thickness = fill != null ? fill.wireThickness() : 1.0f;
         
+        // Check if CPU wave deformation should be applied
+        boolean applyWave = waveConfig != null && waveConfig.isActive() && waveConfig.isCpuMode();
+        
         // Build cage mesh with lines
         MeshBuilder builder = MeshBuilder.lines();
         
@@ -216,10 +219,17 @@ public final class SphereRenderer extends AbstractPrimitiveRenderer {
                 float x2 = MathHelper.cos(phi2) * ringRadius;
                 float z2 = MathHelper.sin(phi2) * ringRadius;
                 
-                // Add line segment using Vertex.pos() factory
-                int v1 = builder.addVertex(Vertex.pos(x1, y, z1));
-                int v2 = builder.addVertex(Vertex.pos(x2, y, z2));
-                builder.line(v1, v2);
+                // Create vertices and apply wave deformation if active
+                Vertex v1 = Vertex.pos(x1, y, z1);
+                Vertex v2 = Vertex.pos(x2, y, z2);
+                if (applyWave) {
+                    v1 = net.cyberpunk042.client.visual.animation.WaveDeformer.applyToVertex(v1, waveConfig, time);
+                    v2 = net.cyberpunk042.client.visual.animation.WaveDeformer.applyToVertex(v2, waveConfig, time);
+                }
+                
+                int idx1 = builder.addVertex(v1);
+                int idx2 = builder.addVertex(v2);
+                builder.line(idx1, idx2);
             }
         }
         
@@ -242,20 +252,25 @@ public final class SphereRenderer extends AbstractPrimitiveRenderer {
                 float y2 = MathHelper.cos(theta2) * radius;
                 float z2 = MathHelper.sin(theta2) * MathHelper.sin(phi) * radius;
                 
-                int v1 = builder.addVertex(Vertex.pos(x1, y1, z1));
-                int v2 = builder.addVertex(Vertex.pos(x2, y2, z2));
-                builder.line(v1, v2);
+                // Create vertices and apply wave deformation if active
+                Vertex v1 = Vertex.pos(x1, y1, z1);
+                Vertex v2 = Vertex.pos(x2, y2, z2);
+                if (applyWave) {
+                    v1 = net.cyberpunk042.client.visual.animation.WaveDeformer.applyToVertex(v1, waveConfig, time);
+                    v2 = net.cyberpunk042.client.visual.animation.WaveDeformer.applyToVertex(v2, waveConfig, time);
+                }
+                
+                int idx1 = builder.addVertex(v1);
+                int idx2 = builder.addVertex(v2);
+                builder.line(idx1, idx2);
             }
         }
         
-        // Emit the cage mesh (already LINES type, so use emit() not emitWireframe())
+        // Emit the cage mesh
         Mesh cageMesh = builder.build();
         VertexEmitter emitter = new VertexEmitter(matrices, consumer);
         emitter.color(color).light(light);
-        if (waveConfig != null && waveConfig.isActive()) {
-            emitter.wave(waveConfig, time);
-        }
-        emitter.emit(cageMesh);  // emit() handles LINES meshes correctly
+        emitter.emit(cageMesh);
     }
     
     // =========================================================================

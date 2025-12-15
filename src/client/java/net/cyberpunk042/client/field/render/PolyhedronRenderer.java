@@ -32,7 +32,7 @@ public final class PolyhedronRenderer extends AbstractPrimitiveRenderer {
     }
     
     @Override
-    protected Mesh tessellate(Primitive primitive) {
+    protected Mesh tessellate(Primitive primitive, net.cyberpunk042.visual.animation.WaveConfig wave, float time) {
         net.cyberpunk042.log.Logging.RENDER.topic("tessellate")
             .kv("primType", primitive.type())
             .kv("shapeClass", primitive.shape() != null ? primitive.shape().getClass().getSimpleName() : "null")

@@ -25,7 +25,7 @@ public final class DiscRenderer extends AbstractPrimitiveRenderer {
     }
     
     @Override
-    protected Mesh tessellate(Primitive primitive) {
+    protected Mesh tessellate(Primitive primitive, net.cyberpunk042.visual.animation.WaveConfig wave, float time) {
         if (!(primitive.shape() instanceof DiscShape shape)) {
             return null;
         }

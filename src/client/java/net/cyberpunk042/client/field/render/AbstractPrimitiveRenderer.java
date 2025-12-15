@@ -14,6 +14,7 @@ import net.cyberpunk042.visual.color.ColorResolver;
 import net.cyberpunk042.visual.fill.FillConfig;
 import net.cyberpunk042.visual.fill.FillMode;
 import net.cyberpunk042.field.primitive.Primitive;
+import net.cyberpunk042.visual.animation.WaveConfig;
 
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.util.math.MatrixStack;
@@ -50,7 +51,10 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
             primitive.id(), primitive.type());
         
         // === PHASE 1: Tessellate ===
-        Mesh mesh = tessellate(primitive);
+        // Get wave config for CPU deformation (if active)
+        Animation anim = primitive.animation();
+        WaveConfig wave = (anim != null) ? anim.wave() : null;
+        Mesh mesh = tessellate(primitive, wave, time);
         if (mesh == null || mesh.isEmpty()) {
             Logging.FIELD.topic("render").warn(
                 "[APR_EXIT] Empty mesh for primitive '{}', skipping", primitive.id());
@@ -128,8 +132,7 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
             PipelineTracer.trace(PipelineTracer.V14_CENTER_Y, 4, "prim.centerY", String.valueOf(v.centerY()));
         }
         
-        // CP4: ALL animation segments
-        Animation anim = primitive.animation();
+        // CP4: ALL animation segments (reuse anim from line 55)
         if (anim != null) {
             if (anim.spin() != null) {
                 PipelineTracer.trace(PipelineTracer.N1_SPIN_SPEED, 4, "prim.spin", String.valueOf(anim.spin().speed()));
@@ -208,9 +211,11 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
      * Tessellates the primitive's shape into a mesh.
      * 
      * @param primitive The primitive containing the shape
+     * @param wave Wave config for CPU deformation (may be null or inactive)
+     * @param time Current time in ticks for wave animation
      * @return The tessellated mesh, or null if invalid
      */
-    protected abstract Mesh tessellate(Primitive primitive);
+    protected abstract Mesh tessellate(Primitive primitive, WaveConfig wave, float time);
     
     /**
      * Traces shape-specific values at CP4.

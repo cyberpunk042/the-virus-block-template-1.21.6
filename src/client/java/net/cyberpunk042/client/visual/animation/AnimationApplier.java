@@ -55,9 +55,6 @@ public final class AnimationApplier {
         // Apply phase offset
         float effectiveTime = time + (animation.phase() * 100);  // phase is 0-1
         
-        Logging.ANIMATION.topic("apply").info("[APPLY] animation: hasSpin={}, hasPulse={}, hasWobble={}, hasWave={}, time={}",
-            animation.hasSpin(), animation.hasPulse(), animation.hasWobble(), animation.hasWave(), effectiveTime);
-        
         // 1. Spin
         if (animation.hasSpin()) {
             applySpin(matrices, animation.spin(), effectiveTime);
@@ -70,14 +67,11 @@ public final class AnimationApplier {
         
         // 3. Wobble
         if (animation.hasWobble()) {
-            Logging.ANIMATION.topic("apply").info("[APPLY] Calling applyWobble with wobble={}", animation.wobble());
             applyWobble(matrices, animation.wobble(), effectiveTime);
         }
         
-        // 4. Wave - affects vertices, not matrix transform. Would need shader or tessellation changes.
-        if (animation.hasWave()) {
-            Logging.ANIMATION.topic("apply").debug("[APPLY] Wave animation detected but NOT IMPLEMENTED - wave affects vertices, not matrix");
-        }
+        // 4. Wave - affects vertices, not matrix transform. TODO: Implement in tessellator.
+        // if (animation.hasWave()) { ... }
     }
     
     // =========================================================================
@@ -211,7 +205,6 @@ public final class AnimationApplier {
         float wobbleY = MathHelper.sin(safeTime * wobble.speed() * 1.3f) * amplitude.y;
         float wobbleZ = MathHelper.sin(safeTime * wobble.speed() * 0.7f) * amplitude.z;
         
-        System.out.println("[WOBBLE] x=" + wobbleX + ", y=" + wobbleY + ", z=" + wobbleZ);
         matrices.translate(wobbleX, wobbleY, wobbleZ);
     }
     
@@ -237,7 +230,6 @@ public final class AnimationApplier {
         float amplitude = bobbing * 0.4f;  // Max 0.4 blocks at full strength
         float y = MathHelper.sin(safeTime * 0.4f) * amplitude;
         
-        System.out.println("[BOBBING] y=" + y + ", amp=" + amplitude + ", safeTime=" + safeTime);
         matrices.translate(0, y, 0);
     }
     
@@ -259,7 +251,6 @@ public final class AnimationApplier {
         float scaleVariation = breathing * 0.25f;  // Max ±25% at full strength
         float scale = 1.0f + (normalizedWave - 0.5f) * scaleVariation * 2;
         
-        System.out.println("[BREATHING] scale=" + scale + ", breathing=" + breathing + ", safeTime=" + safeTime);
         matrices.scale(scale, scale, scale);
     }
     
@@ -274,9 +265,6 @@ public final class AnimationApplier {
         if (modifiers == null) {
             return;
         }
-        
-        // Apply bobbing and breathing directly - caller already verified values
-        System.out.println("[APPLYMODS] bobbing=" + modifiers.bobbing() + ", breathing=" + modifiers.breathing() + ", time=" + time);
         
         applyBobbing(matrices, modifiers.bobbing(), time);
         applyBreathing(matrices, modifiers.breathing(), time);

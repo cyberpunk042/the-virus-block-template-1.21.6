@@ -1,12 +1,14 @@
 package net.cyberpunk042.client.visual.mesh;
 
 import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.visual.animation.WaveConfig;
 import net.cyberpunk042.visual.pattern.VertexPattern;
 import net.cyberpunk042.visual.pattern.QuadPattern;
 import net.cyberpunk042.visual.pattern.TrianglePattern;
 import net.cyberpunk042.visual.shape.SphereAlgorithm;
 import net.cyberpunk042.visual.shape.SphereShape;
 import net.cyberpunk042.visual.visibility.VisibilityMask;
+import net.cyberpunk042.client.visual.animation.WaveDeformer;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -69,10 +71,12 @@ public final class SphereTessellator {
      * @param shape The sphere shape definition
      * @param pattern Vertex pattern for visual variety (null = default)
      * @param visibility Visibility mask for cell filtering (null = all visible)
+     * @param wave Wave config for CPU deformation (null or inactive = no deformation)
+     * @param time Current time in ticks for wave animation
      * @return Generated mesh
      */
     public static Mesh tessellate(SphereShape shape, VertexPattern pattern, 
-                                   VisibilityMask visibility) {
+                                   VisibilityMask visibility, WaveConfig wave, float time) {
         if (shape == null) {
             throw new IllegalArgumentException("SphereShape cannot be null");
         }
@@ -88,29 +92,37 @@ public final class SphereTessellator {
             .kv("shape", "sphere")
             .kv("algorithm", algorithm)
             .kv("radius", shape.radius())
+            .kv("wave", wave != null && wave.isActive() ? "active" : "none")
             .debug("Tessellating sphere");
         
         // Dispatch based on algorithm
         return switch (algorithm) {
-            case LAT_LON -> tessellateLatLon(shape, pattern, visibility);
-            case UV_SPHERE -> tessellateUvSphere(shape, pattern, visibility);
-            case ICO_SPHERE -> tessellateIcoSphere(shape);
+            case LAT_LON -> tessellateLatLon(shape, pattern, visibility, wave, time);
+            case UV_SPHERE -> tessellateUvSphere(shape, pattern, visibility, wave, time);
+            case ICO_SPHERE -> tessellateIcoSphere(shape, wave, time);
             // TYPE_A and TYPE_E are direct rendering, not mesh tessellation
             // Fall back to LAT_LON for mesh generation
             case TYPE_A, TYPE_E -> {
                 Logging.RENDER.topic("tessellate")
                     .kv("algorithm", algorithm)
                     .warn("TYPE_A/TYPE_E use direct rendering. Falling back to LAT_LON for mesh.");
-                yield tessellateLatLon(shape, pattern, visibility);
+                yield tessellateLatLon(shape, pattern, visibility, wave, time);
             }
         };
     }
     
     /**
-     * Tessellates a sphere with default pattern and no visibility mask.
+     * Tessellates a sphere with default pattern and no visibility mask or wave.
      */
     public static Mesh tessellate(SphereShape shape) {
-        return tessellate(shape, null, null);
+        return tessellate(shape, null, null, null, 0);
+    }
+    
+    /**
+     * Tessellates a sphere with pattern and visibility but no wave (backward compatible).
+     */
+    public static Mesh tessellate(SphereShape shape, VertexPattern pattern, VisibilityMask visibility) {
+        return tessellate(shape, pattern, visibility, null, 0);
     }
     
     /**
@@ -131,7 +143,7 @@ public final class SphereTessellator {
      * Has pole singularities (vertices cluster at poles).
      */
     private static Mesh tessellateLatLon(SphereShape shape, VertexPattern pattern,
-                                          VisibilityMask visibility) {
+                                          VisibilityMask visibility, WaveConfig wave, float time) {
         MeshBuilder builder = MeshBuilder.triangles();
         
         int latSteps = shape.latSteps();
@@ -145,6 +157,9 @@ public final class SphereTessellator {
         float latRange = latEnd - latStart;
         float lonRange = lonEnd - lonStart;
         
+        // Check if wave deformation should be applied
+        boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();
+        
         // Generate vertex grid
         int[][] vertexIndices = new int[latSteps + 1][lonSteps + 1];
         
@@ -157,6 +172,12 @@ public final class SphereTessellator {
                 float phi = lonNorm * GeometryMath.TWO_PI;  // 0 to 2PI (around)
                 
                 Vertex v = Vertex.spherical(theta, phi, radius);
+                
+                // Apply wave deformation if active
+                if (applyWave) {
+                    v = WaveDeformer.applyToVertex(v, wave, time);
+                }
+                
                 vertexIndices[lat][lon] = builder.addVertex(v);
             }
         }
@@ -191,7 +212,7 @@ public final class SphereTessellator {
             }
         }
         
-        return logAndBuild(builder, "LAT_LON");
+        return logAndBuild(builder, applyWave ? "LAT_LON+WAVE" : "LAT_LON");
     }
     
     // =========================================================================
@@ -203,15 +224,20 @@ public final class SphereTessellator {
      * Similar to LAT_LON but with proper pole handling.
      */
     private static Mesh tessellateUvSphere(SphereShape shape, VertexPattern pattern,
-                                            VisibilityMask visibility) {
+                                            VisibilityMask visibility, WaveConfig wave, float time) {
         MeshBuilder builder = MeshBuilder.triangles();
         
         int rings = shape.latSteps();
         int segments = shape.lonSteps();
         float radius = shape.radius();
         
+        // Check if wave deformation should be applied
+        boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();
+        
         // Top pole vertex (single shared vertex)
-        int topPole = builder.addVertex(Vertex.pos(0, radius, 0).withNormal(0, 1, 0));
+        Vertex topPoleV = Vertex.pos(0, radius, 0).withNormal(0, 1, 0);
+        if (applyWave) topPoleV = WaveDeformer.applyToVertex(topPoleV, wave, time);
+        int topPole = builder.addVertex(topPoleV);
         
         // Ring vertices (excluding poles)
         int[] ringStartIndices = new int[rings - 1];
@@ -232,12 +258,16 @@ public final class SphereTessellator {
                 float ny = (float) Math.cos(theta);
                 float nz = (float) Math.sin(theta) * (float) Math.sin(phi);
                 
-                builder.addVertex(Vertex.pos(x, y, z).withNormal(nx, ny, nz));
+                Vertex v = Vertex.pos(x, y, z).withNormal(nx, ny, nz);
+                if (applyWave) v = WaveDeformer.applyToVertex(v, wave, time);
+                builder.addVertex(v);
             }
         }
         
         // Bottom pole vertex
-        int bottomPole = builder.addVertex(Vertex.pos(0, -radius, 0).withNormal(0, -1, 0));
+        Vertex bottomPoleV = Vertex.pos(0, -radius, 0).withNormal(0, -1, 0);
+        if (applyWave) bottomPoleV = WaveDeformer.applyToVertex(bottomPoleV, wave, time);
+        int bottomPole = builder.addVertex(bottomPoleV);
         
         // Top cap triangles (pole to first ring)
         int firstRing = ringStartIndices[0];
@@ -274,7 +304,7 @@ public final class SphereTessellator {
             builder.triangle(lastRing + nextSeg, lastRing + seg, bottomPole);
         }
         
-        return logAndBuild(builder, "UV_SPHERE");
+        return logAndBuild(builder, applyWave ? "UV_SPHERE+WAVE" : "UV_SPHERE");
     }
     
     // =========================================================================
@@ -294,9 +324,12 @@ public final class SphereTessellator {
      *   <li>3: 642 vertices, 1280 triangles</li>
      * </ul>
      */
-    private static Mesh tessellateIcoSphere(SphereShape shape) {
+    private static Mesh tessellateIcoSphere(SphereShape shape, WaveConfig wave, float time) {
         MeshBuilder builder = MeshBuilder.triangles();
         float radius = shape.radius();
+        
+        // Check if wave deformation should be applied
+        boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();
         
         // Derive subdivision level from latSteps (approximate mapping)
         // latSteps 8-16 → subdiv 1, 17-32 → subdiv 2, 33-64 → subdiv 3, etc.
@@ -310,7 +343,7 @@ public final class SphereTessellator {
             { PHI, 0, -1}, { PHI, 0,  1}, {-PHI, 0, -1}, {-PHI, 0,  1},
         };
         
-        // Add normalized and scaled vertices
+        // Add normalized and scaled vertices (with wave deformation)
         int[] vertexIndices = new int[12];
         for (int i = 0; i < 12; i++) {
             float x = icoVerts[i][0];
@@ -320,8 +353,10 @@ public final class SphereTessellator {
             x = x/len * radius;
             y = y/len * radius;
             z = z/len * radius;
-            vertexIndices[i] = builder.addVertex(
-                Vertex.pos(x, y, z).withNormal(x/radius, y/radius, z/radius));
+            
+            Vertex v = Vertex.pos(x, y, z).withNormal(x/radius, y/radius, z/radius);
+            if (applyWave) v = WaveDeformer.applyToVertex(v, wave, time);
+            vertexIndices[i] = builder.addVertex(v);
         }
         
         // Icosahedron faces (20 triangles)
@@ -343,6 +378,7 @@ public final class SphereTessellator {
         }
         
         // Subdivision with midpoint cache
+        // Note: Wave is applied in getMidpointWithWave for subdivided vertices
         Map<Long, Integer> midpointCache = new HashMap<>();
         
         for (int level = 0; level < subdivisions; level++) {
@@ -351,9 +387,9 @@ public final class SphereTessellator {
             
             int newIdx = 0;
             for (int[] tri : triangles) {
-                int a = getMidpoint(builder, midpointCache, tri[0], tri[1], radius);
-                int b = getMidpoint(builder, midpointCache, tri[1], tri[2], radius);
-                int c = getMidpoint(builder, midpointCache, tri[2], tri[0], radius);
+                int a = getMidpointWithWave(builder, midpointCache, tri[0], tri[1], radius, wave, time, applyWave);
+                int b = getMidpointWithWave(builder, midpointCache, tri[1], tri[2], radius, wave, time, applyWave);
+                int c = getMidpointWithWave(builder, midpointCache, tri[2], tri[0], radius, wave, time, applyWave);
                 
                 newTriangles[newIdx++] = new int[]{tri[0], a, c};
                 newTriangles[newIdx++] = new int[]{tri[1], b, a};
@@ -370,7 +406,7 @@ public final class SphereTessellator {
             builder.emitCellFromPattern(tri, trianglePattern);
         }
         
-        return logAndBuild(builder, "ICO_SPHERE (subdiv=" + subdivisions + ")");
+        return logAndBuild(builder, applyWave ? "ICO_SPHERE+WAVE (subdiv=" + subdivisions + ")" : "ICO_SPHERE (subdiv=" + subdivisions + ")");
     }
     
     /**
@@ -402,6 +438,46 @@ public final class SphereTessellator {
         
         int idx = builder.addVertex(
             Vertex.pos(mx, my, mz).withNormal(mx/radius, my/radius, mz/radius));
+        cache.put(key, idx);
+        return idx;
+    }
+    
+    /**
+     * Get or create midpoint vertex between two vertices, projected to sphere surface,
+     * with optional wave deformation applied.
+     */
+    private static int getMidpointWithWave(MeshBuilder builder, Map<Long, Integer> cache,
+                                            int v0, int v1, float radius,
+                                            WaveConfig wave, float time, boolean applyWave) {
+        // Canonical key (smaller index first)
+        long key = Math.min(v0, v1) * 100000L + Math.max(v0, v1);
+        
+        Integer cached = cache.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        
+        Vertex vert0 = builder.getVertex(v0);
+        Vertex vert1 = builder.getVertex(v1);
+        
+        // Midpoint (use original sphere positions, not deformed ones)
+        // We need the base positions before wave deformation
+        float mx = (vert0.x() + vert1.x()) / 2;
+        float my = (vert0.y() + vert1.y()) / 2;
+        float mz = (vert0.z() + vert1.z()) / 2;
+        
+        // Project to sphere surface
+        float len = (float) Math.sqrt(mx*mx + my*my + mz*mz);
+        mx = mx/len * radius;
+        my = my/len * radius;
+        mz = mz/len * radius;
+        
+        Vertex v = Vertex.pos(mx, my, mz).withNormal(mx/radius, my/radius, mz/radius);
+        if (applyWave) {
+            v = WaveDeformer.applyToVertex(v, wave, time);
+        }
+        
+        int idx = builder.addVertex(v);
         cache.put(key, idx);
         return idx;
     }
