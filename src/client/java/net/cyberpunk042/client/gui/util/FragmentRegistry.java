@@ -5,7 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.cyberpunk042.client.gui.state.FieldEditState;
-import net.cyberpunk042.field.instance.FollowMode;
+import net.cyberpunk042.field.instance.FollowConfig;
 import net.fabricmc.loader.api.FabricLoader;
 import net.cyberpunk042.TheVirusBlock;
 import org.slf4j.Logger;
@@ -550,14 +550,11 @@ public final class FragmentRegistry {
         JsonObject json = followPresets.get(presetName);
         if (json == null) return;
 
-        if (json.has("enabled")) state.set("followEnabled", json.get("enabled").getAsBoolean());
-        if (json.has("mode")) {
-            try {
-                state.set("followMode", FollowMode.valueOf(json.get("mode").getAsString()));
-            } catch (IllegalArgumentException e) {
-                LOGGER.warn("Unknown follow mode: {}", json.get("mode").getAsString());
-            }
-        }
+        // Apply new FollowConfig fields
+        if (json.has("enabled")) state.set("follow.enabled", json.get("enabled").getAsBoolean());
+        if (json.has("leadOffset")) state.set("follow.leadOffset", json.get("leadOffset").getAsFloat());
+        if (json.has("responsiveness")) state.set("follow.responsiveness", json.get("responsiveness").getAsFloat());
+        if (json.has("lookAhead")) state.set("follow.lookAhead", json.get("lookAhead").getAsFloat());
     }
 
     // ═══════════════════════════════════════════════════════════════════════

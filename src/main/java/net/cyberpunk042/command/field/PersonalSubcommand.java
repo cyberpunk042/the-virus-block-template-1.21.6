@@ -2,7 +2,7 @@ package net.cyberpunk042.command.field;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.cyberpunk042.command.util.CommandKnob;
-import net.cyberpunk042.field.instance.FollowMode;
+import net.cyberpunk042.field.instance.FollowConfig;
 import net.cyberpunk042.log.Logging;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
@@ -14,8 +14,7 @@ import net.minecraft.server.command.ServerCommandSource;
  * <ul>
  *   <li>enabled - Toggle personal field visibility</li>
  *   <li>visual - Toggle visual rendering</li>
- *   <li>follow - Follow mode (SNAP, SMOOTH, GLIDE)</li>
- *   <li>prediction - Movement prediction settings</li>
+ *   <li>follow - Follow mode settings (leadOffset, responsiveness, lookAhead)</li>
  * </ul>
  * 
  * <p>Settings are persisted via CommandKnob to JSON config.</p>
@@ -26,7 +25,7 @@ public final class PersonalSubcommand {
     
     public static LiteralArgumentBuilder<ServerCommandSource> build() {
         var cmd = CommandManager.literal("personal")
-            .then(buildPrediction());
+            .then(buildFollow());
         
         // Knob-based settings
         CommandKnob.toggle("field.personal.enabled", "Personal field")
@@ -45,46 +44,46 @@ public final class PersonalSubcommand {
             })
             .attach(cmd);
         
-        CommandKnob.enumValue("field.personal.follow", "Follow mode", FollowMode.class)
-            .idMapper(FollowMode::id)
-            .parser(FollowMode::fromId)
-            .defaultValue(FollowMode.SMOOTH)
-            .handler((src, v) -> {
-                Logging.COMMANDS.info("Follow mode: {}", v.id());
-                return true;
-            })
-            .attach(cmd);
-        
         return cmd;
     }
     
-    private static LiteralArgumentBuilder<ServerCommandSource> buildPrediction() {
-        var cmd = CommandManager.literal("prediction");
+    private static LiteralArgumentBuilder<ServerCommandSource> buildFollow() {
+        var cmd = CommandManager.literal("follow");
         
-        CommandKnob.toggle("field.personal.prediction.enabled", "Movement prediction")
+        CommandKnob.toggle("field.personal.follow.enabled", "Follow enabled")
             .defaultValue(true)
             .handler((src, v) -> {
-                Logging.COMMANDS.info("Prediction enabled: {}", v);
+                Logging.COMMANDS.info("Follow enabled: {}", v);
                 return true;
             })
             .attach(cmd);
         
-        CommandKnob.value("field.personal.prediction.lead", "Lead ticks")
-            .range(0, 10)
-            .unit("ticks")
-            .defaultValue(2)
+        CommandKnob.floatValue("field.personal.follow.leadOffset", "Lead/trail offset")
+            .range(-1.0f, 1.0f)
+            .unit("")
+            .defaultValue(0.0f)
             .handler((src, v) -> {
-                Logging.COMMANDS.info("Lead ticks: {}", v);
+                Logging.COMMANDS.info("Lead offset: {}", v);
                 return true;
             })
             .attach(cmd);
         
-        CommandKnob.floatValue("field.personal.prediction.max", "Max lead distance")
-            .range(0.1f, 5.0f)
+        CommandKnob.floatValue("field.personal.follow.responsiveness", "Responsiveness")
+            .range(0.1f, 1.0f)
+            .unit("")
+            .defaultValue(0.5f)
+            .handler((src, v) -> {
+                Logging.COMMANDS.info("Responsiveness: {}", v);
+                return true;
+            })
+            .attach(cmd);
+        
+        CommandKnob.floatValue("field.personal.follow.lookAhead", "Look ahead offset")
+            .range(0.0f, 0.5f)
             .unit("blocks")
-            .defaultValue(1.5f)
+            .defaultValue(0.0f)
             .handler((src, v) -> {
-                Logging.COMMANDS.info("Max lead distance: {}", v);
+                Logging.COMMANDS.info("Look ahead: {}", v);
                 return true;
             })
             .attach(cmd);

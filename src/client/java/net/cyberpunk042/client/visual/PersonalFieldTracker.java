@@ -2,8 +2,7 @@ package net.cyberpunk042.client.visual;
 
 import net.cyberpunk042.field.FieldDefinition;
 import net.cyberpunk042.field.FieldRegistry;
-import net.cyberpunk042.field.instance.PredictionConfig;
-import net.cyberpunk042.field.instance.FollowMode;
+import net.cyberpunk042.field.instance.FollowConfig;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.Identifier;
@@ -15,18 +14,16 @@ import net.minecraft.util.math.Vec3d;
  * 
  * <p>Features:
  * <ul>
- *   <li>Movement prediction (anticipates player movement)</li>
+ *   <li>Movement follow (trailing/leading based on FollowConfig)</li>
  *   <li>Smooth interpolation (prevents jitter)</li>
- *   <li>Look-ahead (field leads movement direction)</li>
+ *   <li>Look-ahead (field leads look direction)</li>
  * </ul>
  */
 public final class PersonalFieldTracker {
     
-    // FollowMode is now in net.cyberpunk042.field.instance.FollowMode
-    
     // Configuration
     private Identifier definitionId;
-    private FollowMode followMode = FollowMode.SMOOTH;
+    private float responsiveness = 0.5f;  // From FollowConfig
     private float scale = 1.0f;
     private boolean enabled = false;
     private boolean visible = true;
@@ -48,8 +45,8 @@ public final class PersonalFieldTracker {
         this.definitionId = id;
     }
     
-    public void setFollowMode(FollowMode mode) {
-        this.followMode = mode != null ? mode : FollowMode.SMOOTH;
+    public void setResponsiveness(float resp) {
+        this.responsiveness = Math.max(0.1f, Math.min(1.0f, resp));
     }
     
     public void setScale(float scale) {
@@ -59,7 +56,7 @@ public final class PersonalFieldTracker {
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
         if (!enabled) {
-            age = 0;
+            currentPosition = Vec3d.ZERO;
         }
     }
     
@@ -67,122 +64,121 @@ public final class PersonalFieldTracker {
         this.visible = visible;
     }
     
-    // =========================================================================
-    // State queries
-    // =========================================================================
-    
     public boolean isEnabled() { return enabled; }
-    public boolean isVisible() { return visible && enabled; }
+    public boolean isVisible() { return visible; }
+    public float getScale() { return scale; }
     public Identifier definitionId() { return definitionId; }
-    public Vec3d position() { return currentPosition; }
-    public float scale() { return scale; }
-    public float phase() { return phase; }
-    public int age() { return age; }
-    
-    /**
-     * Gets the interpolated render position for smooth frame-by-frame movement.
-     * 
-     * <p>This interpolates between the position from the last tick and the current
-     * tick position, eliminating visual stuttering when rendering at higher FPS
-     * than the tick rate.
-     * 
-     * @param tickDelta Partial tick progress (0.0 = start of tick, 1.0 = end of tick)
-     * @return Smoothly interpolated position for rendering
-     */
-    public Vec3d getRenderPosition(float tickDelta) {
-        // First frame: no previous position yet
-        if (previousPosition.equals(Vec3d.ZERO) && !currentPosition.equals(Vec3d.ZERO)) {
-            return currentPosition;
-        }
-        // Lerp between previous and current based on partial tick
-        return previousPosition.lerp(currentPosition, tickDelta);
-    }
     
     public FieldDefinition definition() {
         return definitionId != null ? FieldRegistry.get(definitionId) : null;
     }
-
     
     // =========================================================================
-    // Update
+    // Position Access
     // =========================================================================
     
     /**
-     * Updates the tracker for the current tick.
-     * Call once per client tick.
+     * Gets the current tick-aligned position.
      */
-    public void tick() {
-        if (!enabled) {
-            return;
-        }
-        
-        MinecraftClient client = MinecraftClient.getInstance();
-        PlayerEntity player = client.player;
-        
-        if (player == null) {
-            return;
-        }
+    public Vec3d getPosition() {
+        return currentPosition;
+    }
+    
+    /**
+     * Gets the smoothly interpolated render position.
+     * This should be called during rendering with the partial tick delta.
+     * 
+     * @param tickDelta partial tick (0-1)
+     * @return interpolated position between previousPosition and currentPosition
+     */
+    public Vec3d getRenderPosition(float tickDelta) {
+        return new Vec3d(
+            MathHelper.lerp(tickDelta, previousPosition.x, currentPosition.x),
+            MathHelper.lerp(tickDelta, previousPosition.y, currentPosition.y),
+            MathHelper.lerp(tickDelta, previousPosition.z, currentPosition.z)
+        );
+    }
+    
+    public float getPhase() {
+        return phase;
+    }
+    
+    public int getAge() {
+        return age;
+    }
+    
+    // =========================================================================
+    // Tick Update
+    // =========================================================================
+    
+    /**
+     * Updates the tracker for a new tick.
+     * Called once per client tick (not per frame).
+     */
+    public void tick(PlayerEntity player) {
+        if (!enabled || player == null) return;
         
         age++;
+        phase += 0.05f;
         
         // Save previous position for render-frame interpolation
         previousPosition = currentPosition;
         
-        // Calculate target position
+        // Calculate target based on player and follow config
         targetPosition = calculateTargetPosition(player);
         
-        // Interpolate current position (tick-rate smoothing)
-        currentPosition = followMode.interpolate(currentPosition, targetPosition);
+        // Get responsiveness from follow config if available
+        FieldDefinition def = definition();
+        float resp = responsiveness;
+        if (def != null && def.follow() != null && def.follow().enabled()) {
+            resp = def.follow().responsiveness();
+        }
+        
+        // Interpolate toward target with responsiveness
+        currentPosition = currentPosition.lerp(targetPosition, resp);
     }
     
     /**
-     * Calculates the target position for the field.
+     * Calculates the target position based on player and follow config.
      */
     private Vec3d calculateTargetPosition(PlayerEntity player) {
         // Base: center of player bounding box, slightly down
         Vec3d base = player.getBoundingBox().getCenter().add(0, -0.1, 0);
         
-        // Get prediction config from definition
+        // Get follow config from definition
         FieldDefinition def = definition();
-        if (def == null) {
+        if (def == null || def.follow() == null || !def.follow().enabled()) {
             return base;
         }
         
-        PredictionConfig pred = def.prediction();
-        if (pred == null || !pred.enabled()) {
-            return base;
-        }
+        FollowConfig follow = def.follow();
+        Vec3d result = base;
         
-        // Apply velocity prediction
-        Vec3d predicted = base;
-        if (pred.leadTicks() > 0) {
-            Vec3d velocity = player.getVelocity();
-            predicted = base.add(velocity.multiply(pred.leadTicks()));
-        }
-        
-        // Apply look-ahead
-        if (pred.lookAhead() != 0) {
+        // Apply look-ahead (offset toward look direction)
+        float lookAhead = follow.lookAhead();
+        if (Math.abs(lookAhead) > 0.001f) {
             Vec3d look = player.getRotationVec(1.0f).normalize();
-            predicted = predicted.add(look.multiply(pred.lookAhead()));
+            result = result.add(look.multiply(lookAhead));
         }
         
-        // Apply vertical boost
-        if (pred.verticalBoost() != 0) {
-            predicted = predicted.add(0, pred.verticalBoost(), 0);
-        }
-        
-        // Clamp to max distance
-        if (pred.maxDistance() > 0.01f) {
-            Vec3d delta = predicted.subtract(base);
-            double distSq = delta.lengthSquared();
-            double maxDistSq = pred.maxDistance() * pred.maxDistance();
+        // Apply lead/trail offset (in velocity direction)
+        float leadOffset = follow.leadOffset();
+        if (Math.abs(leadOffset) > 0.01f) {
+            Vec3d velocity = player.getVelocity();
             
-            if (distSq > maxDistSq) {
-                predicted = base.add(delta.normalize().multiply(pred.maxDistance()));
+            // Ignore Y velocity when on ground (gravity noise)
+            if (player.isOnGround()) {
+                velocity = new Vec3d(velocity.x, 0.0, velocity.z);
+            }
+            
+            double speed = velocity.length();
+            if (speed > 0.01) {
+                // Scale by velocity magnitude for smooth feel
+                result = result.add(velocity.normalize().multiply(leadOffset * speed * 5.0));
             }
         }
         
-        return predicted;
+        return result;
     }
     
     /**

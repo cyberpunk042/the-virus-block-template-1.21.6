@@ -3,7 +3,6 @@ package net.cyberpunk042.field.instance;
 import net.cyberpunk042.log.Logging;
 
 import net.cyberpunk042.field.FieldType;
-import net.cyberpunk042.field.instance.PredictionConfig;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Vec3d;
@@ -13,73 +12,57 @@ import java.util.UUID;
 /**
  * A field instance attached to a player.
  * 
- * <h2>Follow Modes</h2>
+ * <h2>Follow Configuration</h2>
+ * <p>Uses {@link FollowConfig} to control how the field follows the player:
  * <ul>
- *   <li>{@link FollowMode#SNAP}: Instant teleport to player position</li>
- *   <li>{@link FollowMode#SMOOTH}: Smooth interpolation (slight lag)</li>
- *   <li>{@link FollowMode#GLIDE}: Very slow, floaty movement</li>
+ *   <li>leadOffset: trailing (-) or leading (+) in movement direction</li>
+ *   <li>responsiveness: how quickly field catches up (0.1 to 1.0)</li>
+ *   <li>lookAhead: offset toward player's look direction</li>
  * </ul>
- * 
- * <h2>Prediction</h2>
- * <p>Prediction is controlled separately via {@link PredictionConfig},
- * and can be combined with any follow mode.
  */
 public class PersonalFieldInstance extends FieldInstance {
     
     private final UUID ownerUuid;
-    private FollowMode followMode;
-    private PredictionConfig predictionConfig;
+    private FollowConfig followConfig;
     
     // Smoothing state
     private Vec3d targetPosition;
     private Vec3d velocity;
-    private float smoothFactor;
     
     public PersonalFieldInstance(long id, Identifier definitionId, FieldType type,
                                   UUID ownerUuid, Vec3d initialPosition) {
         super(id, definitionId, type, initialPosition);
         this.ownerUuid = ownerUuid;
-        this.followMode = FollowMode.SMOOTH;
-        this.predictionConfig = PredictionConfig.defaults();
+        this.followConfig = FollowConfig.DEFAULT;
         this.targetPosition = initialPosition;
         this.velocity = Vec3d.ZERO;
-        this.smoothFactor = 0.3f;
     }
     
     // ─────────────────────────────────────────────────────────────────────────────
     // Configuration
     // ─────────────────────────────────────────────────────────────────────────────
     
-    public FollowMode getFollowMode() {
-        return followMode;
+    public FollowConfig getFollowConfig() {
+        return followConfig;
     }
     
-    public void setFollowMode(FollowMode mode) {
-        if (this.followMode != mode) {
+    public void setFollowConfig(FollowConfig config) {
+        if (config != null) {
             Logging.REGISTRY.topic("personal").debug(
-                "Follow mode changed: {} -> {} for player {}", 
-                this.followMode.id(), mode.id(), ownerUuid);
+                "Follow config updated for player {}: enabled={}, leadOffset={}",
+                ownerUuid, config.enabled(), config.leadOffset());
+            this.followConfig = config;
         }
-        this.followMode = mode;
     }
     
-    public PredictionConfig getPredictionConfig() {
-        return predictionConfig;
+    public float getResponsiveness() {
+        return followConfig.responsiveness();
     }
     
-    public void setPredictionConfig(PredictionConfig config) {
-        Logging.REGISTRY.topic("personal").debug(
-            "Prediction config updated for player {}: enabled={}, leadTicks={}",
-            ownerUuid, config.enabled(), config.leadTicks());
-        this.predictionConfig = config;
-    }
-    
-    public float getSmoothFactor() {
-        return smoothFactor;
-    }
-    
-    public void setSmoothFactor(float factor) {
-        this.smoothFactor = Math.max(0.05f, Math.min(1.0f, factor));
+    public void setResponsiveness(float factor) {
+        this.followConfig = followConfig.toBuilder()
+            .responsiveness(Math.max(0.1f, Math.min(1.0f, factor)))
+            .build();
     }
     
     // ─────────────────────────────────────────────────────────────────────────────
@@ -91,62 +74,56 @@ public class PersonalFieldInstance extends FieldInstance {
      * Called from server when player moves.
      */
     public void updateFromPlayer(PlayerEntity player) {
-        if (player == null) {
+        if (player == null || !followConfig.enabled()) {
             return;
         }
         
         Vec3d playerPos = player.getPos().add(0, 1.0, 0); // Center on player
         
-        // Apply prediction if enabled (works with any follow mode)
-        Vec3d targetPos = predictionConfig.enabled() 
-            ? predictPosition(player) 
-            : playerPos;
+        // Apply follow config offsets
+        Vec3d targetPos = calculateTargetPosition(player, playerPos);
         
-        switch (followMode) {
-            case SNAP:
-                // Instant teleport - no interpolation
-                position = targetPos;
-                targetPosition = targetPos;
-                break;
-                
-            case SMOOTH:
-            case GLIDE:
-                // Set target, interpolation happens in tickInstance
-                targetPosition = targetPos;
-                break;
+        // If locked (responsiveness >= 1.0 and no lead offset), snap immediately
+        if (followConfig.isLocked()) {
+            position = targetPos;
+            targetPosition = targetPos;
+        } else {
+            // Set target, interpolation happens in tickInstance
+            targetPosition = targetPos;
         }
     }
     
     /**
-     * Predicts where the player will be based on velocity and look direction.
+     * Calculates target position based on follow config.
      */
-    private Vec3d predictPosition(PlayerEntity player) {
-        if (!predictionConfig.enabled()) {
-            return player.getPos().add(0, 1.0, 0);
+    private Vec3d calculateTargetPosition(PlayerEntity player, Vec3d playerPos) {
+        Vec3d result = playerPos;
+        
+        // Apply look-ahead (offset toward look direction)
+        float lookAhead = followConfig.lookAhead();
+        if (Math.abs(lookAhead) > 0.001f) {
+            Vec3d look = player.getRotationVector().normalize();
+            result = result.add(look.multiply(lookAhead));
         }
         
-        Vec3d playerPos = player.getPos().add(0, 1.0, 0);
-        Vec3d playerVel = player.getVelocity();
-        
-        // Clamp velocity
-        double speed = playerVel.length();
-        if (speed > predictionConfig.maxDistance()) {
-            playerVel = playerVel.normalize().multiply(predictionConfig.maxDistance());
+        // Apply lead/trail offset (in velocity direction)
+        float leadOffset = followConfig.leadOffset();
+        if (Math.abs(leadOffset) > 0.01f) {
+            Vec3d playerVel = player.getVelocity();
+            
+            // Ignore Y velocity when on ground (gravity noise)
+            if (player.isOnGround()) {
+                playerVel = new Vec3d(playerVel.x, 0.0, playerVel.z);
+            }
+            
+            double speed = playerVel.length();
+            if (speed > 0.01) {
+                // Scale by velocity magnitude for smooth feel
+                result = result.add(playerVel.normalize().multiply(leadOffset * speed * 5.0));
+            }
         }
         
-        // Lead based on velocity
-        Vec3d leadPos = playerPos.add(playerVel.multiply(predictionConfig.leadTicks()));
-        
-        // Add look-ahead component
-        Vec3d lookVec = player.getRotationVector();
-        leadPos = leadPos.add(lookVec.multiply(predictionConfig.lookAhead()));
-        
-        // Vertical boost when jumping/falling
-        if (Math.abs(playerVel.y) > 0.1) {
-            leadPos = leadPos.add(0, playerVel.y * predictionConfig.verticalBoost(), 0);
-        }
-        
-        return leadPos;
+        return result;
     }
     
     // ─────────────────────────────────────────────────────────────────────────────
@@ -155,10 +132,9 @@ public class PersonalFieldInstance extends FieldInstance {
     
     @Override
     protected void tickInstance() {
-        // Smooth/glide interpolation toward target (SNAP handled in updateFromPlayer)
-        if (followMode == FollowMode.SMOOTH || followMode == FollowMode.GLIDE) {
-            // Use the follow mode's lerp factor for consistency
-            float lerpFactor = followMode.lerpFactor();
+        // Interpolate toward target (locked mode is handled in updateFromPlayer)
+        if (!followConfig.isLocked() && targetPosition != null) {
+            float lerpFactor = followConfig.responsiveness();
             position = position.lerp(targetPosition, lerpFactor);
         }
     }

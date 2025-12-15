@@ -9,6 +9,7 @@ import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.GuiLayout;
 import net.cyberpunk042.client.gui.widget.LabeledSlider;
+import net.cyberpunk042.field.instance.FollowConfig;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
@@ -18,17 +19,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Sub-panel for movement prediction settings.
- * Controls how the field anticipates player movement.
+ * Sub-panel for follow/movement settings.
+ * Controls how the field follows the player's movement.
+ * 
+ * The new unified FollowConfig replaces the old separate prediction and follow mode systems.
  * 
  * Features:
- * - Preset selector (OFF, LOW, MEDIUM, HIGH, CUSTOM)
- * - Custom mode exposes all parameters:
- *   - enabled: Toggle prediction on/off
- *   - leadTicks: How many ticks ahead to predict (1-10)
- *   - maxDistance: Maximum prediction distance (1-50)
- *   - lookAhead: How much to weight velocity (0-1)
- *   - verticalBoost: Extra vertical compensation (0-2)
+ * - Preset selector (LOCKED, SMOOTH, GLIDE, LEAD, CUSTOM)
+ * - enabled: Toggle following on/off (false = static field)
+ * - leadOffset: Position offset in movement direction (-1 = trail, +1 = lead)
+ * - responsiveness: How quickly field catches up (0.1 = floaty, 1.0 = instant)
+ * - lookAhead: Offset toward player's look direction (0 = none, 0.5 = half block)
  * 
  * @see <a href="GUI_CLASS_DIAGRAM.md §4.9">PredictionSubPanel specification</a>
  * 
@@ -37,55 +38,21 @@ import java.util.List;
 @RequiresFeature(Feature.PREDICTION)
 public class PredictionSubPanel extends AbstractPanel {
     // ═══════════════════════════════════════════════════════════════════════════
-    // ENUMS
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    /** Prediction presets for quick configuration. */
-    public enum PredictionPreset {
-        OFF("Off", false, 0, 0f, 0f, 0f),
-        LOW("Low", true, 1, 4f, 0.2f, 0f),
-        MEDIUM("Medium", true, 2, 8f, 0.5f, 0f),
-        HIGH("High", true, 3, 12f, 0.8f, 0f),
-        CUSTOM("Custom", true, 2, 8f, 0.5f, 0f);
-        
-        private final String displayName;
-        public final boolean enabled;
-        public final int leadTicks;
-        public final float maxDistance;
-        public final float lookAhead;
-        public final float verticalBoost;
-        
-        PredictionPreset(String displayName, boolean enabled, int leadTicks, 
-                         float maxDistance, float lookAhead, float verticalBoost) {
-            this.displayName = displayName;
-            this.enabled = enabled;
-            this.leadTicks = leadTicks;
-            this.maxDistance = maxDistance;
-            this.lookAhead = lookAhead;
-            this.verticalBoost = verticalBoost;
-        }
-        
-        public String getDisplayName() { return displayName; }
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
     // FIELDS
     // ═══════════════════════════════════════════════════════════════════════════
     
     private GuiLayout layout;
     
     // Widgets
-    private CyclingButtonWidget<PredictionPreset> presetButton;
+    private CyclingButtonWidget<FollowConfig.Preset> presetButton;
     private CyclingButtonWidget<Boolean> enabledButton;
-    private CyclingButtonWidget<net.cyberpunk042.field.instance.FollowMode> followModeButton;
-    private LabeledSlider leadTicksSlider;
-    private LabeledSlider maxDistanceSlider;
+    private LabeledSlider leadOffsetSlider;
+    private LabeledSlider responsivenessSlider;
     private LabeledSlider lookAheadSlider;
-    private LabeledSlider verticalBoostSlider;
     
     // State
-    private PredictionPreset currentFragment = PredictionPreset.MEDIUM;
-    private boolean applyingFragment = false;
+    private FollowConfig.Preset currentPreset = FollowConfig.Preset.LOCKED;
+    private boolean applyingPreset = false;
     
     // ═══════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
@@ -94,10 +61,9 @@ public class PredictionSubPanel extends AbstractPanel {
     /**
      * Creates a new PredictionSubPanel.
      * 
+     * @param parent Parent screen
      * @param state The GUI state to bind to
-     * @param x Starting X position
-     * @param y Starting Y position
-     * @param width Panel width
+     * @param startY Starting Y position
      */
     public PredictionSubPanel(Screen parent, FieldEditState state, int startY) {
         super(parent, state);
@@ -112,7 +78,7 @@ public class PredictionSubPanel extends AbstractPanel {
         this.panelHeight = height;
         widgets.clear();
         
-        int x = net.cyberpunk042.client.gui.util.GuiConstants.PADDING;
+        int x = GuiConstants.PADDING;
         int y = startY;
         this.layout = new GuiLayout(
             x,
@@ -120,7 +86,6 @@ public class PredictionSubPanel extends AbstractPanel {
             GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING,
             width - GuiConstants.PADDING * 2);
         
-        // Continue with original build logic...
         initWidgets();
     }
     
@@ -130,96 +95,85 @@ public class PredictionSubPanel extends AbstractPanel {
     
     private void initWidgets() {
         int controlWidth = layout.getPanelWidth() - GuiConstants.PADDING * 2;
+        int halfWidth = (controlWidth - GuiConstants.ELEMENT_SPACING) / 2;
         
         // ─────────────────────────────────────────────────────────────────────────
         // Preset Selector - quick presets for common configurations
         // ─────────────────────────────────────────────────────────────────────────
         int rowY = layout.getCurrentY();
-        presetButton = CyclingButtonWidget.<PredictionPreset>builder(p -> Text.literal(p.getDisplayName()))
-            .values(PredictionPreset.values())
-            .initially(currentFragment)
+        presetButton = CyclingButtonWidget.<FollowConfig.Preset>builder(
+                p -> Text.literal(p.label() + " - " + p.description())
+            )
+            .values(FollowConfig.Preset.values())
+            .initially(currentPreset)
             .build(layout.getStartX() + GuiConstants.PADDING, rowY, controlWidth,
-                GuiConstants.ELEMENT_HEIGHT, Text.literal("Variant"), (button, value) -> applyPreset(value));
+                GuiConstants.ELEMENT_HEIGHT, Text.literal("Preset"), 
+                (button, value) -> applyPreset(value));
         widgets.add(presetButton);
         layout.nextRow();
         
         // ─────────────────────────────────────────────────────────────────────────
-        // Enabled Toggle - master on/off for prediction
+        // Enabled Toggle - master on/off for following
         // ─────────────────────────────────────────────────────────────────────────
         rowY = layout.getCurrentY();
-        enabledButton = CyclingButtonWidget.<Boolean>builder(v -> Text.literal(v ? "Enabled" : "Disabled"))
+        enabledButton = CyclingButtonWidget.<Boolean>builder(
+                v -> Text.literal(v ? "Following" : "Static")
+            )
             .values(List.of(false, true))
-            .initially(state.getBool("prediction.enabled"))
+            .initially(state.getBool("follow.enabled"))
             .build(
                 layout.getStartX() + GuiConstants.PADDING,
                 rowY,
                 controlWidth,
                 GuiConstants.ELEMENT_HEIGHT,
-                Text.literal("Prediction"),
-                (button, value) -> onUserChange(() -> state.set("prediction.enabled", value))
+                Text.literal("Follow"),
+                (button, value) -> onUserChange(() -> {
+                    state.set("follow.enabled", value);
+                    updateSliderStates(value);
+                })
             );
         widgets.add(enabledButton);
         layout.nextRow();
         
         // ─────────────────────────────────────────────────────────────────────────
-        // Follow Mode - how the field follows the player (SNAP/SMOOTH/GLIDE)
+        // Lead Offset - trail/lead in movement direction
+        // -1 = trail behind, 0 = locked, +1 = lead ahead
         // ─────────────────────────────────────────────────────────────────────────
         rowY = layout.getCurrentY();
-        net.cyberpunk042.field.instance.FollowMode initialMode = 
-            state.getTyped("followConfig.mode", net.cyberpunk042.field.instance.FollowMode.class);
-        if (initialMode == null) initialMode = net.cyberpunk042.field.instance.FollowMode.SMOOTH;
-        followModeButton = CyclingButtonWidget.<net.cyberpunk042.field.instance.FollowMode>builder(
-                mode -> Text.literal(mode.id().substring(0, 1).toUpperCase() + mode.id().substring(1) + " - " + mode.description())
-            )
-            .values(net.cyberpunk042.field.instance.FollowMode.values())
-            .initially(initialMode)
-            .build(
-                layout.getStartX() + GuiConstants.PADDING,
-                rowY,
-                controlWidth,
-                GuiConstants.ELEMENT_HEIGHT,
-                Text.literal("Follow Mode"),
-                (button, value) -> onUserChange(() -> state.set("followConfig.mode", value))
-            );
-        widgets.add(followModeButton);
-        layout.nextRow();
-        
-        // ─────────────────────────────────────────────────────────────────────────
-        // Lead Ticks - how many game ticks ahead to predict
-        // ─────────────────────────────────────────────────────────────────────────
-        rowY = layout.getCurrentY();
-        leadTicksSlider = new LabeledSlider(
+        leadOffsetSlider = new LabeledSlider(
             layout.getStartX() + GuiConstants.PADDING,
             rowY,
             controlWidth,
-            "Lead Ticks",
-            1f, 10f,
-            (float) state.getInt("prediction.leadTicks"),
-            "%d", 1f,
-            v -> onUserChange(() -> state.set("prediction.leadTicks", v.intValue()))
+            "Lead/Trail",
+            -1.0f, 1.0f,
+            state.getFloat("follow.leadOffset"),
+            "%.2f", null,
+            v -> onUserChange(() -> state.set("follow.leadOffset", v))
         );
-        widgets.add(leadTicksSlider);
+        widgets.add(leadOffsetSlider);
         layout.nextRow();
         
         // ─────────────────────────────────────────────────────────────────────────
-        // Max Distance - maximum prediction distance in blocks
+        // Responsiveness - how quickly field catches up
+        // 0.1 = very floaty/slow, 1.0 = instant snap
         // ─────────────────────────────────────────────────────────────────────────
         rowY = layout.getCurrentY();
-        maxDistanceSlider = new LabeledSlider(
+        responsivenessSlider = new LabeledSlider(
             layout.getStartX() + GuiConstants.PADDING,
             rowY,
             controlWidth,
-            "Max Distance",
-            1f, 50f,
-            state.getFloat("prediction.maxDistance"),
-            "%.1f", null,
-            v -> onUserChange(() -> state.set("prediction.maxDistance", v))
+            "Responsiveness",
+            0.1f, 1.0f,
+            state.getFloat("follow.responsiveness"),
+            "%.2f", null,
+            v -> onUserChange(() -> state.set("follow.responsiveness", v))
         );
-        widgets.add(maxDistanceSlider);
+        widgets.add(responsivenessSlider);
         layout.nextRow();
         
         // ─────────────────────────────────────────────────────────────────────────
-        // Look Ahead - velocity weighting factor (0 = position only, 1 = full velocity)
+        // Look Ahead - offset toward look direction
+        // 0 = none, 0.5 = half block in look direction
         // ─────────────────────────────────────────────────────────────────────────
         rowY = layout.getCurrentY();
         lookAheadSlider = new LabeledSlider(
@@ -227,58 +181,22 @@ public class PredictionSubPanel extends AbstractPanel {
             rowY,
             controlWidth,
             "Look Ahead",
-            0f, 1f,
-            state.getFloat("prediction.lookAhead"),
+            0.0f, 0.5f,
+            state.getFloat("follow.lookAhead"),
             "%.2f", null,
-            v -> onUserChange(() -> state.set("prediction.lookAhead", v))
+            v -> onUserChange(() -> state.set("follow.lookAhead", v))
         );
         widgets.add(lookAheadSlider);
         layout.nextRow();
         
-        // ─────────────────────────────────────────────────────────────────────────
-        // Vertical Boost - extra compensation for vertical movement (jumping, falling)
-        // ─────────────────────────────────────────────────────────────────────────
-        rowY = layout.getCurrentY();
-        verticalBoostSlider = new LabeledSlider(
-            layout.getStartX() + GuiConstants.PADDING,
-            rowY,
-            controlWidth,
-            "Vertical Boost",
-            0f, 2f,
-            state.getFloat("prediction.verticalBoost"),
-            "%.2f", null,
-            v -> onUserChange(() -> state.set("prediction.verticalBoost", v))
-        );
-        widgets.add(verticalBoostSlider);
-        layout.nextRow();
+        // Initialize slider states
+        updateSliderStates(state.getBool("follow.enabled"));
     }
     
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PRESET APPLICATION
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    /**
-     * Applies a prediction preset, updating all controls and state.
-     * CUSTOM preset does not change values, just enables manual editing.
-     */
-    private void applyPreset(PredictionPreset preset) {
-        applyingFragment = true;
-        currentFragment = preset;
-        if (preset != PredictionPreset.CUSTOM) {
-            state.set("prediction.enabled", preset.enabled);
-            state.set("prediction.leadTicks", preset.leadTicks);
-            state.set("prediction.maxDistance", preset.maxDistance);
-            state.set("prediction.lookAhead", preset.lookAhead);
-            state.set("prediction.verticalBoost", preset.verticalBoost);
-        }
-        boolean isCustom = (preset == PredictionPreset.CUSTOM);
-        enabledButton.active = isCustom || preset == PredictionPreset.OFF;
-        leadTicksSlider.active = isCustom;
-        maxDistanceSlider.active = isCustom;
-        lookAheadSlider.active = isCustom;
-        verticalBoostSlider.active = isCustom;
-        syncFromState();
-        applyingFragment = false;
+    private void updateSliderStates(boolean enabled) {
+        if (leadOffsetSlider != null) leadOffsetSlider.active = enabled;
+        if (responsivenessSlider != null) responsivenessSlider.active = enabled;
+        if (lookAheadSlider != null) lookAheadSlider.active = enabled;
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -290,43 +208,80 @@ public class PredictionSubPanel extends AbstractPanel {
         return widgets;
     }
     
-    /** Renders the sub-panel. */
+    /** 
+     * Renders the sub-panel including description.
+     */
+    @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Widgets render themselves when registered with the screen
+        // Render widgets
+        for (ClickableWidget widget : widgets) {
+            widget.render(context, mouseX, mouseY, delta);
+        }
+        
+        // Draw description based on current values
+        float leadOffset = state.getFloat("follow.leadOffset");
+        String description;
+        if (!state.getBool("follow.enabled")) {
+            description = "Field is static (not following)";
+        } else if (Math.abs(leadOffset) < 0.05f) {
+            description = "Locked to player position";
+        } else if (leadOffset < 0) {
+            description = "Trailing behind player movement";
+        } else {
+            description = "Leading ahead of player movement";
+        }
+        
+        int descY = layout.getCurrentY() + GuiConstants.ELEMENT_SPACING;
+        context.drawTextWithShadow(
+            net.minecraft.client.MinecraftClient.getInstance().textRenderer,
+            Text.literal(description).styled(s -> s.withColor(GuiConstants.TEXT_SECONDARY)),
+            layout.getStartX() + GuiConstants.PADDING,
+            descY,
+            GuiConstants.TEXT_SECONDARY
+        );
     }
     
     /** Returns the total height of this sub-panel. */
     public int getHeight() {
-        return layout.getCurrentY() - layout.getY();
-    }
-
-    private void syncFromState() {
-        if (enabledButton != null) enabledButton.setValue(state.getBool("prediction.enabled"));
-        if (followModeButton != null) {
-            net.cyberpunk042.field.instance.FollowMode mode = 
-                state.getTyped("followConfig.mode", net.cyberpunk042.field.instance.FollowMode.class);
-            if (mode == null) mode = net.cyberpunk042.field.instance.FollowMode.SMOOTH;
-            followModeButton.setValue(mode);
-        }
-        if (leadTicksSlider != null) leadTicksSlider.setValue(state.getInt("prediction.leadTicks"));
-        if (maxDistanceSlider != null) maxDistanceSlider.setValue(state.getFloat("prediction.maxDistance"));
-        if (lookAheadSlider != null) lookAheadSlider.setValue(state.getFloat("prediction.lookAhead"));
-        if (verticalBoostSlider != null) verticalBoostSlider.setValue(state.getFloat("prediction.verticalBoost"));
-        if (presetButton != null) presetButton.setValue(currentFragment);
+        return layout.getCurrentY() - startY + GuiConstants.WIDGET_HEIGHT;
     }
 
     private void onUserChange(Runnable r) {
         r.run();
-        if (!applyingFragment) {
-            currentFragment = PredictionPreset.CUSTOM;
-            if (presetButton != null) presetButton.setValue(currentFragment);
+        if (!applyingPreset) {
+            currentPreset = FollowConfig.Preset.CUSTOM;
+            if (presetButton != null) presetButton.setValue(currentPreset);
         }
+    }
+
+    private void applyPreset(FollowConfig.Preset preset) {
+        currentPreset = preset;
+        if (preset == FollowConfig.Preset.CUSTOM) {
+            return; // Don't change values for custom
+        }
+        
+        applyingPreset = true;
+        FollowConfig config = preset.config();
+        if (config != null) {
+            state.set("follow.enabled", config.enabled());
+            state.set("follow.leadOffset", config.leadOffset());
+            state.set("follow.responsiveness", config.responsiveness());
+            state.set("follow.lookAhead", config.lookAhead());
+            syncFromState();
+        }
+        applyingPreset = false;
+    }
+
+    private void syncFromState() {
+        if (enabledButton != null) enabledButton.setValue(state.getBool("follow.enabled"));
+        if (leadOffsetSlider != null) leadOffsetSlider.setValue(state.getFloat("follow.leadOffset"));
+        if (responsivenessSlider != null) responsivenessSlider.setValue(state.getFloat("follow.responsiveness"));
+        if (lookAheadSlider != null) lookAheadSlider.setValue(state.getFloat("follow.lookAhead"));
+        updateSliderStates(state.getBool("follow.enabled"));
     }
 
     @Override
     public void tick() {
         // No per-tick updates needed
     }
-
 }
-

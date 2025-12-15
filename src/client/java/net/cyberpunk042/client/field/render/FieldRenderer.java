@@ -97,23 +97,30 @@ public final class FieldRenderer {
     }
     
     /**
-     * Renders a field definition with smooth prediction applied at render-time.
+     * Renders a field definition with smooth follow applied at render-time.
      * 
-     * <p>This method computes prediction using the player's LERPED (interpolated) position
+     * <p>This method applies follow offset using the player's LERPED (interpolated) position
      * and rotation, eliminating the flickering caused by tick-rate position updates.</p>
+     * 
+     * <p>The follow system uses:
+     * <ul>
+     *   <li><b>leadOffset</b>: negative = trailing, positive = leading in velocity direction</li>
+     *   <li><b>lookAhead</b>: offset toward player's look direction</li>
+     * </ul>
+     * </p>
      * 
      * @param matrices Matrix stack
      * @param consumers Vertex consumer provider  
      * @param definition Field definition to render
      * @param basePosition Base world position (camera-relative, typically player center)
-     * @param player Player entity for velocity/rotation (can be null to skip prediction)
+     * @param player Player entity for velocity/rotation (can be null to skip follow)
      * @param tickDelta Partial tick for smooth interpolation (0-1)
      * @param camPos Camera position (for computing render position)
      * @param scale Overall scale
      * @param time Animation time (world time + tick delta)
      * @param alpha Overall alpha (0-1)
      */
-    public static void renderWithPrediction(
+    public static void renderWithFollow(
             MatrixStack matrices,
             VertexConsumerProvider consumers,
             FieldDefinition definition,
@@ -127,9 +134,9 @@ public final class FieldRenderer {
         
         Vec3d renderPos = basePosition;
         
-        // Apply prediction if enabled and player available
-        if (player != null && definition.prediction() != null && definition.prediction().isActive()) {
-            renderPos = applyRenderTimePrediction(player, basePosition, definition.prediction(), tickDelta);
+        // Apply follow offset if enabled and player available
+        if (player != null && definition.follow() != null && definition.follow().enabled()) {
+            renderPos = applyFollowOffset(player, basePosition, definition.follow(), tickDelta);
         }
         
         // Convert to camera-relative
@@ -139,84 +146,78 @@ public final class FieldRenderer {
     }
     
     /**
-     * Computes prediction at render-time using player's lerped position/rotation.
-     * This eliminates flickering by computing smooth prediction values every frame.
+     * Legacy method name for backward compatibility.
+     * @deprecated Use {@link #renderWithFollow} instead.
+     */
+    @Deprecated
+    public static void renderWithPrediction(
+            MatrixStack matrices,
+            VertexConsumerProvider consumers,
+            FieldDefinition definition,
+            Vec3d basePosition,
+            PlayerEntity player,
+            float tickDelta,
+            Vec3d camPos,
+            float scale,
+            float time,
+            float alpha) {
+        renderWithFollow(matrices, consumers, definition, basePosition, player, tickDelta, camPos, scale, time, alpha);
+    }
+    
+    /**
+     * Computes follow offset at render-time using player's lerped position/rotation.
      * 
-     * <p>Note: The base position is already smoothly interpolated via getLerpedPos(tickDelta).
-     * Prediction adds a velocity-based offset that should be CONSTANT, not oscillating.</p>
+     * <p>The base position is already smoothly interpolated via getLerpedPos(tickDelta).
+     * Follow offset adds position adjustment based on:
+     * <ul>
+     *   <li>leadOffset: velocity-based offset (negative=trail, positive=lead)</li>
+     *   <li>lookAhead: offset toward look direction</li>
+     * </ul>
+     * </p>
      * 
      * <p>IMPORTANT: Ignores Y velocity when player is on ground to prevent gravity-induced
      * flickering. Minecraft's gravity causes ~-0.0784 Y velocity even when standing still.</p>
      */
-    private static Vec3d applyRenderTimePrediction(
+    private static Vec3d applyFollowOffset(
             PlayerEntity player, 
             Vec3d base, 
-            net.cyberpunk042.field.instance.PredictionConfig pred,
+            net.cyberpunk042.field.instance.FollowConfig follow,
             float tickDelta) {
         
-        // Get player velocity - this is the per-tick velocity
-        Vec3d velocity = player.getVelocity();
-        
-        // When on ground, ignore Y velocity (gravity causes ~-0.0784 even when standing)
-        // This prevents the field from flickering up/down due to ground collision physics
-        if (player.isOnGround()) {
-            velocity = new Vec3d(velocity.x, 0.0, velocity.z);
+        // If locked (no offset), just return base
+        if (follow.isLocked()) {
+            return base;
         }
         
-        // Check HORIZONTAL velocity for "stationary" detection
-        // Even when standing still, there can be micro-velocities
-        double horizontalSpeed = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
+        Vec3d result = base;
         
-        if (horizontalSpeed < 0.01 && Math.abs(velocity.y) < 0.1) {
-            // Player is effectively stationary, only apply look-ahead and vertical boost
-            Vec3d predicted = base;
-            
-            // Apply look-ahead with interpolated rotation
-            float lookAhead = pred.lookAhead();
-            if (Math.abs(lookAhead) > 0.001f) {
-                Vec3d look = player.getRotationVec(tickDelta);
-                predicted = predicted.add(look.multiply(lookAhead));
-            }
-            
-            // Apply vertical boost
-            float verticalBoost = pred.verticalBoost();
-            if (Math.abs(verticalBoost) > 0.001f) {
-                predicted = predicted.add(0.0, verticalBoost, 0.0);
-            }
-            
-            return predicted;
-        }
-        
-        // Use constant leadTicks - the base position is already lerped, so prediction
-        // offset should be CONSTANT to avoid oscillating back and forth
-        int leadTicks = pred.leadTicks();
-        Vec3d predicted = base.add(velocity.multiply(leadTicks));
-        
-        // Apply look-ahead with interpolated rotation
-        float lookAhead = pred.lookAhead();
+        // Apply look-ahead offset (in look direction)
+        float lookAhead = follow.lookAhead();
         if (Math.abs(lookAhead) > 0.001f) {
-            // getRotationVec(tickDelta) handles interpolation internally
             Vec3d look = player.getRotationVec(tickDelta);
-            predicted = predicted.add(look.multiply(lookAhead));
+            result = result.add(look.multiply(lookAhead));
         }
         
-        // Apply vertical boost
-        float verticalBoost = pred.verticalBoost();
-        if (Math.abs(verticalBoost) > 0.001f) {
-            predicted = predicted.add(0.0, verticalBoost, 0.0);
-        }
-        
-        // Clamp to max distance
-        float maxDist = pred.maxDistance();
-        if (maxDist > 0) {
-            Vec3d offset = predicted.subtract(base);
-            if (offset.length() > maxDist) {
-                offset = offset.normalize().multiply(maxDist);
-                predicted = base.add(offset);
+        // Apply lead/trail offset (in velocity direction)
+        float leadOffset = follow.leadOffset();
+        if (Math.abs(leadOffset) > 0.01f) {
+            Vec3d velocity = player.getVelocity();
+            
+            // Ignore Y velocity when on ground (gravity noise)
+            if (player.isOnGround()) {
+                velocity = new Vec3d(velocity.x, 0.0, velocity.z);
+            }
+            
+            // Only apply if moving significantly
+            double speed = velocity.length();
+            if (speed > 0.01) {
+                // Scale the offset by velocity magnitude for smooth feel
+                // leadOffset of 1.0 with speed of 0.2 should give ~0.2 offset
+                result = result.add(velocity.normalize().multiply(leadOffset * speed * 5.0));
             }
         }
         
-        return predicted;
+        return result;
     }
     
     /**
@@ -547,21 +548,15 @@ public final class FieldRenderer {
                 PipelineTracer.trace(PipelineTracer.D1_BOBBING, 4, "def", String.valueOf(mods.bobbing()));
                 PipelineTracer.trace(PipelineTracer.D2_BREATHING, 4, "def", String.valueOf(mods.breathing()));
             }
-            // Note: Prediction and FollowMode affect field POSITIONING (before render),
-            // not the rendering itself. They're used by the field tracking system to 
+            // Note: Follow affects field POSITIONING (before render),
+            // not the rendering itself. It's used by the field tracking system to 
             // calculate the `position` parameter passed to this method.
-            if (definition.prediction() != null) {
-                PipelineTracer.trace(PipelineTracer.D3_PREDICTION, 4, "def", "enabled");
+            if (definition.follow() != null && definition.follow().enabled()) {
+                var f = definition.follow();
+                PipelineTracer.trace(PipelineTracer.D3_PREDICTION, 4, "def", "leadOffset=" + f.leadOffset());
+                PipelineTracer.trace(PipelineTracer.D4_FOLLOW_MODE, 4, "def", "responsiveness=" + f.responsiveness());
                 // Mark as complete - affects position calculation, not render
-                PipelineTracer.trace(PipelineTracer.D3_PREDICTION, 5, "position", "pre-calculated");
-                PipelineTracer.trace(PipelineTracer.D3_PREDICTION, 6, "position", "applied");
                 PipelineTracer.trace(PipelineTracer.D3_PREDICTION, 7, "position", "complete");
-            }
-            if (definition.followMode() != null) {
-                PipelineTracer.trace(PipelineTracer.D4_FOLLOW_MODE, 4, "def", definition.followMode().toString());
-                // Mark as complete - affects position calculation, not render
-                PipelineTracer.trace(PipelineTracer.D4_FOLLOW_MODE, 5, "position", "pre-calculated");
-                PipelineTracer.trace(PipelineTracer.D4_FOLLOW_MODE, 6, "position", "applied");
                 PipelineTracer.trace(PipelineTracer.D4_FOLLOW_MODE, 7, "position", "complete");
             }
             

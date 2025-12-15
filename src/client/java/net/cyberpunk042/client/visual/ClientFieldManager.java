@@ -139,7 +139,9 @@ public final class ClientFieldManager {
         }
         
         states.values().removeIf(ClientFieldState::tick);
-        personalTracker.tick();
+        if (client.player != null) {
+            personalTracker.tick(client.player);
+        }
     }
     
     /**
@@ -453,11 +455,11 @@ public final class ClientFieldManager {
             Vec3d playerRenderPos = client.player.getLerpedPos(tickDelta);
             Vec3d playerCenter = playerRenderPos.add(0, client.player.getHeight() / 2.0 - 0.1, 0);
             
-            // Check if prediction is enabled in the definition
-            net.cyberpunk042.field.instance.PredictionConfig pred = def.prediction();
-            if (pred != null && pred.enabled()) {
-                // Use render-time prediction for smooth results
-                fieldPos = applyRenderTimePredictionPersonal(client.player, playerCenter, pred, tickDelta);
+            // Check if follow is enabled in the definition
+            net.cyberpunk042.field.instance.FollowConfig follow = def.follow();
+            if (follow != null && follow.enabled() && !follow.isLocked()) {
+                // Use render-time follow for smooth results
+                fieldPos = applyRenderTimeFollow(client.player, playerCenter, follow, tickDelta);
             } else {
                 fieldPos = playerCenter;
             }
@@ -467,55 +469,52 @@ public final class ClientFieldManager {
         }
         
         Vec3d pos = fieldPos.subtract(camPos);
-        float time = worldTime + personalTracker.phase();
+        float time = worldTime + personalTracker.getPhase();
         
         FieldRenderer.render(
             matrices,
             consumers,
             def,
             pos,
-            personalTracker.scale(),
+            personalTracker.getScale(),
             time,
             1.0f
         );
     }
     
     /**
-     * Applies prediction at render time for personal fields using smoothed values.
+     * Applies follow offset at render time for personal fields using smoothed values.
      */
-    private Vec3d applyRenderTimePredictionPersonal(net.minecraft.entity.player.PlayerEntity player,
-                                                     Vec3d base, 
-                                                     net.cyberpunk042.field.instance.PredictionConfig pred,
-                                                     float tickDelta) {
-        Vec3d velocity = player.getVelocity();
-        int leadTicks = pred.leadTicks();
+    private Vec3d applyRenderTimeFollow(net.minecraft.entity.player.PlayerEntity player,
+                                        Vec3d base, 
+                                        net.cyberpunk042.field.instance.FollowConfig follow,
+                                        float tickDelta) {
+        Vec3d result = base;
         
-        // Scale lead by tickDelta to smoothly ramp prediction
-        float smoothLead = leadTicks * (0.5f + tickDelta * 0.5f);
-        Vec3d predicted = base.add(velocity.multiply(smoothLead));
-        
-        // Apply look-ahead with interpolated rotation
-        float lookAhead = pred.lookAhead();
+        // Apply look-ahead
+        float lookAhead = follow.lookAhead();
         if (Math.abs(lookAhead) > 0.001f) {
-            // getRotationVec(tickDelta) handles interpolation internally
             Vec3d look = player.getRotationVec(tickDelta);
-            predicted = predicted.add(look.multiply(lookAhead));
+            result = result.add(look.multiply(lookAhead));
         }
         
-        // Apply vertical boost
-        if (Math.abs(pred.verticalBoost()) > 0.001f) {
-            predicted = predicted.add(0.0, pred.verticalBoost(), 0.0);
-        }
-        
-        // Clamp to max distance
-        if (pred.maxDistance() > 0) {
-            Vec3d delta = predicted.subtract(base);
-            double dist = delta.length();
-            if (dist > pred.maxDistance()) {
-                predicted = base.add(delta.normalize().multiply(pred.maxDistance()));
+        // Apply lead/trail offset
+        float leadOffset = follow.leadOffset();
+        if (Math.abs(leadOffset) > 0.01f) {
+            Vec3d velocity = player.getVelocity();
+            
+            // Ignore Y velocity when on ground
+            if (player.isOnGround()) {
+                velocity = new Vec3d(velocity.x, 0.0, velocity.z);
+            }
+            
+            double speed = velocity.length();
+            if (speed > 0.01) {
+                result = result.add(velocity.normalize().multiply(leadOffset * speed * 5.0));
             }
         }
         
-        return predicted;
+        return result;
     }
 }
+

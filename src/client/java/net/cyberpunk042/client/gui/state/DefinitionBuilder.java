@@ -7,8 +7,7 @@ import net.cyberpunk042.field.FieldType;
 import net.cyberpunk042.field.Modifiers;
 import net.cyberpunk042.field.influence.BindingConfig;
 import net.cyberpunk042.field.influence.TriggerConfig;
-import net.cyberpunk042.field.instance.FollowModeConfig;
-import net.cyberpunk042.field.instance.PredictionConfig;
+import net.cyberpunk042.field.instance.FollowConfig;
 import net.cyberpunk042.field.loader.SimplePrimitive;
 import net.cyberpunk042.field.primitive.Primitive;
 import net.cyberpunk042.log.Logging;
@@ -75,17 +74,15 @@ public final class DefinitionBuilder {
             // CP2-CP3: Field-level segments (D1-D4)
             // Ensure modifiers is never null - use DEFAULT if not set
             Modifiers modifiers = (Modifiers) defFields.getOrDefault("modifiers", Modifiers.DEFAULT);
-            PredictionConfig prediction = (PredictionConfig) defFields.get("prediction");
-            FollowModeConfig followMode = (FollowModeConfig) defFields.get("followMode");
+            net.cyberpunk042.field.instance.FollowConfig follow = 
+                (net.cyberpunk042.field.instance.FollowConfig) defFields.get("follow");
             
             // CP2: State values
             PipelineTracer.trace(PipelineTracer.D1_BOBBING, 2, "state", String.valueOf(modifiers.bobbing()));
             PipelineTracer.trace(PipelineTracer.D2_BREATHING, 2, "state", String.valueOf(modifiers.breathing()));
-            if (prediction != null) {
-                PipelineTracer.trace(PipelineTracer.D3_PREDICTION, 2, "state", "active");
-            }
-            if (followMode != null) {
-                PipelineTracer.trace(PipelineTracer.D4_FOLLOW_MODE, 2, "state", followMode.toString());
+            if (follow != null && follow.enabled()) {
+                PipelineTracer.trace(PipelineTracer.D4_FOLLOW_MODE, 2, "state", 
+                    "lead=" + follow.leadOffset() + " resp=" + follow.responsiveness());
             }
             
             // CP2: Beam segments (B1-B7) from state
@@ -116,9 +113,8 @@ public final class DefinitionBuilder {
                 null, // themeId - could be added later
                 layers,
                 modifiers,
-                prediction,
+                follow,
                 (BeamConfig) defFields.get("beam"),
-                followMode,
                 buildBindings(state),
                 buildTriggers(state),
                 null // lifecycle - handled separately
@@ -128,11 +124,9 @@ public final class DefinitionBuilder {
             var defMods = def.modifiers();
             PipelineTracer.trace(PipelineTracer.D1_BOBBING, 3, "def", String.valueOf(defMods != null ? defMods.bobbing() : "null"));
             PipelineTracer.trace(PipelineTracer.D2_BREATHING, 3, "def", String.valueOf(defMods != null ? defMods.breathing() : "null"));
-            if (def.prediction() != null) {
-                PipelineTracer.trace(PipelineTracer.D3_PREDICTION, 3, "def", "active");
-            }
-            if (def.followMode() != null) {
-                PipelineTracer.trace(PipelineTracer.D4_FOLLOW_MODE, 3, "def", def.followMode().toString());
+            if (def.follow() != null && def.follow().enabled()) {
+                PipelineTracer.trace(PipelineTracer.D4_FOLLOW_MODE, 3, "def", 
+                    "lead=" + def.follow().leadOffset() + " resp=" + def.follow().responsiveness());
             }
             
             scope.kv("layers", layers.size()).kv("id", def.id());

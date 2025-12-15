@@ -6,9 +6,7 @@ import net.cyberpunk042.field.BeamConfig;
 import net.cyberpunk042.field.influence.BindingConfig;
 import net.cyberpunk042.field.influence.LifecycleConfig;
 import net.cyberpunk042.field.Modifiers;
-import net.cyberpunk042.field.instance.FollowMode;
-import net.cyberpunk042.field.instance.FollowModeConfig;
-import net.cyberpunk042.field.instance.PredictionConfig;
+import net.cyberpunk042.field.instance.FollowConfig;
 import net.cyberpunk042.field.primitive.Primitive;
 import net.cyberpunk042.field.primitive.PrimitiveLink;
 import net.cyberpunk042.field.loader.SimplePrimitive;
@@ -119,15 +117,11 @@ public class FieldEditState {
     private Modifiers modifiers = Modifiers.DEFAULT;
     
     // ═══════════════════════════════════════════════════════════════════════════
-    // FOLLOW & PREDICTION (definition-level)
+    // FOLLOW (definition-level) - unified lead/trail/responsiveness
     // ═══════════════════════════════════════════════════════════════════════════
     
-    @StateField @DefinitionField("followMode")
-    private FollowModeConfig followConfig = FollowModeConfig.DEFAULT;
-    @StateField @DefinitionField("prediction")
-    private PredictionConfig prediction = PredictionConfig.DEFAULT;
-    @StateField public FollowMode followMode = FollowMode.SMOOTH;
-    @StateField public boolean predictionEnabled = true;
+    @StateField @DefinitionField("follow")
+    private net.cyberpunk042.field.instance.FollowConfig follow = net.cyberpunk042.field.instance.FollowConfig.DEFAULT;
     
     // ═══════════════════════════════════════════════════════════════════════════
     // LINKING & BEAM (definition-level)
@@ -363,12 +357,9 @@ public class FieldEditState {
         this.colorCycle = ColorCycleConfig.NONE;
         this.modifiers = Modifiers.DEFAULT;
         
-        // Reset follow & prediction
-        this.followConfig = FollowModeConfig.DEFAULT;
-        this.prediction = PredictionConfig.DEFAULT;
-        this.followMode = FollowMode.SMOOTH;
+        // Reset follow
+        this.follow = net.cyberpunk042.field.instance.FollowConfig.DEFAULT;
         this.followEnabled = true;
-        this.predictionEnabled = true;
         
         // Reset layers/primitives to single default
         this.fieldLayers.clear();
@@ -755,8 +746,7 @@ public class FieldEditState {
     public WaveConfig wave() { return wave; }
     public ColorCycleConfig colorCycle() { return colorCycle; }
 
-    public FollowModeConfig followConfig() { return followConfig; }
-    public PredictionConfig prediction() { return prediction; }
+    public FollowConfig follow() { return follow; }
     public BeamConfig beam() { return beam; }
     public PrimitiveLink link() { return link; }
     

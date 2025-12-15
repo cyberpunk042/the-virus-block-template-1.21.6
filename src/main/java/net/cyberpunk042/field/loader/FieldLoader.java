@@ -324,14 +324,13 @@ public final class FieldLoader {
         net.cyberpunk042.field.Modifiers modifiers = 
             JsonParseUtils.parseOptional(json, "modifiers", net.cyberpunk042.field.Modifiers::fromJson);
         
-        net.cyberpunk042.field.instance.PredictionConfig prediction = 
-            JsonParseUtils.parseOptional(json, "prediction", net.cyberpunk042.field.instance.PredictionConfig::fromJson);
+        // Parse follow config (new unified format)
+        // Also supports legacy 'prediction' and 'followMode' keys
+        net.cyberpunk042.field.instance.FollowConfig follow = 
+            JsonParseUtils.parseOptional(json, "follow", net.cyberpunk042.field.instance.FollowConfig::fromJson);
         
         net.cyberpunk042.field.BeamConfig beam = 
             JsonParseUtils.parseOptional(json, "beam", net.cyberpunk042.field.BeamConfig::fromJson);
-        
-        net.cyberpunk042.field.instance.FollowModeConfig followMode = 
-            JsonParseUtils.parseOptional(json, "followMode", net.cyberpunk042.field.instance.FollowModeConfig::fromJson);
         
         net.cyberpunk042.field.influence.LifecycleConfig lifecycle = 
             JsonParseUtils.parseOptional(json, "lifecycle", net.cyberpunk042.field.influence.LifecycleConfig::fromJson);
@@ -340,7 +339,7 @@ public final class FieldLoader {
             id, layers.size(), bindings.size(), triggers.size());
         return new FieldDefinition(
             id, fieldType, baseRadius, theme, layers,
-            modifiers, prediction, beam, followMode,
+            modifiers, follow, beam,
             bindings, triggers, lifecycle);
     }
     

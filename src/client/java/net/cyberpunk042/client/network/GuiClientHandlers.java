@@ -130,13 +130,13 @@ public final class GuiClientHandlers {
                 case "APPEARANCE" -> applyAppearanceUpdate(state, json);
                 case "ANIMATION" -> applyAnimationUpdate(state, json);
                 case "FOLLOW" -> {
-                    if (json.has("mode")) {
-                        try {
-                            state.set("followMode", net.cyberpunk042.field.instance.FollowMode.fromId(json.get("mode").getAsString()));
-                        } catch (Exception ignored) {}
-                    }
+                    // New unified follow config
+                    if (json.has("enabled")) state.set("follow.enabled", json.get("enabled").getAsBoolean());
+                    if (json.has("leadOffset")) state.set("follow.leadOffset", json.get("leadOffset").getAsFloat());
+                    if (json.has("responsiveness")) state.set("follow.responsiveness", json.get("responsiveness").getAsFloat());
+                    if (json.has("lookAhead")) state.set("follow.lookAhead", json.get("lookAhead").getAsFloat());
                 }
-                case "PREDICTION" -> applyPredictionUpdate(state, json);
+                case "PREDICTION" -> applyFollowUpdate(state, json);  // Legacy - redirect to follow
                 
                 // $ref loading - resolve fragment and apply
                 case "SHAPE_REF" -> applyFragmentRef(state, "shape", json);
@@ -258,10 +258,20 @@ public final class GuiClientHandlers {
         }
     }
     
-    private static void applyPredictionUpdate(FieldEditState state, JsonObject json) {
-        if (json.has("enabled")) state.set("predictionEnabled", json.get("enabled").getAsBoolean());
-        if (json.has("leadTicks")) state.set("prediction.leadTicks", json.get("leadTicks").getAsInt());
-        if (json.has("maxDistance")) state.set("prediction.maxDistance", json.get("maxDistance").getAsFloat());
+    private static void applyFollowUpdate(FieldEditState state, JsonObject json) {
+        // Legacy prediction fields - convert to follow config
+        if (json.has("enabled")) state.set("follow.enabled", json.get("enabled").getAsBoolean());
+        if (json.has("leadTicks")) {
+            // Convert leadTicks to leadOffset (approximate mapping)
+            int leadTicks = json.get("leadTicks").getAsInt();
+            state.set("follow.leadOffset", leadTicks * 0.1f);
+        }
+        if (json.has("maxDistance")) {
+            // maxDistance is handled differently in new system - ignore for now
+        }
+        if (json.has("leadOffset")) state.set("follow.leadOffset", json.get("leadOffset").getAsFloat());
+        if (json.has("responsiveness")) state.set("follow.responsiveness", json.get("responsiveness").getAsFloat());
+        if (json.has("lookAhead")) state.set("follow.lookAhead", json.get("lookAhead").getAsFloat());
     }
     
     /**

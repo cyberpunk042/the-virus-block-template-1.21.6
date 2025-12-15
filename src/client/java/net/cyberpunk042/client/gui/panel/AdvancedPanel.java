@@ -19,6 +19,7 @@ import net.minecraft.client.gui.screen.Screen;
  *   <li>Visibility - masks, patterns</li>
  *   <li>Arrangement - cell patterns</li>
  *   <li>Fill - wireframe, cage settings</li>
+ *   <li>Follow - how field follows player (lead/trail, responsiveness)</li>
  * </ul>
  */
 public class AdvancedPanel extends AbstractPanel {
@@ -34,8 +35,7 @@ public class AdvancedPanel extends AbstractPanel {
     private ArrangementSubPanel arrangementSubPanel;
     private FillSubPanel fillSubPanel;
     private LinkingSubPanel linkingSubPanel;
-    private PredictionSubPanel predictionSubPanel;
-    private FollowModeSubPanel followModeSubPanel;
+    private PredictionSubPanel predictionSubPanel;  // Now handles unified follow config
     
     // Scroll state
     private int scrollOffset = 0;
@@ -103,17 +103,14 @@ public class AdvancedPanel extends AbstractPanel {
         linkingSubPanel = new LinkingSubPanel(parent, state, contentY);
         contentY += linkingSubPanel.getHeight() + GuiConstants.SECTION_SPACING;
         
-        // Prediction (movement prediction settings)
+        // Follow (unified follow config with lead/trail, responsiveness, look-ahead)
         predictionSubPanel = new PredictionSubPanel(parent, state, contentY);
+        predictionSubPanel.init(width, height);
         contentY += predictionSubPanel.getHeight() + GuiConstants.SECTION_SPACING;
-        
-        // Follow Mode (how field follows player)
-        followModeSubPanel = new FollowModeSubPanel(parent, state, contentY);
-        contentY += followModeSubPanel.getHeight() + GuiConstants.SECTION_SPACING;
         
         contentHeight = contentY;
         
-        Logging.GUI.topic("panel").debug("AdvancedPanel initialized with 10 sub-panels, height: {}", contentHeight);
+        Logging.GUI.topic("panel").debug("AdvancedPanel initialized with 11 sub-panels, height: {}", contentHeight);
     }
     
     @Override
@@ -150,7 +147,6 @@ public class AdvancedPanel extends AbstractPanel {
         // New-style sub-panels render themselves differently
         if (linkingSubPanel != null) linkingSubPanel.render(context, mouseX, mouseY + scrollOffset, delta);
         if (predictionSubPanel != null) predictionSubPanel.render(context, mouseX, mouseY + scrollOffset, delta);
-        if (followModeSubPanel != null) followModeSubPanel.render(context, mouseX, mouseY + scrollOffset, delta);
         
         context.disableScissor();
         

@@ -9,7 +9,6 @@ import net.cyberpunk042.client.gui.widget.LabeledSlider;
 import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.visual.fill.FillMode;
 import net.cyberpunk042.visual.shape.ShapeRegistry;
-import net.cyberpunk042.field.instance.FollowMode;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.tooltip.Tooltip;
@@ -20,7 +19,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * G41-G50: Quick customization panel (Level 1).
+ * G41-G46: Quick customization panel (Level 1).
+ * Contains only the most basic controls for quick adjustments.
+ * Advanced features (spin, prediction, follow) are in the Advanced panel.
  */
 public class QuickPanel extends AbstractPanel {
     
@@ -31,19 +32,8 @@ public class QuickPanel extends AbstractPanel {
     private ColorButton colorButton;
     private LabeledSlider alphaSlider;
     private CyclingButtonWidget<FillMode> fillDropdown;
-    private LabeledSlider spinSlider;
-    private CyclingButtonWidget<FollowMode> followDropdown;
-    private CyclingButtonWidget<Boolean> predictionToggle;
-    private CyclingButtonWidget<PredictionPreset> predictionPreset;
     
     private GuiLayout layout;
-    
-    public enum PredictionPreset {
-        OFF("Off"), LOW("Low"), MEDIUM("Medium"), HIGH("High"), CUSTOM("Custom");
-        private final String label;
-        PredictionPreset(String label) { this.label = label; }
-        @Override public String toString() { return label; }
-    }
     
     public QuickPanel(Screen parent, FieldEditState state) {
         super(parent, state);
@@ -107,42 +97,11 @@ public class QuickPanel extends AbstractPanel {
             .onChange(this::onAlphaChanged)
             .build();
         
-        // G46: Fill mode (fixed order: label, enumClass, initial, tooltip, onChange)
+        // G46: Fill mode
         fillDropdown = GuiWidgets.enumDropdown(
             x, layout.nextRow(), widgetWidth,
             "Fill", FillMode.class, FillMode.valueOf(state.getString("fill.mode")), "Fill mode",
             this::onFillChanged
-        );
-        
-        // G47: Spin
-        spinSlider = LabeledSlider.builder("Spin")
-            .position(x, layout.nextRow())
-            .width(widgetWidth)
-            .range(-0.5f, 0.5f)
-            .initial(state.getFloat("spin.speed"))
-            .format("%.2f")
-            .onChange(this::onSpinChanged)
-            .build();
-        
-        // G48: Follow mode
-        followDropdown = GuiWidgets.enumDropdown(
-            x, layout.nextRow(), widgetWidth,
-            "Follow", FollowMode.class, getFollowMode(), "Follow mode",
-            this::onFollowChanged
-        );
-        
-        // G49: Prediction toggle (fixed order: label, initial, tooltip, onChange)
-        predictionToggle = GuiWidgets.toggle(
-            x, layout.nextRow(), widgetWidth,
-            "Prediction", state.getBool("prediction.enabled"), "Enable prediction",
-            this::onPredictionToggled
-        );
-        
-        // G50: Prediction preset
-        predictionPreset = GuiWidgets.enumDropdown(
-            x, layout.nextRow(), widgetWidth,
-            "Preset", PredictionPreset.class, PredictionPreset.MEDIUM, "Prediction preset",
-            this::onPresetChanged
         );
         
         Logging.GUI.topic("panel").debug("QuickPanel initialized");
@@ -164,7 +123,7 @@ public class QuickPanel extends AbstractPanel {
             case "disc" -> state.set("disc.radius", v);
             case "cylinder" -> state.set("cylinder.radius", v);
             case "prism" -> state.set("prism.radius", v);
-            case "ring" -> state.set("ring.outerRadius", v); // Ring uses outerRadius as main radius
+            case "ring" -> state.set("ring.outerRadius", v);
             default -> state.set("sphere.radius", v);
         }
     }
@@ -183,18 +142,9 @@ public class QuickPanel extends AbstractPanel {
     private void onColorChanged(int c) { state.set("appearance.primaryColor", c); }
     private void onAlphaChanged(float v) { state.set("appearance.alpha", v); }
     private void onFillChanged(FillMode m) { 
-        net.cyberpunk042.log.Logging.GUI.topic("panel").debug("[FILL-DEBUG] QuickPanel changing fill.mode to: {}", m.name());
+        Logging.GUI.topic("panel").debug("[FILL-DEBUG] QuickPanel changing fill.mode to: {}", m.name());
         state.set("fill.mode", m); 
     }
-    private void onSpinChanged(float v) { state.set("spin.speed", v); }
-    private void onFollowChanged(FollowMode m) { state.set("followConfig.mode", m); }
-    private void onPredictionToggled(boolean e) { state.set("prediction.enabled", e); }
-    
-    private FollowMode getFollowMode() {
-        FollowMode mode = state.getTyped("followConfig.mode", FollowMode.class);
-        return mode != null ? mode : FollowMode.SMOOTH;
-    }
-    private void onPresetChanged(PredictionPreset p) { /* TODO */ }
     
     @Override
     public void tick() {}
@@ -210,10 +160,6 @@ public class QuickPanel extends AbstractPanel {
         if (colorButton != null) colorButton.render(context, mouseX, mouseY, delta);
         if (alphaSlider != null) alphaSlider.render(context, mouseX, mouseY, delta);
         if (fillDropdown != null) fillDropdown.render(context, mouseX, mouseY, delta);
-        if (spinSlider != null) spinSlider.render(context, mouseX, mouseY, delta);
-        if (followDropdown != null) followDropdown.render(context, mouseX, mouseY, delta);
-        if (predictionToggle != null) predictionToggle.render(context, mouseX, mouseY, delta);
-        if (predictionPreset != null) predictionPreset.render(context, mouseX, mouseY, delta);
     }
     
     public List<net.minecraft.client.gui.widget.ClickableWidget> getWidgets() {
@@ -225,10 +171,6 @@ public class QuickPanel extends AbstractPanel {
         if (colorButton != null) list.add(colorButton);
         if (alphaSlider != null) list.add(alphaSlider);
         if (fillDropdown != null) list.add(fillDropdown);
-        if (spinSlider != null) list.add(spinSlider);
-        if (followDropdown != null) list.add(followDropdown);
-        if (predictionToggle != null) list.add(predictionToggle);
-        if (predictionPreset != null) list.add(predictionPreset);
         return list;
     }
 }

@@ -184,18 +184,31 @@ public final class AnimationApplier {
      * Uses {@link MathHelper#sin} for fast lookup-table based sine.
      */
     public static void applyWobble(MatrixStack matrices, WobbleConfig wobble, float time) {
-        if (wobble == null || !wobble.isActive()) return;
+        if (wobble == null) {
+            Logging.ANIMATION.topic("wobble").debug("[WOBBLE-DEBUG] wobble config is null");
+            return;
+        }
+        if (!wobble.isActive()) {
+            Logging.ANIMATION.topic("wobble").debug("[WOBBLE-DEBUG] isActive=false, amp={}, speed={}", 
+                wobble.amplitude(), wobble.speed());
+            return;
+        }
         
         Vector3f amplitude = wobble.amplitude();
-        if (amplitude == null) return;
+        if (amplitude == null) {
+            Logging.ANIMATION.topic("wobble").debug("[WOBBLE-DEBUG] amplitude is null after isActive check");
+            return;
+        }
         
         // Generate pseudo-random wobble using MathHelper.sin (fast lookup table)
         float wobbleX = MathHelper.sin(time * wobble.speed() * 1.0f) * amplitude.x;
         float wobbleY = MathHelper.sin(time * wobble.speed() * 1.3f) * amplitude.y;
         float wobbleZ = MathHelper.sin(time * wobble.speed() * 0.7f) * amplitude.z;
         
+        Logging.ANIMATION.topic("wobble").info("[WOBBLE-DEBUG] APPLYING wobble: ({}, {}, {}), time={}", 
+            wobbleX, wobbleY, wobbleZ, time);
+        
         matrices.translate(wobbleX, wobbleY, wobbleZ);
-        Logging.ANIMATION.topic("wobble").trace("Wobble: ({}, {}, {})", wobbleX, wobbleY, wobbleZ);
     }
     
     // =========================================================================
@@ -247,7 +260,18 @@ public final class AnimationApplier {
      * @param time Current time in ticks
      */
     public static void applyModifiers(MatrixStack matrices, net.cyberpunk042.field.Modifiers modifiers, float time) {
-        if (modifiers == null || !modifiers.hasAnimationModifiers()) return;
+        if (modifiers == null) {
+            Logging.ANIMATION.topic("modifiers").debug("[BOBBING-DEBUG] modifiers is null");
+            return;
+        }
+        if (!modifiers.hasAnimationModifiers()) {
+            Logging.ANIMATION.topic("modifiers").debug("[BOBBING-DEBUG] hasAnimationModifiers=false, bobbing={}, breathing={}", 
+                modifiers.bobbing(), modifiers.breathing());
+            return;
+        }
+        
+        Logging.ANIMATION.topic("modifiers").info("[BOBBING-DEBUG] APPLYING modifiers: bobbing={}, breathing={}, time={}", 
+            modifiers.bobbing(), modifiers.breathing(), time);
         
         applyBobbing(matrices, modifiers.bobbing(), time);
         applyBreathing(matrices, modifiers.breathing(), time);

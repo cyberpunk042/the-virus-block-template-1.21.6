@@ -201,9 +201,9 @@ public final class SimplifiedFieldRenderer {
             return;
         }
         
-        // Use the FULL FieldRenderer pipeline with smooth prediction
-        // renderWithPrediction computes prediction at render-time using lerped values
-        net.cyberpunk042.client.field.render.FieldRenderer.renderWithPrediction(
+        // Use the FULL FieldRenderer pipeline with smooth follow
+        // renderWithFollow computes position offset at render-time using lerped values
+        net.cyberpunk042.client.field.render.FieldRenderer.renderWithFollow(
             matrices,
             consumers,
             definition,
