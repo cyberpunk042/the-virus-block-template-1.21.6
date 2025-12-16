@@ -1,6 +1,8 @@
 package net.cyberpunk042.client.visual.mesh;
 
+import net.cyberpunk042.client.visual.animation.WaveDeformer;
 import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.visual.animation.WaveConfig;
 import net.cyberpunk042.visual.pattern.VertexPattern;
 import net.cyberpunk042.visual.pattern.SegmentPattern;
 import net.cyberpunk042.visual.shape.RingShape;
@@ -38,15 +40,18 @@ public final class RingTessellator {
     private RingTessellator() {}
     
     /**
-     * Tessellates a ring shape into a mesh.
+     * Tessellates a ring shape into a mesh with optional wave deformation.
      * 
      * @param shape The ring shape definition
      * @param pattern Vertex pattern (null = SegmentPattern.DEFAULT)
      * @param visibility Visibility mask (null = all visible)
+     * @param wave Wave configuration for CPU deformation (null = no wave)
+     * @param time Current time for wave animation
      * @return Generated mesh
      */
     public static Mesh tessellate(RingShape shape, VertexPattern pattern,
-                                   VisibilityMask visibility) {
+                                   VisibilityMask visibility,
+                                   WaveConfig wave, float time) {
         if (shape == null) {
             throw new IllegalArgumentException("RingShape cannot be null");
         }
@@ -62,16 +67,25 @@ public final class RingTessellator {
             .kv("outer", shape.outerRadius())
             .kv("segments", shape.segments())
             .kv("height", shape.height())
+            .kv("wave", wave != null && wave.isActive())
             .debug("Tessellating ring");
         
         if (shape.height() > 0) {
-            return tessellate3DRing(shape, pattern, visibility);
+            return tessellate3DRing(shape, pattern, visibility, wave, time);
         }
-        return tessellateFlatRing(shape, pattern, visibility);
+        return tessellateFlatRing(shape, pattern, visibility, wave, time);
+    }
+    
+    /**
+     * Tessellates a ring shape into a mesh (backward compatible).
+     */
+    public static Mesh tessellate(RingShape shape, VertexPattern pattern,
+                                   VisibilityMask visibility) {
+        return tessellate(shape, pattern, visibility, null, 0);
     }
     
     public static Mesh tessellate(RingShape shape) {
-        return tessellate(shape, null, null);
+        return tessellate(shape, null, null, null, 0);
     }
     
     // =========================================================================
@@ -79,7 +93,8 @@ public final class RingTessellator {
     // =========================================================================
     
     private static Mesh tessellateFlatRing(RingShape shape, VertexPattern pattern,
-                                            VisibilityMask visibility) {
+                                            VisibilityMask visibility,
+                                            WaveConfig wave, float time) {
         MeshBuilder builder = MeshBuilder.triangles();
         
         int segments = shape.segments();
@@ -89,6 +104,8 @@ public final class RingTessellator {
         float arcStart = GeometryMath.toRadians(shape.arcStart());
         float arcEnd = GeometryMath.toRadians(shape.arcEnd());
         float arcRange = arcEnd - arcStart;
+        
+        boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();
         
         // Generate vertices for inner and outer edges
         int[] innerIndices = new int[segments + 1];
@@ -100,6 +117,12 @@ public final class RingTessellator {
             
             Vertex inner = GeometryMath.ringInnerPoint(angle, innerR, y);
             Vertex outer = GeometryMath.ringOuterPoint(angle, outerR, y);
+            
+            // Apply wave deformation
+            if (applyWave) {
+                inner = WaveDeformer.applyToVertex(inner, wave, time);
+                outer = WaveDeformer.applyToVertex(outer, wave, time);
+            }
             
             innerIndices[i] = builder.addVertex(inner);
             outerIndices[i] = builder.addVertex(outer);
@@ -149,7 +172,8 @@ public final class RingTessellator {
      * - Inner wall
      */
     private static Mesh tessellate3DRing(RingShape shape, VertexPattern pattern,
-                                          VisibilityMask visibility) {
+                                          VisibilityMask visibility,
+                                          WaveConfig wave, float time) {
         MeshBuilder builder = MeshBuilder.triangles();
         
         int segments = shape.segments();
@@ -164,6 +188,8 @@ public final class RingTessellator {
         float arcEnd = GeometryMath.toRadians(shape.arcEnd());
         float arcRange = arcEnd - arcStart;
         boolean isFullRing = shape.isFullRing();
+        
+        boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();
         
         // =====================================================================
         // Generate all vertices
@@ -183,12 +209,24 @@ public final class RingTessellator {
             float topAngle = baseAngle + twist;  // Apply twist to top
             
             // Bottom vertices (normal pointing down for bottom face)
-            bottomInner[i] = builder.addVertex(ringVertex(baseAngle, innerR, yBottom, 0, -1, 0));
-            bottomOuter[i] = builder.addVertex(ringVertex(baseAngle, outerR, yBottom, 0, -1, 0));
-            
+            Vertex bInner = ringVertex(baseAngle, innerR, yBottom, 0, -1, 0);
+            Vertex bOuter = ringVertex(baseAngle, outerR, yBottom, 0, -1, 0);
             // Top vertices (normal pointing up for top face)
-            topInner[i] = builder.addVertex(ringVertex(topAngle, innerR, yTop, 0, 1, 0));
-            topOuter[i] = builder.addVertex(ringVertex(topAngle, outerR, yTop, 0, 1, 0));
+            Vertex tInner = ringVertex(topAngle, innerR, yTop, 0, 1, 0);
+            Vertex tOuter = ringVertex(topAngle, outerR, yTop, 0, 1, 0);
+            
+            // Apply wave deformation
+            if (applyWave) {
+                bInner = WaveDeformer.applyToVertex(bInner, wave, time);
+                bOuter = WaveDeformer.applyToVertex(bOuter, wave, time);
+                tInner = WaveDeformer.applyToVertex(tInner, wave, time);
+                tOuter = WaveDeformer.applyToVertex(tOuter, wave, time);
+            }
+            
+            bottomInner[i] = builder.addVertex(bInner);
+            bottomOuter[i] = builder.addVertex(bOuter);
+            topInner[i] = builder.addVertex(tInner);
+            topOuter[i] = builder.addVertex(tOuter);
         }
         
         // =====================================================================
@@ -230,11 +268,19 @@ public final class RingTessellator {
             // Normal points outward (radial direction)
             float nx = (float) Math.cos(baseAngle);
             float nz = (float) Math.sin(baseAngle);
-            outerWallBottom[i] = builder.addVertex(ringVertex(baseAngle, outerR, yBottom, nx, 0, nz));
+            Vertex owBottom = ringVertex(baseAngle, outerR, yBottom, nx, 0, nz);
             
             float nxTop = (float) Math.cos(topAngle);
             float nzTop = (float) Math.sin(topAngle);
-            outerWallTop[i] = builder.addVertex(ringVertex(topAngle, outerR, yTop, nxTop, 0, nzTop));
+            Vertex owTop = ringVertex(topAngle, outerR, yTop, nxTop, 0, nzTop);
+            
+            if (applyWave) {
+                owBottom = WaveDeformer.applyToVertex(owBottom, wave, time);
+                owTop = WaveDeformer.applyToVertex(owTop, wave, time);
+            }
+            
+            outerWallBottom[i] = builder.addVertex(owBottom);
+            outerWallTop[i] = builder.addVertex(owTop);
         }
         
         for (int i = 0; i < segments; i++) {
@@ -263,11 +309,19 @@ public final class RingTessellator {
             // Normal points inward (negative radial direction)
             float nx = -(float) Math.cos(baseAngle);
             float nz = -(float) Math.sin(baseAngle);
-            innerWallBottom[i] = builder.addVertex(ringVertex(baseAngle, innerR, yBottom, nx, 0, nz));
+            Vertex iwBottom = ringVertex(baseAngle, innerR, yBottom, nx, 0, nz);
             
             float nxTop = -(float) Math.cos(topAngle);
             float nzTop = -(float) Math.sin(topAngle);
-            innerWallTop[i] = builder.addVertex(ringVertex(topAngle, innerR, yTop, nxTop, 0, nzTop));
+            Vertex iwTop = ringVertex(topAngle, innerR, yTop, nxTop, 0, nzTop);
+            
+            if (applyWave) {
+                iwBottom = WaveDeformer.applyToVertex(iwBottom, wave, time);
+                iwTop = WaveDeformer.applyToVertex(iwTop, wave, time);
+            }
+            
+            innerWallBottom[i] = builder.addVertex(iwBottom);
+            innerWallTop[i] = builder.addVertex(iwTop);
         }
         
         for (int i = 0; i < segments; i++) {

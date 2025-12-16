@@ -1,6 +1,8 @@
 package net.cyberpunk042.client.visual.mesh;
 
+import net.cyberpunk042.client.visual.animation.WaveDeformer;
 import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.visual.animation.WaveConfig;
 import net.cyberpunk042.visual.pattern.QuadPattern;
 import net.cyberpunk042.visual.pattern.VertexPattern;
 import net.cyberpunk042.visual.shape.CapsuleShape;
@@ -24,15 +26,18 @@ public final class CapsuleTessellator {
     private CapsuleTessellator() {}
     
     /**
-     * Tessellates a capsule shape into a mesh.
+     * Tessellates a capsule shape into a mesh with optional wave deformation.
      * 
      * @param shape The capsule shape definition
      * @param pattern Optional vertex pattern (can be null)
      * @param visibility Optional visibility mask (can be null)
+     * @param wave Wave configuration for CPU deformation (null = no wave)
+     * @param time Current time for wave animation
      * @return Generated mesh
      */
     public static Mesh tessellate(CapsuleShape shape, VertexPattern pattern,
-                                   VisibilityMask visibility) {
+                                   VisibilityMask visibility,
+                                   WaveConfig wave, float time) {
         if (shape == null) {
             throw new IllegalArgumentException("CapsuleShape cannot be null");
         }
@@ -41,12 +46,15 @@ public final class CapsuleTessellator {
             pattern = QuadPattern.FILLED_1;
         }
         
+        boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();
+        
         Logging.RENDER.topic("tessellate")
             .kv("shape", "capsule")
             .kv("radius", shape.radius())
             .kv("height", shape.height())
             .kv("segments", shape.segments())
             .kv("rings", shape.rings())
+            .kv("wave", wave != null && wave.isActive())
             .debug("Tessellating capsule");
         
         MeshBuilder builder = MeshBuilder.triangles();
@@ -64,7 +72,11 @@ public final class CapsuleTessellator {
         // =================================================================
         // Top Hemisphere
         // =================================================================
-        int topPoleIdx = builder.addVertex(new Vertex(0, topCapCenter + radius, 0, 0, 1, 0, 0.5f, 0));
+        Vertex topPoleV = new Vertex(0, topCapCenter + radius, 0, 0, 1, 0, 0.5f, 0);
+        if (applyWave) {
+            topPoleV = WaveDeformer.applyToVertex(topPoleV, wave, time);
+        }
+        int topPoleIdx = builder.addVertex(topPoleV);
         
         // Rings from near-pole to equator
         int[][] topHemiVerts = new int[rings][segments + 1];
@@ -87,7 +99,11 @@ public final class CapsuleTessellator {
                 float u = seg / (float) segments;
                 float v = (ring + 1) / (float) (rings * 2 + (cylinderHeight > 0 ? 2 : 0));
                 
-                topHemiVerts[ring][seg] = builder.addVertex(new Vertex(x, y, z, nx, ny, nz, u, v));
+                Vertex vertex = new Vertex(x, y, z, nx, ny, nz, u, v);
+                if (applyWave) {
+                    vertex = WaveDeformer.applyToVertex(vertex, wave, time);
+                }
+                topHemiVerts[ring][seg] = builder.addVertex(vertex);
             }
         }
         
@@ -142,7 +158,11 @@ public final class CapsuleTessellator {
                 float u = seg / (float) segments;
                 float v = 0.5f;
                 
-                bottomRingVerts[seg] = builder.addVertex(new Vertex(x, bottomCapCenter, z, nx, 0, nz, u, v));
+                Vertex vertex = new Vertex(x, bottomCapCenter, z, nx, 0, nz, u, v);
+                if (applyWave) {
+                    vertex = WaveDeformer.applyToVertex(vertex, wave, time);
+                }
+                bottomRingVerts[seg] = builder.addVertex(vertex);
             }
             
             // Cylinder quads
@@ -186,7 +206,11 @@ public final class CapsuleTessellator {
                 float u = seg / (float) segments;
                 float v = 0.5f + (ring + 1) / (float) (rings * 2);
                 
-                bottomHemiVerts[ring][seg] = builder.addVertex(new Vertex(x, y, z, nx, ny, nz, u, v));
+                Vertex vertex = new Vertex(x, y, z, nx, ny, nz, u, v);
+                if (applyWave) {
+                    vertex = WaveDeformer.applyToVertex(vertex, wave, time);
+                }
+                bottomHemiVerts[ring][seg] = builder.addVertex(vertex);
             }
         }
         
@@ -226,7 +250,11 @@ public final class CapsuleTessellator {
         }
         
         // Bottom pole triangles
-        int bottomPoleIdx = builder.addVertex(new Vertex(0, bottomCapCenter - radius, 0, 0, -1, 0, 0.5f, 1));
+        Vertex bottomPoleV = new Vertex(0, bottomCapCenter - radius, 0, 0, -1, 0, 0.5f, 1);
+        if (applyWave) {
+            bottomPoleV = WaveDeformer.applyToVertex(bottomPoleV, wave, time);
+        }
+        int bottomPoleIdx = builder.addVertex(bottomPoleV);
         int[] lastBottomRing = bottomHemiVerts[rings - 1];
         
         for (int seg = 0; seg < segments; seg++) {
@@ -246,8 +274,16 @@ public final class CapsuleTessellator {
         return builder.build();
     }
     
+    /**
+     * Tessellates a capsule shape into a mesh (backward compatible).
+     */
+    public static Mesh tessellate(CapsuleShape shape, VertexPattern pattern,
+                                   VisibilityMask visibility) {
+        return tessellate(shape, pattern, visibility, null, 0);
+    }
+    
     public static Mesh tessellate(CapsuleShape shape) {
-        return tessellate(shape, null, null);
+        return tessellate(shape, null, null, null, 0);
     }
 }
 

@@ -37,7 +37,7 @@ public final class CapsuleRenderer extends AbstractPrimitiveRenderer {
         // Get visibility mask
         VisibilityMask visibility = primitive.visibility();
         
-        return CapsuleTessellator.tessellate(shape, pattern, visibility);
+        return CapsuleTessellator.tessellate(shape, pattern, visibility, wave, time);
     }
 }
 

@@ -1,6 +1,8 @@
 package net.cyberpunk042.client.visual.mesh;
 
+import net.cyberpunk042.client.visual.animation.WaveDeformer;
 import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.visual.animation.WaveConfig;
 import net.cyberpunk042.visual.pattern.QuadPattern;
 import net.cyberpunk042.visual.pattern.VertexPattern;
 import net.cyberpunk042.visual.shape.ConeShape;
@@ -23,15 +25,18 @@ public final class ConeTessellator {
     private ConeTessellator() {}
     
     /**
-     * Tessellates a cone shape into a mesh.
+     * Tessellates a cone shape into a mesh with optional wave deformation.
      * 
      * @param shape The cone shape definition
      * @param pattern Optional vertex pattern (can be null)
      * @param visibility Optional visibility mask (can be null)
+     * @param wave Wave configuration for CPU deformation (null = no wave)
+     * @param time Current time for wave animation
      * @return Generated mesh
      */
     public static Mesh tessellate(ConeShape shape, VertexPattern pattern,
-                                   VisibilityMask visibility) {
+                                   VisibilityMask visibility,
+                                   WaveConfig wave, float time) {
         if (shape == null) {
             throw new IllegalArgumentException("ConeShape cannot be null");
         }
@@ -46,9 +51,12 @@ public final class ConeTessellator {
             .kv("topR", shape.topRadius())
             .kv("height", shape.height())
             .kv("segments", shape.segments())
+            .kv("wave", wave != null && wave.isActive())
             .debug("Tessellating cone");
         
         MeshBuilder builder = MeshBuilder.triangles();
+        
+        boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();
         
         float bottomR = shape.bottomRadius();
         float topR = shape.topRadius();
@@ -82,14 +90,22 @@ public final class ConeTessellator {
             float nz = normalXZScale * (float) Math.sin(phi);
             
             float u = seg / (float) segments;
-            bottomVerts[seg] = builder.addVertex(new Vertex(x, bottomY, z, nx, ny, nz, u, 1));
+            Vertex v = new Vertex(x, bottomY, z, nx, ny, nz, u, 1);
+            if (applyWave) {
+                v = WaveDeformer.applyToVertex(v, wave, time);
+            }
+            bottomVerts[seg] = builder.addVertex(v);
         }
         
         if (isPointed) {
             // =============================================================
             // True Cone - triangles to apex
             // =============================================================
-            int apexIdx = builder.addVertex(new Vertex(0, topY, 0, 0, 1, 0, 0.5f, 0));
+            Vertex apexV = new Vertex(0, topY, 0, 0, 1, 0, 0.5f, 0);
+            if (applyWave) {
+                apexV = WaveDeformer.applyToVertex(apexV, wave, time);
+            }
+            int apexIdx = builder.addVertex(apexV);
             
             for (int seg = 0; seg < segments; seg++) {
                 float segFrac = seg / (float) segments;
@@ -115,7 +131,11 @@ public final class ConeTessellator {
                 float nz = normalXZScale * (float) Math.sin(phi);
                 
                 float u = seg / (float) segments;
-                topVerts[seg] = builder.addVertex(new Vertex(x, topY, z, nx, ny, nz, u, 0));
+                Vertex v = new Vertex(x, topY, z, nx, ny, nz, u, 0);
+                if (applyWave) {
+                    v = WaveDeformer.applyToVertex(v, wave, time);
+                }
+                topVerts[seg] = builder.addVertex(v);
             }
             
             // Side quads
@@ -136,7 +156,11 @@ public final class ConeTessellator {
             
             // Top cap (if not open)
             if (!shape.openTop()) {
-                int topCenterIdx = builder.addVertex(new Vertex(0, topY, 0, 0, 1, 0, 0.5f, 0.5f));
+                Vertex topCenterV = new Vertex(0, topY, 0, 0, 1, 0, 0.5f, 0.5f);
+                if (applyWave) {
+                    topCenterV = WaveDeformer.applyToVertex(topCenterV, wave, time);
+                }
+                int topCenterIdx = builder.addVertex(topCenterV);
                 for (int seg = 0; seg < segments; seg++) {
                     float segFrac = seg / (float) segments;
                     if (visibility != null && !visibility.isVisible(0f, segFrac)) continue;
@@ -153,7 +177,11 @@ public final class ConeTessellator {
         // Bottom cap (if not open)
         // =================================================================
         if (!shape.openBottom()) {
-            int bottomCenterIdx = builder.addVertex(new Vertex(0, bottomY, 0, 0, -1, 0, 0.5f, 0.5f));
+            Vertex bottomCenterV = new Vertex(0, bottomY, 0, 0, -1, 0, 0.5f, 0.5f);
+            if (applyWave) {
+                bottomCenterV = WaveDeformer.applyToVertex(bottomCenterV, wave, time);
+            }
+            int bottomCenterIdx = builder.addVertex(bottomCenterV);
             for (int seg = 0; seg < segments; seg++) {
                 float segFrac = seg / (float) segments;
                 if (visibility != null && !visibility.isVisible(1f, segFrac)) continue;
@@ -171,8 +199,16 @@ public final class ConeTessellator {
         return builder.build();
     }
     
+    /**
+     * Tessellates a cone shape into a mesh (backward compatible).
+     */
+    public static Mesh tessellate(ConeShape shape, VertexPattern pattern,
+                                   VisibilityMask visibility) {
+        return tessellate(shape, pattern, visibility, null, 0);
+    }
+    
     public static Mesh tessellate(ConeShape shape) {
-        return tessellate(shape, null, null);
+        return tessellate(shape, null, null, null, 0);
     }
 }
 

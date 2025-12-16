@@ -1,6 +1,8 @@
 package net.cyberpunk042.client.visual.mesh;
 
+import net.cyberpunk042.client.visual.animation.WaveDeformer;
 import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.visual.animation.WaveConfig;
 import net.cyberpunk042.visual.pattern.QuadPattern;
 import net.cyberpunk042.visual.pattern.VertexPattern;
 import net.cyberpunk042.visual.shape.TorusShape;
@@ -32,15 +34,18 @@ public final class TorusTessellator {
     private TorusTessellator() {}
     
     /**
-     * Tessellates a torus shape into a mesh.
+     * Tessellates a torus shape into a mesh with optional wave deformation.
      * 
      * @param shape The torus shape definition
      * @param pattern Optional vertex pattern (can be null)
      * @param visibility Optional visibility mask (can be null)
+     * @param wave Wave configuration for CPU deformation (null = no wave)
+     * @param time Current time for wave animation
      * @return Generated mesh
      */
     public static Mesh tessellate(TorusShape shape, VertexPattern pattern,
-                                   VisibilityMask visibility) {
+                                   VisibilityMask visibility,
+                                   WaveConfig wave, float time) {
         if (shape == null) {
             throw new IllegalArgumentException("TorusShape cannot be null");
         }
@@ -55,6 +60,7 @@ public final class TorusTessellator {
             .kv("minorR", shape.minorRadius())
             .kv("majorSeg", shape.majorSegments())
             .kv("minorSeg", shape.minorSegments())
+            .kv("wave", wave != null && wave.isActive())
             .debug("Tessellating torus");
         
         MeshBuilder builder = MeshBuilder.triangles();
@@ -67,6 +73,8 @@ public final class TorusTessellator {
         float arcEnd = GeometryMath.toRadians(shape.arcEnd());
         float arcRange = arcEnd - arcStart;
         
+        boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();
+        
         // Generate vertices
         int[][] vertexIndices = new int[majorSegs + 1][minorSegs + 1];
         
@@ -76,9 +84,9 @@ public final class TorusTessellator {
             float sinU = (float) Math.sin(u);
             
             for (int j = 0; j <= minorSegs; j++) {
-                float v = GeometryMath.TWO_PI * j / minorSegs;
-                float cosV = (float) Math.cos(v);
-                float sinV = (float) Math.sin(v);
+                float vAngle = GeometryMath.TWO_PI * j / minorSegs;
+                float cosV = (float) Math.cos(vAngle);
+                float sinV = (float) Math.sin(vAngle);
                 
                 // Position
                 float x = (R + r * cosV) * cosU;
@@ -94,8 +102,14 @@ public final class TorusTessellator {
                 float texU = i / (float) majorSegs;
                 float texV = j / (float) minorSegs;
                 
-                vertexIndices[i][j] = builder.addVertex(
-                    new Vertex(x, y, z, nx, ny, nz, texU, texV));
+                Vertex vtx = new Vertex(x, y, z, nx, ny, nz, texU, texV);
+                
+                // Apply wave deformation
+                if (applyWave) {
+                    vtx = WaveDeformer.applyToVertex(vtx, wave, time);
+                }
+                
+                vertexIndices[i][j] = builder.addVertex(vtx);
             }
         }
         
@@ -136,8 +150,16 @@ public final class TorusTessellator {
         return builder.build();
     }
     
+    /**
+     * Tessellates a torus shape into a mesh (backward compatible).
+     */
+    public static Mesh tessellate(TorusShape shape, VertexPattern pattern,
+                                   VisibilityMask visibility) {
+        return tessellate(shape, pattern, visibility, null, 0);
+    }
+    
     public static Mesh tessellate(TorusShape shape) {
-        return tessellate(shape, null, null);
+        return tessellate(shape, null, null, null, 0);
     }
 }
 

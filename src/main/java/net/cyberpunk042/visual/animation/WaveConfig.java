@@ -76,14 +76,14 @@ public record WaveConfig(
             }
         }
         
-        // Parse mode
-        WaveMode mode = WaveMode.GPU;
+        // Parse mode - default to CPU since GPU is not yet implemented
+        WaveMode mode = WaveMode.CPU;
         if (json.has("mode")) {
             String modeStr = json.get("mode").getAsString().toUpperCase();
             try {
                 mode = WaveMode.valueOf(modeStr);
             } catch (IllegalArgumentException e) {
-                mode = WaveMode.GPU; // Default to GPU
+                mode = WaveMode.CPU; // Default to CPU
             }
         }
         
@@ -94,16 +94,16 @@ public record WaveConfig(
     }
     
     /** No wave animation. */
-    public static final WaveConfig NONE = new WaveConfig(0, 0, 0, Axis.Y, WaveMode.GPU);
+    public static final WaveConfig NONE = new WaveConfig(0, 0, 0, Axis.Y, WaveMode.CPU);
     
     /** Default gentle wave. */
-    public static final WaveConfig DEFAULT = new WaveConfig(0.1f, 2.0f, 1.0f, Axis.Y, WaveMode.GPU);
+    public static final WaveConfig DEFAULT = new WaveConfig(0.1f, 2.0f, 1.0f, Axis.Y, WaveMode.CPU);
     
     /** Strong wave. */
-    public static final WaveConfig STRONG = new WaveConfig(0.3f, 3.0f, 1.5f, Axis.Y, WaveMode.GPU);
+    public static final WaveConfig STRONG = new WaveConfig(0.3f, 3.0f, 1.5f, Axis.Y, WaveMode.CPU);
     
     /** Horizontal ripple. */
-    public static final WaveConfig RIPPLE = new WaveConfig(0.05f, 4.0f, 2.0f, Axis.Y, WaveMode.GPU);
+    public static final WaveConfig RIPPLE = new WaveConfig(0.05f, 4.0f, 2.0f, Axis.Y, WaveMode.CPU);
     
     /**
      * Creates a vertical wave using GPU mode.
@@ -113,7 +113,7 @@ public record WaveConfig(
     public static WaveConfig vertical(
             @Range(ValueRange.POSITIVE) float amplitude, 
             @Range(ValueRange.POSITIVE) float frequency) {
-        return new WaveConfig(amplitude, frequency, 1.0f, Axis.Y, WaveMode.GPU);
+        return new WaveConfig(amplitude, frequency, 1.0f, Axis.Y, WaveMode.CPU);
     }
     
     /** Whether wave is active. */
@@ -159,7 +159,7 @@ public record WaveConfig(
         private @Range(ValueRange.POSITIVE) float frequency = 2.0f;
         private @Range(ValueRange.POSITIVE) float speed = 1.0f;
         private Axis direction = Axis.Y;
-        private WaveMode mode = WaveMode.GPU;
+        private WaveMode mode = WaveMode.CPU;
         
         public Builder amplitude(float a) { this.amplitude = a; return this; }
         public Builder frequency(float f) { this.frequency = f; return this; }

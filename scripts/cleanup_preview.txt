@@ -1,0 +1,26 @@
+﻿============================================================
+python : Traceback (most recent call last):
+At line:1 char:1
++ python scripts/cleanup_gui_unused.py --dry-run 2>&1 | 
+Out-File -Encod ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback  
+   (most recent call last)::String) [], RemoteExceptio  
+  n
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "C:\Users\Jean\the-virus-block-template-1.21.6\sc
+ripts\cleanup_gui_unused.py", line 257, in <module>
+    main()
+  File "C:\Users\Jean\the-virus-block-template-1.21.6\sc
+ripts\cleanup_gui_unused.py", line 226, in main
+    print("\U0001f9f9 GUI UNUSED CODE CLEANUP")
+  File "C:\Users\Jean\.platformio\python3\Lib\encodings\
+cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encod
+ing_table)[0]
+           
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode 
+character '\U0001f9f9' in position 0: character maps to 
+<undefined>

@@ -2,6 +2,7 @@ package net.cyberpunk042.client.gui.component;
 
 import net.cyberpunk042.client.gui.layout.Bounds;
 import net.cyberpunk042.client.gui.screen.TabType;
+import net.cyberpunk042.client.gui.util.GuiConfigPersistence;
 import net.cyberpunk042.client.gui.widget.SubTabPane;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
@@ -76,34 +77,49 @@ public class ContentArea implements ScreenComponent {
     }
     
     private void initQuickSubTabs() {
+        int savedSubtab = GuiConfigPersistence.loadSavedSubtab(TabType.QUICK);
         quickSubTabs = new SubTabPane(textRenderer)
             .addTab("Fill", contentFactory.fill())
             .addTab("Appear", contentFactory.appearance())
             .addTab("Visibility", contentFactory.visibility())
             .addTab("Xfm", contentFactory.transform())
-            .onTabChange(idx -> onSubTabChange.run());
+            .onTabChange(idx -> {
+                GuiConfigPersistence.saveSubtab(TabType.QUICK, idx);
+                onSubTabChange.run();
+            });
         quickSubTabs.setBounds(bounds);
+        quickSubTabs.setActiveTab(savedSubtab);
     }
     
     private void initAdvancedSubTabs() {
+        int savedSubtab = GuiConfigPersistence.loadSavedSubtab(TabType.ADVANCED);
         advancedSubTabs = new SubTabPane(textRenderer)
             .addTab("Anim", contentFactory.animation())
             .addTab("Predict", contentFactory.prediction())
             .addTab("Linking", contentFactory.linking())
             .addTab("Mods", contentFactory.modifiers())
-            .onTabChange(idx -> onSubTabChange.run());
+            .onTabChange(idx -> {
+                GuiConfigPersistence.saveSubtab(TabType.ADVANCED, idx);
+                onSubTabChange.run();
+            });
         advancedSubTabs.setBounds(bounds);
+        advancedSubTabs.setActiveTab(savedSubtab);
     }
     
     private void initDebugSubTabs() {
+        int savedSubtab = GuiConfigPersistence.loadSavedSubtab(TabType.DEBUG);
         debugSubTabs = new SubTabPane(textRenderer)
             .addTab("Beam", contentFactory.beam())
             .addTab("Trigger", contentFactory.trigger())
             .addTab("Life", contentFactory.lifecycle())
             .addTab("Bindings", contentFactory.bindings())
             .addTab("Trace", contentFactory.trace())
-            .onTabChange(idx -> onSubTabChange.run());
+            .onTabChange(idx -> {
+                GuiConfigPersistence.saveSubtab(TabType.DEBUG, idx);
+                onSubTabChange.run();
+            });
         debugSubTabs.setBounds(bounds);
+        debugSubTabs.setActiveTab(savedSubtab);
     }
     
     /**

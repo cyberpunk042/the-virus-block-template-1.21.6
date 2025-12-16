@@ -68,6 +68,8 @@ public class TheVirusBlockClient implements ClientModInitializer {
 		GuiClientHandlers.register();
 		// Test field renderer for debug field preview (G145)
 		SimplifiedFieldRenderer.init();
+		// Wave shader for GPU-based wave deformation
+		net.cyberpunk042.client.visual.render.WaveShaderRegistry.register();
 		SingularityVisualManager.init();
 		SingularityBorderClientState.init();
 		VirusFluidRenderers.register();

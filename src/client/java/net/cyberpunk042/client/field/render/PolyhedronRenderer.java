@@ -70,7 +70,7 @@ public final class PolyhedronRenderer extends AbstractPrimitiveRenderer {
             .subdivisions(shape.subdivisions())
             .pattern(pattern)
             .build()
-            .tessellate(0);
+            .tessellate(0, wave, time);
         
         net.cyberpunk042.log.Logging.RENDER.topic("tessellate")
             .kv("vertexCount", mesh != null ? mesh.vertexCount() : 0)

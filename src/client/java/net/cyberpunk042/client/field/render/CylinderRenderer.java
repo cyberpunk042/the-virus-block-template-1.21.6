@@ -52,7 +52,6 @@ public final class CylinderRenderer extends AbstractPrimitiveRenderer {
         VisibilityMask visibility = primitive.visibility();
         
         // Tessellate with separate patterns for sides and caps
-        return CylinderTessellator.tessellate(shape, sidesPattern, capPattern, visibility);
+    return CylinderTessellator.tessellate(shape, sidesPattern, capPattern, visibility, wave, time);
     }
 }
-

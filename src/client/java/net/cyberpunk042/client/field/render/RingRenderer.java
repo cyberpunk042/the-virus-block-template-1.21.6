@@ -42,7 +42,7 @@ public final class RingRenderer extends AbstractPrimitiveRenderer {
         // Get visibility mask
         VisibilityMask visibility = primitive.visibility();
         
-        // Tessellate with full config
-        return RingTessellator.tessellate(shape, pattern, visibility);
+        // Tessellate with full config including wave
+        return RingTessellator.tessellate(shape, pattern, visibility, wave, time);
     }
 }

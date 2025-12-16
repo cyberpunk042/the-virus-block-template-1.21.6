@@ -1,6 +1,8 @@
 package net.cyberpunk042.client.visual.mesh;
 
+import net.cyberpunk042.client.visual.animation.WaveDeformer;
 import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.visual.animation.WaveConfig;
 import net.cyberpunk042.visual.pattern.VertexPattern;
 import net.cyberpunk042.visual.pattern.SectorPattern;
 import net.cyberpunk042.visual.shape.DiscShape;
@@ -25,15 +27,18 @@ public final class DiscTessellator {
     private DiscTessellator() {}
     
     /**
-     * Tessellates a disc shape into a mesh.
+     * Tessellates a disc shape into a mesh with optional wave deformation.
      * 
      * @param shape The disc shape definition
      * @param pattern Vertex pattern (null = SectorPattern.DEFAULT)
      * @param visibility Visibility mask (null = all visible)
+     * @param wave Wave configuration for CPU deformation (null = no wave)
+     * @param time Current time for wave animation
      * @return Generated mesh
      */
     public static Mesh tessellate(DiscShape shape, VertexPattern pattern,
-                                   VisibilityMask visibility) {
+                                   VisibilityMask visibility,
+                                   WaveConfig wave, float time) {
         if (shape == null) {
             throw new IllegalArgumentException("DiscShape cannot be null");
         }
@@ -47,16 +52,25 @@ public final class DiscTessellator {
             .kv("shape", "disc")
             .kv("radius", shape.radius())
             .kv("segments", shape.segments())
+            .kv("wave", wave != null && wave.isActive())
             .debug("Tessellating disc");
         
         if (shape.hasHole()) {
-            return tessellateDonut(shape, pattern, visibility);
+            return tessellateDonut(shape, pattern, visibility, wave, time);
         }
-        return tessellateSolid(shape, pattern, visibility);
+        return tessellateSolid(shape, pattern, visibility, wave, time);
+    }
+    
+    /**
+     * Tessellates a disc shape into a mesh (backward compatible).
+     */
+    public static Mesh tessellate(DiscShape shape, VertexPattern pattern,
+                                   VisibilityMask visibility) {
+        return tessellate(shape, pattern, visibility, null, 0);
     }
     
     public static Mesh tessellate(DiscShape shape) {
-        return tessellate(shape, null, null);
+        return tessellate(shape, null, null, null, 0);
     }
     
     // =========================================================================
@@ -64,7 +78,8 @@ public final class DiscTessellator {
     // =========================================================================
     
     private static Mesh tessellateSolid(DiscShape shape, VertexPattern pattern,
-                                         VisibilityMask visibility) {
+                                         VisibilityMask visibility,
+                                         WaveConfig wave, float time) {
         MeshBuilder builder = MeshBuilder.triangles();
         
         int segments = shape.segments();
@@ -74,15 +89,25 @@ public final class DiscTessellator {
         float arcEnd = GeometryMath.toRadians(shape.arcEnd());
         float arcRange = arcEnd - arcStart;
         
+        boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();
+        
         // Center vertex
-        int centerIdx = builder.addVertex(GeometryMath.discCenter(y));
+        Vertex center = GeometryMath.discCenter(y);
+        if (applyWave) {
+            center = WaveDeformer.applyToVertex(center, wave, time);
+        }
+        int centerIdx = builder.addVertex(center);
         
         // Edge vertices
         int[] edgeIndices = new int[segments + 1];
         for (int i = 0; i <= segments; i++) {
             float t = i / (float) segments;
             float angle = arcStart + t * arcRange;
-            edgeIndices[i] = builder.addVertex(GeometryMath.discPoint(angle, radius, y));
+            Vertex v = GeometryMath.discPoint(angle, radius, y);
+            if (applyWave) {
+                v = WaveDeformer.applyToVertex(v, wave, time);
+            }
+            edgeIndices[i] = builder.addVertex(v);
         }
         
         // Triangular sectors from center to edge
@@ -113,7 +138,8 @@ public final class DiscTessellator {
     // =========================================================================
     
     private static Mesh tessellateDonut(DiscShape shape, VertexPattern pattern,
-                                         VisibilityMask visibility) {
+                                         VisibilityMask visibility,
+                                         WaveConfig wave, float time) {
         // Disc with inner hole is essentially a ring
         MeshBuilder builder = MeshBuilder.triangles();
         
@@ -125,6 +151,8 @@ public final class DiscTessellator {
         float arcEnd = GeometryMath.toRadians(shape.arcEnd());
         float arcRange = arcEnd - arcStart;
         
+        boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();
+        
         // Generate inner and outer edge vertices
         int[] innerIndices = new int[segments + 1];
         int[] outerIndices = new int[segments + 1];
@@ -133,8 +161,16 @@ public final class DiscTessellator {
             float t = i / (float) segments;
             float angle = arcStart + t * arcRange;
             
-            innerIndices[i] = builder.addVertex(GeometryMath.discPoint(angle, innerR, y));
-            outerIndices[i] = builder.addVertex(GeometryMath.discPoint(angle, outerR, y));
+            Vertex inner = GeometryMath.discPoint(angle, innerR, y);
+            Vertex outer = GeometryMath.discPoint(angle, outerR, y);
+            
+            if (applyWave) {
+                inner = WaveDeformer.applyToVertex(inner, wave, time);
+                outer = WaveDeformer.applyToVertex(outer, wave, time);
+            }
+            
+            innerIndices[i] = builder.addVertex(inner);
+            outerIndices[i] = builder.addVertex(outer);
         }
         
         // Quads between inner and outer

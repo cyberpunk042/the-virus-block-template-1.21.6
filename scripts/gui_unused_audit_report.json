@@ -1,0 +1,350 @@
+{
+  "backup_files": [
+    {
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\ActionPanel.java.bak",
+      "size_bytes": 7409,
+      "original_exists": true
+    },
+    {
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\sub\\LifecycleSubPanel.java.bak",
+      "size_bytes": 6055,
+      "original_exists": true
+    },
+    {
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\sub\\TriggerSubPanel.java.bak",
+      "size_bytes": 6362,
+      "original_exists": true
+    },
+    {
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\screen\\FieldCustomizerScreen.java.bak",
+      "size_bytes": 37171,
+      "original_exists": true
+    },
+    {
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\state\\DefinitionBuilder.java.bak",
+      "size_bytes": 36103,
+      "original_exists": true
+    },
+    {
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\state\\FieldEditState.java.bak",
+      "size_bytes": 68359,
+      "original_exists": true
+    },
+    {
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\state\\FieldEditStateHolder.java.bak",
+      "size_bytes": 3720,
+      "original_exists": true
+    },
+    {
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\state\\PipelineTracer.java.bak",
+      "size_bytes": 22966,
+      "original_exists": true
+    },
+    {
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\ActionPanel.java.bak",
+      "size_bytes": 7409,
+      "original_exists": true
+    },
+    {
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\sub\\LifecycleSubPanel.java.bak",
+      "size_bytes": 6055,
+      "original_exists": true
+    },
+    {
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\sub\\TriggerSubPanel.java.bak",
+      "size_bytes": 6362,
+      "original_exists": true
+    },
+    {
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\screen\\FieldCustomizerScreen.java.bak",
+      "size_bytes": 37171,
+      "original_exists": true
+    },
+    {
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\state\\DefinitionBuilder.java.bak",
+      "size_bytes": 36103,
+      "original_exists": true
+    },
+    {
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\state\\FieldEditState.java.bak",
+      "size_bytes": 68359,
+      "original_exists": true
+    },
+    {
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\state\\FieldEditStateHolder.java.bak",
+      "size_bytes": 3720,
+      "original_exists": true
+    },
+    {
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\state\\PipelineTracer.java.bak",
+      "size_bytes": 22966,
+      "original_exists": true
+    },
+    {
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\state\\FieldEditState.java.bak.original",
+      "size_bytes": 84720,
+      "original_exists": true
+    }
+  ],
+  "unused_classes": [
+    {
+      "name": "AnimationPanel",
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\AnimationPanel.java",
+      "line_count": 101,
+      "reason": "ENTIRE v2/ directory is never imported - candidate for removal",
+      "references_found": 0
+    },
+    {
+      "name": "AppearancePanel",
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\AppearancePanel.java",
+      "line_count": 91,
+      "reason": "ENTIRE v2/ directory is never imported - candidate for removal",
+      "references_found": 0
+    },
+    {
+      "name": "ArrangementPanel",
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\ArrangementPanel.java",
+      "line_count": 46,
+      "reason": "ENTIRE v2/ directory is never imported - candidate for removal",
+      "references_found": 0
+    },
+    {
+      "name": "ArrangePanel",
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\ArrangePanel.java",
+      "line_count": 46,
+      "reason": "ENTIRE v2/ directory is never imported - candidate for removal",
+      "references_found": 0
+    },
+    {
+      "name": "BeamPanel",
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\BeamPanel.java",
+      "line_count": 91,
+      "reason": "ENTIRE v2/ directory is never imported - candidate for removal",
+      "references_found": 0
+    },
+    {
+      "name": "BindingsPanel",
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\BindingsPanel.java",
+      "line_count": 46,
+      "reason": "ENTIRE v2/ directory is never imported - candidate for removal",
+      "references_found": 0
+    },
+    {
+      "name": "FillPanel",
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\FillPanel.java",
+      "line_count": 61,
+      "reason": "ENTIRE v2/ directory is never imported - candidate for removal",
+      "references_found": 0
+    },
+    {
+      "name": "FollowModePanel",
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\FollowModePanel.java",
+      "line_count": 46,
+      "reason": "ENTIRE v2/ directory is never imported - candidate for removal",
+      "references_found": 0
+    },
+    {
+      "name": "LifecyclePanel",
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\LifecyclePanel.java",
+      "line_count": 68,
+      "reason": "ENTIRE v2/ directory is never imported - candidate for removal",
+      "references_found": 0
+    },
+    {
+      "name": "LinkingPanel",
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\LinkingPanel.java",
+      "line_count": 46,
+      "reason": "ENTIRE v2/ directory is never imported - candidate for removal",
+      "references_found": 0
+    },
+    {
+      "name": "ModifiersPanel",
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\ModifiersPanel.java",
+      "line_count": 61,
+      "reason": "ENTIRE v2/ directory is never imported - candidate for removal",
+      "references_found": 0
+    },
+    {
+      "name": "OrbitPanel",
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\OrbitPanel.java",
+      "line_count": 73,
+      "reason": "ENTIRE v2/ directory is never imported - candidate for removal",
+      "references_found": 0
+    },
+    {
+      "name": "PredictionPanel",
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\PredictionPanel.java",
+      "line_count": 46,
+      "reason": "ENTIRE v2/ directory is never imported - candidate for removal",
+      "references_found": 0
+    },
+    {
+      "name": "ShapePanel",
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\ShapePanel.java",
+      "line_count": 78,
+      "reason": "ENTIRE v2/ directory is never imported - candidate for removal",
+      "references_found": 0
+    },
+    {
+      "name": "TransformPanel",
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\TransformPanel.java",
+      "line_count": 104,
+      "reason": "ENTIRE v2/ directory is never imported - candidate for removal",
+      "references_found": 0
+    },
+    {
+      "name": "TriggerPanel",
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\TriggerPanel.java",
+      "line_count": 68,
+      "reason": "ENTIRE v2/ directory is never imported - candidate for removal",
+      "references_found": 0
+    },
+    {
+      "name": "VisibilityPanel",
+      "path": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\VisibilityPanel.java",
+      "line_count": 77,
+      "reason": "ENTIRE v2/ directory is never imported - candidate for removal",
+      "references_found": 0
+    }
+  ],
+  "duplicate_pairs": [
+    {
+      "name": "AnimationPanel",
+      "path1": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\sub\\AnimationSubPanel.java",
+      "path2": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\AnimationPanel.java",
+      "lines1": 323,
+      "lines2": 101,
+      "similarity_reason": "v2/AnimationPanel duplicates sub/AnimationSubPanel - sub/ is used, v2/ is unused"
+    },
+    {
+      "name": "AppearancePanel",
+      "path1": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\sub\\AppearanceSubPanel.java",
+      "path2": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\AppearancePanel.java",
+      "lines1": 211,
+      "lines2": 91,
+      "similarity_reason": "v2/AppearancePanel duplicates sub/AppearanceSubPanel - sub/ is used, v2/ is unused"
+    },
+    {
+      "name": "ArrangementPanel",
+      "path1": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\sub\\ArrangementSubPanel.java",
+      "path2": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\ArrangementPanel.java",
+      "lines1": 217,
+      "lines2": 46,
+      "similarity_reason": "v2/ArrangementPanel duplicates sub/ArrangementSubPanel - sub/ is used, v2/ is unused"
+    },
+    {
+      "name": "ArrangePanel",
+      "path1": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\sub\\ArrangeSubPanel.java",
+      "path2": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\ArrangePanel.java",
+      "lines1": 775,
+      "lines2": 46,
+      "similarity_reason": "v2/ArrangePanel duplicates sub/ArrangeSubPanel - sub/ is used, v2/ is unused"
+    },
+    {
+      "name": "BeamPanel",
+      "path1": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\sub\\BeamSubPanel.java",
+      "path2": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\BeamPanel.java",
+      "lines1": 298,
+      "lines2": 91,
+      "similarity_reason": "v2/BeamPanel duplicates sub/BeamSubPanel - sub/ is used, v2/ is unused"
+    },
+    {
+      "name": "BindingsPanel",
+      "path1": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\sub\\BindingsSubPanel.java",
+      "path2": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\BindingsPanel.java",
+      "lines1": 526,
+      "lines2": 46,
+      "similarity_reason": "v2/BindingsPanel duplicates sub/BindingsSubPanel - sub/ is used, v2/ is unused"
+    },
+    {
+      "name": "FillPanel",
+      "path1": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\sub\\FillSubPanel.java",
+      "path2": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\FillPanel.java",
+      "lines1": 308,
+      "lines2": 61,
+      "similarity_reason": "v2/FillPanel duplicates sub/FillSubPanel - sub/ is used, v2/ is unused"
+    },
+    {
+      "name": "LifecyclePanel",
+      "path1": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\sub\\LifecycleSubPanel.java",
+      "path2": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\LifecyclePanel.java",
+      "lines1": 216,
+      "lines2": 68,
+      "similarity_reason": "v2/LifecyclePanel duplicates sub/LifecycleSubPanel - sub/ is used, v2/ is unused"
+    },
+    {
+      "name": "LinkingPanel",
+      "path1": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\sub\\LinkingSubPanel.java",
+      "path2": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\LinkingPanel.java",
+      "lines1": 240,
+      "lines2": 46,
+      "similarity_reason": "v2/LinkingPanel duplicates sub/LinkingSubPanel - sub/ is used, v2/ is unused"
+    },
+    {
+      "name": "ModifiersPanel",
+      "path1": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\sub\\ModifiersSubPanel.java",
+      "path2": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\ModifiersPanel.java",
+      "lines1": 275,
+      "lines2": 61,
+      "similarity_reason": "v2/ModifiersPanel duplicates sub/ModifiersSubPanel - sub/ is used, v2/ is unused"
+    },
+    {
+      "name": "OrbitPanel",
+      "path1": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\sub\\OrbitSubPanel.java",
+      "path2": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\OrbitPanel.java",
+      "lines1": 135,
+      "lines2": 73,
+      "similarity_reason": "v2/OrbitPanel duplicates sub/OrbitSubPanel - sub/ is used, v2/ is unused"
+    },
+    {
+      "name": "PredictionPanel",
+      "path1": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\sub\\PredictionSubPanel.java",
+      "path2": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\PredictionPanel.java",
+      "lines1": 288,
+      "lines2": 46,
+      "similarity_reason": "v2/PredictionPanel duplicates sub/PredictionSubPanel - sub/ is used, v2/ is unused"
+    },
+    {
+      "name": "ShapePanel",
+      "path1": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\sub\\ShapeSubPanel.java",
+      "path2": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\ShapePanel.java",
+      "lines1": 931,
+      "lines2": 78,
+      "similarity_reason": "v2/ShapePanel duplicates sub/ShapeSubPanel - sub/ is used, v2/ is unused"
+    },
+    {
+      "name": "TransformPanel",
+      "path1": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\sub\\TransformSubPanel.java",
+      "path2": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\TransformPanel.java",
+      "lines1": 157,
+      "lines2": 104,
+      "similarity_reason": "v2/TransformPanel duplicates sub/TransformSubPanel - sub/ is used, v2/ is unused"
+    },
+    {
+      "name": "TriggerPanel",
+      "path1": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\sub\\TriggerSubPanel.java",
+      "path2": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\TriggerPanel.java",
+      "lines1": 166,
+      "lines2": 68,
+      "similarity_reason": "v2/TriggerPanel duplicates sub/TriggerSubPanel - sub/ is used, v2/ is unused"
+    },
+    {
+      "name": "VisibilityPanel",
+      "path1": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\sub\\VisibilitySubPanel.java",
+      "path2": "src\\client\\java\\net\\cyberpunk042\\client\\gui\\panel\\v2\\VisibilityPanel.java",
+      "lines1": 241,
+      "lines2": 77,
+      "similarity_reason": "v2/VisibilityPanel duplicates sub/VisibilitySubPanel - sub/ is used, v2/ is unused"
+    }
+  ],
+  "dead_code": [],
+  "summary": {
+    "backup_files_count": 17,
+    "backup_files_size_kb": 450.21,
+    "unused_classes_count": 17,
+    "unused_classes_lines": 1149,
+    "duplicate_pairs_count": 16,
+    "dead_code_count": 0,
+    "cleanup_potential_lines": 1149
+  }
+}

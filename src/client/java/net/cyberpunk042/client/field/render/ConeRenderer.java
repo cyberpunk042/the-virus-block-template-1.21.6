@@ -37,7 +37,7 @@ public final class ConeRenderer extends AbstractPrimitiveRenderer {
         // Get visibility mask
         VisibilityMask visibility = primitive.visibility();
         
-        return ConeTessellator.tessellate(shape, pattern, visibility);
+        return ConeTessellator.tessellate(shape, pattern, visibility, wave, time);
     }
 }
 

@@ -1,6 +1,8 @@
 package net.cyberpunk042.client.visual.mesh;
 
+import net.cyberpunk042.client.visual.animation.WaveDeformer;
 import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.visual.animation.WaveConfig;
 import net.cyberpunk042.visual.pattern.VertexPattern;
 import net.cyberpunk042.visual.pattern.TrianglePattern;
 import net.cyberpunk042.visual.shape.PolyhedronShape;
@@ -145,6 +147,10 @@ public final class PolyhedronTessellator implements Tessellator {
     private final int subdivisions;
     private final VertexPattern pattern;
     
+    // Wave deformation state (set per-tessellate call)
+    private WaveConfig wave;
+    private float waveTime;
+    
     // =========================================================================
     // Constructor & Factory
     // =========================================================================
@@ -186,6 +192,7 @@ public final class PolyhedronTessellator implements Tessellator {
             .kv("type", polyType)
             .kv("radius", radius)
             .kv("subdivisions", subdivisions)
+            .kv("wave", wave != null && wave.isActive())
             .debug("Tessellating polyhedron");
         
         // Dispatch to type-specific tessellation
@@ -203,6 +210,24 @@ public final class PolyhedronTessellator implements Tessellator {
         }
         
         return baseMesh;
+    }
+    
+    /**
+     * Tessellates with wave deformation support.
+     * 
+     * @param detail Detail level (typically 0 for polyhedra)
+     * @param wave Wave configuration for CPU deformation (null = no wave)
+     * @param time Current time for wave animation
+     * @return Generated mesh with wave deformation applied
+     */
+    public Mesh tessellate(int detail, WaveConfig wave, float time) {
+        this.wave = wave;
+        this.waveTime = time;
+        Mesh result = tessellate(detail);
+        // Clear wave state after tessellation
+        this.wave = null;
+        this.waveTime = 0;
+        return result;
     }
     
     @Override
@@ -894,6 +919,11 @@ public final class PolyhedronTessellator implements Tessellator {
      * Emits a triangle from 3 vertices to the mesh builder.
      */
     private void emitSubdividedTriangle(MeshBuilder builder, Vertex v0, Vertex v1, Vertex v2) {
+        // Apply wave deformation if active
+        v0 = applyWaveIfActive(v0);
+        v1 = applyWaveIfActive(v1);
+        v2 = applyWaveIfActive(v2);
+        
         int i0 = builder.vertex(v0.x(), v0.y(), v0.z(), v0.nx(), v0.ny(), v0.nz(), v0.u(), v0.v());
         int i1 = builder.vertex(v1.x(), v1.y(), v1.z(), v1.nx(), v1.ny(), v1.nz(), v1.u(), v1.v());
         int i2 = builder.vertex(v2.x(), v2.y(), v2.z(), v2.nx(), v2.ny(), v2.nz(), v2.u(), v2.v());
@@ -943,9 +973,24 @@ public final class PolyhedronTessellator implements Tessellator {
     
     /**
      * Emits a single vertex with position, normal, and UV.
+     * Applies wave deformation if active.
      */
     private int emitVertex(MeshBuilder builder, float[] pos, float[] normal, float u, float v) {
-        return builder.vertex(pos[0], pos[1], pos[2], normal[0], normal[1], normal[2], u, v);
+        Vertex vertex = new Vertex(pos[0], pos[1], pos[2], normal[0], normal[1], normal[2], u, v);
+        vertex = applyWaveIfActive(vertex);
+        return builder.vertex(vertex.x(), vertex.y(), vertex.z(), 
+                              vertex.nx(), vertex.ny(), vertex.nz(), 
+                              vertex.u(), vertex.v());
+    }
+    
+    /**
+     * Applies wave deformation if wave is active and in CPU mode.
+     */
+    private Vertex applyWaveIfActive(Vertex v) {
+        if (wave != null && wave.isActive() && wave.isCpuMode()) {
+            return WaveDeformer.applyToVertex(v, wave, waveTime);
+        }
+        return v;
     }
     
     // =========================================================================

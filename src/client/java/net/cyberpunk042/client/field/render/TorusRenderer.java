@@ -37,7 +37,7 @@ public final class TorusRenderer extends AbstractPrimitiveRenderer {
         // Get visibility mask
         VisibilityMask visibility = primitive.visibility();
         
-        return TorusTessellator.tessellate(shape, pattern, visibility);
+        return TorusTessellator.tessellate(shape, pattern, visibility, wave, time);
     }
 }
 

@@ -1,6 +1,8 @@
 package net.cyberpunk042.client.visual.mesh;
 
+import net.cyberpunk042.client.visual.animation.WaveDeformer;
 import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.visual.animation.WaveConfig;
 import net.cyberpunk042.visual.pattern.VertexPattern;
 import net.cyberpunk042.visual.shape.PrismShape;
 import net.cyberpunk042.visual.visibility.VisibilityMask;
@@ -36,9 +38,23 @@ public final class PrismTessellator {
      * @param sidesPattern Pattern for side walls (QUAD)
      * @param capPattern Pattern for top/bottom caps (SECTOR)
      * @param visibility Visibility mask
+     * @param wave Wave configuration for CPU deformation (null = no wave)
+     * @param time Current time for wave animation
      */
     public static Mesh tessellate(PrismShape shape, VertexPattern sidesPattern,
-                                   VertexPattern capPattern, VisibilityMask visibility) {
+                                   VertexPattern capPattern, VisibilityMask visibility,
+                                   WaveConfig wave, float time) {
+        if (shape == null) {
+            throw new IllegalArgumentException("PrismShape cannot be null");
+        }
+        
+        Logging.RENDER.topic("tessellate")
+            .kv("shape", "prism")
+            .kv("sides", shape.sides())
+            .kv("radius", shape.radius())
+            .kv("height", shape.height())
+            .kv("wave", wave != null && wave.isActive())
+            .debug("Tessellating prism");
         if (shape == null) {
             throw new IllegalArgumentException("PrismShape cannot be null");
         }
@@ -64,17 +80,25 @@ public final class PrismTessellator {
         
         // === SIDE FACES (uses sidesPattern) ===
         tessellateSides(builder, sides, bottomR, topR, height, twist, heightSegs, 
-                        yBase, sidesPattern, visibility);
+                        yBase, sidesPattern, visibility, wave, time);
         
         // === CAPS (uses capPattern) ===
         if (shape.capBottom()) {
-            tessellateCap(builder, sides, bottomR, yBase, false, twist, height, yBase, capPattern);
+            tessellateCap(builder, sides, bottomR, yBase, false, twist, height, yBase, capPattern, wave, time);
         }
         if (shape.capTop()) {
-            tessellateCap(builder, sides, topR, yTop, true, twist, height, yBase, capPattern);
+            tessellateCap(builder, sides, topR, yTop, true, twist, height, yBase, capPattern, wave, time);
         }
         
         return builder.build();
+    }
+    
+    /**
+     * Tessellates with separate patterns (backward compatible).
+     */
+    public static Mesh tessellate(PrismShape shape, VertexPattern sidesPattern,
+                                   VertexPattern capPattern, VisibilityMask visibility) {
+        return tessellate(shape, sidesPattern, capPattern, visibility, null, 0);
     }
     
     /**
@@ -82,11 +106,11 @@ public final class PrismTessellator {
      */
     public static Mesh tessellate(PrismShape shape, VertexPattern pattern,
                                    VisibilityMask visibility) {
-        return tessellate(shape, pattern, pattern, visibility);
+        return tessellate(shape, pattern, pattern, visibility, null, 0);
     }
     
     public static Mesh tessellate(PrismShape shape) {
-        return tessellate(shape, null, null, null);
+        return tessellate(shape, null, null, null, null, 0);
     }
     
     // =========================================================================
@@ -97,7 +121,10 @@ public final class PrismTessellator {
                                          float bottomR, float topR, float height,
                                          float twist, int heightSegs,
                                          float yBase, VertexPattern pattern,
-                                         VisibilityMask visibility) {
+                                         VisibilityMask visibility,
+                                         WaveConfig wave, float time) {
+        boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();
+        
         // For each height segment
         for (int h = 0; h < heightSegs; h++) {
             float t0 = h / (float) heightSegs;
@@ -125,6 +152,14 @@ public final class PrismTessellator {
                 Vertex v01 = GeometryMath.prismCorner(s, sides, y1, r1, twist, height, yBase);
                 Vertex v11 = GeometryMath.prismCorner(s + 1, sides, y1, r1, twist, height, yBase);
                 
+                // Apply wave deformation
+                if (applyWave) {
+                    v00 = WaveDeformer.applyToVertex(v00, wave, time);
+                    v10 = WaveDeformer.applyToVertex(v10, wave, time);
+                    v01 = WaveDeformer.applyToVertex(v01, wave, time);
+                    v11 = WaveDeformer.applyToVertex(v11, wave, time);
+                }
+                
                 int i00 = builder.addVertex(v00);
                 int i10 = builder.addVertex(v10);
                 int i01 = builder.addVertex(v01);
@@ -144,9 +179,15 @@ public final class PrismTessellator {
     
     private static void tessellateCap(MeshBuilder builder, int sides, float radius,
                                        float y, boolean isTop, float twist, 
-                                       float height, float yBase, VertexPattern pattern) {
+                                       float height, float yBase, VertexPattern pattern,
+                                       WaveConfig wave, float time) {
+        boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();
+        
         // Center vertex
         Vertex center = GeometryMath.prismFaceCenter(sides, y, radius);
+        if (applyWave) {
+            center = WaveDeformer.applyToVertex(center, wave, time);
+        }
         int centerIdx = builder.addVertex(center);
         
         // Edge vertices
@@ -155,6 +196,9 @@ public final class PrismTessellator {
             Vertex v = GeometryMath.prismCorner(s, sides, y, radius, twist, height, yBase);
             // Adjust normal for cap (up or down)
             v = new Vertex(v.x(), v.y(), v.z(), 0, isTop ? 1 : -1, 0, v.u(), v.v());
+            if (applyWave) {
+                v = WaveDeformer.applyToVertex(v, wave, time);
+            }
             edgeIndices[s] = builder.addVertex(v);
         }
         

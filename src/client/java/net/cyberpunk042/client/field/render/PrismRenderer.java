@@ -52,7 +52,6 @@ public final class PrismRenderer extends AbstractPrimitiveRenderer {
         VisibilityMask visibility = primitive.visibility();
         
         // Tessellate with separate patterns for sides and caps
-        return PrismTessellator.tessellate(shape, sidesPattern, capPattern, visibility);
+        return PrismTessellator.tessellate(shape, sidesPattern, capPattern, visibility, wave, time);
     }
 }
-

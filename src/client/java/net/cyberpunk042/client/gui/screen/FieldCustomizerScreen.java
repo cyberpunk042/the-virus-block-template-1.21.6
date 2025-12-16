@@ -53,8 +53,8 @@ public class FieldCustomizerScreen extends Screen {
     private VisibilityController visibilityController;
     private ContentProviderFactory contentFactory;
     
-    // State
-    private TabType currentTab = TabType.QUICK;
+    // State - load saved tab from persistence
+    private TabType currentTab = GuiConfigPersistence.loadSavedTab();
     private DropdownWidget<String> presetDropdown;
     private ClickableWidget previewModeCheckbox;
     private boolean useFullPreviewRenderer = false;
@@ -190,6 +190,7 @@ public class FieldCustomizerScreen extends Screen {
     private void switchTab(TabType tab) {
         if (tab == currentTab) return;
         currentTab = tab;
+        GuiConfigPersistence.saveTab(tab);  // Persist tab selection
         tabBar.setActiveTab(tab);
         contentArea.setActiveMainTab(tab);
         registerWidgets();

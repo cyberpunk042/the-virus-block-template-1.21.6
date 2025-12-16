@@ -1,6 +1,8 @@
 package net.cyberpunk042.client.visual.mesh;
 
+import net.cyberpunk042.client.visual.animation.WaveDeformer;
 import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.visual.animation.WaveConfig;
 import net.cyberpunk042.visual.pattern.VertexPattern;
 import net.cyberpunk042.visual.shape.CylinderShape;
 import net.cyberpunk042.visual.visibility.VisibilityMask;
@@ -36,9 +38,12 @@ public final class CylinderTessellator {
      * @param sidesPattern Pattern for side walls (QUAD)
      * @param capPattern Pattern for top/bottom caps (SECTOR)
      * @param visibility Visibility mask
+     * @param wave Wave configuration for CPU deformation (null = no wave)
+     * @param time Current time for wave animation
      */
     public static Mesh tessellate(CylinderShape shape, VertexPattern sidesPattern,
-                                   VertexPattern capPattern, VisibilityMask visibility) {
+                                   VertexPattern capPattern, VisibilityMask visibility,
+                                   WaveConfig wave, float time) {
         if (shape == null) {
             throw new IllegalArgumentException("CylinderShape cannot be null");
         }
@@ -48,6 +53,7 @@ public final class CylinderTessellator {
             .kv("radius", shape.radius())
             .kv("height", shape.height())
             .kv("segments", shape.segments())
+            .kv("wave", wave != null && wave.isActive())
             .debug("Tessellating cylinder");
         
         MeshBuilder builder = MeshBuilder.triangles();
@@ -64,17 +70,25 @@ public final class CylinderTessellator {
         
         // === SIDE WALL (uses sidesPattern) ===
         tessellateSideWall(builder, segments, bottomR, topR, height, heightSegs,
-                           yBase, arc, sidesPattern, visibility);
+                           yBase, arc, sidesPattern, visibility, wave, time);
         
         // === CAPS (uses capPattern) ===
         if (shape.capBottom()) {
-            tessellateCap(builder, segments, bottomR, yBase, false, arc, capPattern);
+            tessellateCap(builder, segments, bottomR, yBase, false, arc, capPattern, wave, time);
         }
         if (shape.capTop()) {
-            tessellateCap(builder, segments, topR, yTop, true, arc, capPattern);
+            tessellateCap(builder, segments, topR, yTop, true, arc, capPattern, wave, time);
         }
         
         return builder.build();
+    }
+    
+    /**
+     * Tessellates with separate patterns (backward compatible).
+     */
+    public static Mesh tessellate(CylinderShape shape, VertexPattern sidesPattern,
+                                   VertexPattern capPattern, VisibilityMask visibility) {
+        return tessellate(shape, sidesPattern, capPattern, visibility, null, 0);
     }
     
     /**
@@ -82,11 +96,11 @@ public final class CylinderTessellator {
      */
     public static Mesh tessellate(CylinderShape shape, VertexPattern pattern,
                                    VisibilityMask visibility) {
-        return tessellate(shape, pattern, pattern, visibility);
+        return tessellate(shape, pattern, pattern, visibility, null, 0);
     }
     
     public static Mesh tessellate(CylinderShape shape) {
-        return tessellate(shape, null, null);
+        return tessellate(shape, null, null, null, null, 0);
     }
     
     // =========================================================================
@@ -96,7 +110,10 @@ public final class CylinderTessellator {
     private static void tessellateSideWall(MeshBuilder builder, int segments,
                                             float bottomR, float topR, float height,
                                             int heightSegs, float yBase, float arc,
-                                            VertexPattern pattern, VisibilityMask visibility) {
+                                            VertexPattern pattern, VisibilityMask visibility,
+                                            WaveConfig wave, float time) {
+        boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();
+        
         for (int h = 0; h < heightSegs; h++) {
             float t0 = h / (float) heightSegs;
             float t1 = (h + 1) / (float) heightSegs;
@@ -121,6 +138,14 @@ public final class CylinderTessellator {
                 Vertex v01 = GeometryMath.cylinderTaperedPoint(angle0, t1, bottomR, topR, height, yBase);
                 Vertex v11 = GeometryMath.cylinderTaperedPoint(angle1, t1, bottomR, topR, height, yBase);
                 
+                // Apply wave deformation
+                if (applyWave) {
+                    v00 = WaveDeformer.applyToVertex(v00, wave, time);
+                    v10 = WaveDeformer.applyToVertex(v10, wave, time);
+                    v01 = WaveDeformer.applyToVertex(v01, wave, time);
+                    v11 = WaveDeformer.applyToVertex(v11, wave, time);
+                }
+                
                 int i00 = builder.addVertex(v00);
                 int i10 = builder.addVertex(v10);
                 int i01 = builder.addVertex(v01);
@@ -140,11 +165,17 @@ public final class CylinderTessellator {
     
     private static void tessellateCap(MeshBuilder builder, int segments, 
                                        float radius, float y, boolean isTop, float arc,
-                                       VertexPattern pattern) {
+                                       VertexPattern pattern,
+                                       WaveConfig wave, float time) {
+        boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();
+        
         // Center vertex
         Vertex center = GeometryMath.discCenter(y);
         center = new Vertex(center.x(), center.y(), center.z(), 
                             0, isTop ? 1 : -1, 0, 0.5f, 0.5f);
+        if (applyWave) {
+            center = WaveDeformer.applyToVertex(center, wave, time);
+        }
         int centerIdx = builder.addVertex(center);
         
         // Edge vertices
@@ -153,6 +184,9 @@ public final class CylinderTessellator {
             float angle = (s / (float) segments) * arc;
             Vertex v = GeometryMath.discPoint(angle, radius, y);
             v = new Vertex(v.x(), v.y(), v.z(), 0, isTop ? 1 : -1, 0, v.u(), v.v());
+            if (applyWave) {
+                v = WaveDeformer.applyToVertex(v, wave, time);
+            }
             edgeIndices[s] = builder.addVertex(v);
         }
         

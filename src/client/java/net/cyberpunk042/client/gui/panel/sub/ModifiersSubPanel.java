@@ -2,7 +2,6 @@ package net.cyberpunk042.client.gui.panel.sub;
 
 import net.cyberpunk042.visual.animation.WobbleConfig;
 import net.cyberpunk042.visual.animation.WaveConfig;
-import net.cyberpunk042.visual.animation.WaveConfig.WaveMode;
 import net.cyberpunk042.client.gui.panel.AbstractPanel;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
@@ -52,7 +51,8 @@ public class ModifiersSubPanel extends AbstractPanel {
     private LabeledSlider waveFrequency;
     private LabeledSlider waveSpeed;
     private CyclingButtonWidget<WaveDirection> waveDirection;
-    private CyclingButtonWidget<WaveMode> waveMode;
+    // Note: Wave mode control removed - CPU mode is now the default and only option
+    // since GPU wave deformation is not yet implemented
     
     public enum WaveDirection {
         X("X Axis"), Y("Y Axis"), Z("Z Axis"), RADIAL("Radial");
@@ -227,22 +227,7 @@ public class ModifiersSubPanel extends AbstractPanel {
             waveDirection.setValue(WaveDirection.valueOf(state.getString("wave.direction")));
         } catch (IllegalArgumentException ignored) {}
         widgets.add(waveDirection);
-        currentY += widgetH + gap;
-        
-        // Mode dropdown (full width)
-        WaveMode currentMode = wave != null && wave.mode() != null ? wave.mode() : WaveMode.GPU;
-        waveMode = CyclingButtonWidget.<WaveMode>builder(m -> net.minecraft.text.Text.literal(m.displayName()))
-            .values(WaveMode.values())
-            .initially(currentMode)
-            .build(
-                leftX,
-                currentY,
-                fullW,
-                widgetH,
-                net.minecraft.text.Text.literal("Mode"),
-                (btn, v) -> state.set("wave.mode", v.name())
-            );
-        widgets.add(waveMode);
+        // Note: Mode dropdown removed - CPU is now the default and only option
     }
 
     @Override
