@@ -361,7 +361,7 @@ public final class FragmentRegistry {
         if (json.has("doubleSided")) state.set("fill.doubleSided", json.get("doubleSided").getAsBoolean());
         if (json.has("depthTest")) state.set("fill.depthTest", json.get("depthTest").getAsBoolean());
         if (json.has("depthWrite")) state.set("fill.depthWrite", json.get("depthWrite").getAsBoolean());
-        if (json.has("pointSize")) state.set("pointSize", json.get("pointSize").getAsFloat());
+        if (json.has("pointSize")) state.set("fill.pointSize", json.get("pointSize").getAsFloat());
 
         // Cage settings - build proper cage object based on shape type
         if (json.has("cage")) {

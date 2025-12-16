@@ -26,13 +26,58 @@ public final class FieldEditStateHolder {
     
     /**
      * Gets the current editing state, creating if needed.
+     * Loads the last used profile from preferences if creating a new state.
      */
     public static FieldEditState getOrCreate() {
         if (current == null) {
             current = new FieldEditState();
             Logging.GUI.topic("state").debug("Created new FieldEditState");
+            
+            // Try to load the last used profile
+            tryLoadSavedProfile();
         }
         return current;
+    }
+    
+    /**
+     * Attempts to load the saved profile from preferences.
+     * This populates the FieldEditState with the user's last used profile.
+     */
+    private static void tryLoadSavedProfile() {
+        if (current == null) return;
+        
+        try {
+            String profileName = net.cyberpunk042.client.gui.util.GuiConfigPersistence.loadSavedProfile();
+            if (profileName == null || profileName.isEmpty()) {
+                profileName = "default";
+            }
+            
+            // Try to find and load the profile (including "default" if it's been saved locally)
+            var profileManager = net.cyberpunk042.client.profile.ProfileManager.getInstance();
+            var profileOpt = profileManager.getProfile(profileName);
+            
+            if (profileOpt.isPresent()) {
+                var profile = profileOpt.get();
+                if (profile.definition() != null) {
+                    // Load the profile's definition into the current state
+                    current.loadFromDefinition(profile.definition());
+                    current.setCurrentProfile(profileName, false);
+                    current.clearDirty();
+                    Logging.GUI.topic("state").info("Loaded saved profile: {}", profileName);
+                    return;
+                } else {
+                    Logging.GUI.topic("state").warn("Profile '{}' has no definition, using defaults", profileName);
+                }
+            } else {
+                Logging.GUI.topic("state").debug("Saved profile '{}' not found, using defaults", profileName);
+            }
+            
+            // If we get here, use programmatic defaults
+            Logging.GUI.topic("state").debug("Using programmatic default profile");
+            
+        } catch (Exception e) {
+            Logging.GUI.topic("state").error("Failed to load saved profile", e);
+        }
     }
     
     /**

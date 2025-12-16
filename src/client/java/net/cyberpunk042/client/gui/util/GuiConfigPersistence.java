@@ -133,6 +133,29 @@ public final class GuiConfigPersistence {
     }
     
     // =========================================================================
+    // Profile Persistence
+    // =========================================================================
+    
+    /**
+     * Loads the saved current profile name from preferences.
+     * 
+     * @return The saved profile name, or "default" if not found
+     */
+    public static String loadSavedProfile() {
+        Properties props = loadProperties();
+        return props.getProperty("profile.current", "default");
+    }
+    
+    /**
+     * Saves the current profile name to preferences.
+     * 
+     * @param profileName The profile name to save
+     */
+    public static void saveCurrentProfile(String profileName) {
+        saveProperty("profile.current", profileName != null ? profileName : "default");
+    }
+    
+    // =========================================================================
     // Internal Helpers
     // =========================================================================
     

@@ -7,6 +7,7 @@ import org.joml.Vector3f;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,17 +46,20 @@ public final class JsonSerializer {
      */
     private static final JsonSerializer.Vector3fAdapter VECTOR3F_ADAPTER = new Vector3fAdapter();
     private static final ShapeTypeAdapter SHAPE_ADAPTER = new ShapeTypeAdapter();
+    private static final InstantAdapter INSTANT_ADAPTER = new InstantAdapter();
     
     private static final Gson GSON = new GsonBuilder()
             .setPrettyPrinting()
             .serializeNulls()
             .registerTypeAdapter(Vector3f.class, VECTOR3F_ADAPTER)
             .registerTypeAdapter(net.cyberpunk042.visual.shape.Shape.class, SHAPE_ADAPTER)
+            .registerTypeAdapter(Instant.class, INSTANT_ADAPTER)
             .create();
     
     private static final Gson GSON_COMPACT = new GsonBuilder()
             .registerTypeAdapter(Vector3f.class, VECTOR3F_ADAPTER)
             .registerTypeAdapter(net.cyberpunk042.visual.shape.Shape.class, SHAPE_ADAPTER)
+            .registerTypeAdapter(Instant.class, INSTANT_ADAPTER)
             .create();
     
     /**
@@ -88,6 +92,33 @@ public final class JsonSerializer {
                 }
             }
             throw new JsonParseException("Expected [x, y, z] array for Vector3f");
+        }
+    }
+    
+    /**
+     * Gson TypeAdapter for java.time.Instant.
+     * Serializes as ISO-8601 string, deserializes from same format.
+     * This avoids the Java module system reflection issue.
+     */
+    private static class InstantAdapter implements com.google.gson.JsonSerializer<Instant>, JsonDeserializer<Instant> {
+        @Override
+        public JsonElement serialize(Instant src, Type typeOfSrc, JsonSerializationContext context) {
+            if (src == null) return JsonNull.INSTANCE;
+            return new JsonPrimitive(src.toString()); // ISO-8601 format
+        }
+        
+        @Override
+        public Instant deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) 
+                throws JsonParseException {
+            if (json == null || json.isJsonNull()) return null;
+            if (json.isJsonPrimitive()) {
+                try {
+                    return Instant.parse(json.getAsString());
+                } catch (Exception e) {
+                    throw new JsonParseException("Invalid Instant format: " + json.getAsString(), e);
+                }
+            }
+            throw new JsonParseException("Expected string for Instant");
         }
     }
     
@@ -580,21 +611,51 @@ public final class JsonSerializer {
             if (value == null) {
                 return true;  // Null is always skipped when skipIfEqualsConstant is set
             }
+            
+            String constantSpec = meta.skipIfEqualsConstant;
+            
+            // Handle primitive literals like "0.0f", "1.0f"
+            if (constantSpec.matches("-?\\d+(\\.\\d+)?[fFdD]?")) {
+                try {
+                    if (value instanceof Float) {
+                        float literal = Float.parseFloat(constantSpec.replaceAll("[fFdD]$", ""));
+                        if (Math.abs((Float) value - literal) < 0.0001f) {
+                            return true;
+                        }
+                    } else if (value instanceof Double) {
+                        double literal = Double.parseDouble(constantSpec.replaceAll("[fFdD]$", ""));
+                        if (Math.abs((Double) value - literal) < 0.0001) {
+                            return true;
+                        }
+                    }
+                } catch (NumberFormatException e) {
+                    // Fall through to constant lookup
+                }
+                return false;  // Non-matching primitive
+            }
+            
+            // Extract constant name from potential class-prefixed format (e.g., "Transform.IDENTITY" -> "IDENTITY")
+            String constantName = constantSpec;
+            if (constantSpec.contains(".")) {
+                constantName = constantSpec.substring(constantSpec.lastIndexOf('.') + 1);
+            }
+            
             try {
                 // Look up the static constant on the field's type
                 Class<?> fieldType = meta.field.getType();
-                Field constantField = fieldType.getDeclaredField(meta.skipIfEqualsConstant);
+                Field constantField = fieldType.getDeclaredField(constantName);
                 constantField.setAccessible(true);
                 Object constantValue = constantField.get(null);  // null for static field
                 if (value.equals(constantValue)) {
                     return true;
                 }
             } catch (NoSuchFieldException e) {
-                TheVirusBlock.LOGGER.warn("skipIfEqualsConstant: constant '{}' not found in {}", 
-                        meta.skipIfEqualsConstant, meta.field.getType().getSimpleName());
+                // Only warn if it's not a known-good constant format
+                TheVirusBlock.LOGGER.trace("skipIfEqualsConstant: constant '{}' not found in {}", 
+                        constantName, meta.field.getType().getSimpleName());
             } catch (IllegalAccessException e) {
                 TheVirusBlock.LOGGER.warn("skipIfEqualsConstant: cannot access constant '{}' in {}", 
-                        meta.skipIfEqualsConstant, meta.field.getType().getSimpleName());
+                        constantName, meta.field.getType().getSimpleName());
             }
         }
         

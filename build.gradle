@@ -131,6 +131,7 @@ task copyFragmentsToResources(type: Copy) {
 		include 'field_predictions/**/*.json'
 		include 'field_presets/**/*.json'
 		include 'field_primitives/**/*.json'
+		include 'field_profiles/**/*.json'
 		include 'field_shapes/**/*.json'
 		include 'field_transforms/**/*.json'
 	}

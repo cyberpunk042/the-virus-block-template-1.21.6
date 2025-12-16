@@ -2,7 +2,7 @@ package net.cyberpunk042.client;
 
 import net.cyberpunk042.client.command.FieldEditCommands;
 import net.cyberpunk042.client.command.LogViewerCommand;
-import net.cyberpunk042.client.gui.render.SimplifiedFieldRenderer;
+import net.cyberpunk042.client.gui.render.TestFieldRenderer;
 import net.cyberpunk042.client.network.GuiClientHandlers;
 import net.cyberpunk042.log.Logging;
 import net.fabricmc.api.ClientModInitializer;
@@ -45,7 +45,16 @@ public class GuiClientInit implements ClientModInitializer {
         // ProfileStorage.init();
         
         // G145: Register test field renderer (client-side preview)
-        SimplifiedFieldRenderer.init();
+        TestFieldRenderer.init();
+        
+        // Clear test field on disconnect to prevent double-rendering on rejoin
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register(
+            (handler, client) -> {
+                client.execute(() -> {
+                    net.cyberpunk042.client.gui.state.FieldEditStateHolder.despawnTestField();
+                    Logging.GUI.topic("init").debug("Cleared test field on disconnect");
+                });
+            });
         
         // G146: Register client-side /field edit commands
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, access) -> {

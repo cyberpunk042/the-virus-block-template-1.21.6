@@ -106,6 +106,52 @@ public final class ModalFactory {
     }
     
     /**
+     * Creates a modal for entering a color value as a string.
+     * Supports theme references like @primary, @beam, or hex codes like #FF00FF.
+     */
+    public static ModalDialog createColorInputModal(
+            String currentColorString,
+            TextRenderer textRenderer,
+            int screenWidth, int screenHeight,
+            java.util.function.Consumer<String> onSubmit,
+            Runnable onClose) {
+        
+        final TextFieldWidget[] fieldHolder = new TextFieldWidget[1];
+        
+        ModalDialog modal = new ModalDialog("Enter Color", textRenderer, screenWidth, screenHeight)
+            .size(300, 150)
+            .content((bounds, tr) -> {
+                List<ClickableWidget> widgets = new java.util.ArrayList<>();
+                
+                // Help text label (draw as part of content, positioned above field)
+                // The modal renders this, so we just need the field
+                
+                TextFieldWidget field = new TextFieldWidget(tr, 
+                    bounds.x(), bounds.y() + 25, bounds.width(), 20, net.minecraft.text.Text.literal(""));
+                field.setText(currentColorString);
+                field.setMaxLength(64);
+                field.visible = true;
+                field.active = true;
+                field.setEditable(true);
+                field.setPlaceholder(net.minecraft.text.Text.literal("#RRGGBB or @theme"));
+                fieldHolder[0] = field;
+                widgets.add(field);
+                
+                return widgets;
+            })
+            .addAction("Cancel", () -> {})
+            .addAction("Apply", () -> {
+                if (fieldHolder[0] != null) {
+                    onSubmit.accept(fieldHolder[0].getText());
+                }
+            }, true);
+        
+        modal.onClose(onClose);
+        
+        return modal;
+    }
+    
+    /**
      * Focuses the text field within a modal and selects all text.
      * Call this after showing the modal and registering widgets.
      * 

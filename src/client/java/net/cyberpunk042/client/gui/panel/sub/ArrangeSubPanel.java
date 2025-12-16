@@ -2,7 +2,7 @@ package net.cyberpunk042.client.gui.panel.sub;
 
 import net.cyberpunk042.client.gui.layout.Bounds;
 import net.cyberpunk042.client.gui.panel.AbstractPanel;
-import net.cyberpunk042.client.gui.render.SimplifiedFieldRenderer;
+import net.cyberpunk042.client.gui.render.TestFieldRenderer;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.FragmentRegistry;
@@ -406,8 +406,8 @@ public class ArrangeSubPanel extends AbstractPanel {
         ArrangementConfig updated = current.toBuilder()
             .defaultPattern(patternName)
             .build();
-        state.set(updated);
-        SimplifiedFieldRenderer.markDirty();  // Force mesh rebuild
+        state.set("arrangement", updated);
+        TestFieldRenderer.markDirty();  // Force mesh rebuild
         Logging.GUI.topic("arrange").info("Pattern applied: {}", patternName);
     }
     
@@ -442,8 +442,8 @@ public class ArrangeSubPanel extends AbstractPanel {
             default -> builder.defaultPattern(patternName);
         }
         
-        state.set(builder.build());
-        SimplifiedFieldRenderer.markDirty();  // Force mesh rebuild
+        state.set("arrangement", builder.build());
+        TestFieldRenderer.markDirty();  // Force mesh rebuild
         Logging.GUI.topic("arrange").debug("Part pattern applied: {} = {}", part, patternName);
     }
     

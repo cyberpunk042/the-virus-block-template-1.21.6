@@ -32,7 +32,6 @@ public class AdvancedPanel extends AbstractPanel {
     private TransformSubPanel transformSubPanel;
     private OrbitSubPanel orbitSubPanel;
     private VisibilitySubPanel visibilitySubPanel;
-    private ArrangementSubPanel arrangementSubPanel;
     private FillSubPanel fillSubPanel;
     private LinkingSubPanel linkingSubPanel;
     private PredictionSubPanel predictionSubPanel;  // Now handles unified follow config
@@ -89,11 +88,6 @@ public class AdvancedPanel extends AbstractPanel {
         visibilitySubPanel.init(width, height);
         contentY += visibilitySubPanel.getHeight() + GuiConstants.SECTION_SPACING;
         
-        // Arrangement (patterns)
-        arrangementSubPanel = new ArrangementSubPanel(parent, state, contentY);
-        arrangementSubPanel.init(width, height);
-        contentY += arrangementSubPanel.getHeight() + GuiConstants.SECTION_SPACING;
-        
         // Fill (wireframe, cage)
         fillSubPanel = new FillSubPanel(parent, state, contentY);
         fillSubPanel.init(width, height);
@@ -120,7 +114,6 @@ public class AdvancedPanel extends AbstractPanel {
         if (animationSubPanel != null) animationSubPanel.tick();
         if (transformSubPanel != null) transformSubPanel.tick();
         if (visibilitySubPanel != null) visibilitySubPanel.tick();
-        if (arrangementSubPanel != null) arrangementSubPanel.tick();
         if (fillSubPanel != null) fillSubPanel.tick();
         // linkingSubPanel, predictionSubPanel, followModeSubPanel don't need tick
     }
@@ -141,7 +134,6 @@ public class AdvancedPanel extends AbstractPanel {
         renderSubPanel(transformSubPanel, context, mouseX, mouseY, delta);
         renderSubPanel(orbitSubPanel, context, mouseX, mouseY, delta);
         renderSubPanel(visibilitySubPanel, context, mouseX, mouseY, delta);
-        renderSubPanel(arrangementSubPanel, context, mouseX, mouseY, delta);
         renderSubPanel(fillSubPanel, context, mouseX, mouseY, delta);
         
         // New-style sub-panels render themselves differently

@@ -17,6 +17,7 @@ import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
 import net.cyberpunk042.client.gui.widget.ConfirmDialog;
+import net.cyberpunk042.client.gui.widget.ModalDialog;
 import net.cyberpunk042.network.gui.ProfileSaveC2SPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 
@@ -59,8 +60,11 @@ public class ProfilesPanel extends AbstractPanel {
     
     // Action buttons (RIGHT panel)
     private ButtonWidget loadBtn, saveBtn, saveAsBtn, deleteBtn;
-    private ButtonWidget duplicateBtn, renameBtn;
+    private ButtonWidget duplicateBtn, renameBtn, factoryResetBtn;
     private ButtonWidget saveToServerBtn;
+    
+    // Modal dialog for text input (save as, rename, etc.)
+    private ModalDialog activeDialog;
     
     private static final int FILTER_HEIGHT = 20;
     private static final int FILTER_GAP = 4;
@@ -210,6 +214,11 @@ public class ProfilesPanel extends AbstractPanel {
             .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Rename profile")))
             .build();
         
+        factoryResetBtn = ButtonWidget.builder(Text.literal("⟲ Reset"), btn -> factoryResetProfile())
+            .dimensions(rx + (btnW + BTN_GAP) * 2, btnY, btnW, BTN_HEIGHT)
+            .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Reset to factory defaults")))
+            .build();
+        
         btnY += BTN_HEIGHT + BTN_GAP;
         
         // Row 3: Save to Server (full width, OP only)
@@ -293,9 +302,17 @@ public class ProfilesPanel extends AbstractPanel {
             .filter(p -> {
                 // Source filter
                 if (selectedSource != null) {
-                    boolean isLocal = !p.isServer();
-                    if ("Local".equals(selectedSource) && !isLocal) return false;
-                    if ("Server".equals(selectedSource) && isLocal) return false;
+                    switch (selectedSource) {
+                        case "Local":
+                            if (!p.isLocal()) return false;
+                            break;
+                        case "Server":
+                            if (!p.isServer()) return false;
+                            break;
+                        case "Bundled":
+                            if (!p.isBundled()) return false;
+                            break;
+                    }
                 }
                 // Category filter - check description for category keyword (simplified)
                 if (selectedCategory != null && p.description() != null) {
@@ -306,6 +323,18 @@ public class ProfilesPanel extends AbstractPanel {
                     if (!p.name().toLowerCase().contains(searchText)) return false;
                 }
                 return true;
+            })
+            // Sort: Local first, then Bundled, then Server. Within each, sort by name.
+            .sorted((a, b) -> {
+                // Priority: LOCAL (0), BUNDLED (1), SERVER (2)
+                int priorityA = a.isLocal() ? 0 : (a.isBundled() ? 1 : 2);
+                int priorityB = b.isLocal() ? 0 : (b.isBundled() ? 1 : 2);
+                
+                if (priorityA != priorityB) {
+                    return Integer.compare(priorityA, priorityB);
+                }
+                // Same priority, sort by name
+                return a.name().compareToIgnoreCase(b.name());
             })
             .collect(Collectors.toList());
         
@@ -329,6 +358,15 @@ public class ProfilesPanel extends AbstractPanel {
             renderDualMode(context, mouseX, mouseY, delta);
         } else {
             renderSingleMode(context, mouseX, mouseY, delta);
+        }
+        
+        // Render modal dialog overlay (on top of everything else)
+        if (activeDialog != null && activeDialog.isVisible()) {
+            activeDialog.render(context, mouseX, mouseY, delta);
+            // Render dialog widgets
+            for (var widget : activeDialog.getWidgets()) {
+                widget.render(context, mouseX, mouseY, delta);
+            }
         }
     }
     
@@ -394,7 +432,8 @@ public class ProfilesPanel extends AbstractPanel {
                 ProfileEntry entry = filteredProfiles.get(i);
                 
                 // Source icon
-                String icon = entry.isServer() ? "🔒" : "✎";
+                // Icon: 🔒 = server, 📦 = bundled, ✎ = local
+                String icon = entry.isServer() ? "🔒" : (entry.isBundled() ? "📦" : "✎");
                 context.drawText(textRenderer, icon, listX + 6, itemY + 5, GuiConstants.TEXT_SECONDARY, false);
                 
                 // Profile name
@@ -402,7 +441,7 @@ public class ProfilesPanel extends AbstractPanel {
                 context.drawText(textRenderer, entry.name(), listX + 22, itemY + 5, textColor, false);
                 
                 // Source label (right side)
-                String sourceLabel = entry.isServer() ? "server" : "local";
+                String sourceLabel = entry.isServer() ? "server" : (entry.isBundled() ? "bundled" : "local");
                 int labelWidth = textRenderer.getWidth(sourceLabel);
                 context.drawText(textRenderer, sourceLabel, listX + listW - labelWidth - 8, itemY + 5, 
                     GuiConstants.TEXT_SECONDARY, false);
@@ -442,7 +481,7 @@ public class ProfilesPanel extends AbstractPanel {
         context.drawText(textRenderer, "latSteps: " + state.getInt("sphere.latSteps"), rx + 6, statY, GuiConstants.TEXT_SECONDARY, false);
         context.drawText(textRenderer, "lonSteps: " + state.getInt("sphere.lonSteps"), rx + 90, statY, GuiConstants.TEXT_SECONDARY, false);
         statY += 12;
-        context.drawText(textRenderer, "radius: " + String.format("%.1f", state.getFloat("radius")), rx + 6, statY, GuiConstants.TEXT_SECONDARY, false);
+        context.drawText(textRenderer, "radius: " + String.format("%.1f", state.getFloat("sphere.radius")), rx + 6, statY, GuiConstants.TEXT_SECONDARY, false);
         context.drawText(textRenderer, "alpha: " + String.format("%.2f", state.getFloat("appearance.alpha")), rx + 90, statY, GuiConstants.TEXT_SECONDARY, false);
         
         // Dirty indicator (right panel bottom area, above buttons)
@@ -464,7 +503,12 @@ public class ProfilesPanel extends AbstractPanel {
         if (deleteBtn != null) deleteBtn.render(context, mouseX, mouseY, delta);
         if (saveAsBtn != null) saveAsBtn.render(context, mouseX, mouseY, delta);
         if (duplicateBtn != null) duplicateBtn.render(context, mouseX, mouseY, delta);
-        if (renameBtn != null) renameBtn.render(context, mouseX, mouseY, delta);
+        // Show Factory Reset for default profile, Rename for others
+        if (isDefaultProfileSelected()) {
+            if (factoryResetBtn != null) factoryResetBtn.render(context, mouseX, mouseY, delta);
+        } else {
+            if (renameBtn != null) renameBtn.render(context, mouseX, mouseY, delta);
+        }
         if (saveToServerBtn != null) saveToServerBtn.render(context, mouseX, mouseY, delta);
     }
     
@@ -538,7 +582,12 @@ public class ProfilesPanel extends AbstractPanel {
         if (deleteBtn != null) deleteBtn.render(context, mouseX, mouseY, delta);
         if (saveAsBtn != null) saveAsBtn.render(context, mouseX, mouseY, delta);
         if (duplicateBtn != null) duplicateBtn.render(context, mouseX, mouseY, delta);
-        if (renameBtn != null) renameBtn.render(context, mouseX, mouseY, delta);
+        // Show Factory Reset for default profile, Rename for others
+        if (isDefaultProfileSelected()) {
+            if (factoryResetBtn != null) factoryResetBtn.render(context, mouseX, mouseY, delta);
+        } else {
+            if (renameBtn != null) renameBtn.render(context, mouseX, mouseY, delta);
+        }
     }
     
     private int drawSummaryLine(DrawContext context, net.minecraft.client.font.TextRenderer textRenderer,
@@ -591,7 +640,12 @@ public class ProfilesPanel extends AbstractPanel {
         if (saveAsBtn != null) list.add(saveAsBtn);
         if (deleteBtn != null) list.add(deleteBtn);
         if (duplicateBtn != null) list.add(duplicateBtn);
-        if (renameBtn != null) list.add(renameBtn);
+        // Only add ONE of these - depending on whether default profile is selected
+        if (isDefaultProfileSelected()) {
+            if (factoryResetBtn != null) list.add(factoryResetBtn);
+        } else {
+            if (renameBtn != null) list.add(renameBtn);
+        }
         if (saveToServerBtn != null) list.add(saveToServerBtn);
         return list;
     }
@@ -601,6 +655,22 @@ public class ProfilesPanel extends AbstractPanel {
     // ═══════════════════════════════════════════════════════════════════════════
     
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        // Handle modal dialog first
+        if (activeDialog != null && activeDialog.isVisible()) {
+            // Check dialog widgets
+            for (var widget : activeDialog.getWidgets()) {
+                if (widget.mouseClicked(mouseX, mouseY, button)) {
+                    return true;
+                }
+            }
+            // Clicking outside the dialog closes it
+            if (!activeDialog.containsClick(mouseX, mouseY)) {
+                activeDialog.hide();
+                activeDialog = null;
+            }
+            return true; // Consume click when dialog is visible
+        }
+        
         if (button != 0) return false;
         
         // Determine list bounds
@@ -651,6 +721,49 @@ public class ProfilesPanel extends AbstractPanel {
         return true;
     }
     
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        // Handle modal dialog first
+        if (activeDialog != null && activeDialog.isVisible()) {
+            // ESC closes dialog
+            if (activeDialog.keyPressed(keyCode)) {
+                activeDialog = null;
+                return true;
+            }
+            // Forward to dialog widgets (for text field navigation)
+            for (var widget : activeDialog.getWidgets()) {
+                if (widget instanceof net.minecraft.client.gui.widget.TextFieldWidget tf) {
+                    if (tf.keyPressed(keyCode, scanCode, modifiers)) {
+                        return true;
+                    }
+                }
+            }
+            return true; // Consume key when dialog is visible
+        }
+        return false;
+    }
+    
+    public boolean charTyped(char chr, int modifiers) {
+        // Handle modal dialog first
+        if (activeDialog != null && activeDialog.isVisible()) {
+            for (var widget : activeDialog.getWidgets()) {
+                if (widget instanceof net.minecraft.client.gui.widget.TextFieldWidget tf) {
+                    if (tf.charTyped(chr, modifiers)) {
+                        return true;
+                    }
+                }
+            }
+            return true; // Consume char when dialog is visible
+        }
+        return false;
+    }
+    
+    /**
+     * Returns true if a modal dialog is currently visible.
+     */
+    public boolean isDialogVisible() {
+        return activeDialog != null && activeDialog.isVisible();
+    }
+    
     // ═══════════════════════════════════════════════════════════════════════════
     // PROFILE ACTIONS
     // ═══════════════════════════════════════════════════════════════════════════
@@ -669,20 +782,40 @@ public class ProfilesPanel extends AbstractPanel {
         return null;
     }
     
+    private boolean isDefaultProfileSelected() {
+        ProfileEntry entry = getSelectedProfile();
+        return entry != null && "default".equals(entry.name());
+    }
+    
     private void updateButtonStates() {
         ProfileEntry selected = getSelectedProfile();
         boolean hasSelection = selected != null;
         boolean isServerProfile = hasSelection && selected.isServer();
         boolean isDefaultProfile = hasSelection && selected.name().equalsIgnoreCase("default");
-        boolean canModify = hasSelection && !isServerProfile;
+        boolean isBundledProfile = hasSelection && selected.isBundled();
+        
+        // canModify: local profiles only (not server, not bundled)
+        boolean canModify = hasSelection && !isServerProfile && !isBundledProfile;
+        // canDelete: modifiable profiles except default
         boolean canDelete = canModify && !isDefaultProfile;
+        // showFactoryReset: for default and bundled profiles (restore original)
+        boolean showFactoryReset = hasSelection && (isDefaultProfile || isBundledProfile);
 
         if (loadBtn != null) loadBtn.active = hasSelection;
-        if (saveBtn != null) saveBtn.active = canModify && state.isDirty();
+        if (saveBtn != null) saveBtn.active = canModify;  // Allow save for local profiles (don't require dirty)
         if (deleteBtn != null) deleteBtn.active = canDelete;
         if (saveAsBtn != null) saveAsBtn.active = true;
         if (duplicateBtn != null) duplicateBtn.active = hasSelection;
-        if (renameBtn != null) renameBtn.active = canModify;
+        
+        // Rename vs Factory Reset: swap visibility based on profile type
+        if (renameBtn != null) {
+            renameBtn.visible = !showFactoryReset;
+            renameBtn.active = canModify;
+        }
+        if (factoryResetBtn != null) {
+            factoryResetBtn.visible = showFactoryReset;
+            factoryResetBtn.active = showFactoryReset;
+        }
         
         if (saveToServerBtn != null) {
             var player = MinecraftClient.getInstance().player;
@@ -694,60 +827,190 @@ public class ProfilesPanel extends AbstractPanel {
     
     private void loadProfile() {
         ProfileEntry entry = getSelectedProfile();
-        if (entry != null) {
-            // Set as current profile (actual loading happens via network for server profiles)
-            state.setCurrentProfile(entry.name(), entry.isServer());
-            ToastNotification.success("Loaded: " + entry.name());
-            Logging.GUI.info("Loaded profile: {}", entry.name());
+        if (entry == null) return;
+        
+        try {
+            // Get the profile from manager (search by name, not id)
+            var profileManager = net.cyberpunk042.client.profile.ProfileManager.getInstance();
+            var profileOpt = profileManager.getProfileByName(entry.name());
+            
+            if (profileOpt.isPresent()) {
+                var profile = profileOpt.get();
+                if (profile.definition() != null) {
+                    // Load the profile's definition into the current state
+                    state.loadFromDefinition(profile.definition());
+                    state.setCurrentProfile(entry.name(), entry.isServer());
+                    state.clearDirty();
+                    
+                    // Persist the current profile name for next startup (local profiles only)
+                    if (entry.isLocal()) {
+                        net.cyberpunk042.client.gui.util.GuiConfigPersistence.saveCurrentProfile(entry.name());
+                    }
+                    
+                    ToastNotification.success("Loaded: " + entry.name());
+                    Logging.GUI.info("Loaded profile: {} (source={})", entry.name(), profile.source());
+                } else {
+                    ToastNotification.warning("Profile has no definition: " + entry.name());
+                    Logging.GUI.warn("Profile {} has null definition", entry.name());
+                }
+            } else {
+                // Profile not found - for server profiles this is expected (loaded via network)
+                if (entry.isServer()) {
+                    state.setCurrentProfile(entry.name(), true);
+                    ToastNotification.info("Server profile selected: " + entry.name());
+                } else {
+                    ToastNotification.error("Profile not found: " + entry.name());
+                    Logging.GUI.error("Profile not found by name: {}", entry.name());
+                }
+            }
+        } catch (Exception e) {
+            Logging.GUI.error("Failed to load profile: {}", entry.name(), e);
+            ToastNotification.error("Load failed: " + e.getMessage());
         }
     }
     
     private void saveProfile() {
         ProfileEntry entry = getSelectedProfile();
         if (entry != null && !entry.isServer()) {
-            // Mark as saved (actual persistence is external)
-            state.setCurrentProfile(entry.name(), false);
-            state.clearDirty();
-            ToastNotification.success("Saved: " + entry.name());
-            Logging.GUI.info("Saved profile: {}", entry.name());
-            updateButtonStates();
+            try {
+                // Build the definition from current state
+                var definition = net.cyberpunk042.client.gui.state.DefinitionBuilder.fromState(state);
+                
+                // Create a profile with the current name
+                var profile = net.cyberpunk042.field.profile.Profile.builder()
+                    .id(entry.name())
+                    .name(entry.name())
+                    .source(net.cyberpunk042.field.category.ProfileSource.LOCAL)
+                    .definition(definition)
+                    .build();
+                
+                // Save to disk
+                net.cyberpunk042.client.profile.ProfileManager.getInstance().saveProfile(profile);
+                
+                // Persist the current profile name for next startup
+                net.cyberpunk042.client.gui.util.GuiConfigPersistence.saveCurrentProfile(entry.name());
+                
+                // Mark as saved
+                state.setCurrentProfile(entry.name(), false);
+                state.clearDirty();
+                ToastNotification.success("Saved: " + entry.name());
+                Logging.GUI.info("Saved profile: {}", entry.name());
+                updateButtonStates();
+            } catch (Exception e) {
+                Logging.GUI.error("Failed to save profile: {}", entry.name(), e);
+                ToastNotification.error("Save failed: " + e.getMessage());
+            }
         }
     }
     
     private void saveAsProfile() {
-        String name = nameField != null ? nameField.getText().trim() : "";
+        // Show modal dialog to enter new profile name
+        MinecraftClient client = MinecraftClient.getInstance();
+        activeDialog = ModalDialog.textInput(
+            "Save Profile As",
+            "new_profile",
+            client.textRenderer,
+            parent.width,
+            parent.height,
+            name -> doSaveAsProfile(name.trim())
+        );
+        activeDialog.show();
+    }
+    
+    private void doSaveAsProfile(String name) {
         if (name.isEmpty()) {
             ToastNotification.warning("Enter a profile name");
             return;
         }
         
-        boolean exists = allProfiles.stream().anyMatch(p -> p.name().equals(name));
+        // Sanitize ID (lowercase, underscores for spaces)
+        String tempId = name.toLowerCase().replaceAll("\\s+", "_").replaceAll("[^a-z0-9_]", "");
+        final String id = tempId.isEmpty() ? "profile_" + System.currentTimeMillis() : tempId;
+        
+        boolean exists = allProfiles.stream().anyMatch(p -> 
+            p.name().equalsIgnoreCase(name) || id.equals(p.name().toLowerCase().replaceAll("\\s+", "_")));
         if (exists) {
-            ToastNotification.warning("Profile already exists");
+            ToastNotification.warning("Profile '" + name + "' already exists");
             return;
         }
         
-        // Add to local profiles list and set as current
-        allProfiles.add(new ProfileEntry(name, false, ""));
+        // Build the current field definition from state
+        var definition = net.cyberpunk042.client.gui.state.DefinitionBuilder.fromState(state);
+        
+        // Create profile with the definition
+        var profile = net.cyberpunk042.field.profile.Profile.builder()
+            .id(id)
+            .name(name)
+            .source(net.cyberpunk042.field.category.ProfileSource.LOCAL)
+            .definition(definition)
+            .build();
+        
+        // Save via ProfileManager
+        net.cyberpunk042.client.profile.ProfileManager.getInstance().saveProfile(profile);
+        
+        // Sync profile list from file manager (picks up the newly saved profile)
+        state.profiles().syncFromFileProfileManager();
+        this.allProfiles.clear();
+        this.allProfiles.addAll(state.getProfiles());
+        
+        // Set as current profile
         state.setCurrentProfile(name, false);
         state.clearDirty();
         applyFilters();
-        ToastNotification.success("Created: " + name);
+        
+        // Select the new profile in the list
+        for (int i = 0; i < filteredProfiles.size(); i++) {
+            if (filteredProfiles.get(i).name().equals(name)) {
+                selectedProfileIndex = i;
+                break;
+            }
+        }
+        
+        // Persist the current profile name for next startup
+        net.cyberpunk042.client.gui.util.GuiConfigPersistence.saveCurrentProfile(name);
+        
+        ToastNotification.success("Saved as: " + name);
         Logging.GUI.info("Created profile: {}", name);
     }
     
     private void deleteProfile() {
         ProfileEntry entry = getSelectedProfile();
-        if (entry != null && !entry.isServer()) {
-            // Prevent deleting the default profile
-            if (entry.name().equalsIgnoreCase("default")) {
-                ToastNotification.warning("Cannot delete default profile");
-                return;
-            }
-            allProfiles.remove(entry);
+        if (entry == null) {
+            ToastNotification.warning("Select a profile first");
+            return;
+        }
+        
+        if (entry.isServer()) {
+            ToastNotification.warning("Cannot delete server profiles");
+            return;
+        }
+        
+        // Prevent deleting the default profile
+        if (entry.name().equalsIgnoreCase("default")) {
+            ToastNotification.warning("Cannot delete default profile");
+            return;
+        }
+        
+        // Check if it's a bundled profile (can't delete these)
+        if (entry.isBundled()) {
+            ToastNotification.warning("Cannot delete bundled profiles");
+            return;
+        }
+        
+        // Delete from file manager (this deletes from disk and memory)
+        var profileManager = net.cyberpunk042.client.profile.ProfileManager.getInstance();
+        boolean deleted = profileManager.deleteProfileByName(entry.name());
+        if (deleted) {
+            // Sync the profile list
+            state.profiles().syncFromFileProfileManager();
+            allProfiles.clear();
+            allProfiles.addAll(state.getProfiles());
             applyFilters();
+            selectedProfileIndex = -1;
             ToastNotification.success("Deleted: " + entry.name());
             Logging.GUI.info("Deleted profile: {}", entry.name());
+        } else {
+            ToastNotification.error("Failed to delete profile");
         }
     }
     
@@ -796,6 +1059,46 @@ public class ProfilesPanel extends AbstractPanel {
         applyFilters();
         ToastNotification.success("Renamed to: " + newName);
         Logging.GUI.info("Renamed profile {} to {}", entry.name(), newName);
+    }
+    
+    private void factoryResetProfile() {
+        ProfileEntry entry = getSelectedProfile();
+        if (entry == null) return;
+        
+        // Only allow factory reset for default and bundled profiles
+        boolean isDefault = "default".equalsIgnoreCase(entry.name());
+        boolean isBundled = entry.isBundled();
+        
+        if (!isDefault && !isBundled) {
+            ToastNotification.warning("Factory reset only for default/bundled profiles");
+            return;
+        }
+        
+        // Ensure the current profile matches the selected entry before reset
+        state.setCurrentProfile(entry.name(), entry.isServer());
+        
+        // For default, reset to programmatic defaults
+        if (isDefault) {
+            state.reset();
+            state.clearDirty();
+            ToastNotification.success("Default profile reset to factory settings");
+            Logging.GUI.info("Factory reset applied to default profile");
+            return;
+        }
+        
+        // For bundled profiles, reload from the file-based ProfileManager
+        var profileManager = net.cyberpunk042.client.profile.ProfileManager.getInstance();
+        var profileOpt = profileManager.getProfileByName(entry.name());
+        
+        if (profileOpt.isPresent() && profileOpt.get().definition() != null) {
+            state.loadFromDefinition(profileOpt.get().definition());
+            state.clearDirty();
+            ToastNotification.success("Reset to original: " + entry.name());
+            Logging.GUI.info("Factory reset applied to bundled profile: {}", entry.name());
+        } else {
+            ToastNotification.error("Could not find original definition for: " + entry.name());
+            Logging.GUI.error("Factory reset failed - no definition for: {}", entry.name());
+        }
     }
     
     private void promptSaveToServer() {

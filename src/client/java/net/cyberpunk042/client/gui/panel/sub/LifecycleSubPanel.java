@@ -170,14 +170,14 @@ public class LifecycleSubPanel extends AbstractPanel {
     // ═══════════════════════════════════════════════════════════════════════════
     
     private LifecycleConfig getLifecycleConfig() {
-        LifecycleConfig config = state.get(LifecycleConfig.class);
+        LifecycleConfig config = state.lifecycle();
         return config != null ? config : LifecycleConfig.DEFAULT;
     }
     
     private void updateLifecycle(java.util.function.Function<LifecycleConfig, LifecycleConfig> updater) {
         LifecycleConfig current = getLifecycleConfig();
         LifecycleConfig updated = updater.apply(current);
-        state.set(updated);
+        state.set("lifecycle", updated);
     }
     
     private void updateDecay(java.util.function.Function<DecayConfig, DecayConfig> updater) {
@@ -185,11 +185,11 @@ public class LifecycleSubPanel extends AbstractPanel {
         DecayConfig currentDecay = config.decay() != null ? config.decay() : DecayConfig.NONE;
         DecayConfig updatedDecay = updater.apply(currentDecay);
         LifecycleConfig updated = config.toBuilder().decay(updatedDecay).build();
-        state.set(updated);
+        state.set("lifecycle", updated);
     }
     
     private void applyPreset(LifecycleConfig preset) {
-        state.set(preset);
+        state.set("lifecycle", preset);
         // Refresh sliders to show new values
         init(panelWidth, panelHeight);
     }

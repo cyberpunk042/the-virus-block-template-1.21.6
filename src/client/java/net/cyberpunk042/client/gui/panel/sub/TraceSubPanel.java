@@ -4,7 +4,6 @@ import net.cyberpunk042.client.gui.panel.AbstractPanel;
 import net.cyberpunk042.client.gui.state.DefinitionBuilder;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.state.PipelineTracer;
-import net.cyberpunk042.client.gui.state.StateAccessor;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.GuiWidgets;
 import net.cyberpunk042.client.gui.widget.ToastNotification;
@@ -130,7 +129,7 @@ public class TraceSubPanel extends AbstractPanel {
      */
     private void dumpStateJson() {
         try {
-            JsonObject json = StateAccessor.toJson(state);
+            JsonObject json = state.toJson(); // Uses SerializationManager - includes adapters + layers
             String pretty = GSON.toJson(json);
             
             Logging.GUI.topic("debug").info("=== RAW FIELD EDIT STATE ===\n" +

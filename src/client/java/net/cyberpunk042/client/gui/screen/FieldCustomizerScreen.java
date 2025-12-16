@@ -5,7 +5,7 @@ import net.cyberpunk042.client.gui.layout.*;
 import net.cyberpunk042.client.gui.panel.*;
 import net.cyberpunk042.client.gui.panel.sub.*;
 import net.cyberpunk042.client.gui.preview.FieldPreviewRenderer;
-import net.cyberpunk042.client.gui.render.SimplifiedFieldRenderer;
+import net.cyberpunk042.client.gui.render.TestFieldRenderer;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.state.FieldEditStateHolder;
 import net.cyberpunk042.client.gui.widget.*;
@@ -181,10 +181,31 @@ public class FieldCustomizerScreen extends Screen {
     }
     
     private void resetState() {
-        state.reset();
+        // Reload the current profile from disk (revert unsaved changes)
+        String currentProfileName = state.profiles().getCurrentName();
+        
+        Logging.GUI.topic("screen").info("Reset requested for profile: '{}'", currentProfileName);
+        
+        var profileManager = net.cyberpunk042.client.profile.ProfileManager.getInstance();
+        var profileOpt = profileManager.getProfile(currentProfileName);
+        
+        Logging.GUI.topic("screen").info("Profile lookup result: present={}, hasDef={}", 
+            profileOpt.isPresent(), 
+            profileOpt.isPresent() && profileOpt.get().definition() != null);
+        
+        if (profileOpt.isPresent() && profileOpt.get().definition() != null) {
+            // Reload from saved profile
+            state.loadFromDefinition(profileOpt.get().definition());
+            state.clearDirty();
+            ToastNotification.info("Reverted to saved: " + currentProfileName);
+        } else {
+            // No saved profile found - reset to programmatic defaults
+            state.reset();
+            ToastNotification.info("Reset to defaults (no saved profile: " + currentProfileName + ")");
+        }
+        
         clearChildren();
         init();
-        ToastNotification.info("Reset to defaults");
     }
     
     private void switchTab(TabType tab) {
@@ -209,7 +230,7 @@ public class FieldCustomizerScreen extends Screen {
     // ═══════════════════════════════════════════════════════════════════════════
     
     private void onStateChanged() {
-        SimplifiedFieldRenderer.markDirty();
+        TestFieldRenderer.markDirty();
         if (state.getBool("livePreviewEnabled")) {
             GuiPacketSender.updateDebugField(state.toStateJson());
         }
@@ -227,7 +248,7 @@ public class FieldCustomizerScreen extends Screen {
         // IMPORTANT: Rebuild shape panel to show selected primitive's shape values
         initShapePanel();
         registerWidgets();
-        SimplifiedFieldRenderer.markDirty();
+        TestFieldRenderer.markDirty();
     }
     
     private void onPresetSelected(String presetName) {
@@ -386,6 +407,18 @@ public class FieldCustomizerScreen extends Screen {
     
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        // Forward to ProfilesPanel dialog first (if visible)
+        if (profilesPanel != null && profilesPanel.isDialogVisible()) {
+            if (profilesPanel.mouseClicked(mouseX, mouseY, button)) {
+                return true;
+            }
+        }
+        // Forward to ProfilesPanel for list selection when on PROFILES tab
+        if (currentTab == TabType.PROFILES && profilesPanel != null) {
+            if (profilesPanel.mouseClicked(mouseX, mouseY, button)) {
+                return true;
+            }
+        }
         if (presetConfirmDialog != null && presetConfirmDialog.isVisible()) {
             presetConfirmDialog.mouseClicked((int)mouseX, (int)mouseY, button);
             return true;
@@ -400,6 +433,12 @@ public class FieldCustomizerScreen extends Screen {
     
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        // Forward to ProfilesPanel dialog first (if visible)
+        if (profilesPanel != null && profilesPanel.isDialogVisible()) {
+            if (profilesPanel.keyPressed(keyCode, scanCode, modifiers)) {
+                return true;
+            }
+        }
         // Modal handling
         if (activeModal != null && activeModal.isVisible()) {
             if (keyCode == 256) { activeModal.hide(); return true; }
@@ -431,6 +470,12 @@ public class FieldCustomizerScreen extends Screen {
     
     @Override
     public boolean charTyped(char chr, int modifiers) {
+        // Forward to ProfilesPanel dialog first (if visible)
+        if (profilesPanel != null && profilesPanel.isDialogVisible()) {
+            if (profilesPanel.charTyped(chr, modifiers)) {
+                return true;
+            }
+        }
         if (activeModal != null && activeModal.isVisible()) return super.charTyped(chr, modifiers);
         return super.charTyped(chr, modifiers);
     }
@@ -441,6 +486,15 @@ public class FieldCustomizerScreen extends Screen {
     
     @Override
     public boolean shouldPause() { return mode == GuiMode.FULLSCREEN; }
+    
+    @Override
+    protected void applyBlur(DrawContext context) {
+        // In windowed mode, skip blur so game world is clearly visible
+        if (mode == GuiMode.FULLSCREEN) {
+            super.applyBlur(context);
+        }
+        // In windowed mode, do nothing (no blur)
+    }
     
     @Override
     public void close() {
@@ -492,7 +546,8 @@ public class FieldCustomizerScreen extends Screen {
     }
     
     private List<String> getPrimitiveNames() {
-        return new java.util.ArrayList<>(state.getPrimitivesForLayer(state.getSelectedLayerIndex()));
+        return state.getPrimitivesForLayer(state.getSelectedLayerIndex())
+            .stream().map(p -> p.id()).collect(java.util.stream.Collectors.toList());
     }
     
     private void renderPanelInBounds(DrawContext ctx, AbstractPanel panel, Bounds bounds, int mouseX, int mouseY, float delta) {

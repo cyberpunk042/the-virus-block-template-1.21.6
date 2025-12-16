@@ -108,20 +108,13 @@ public class ShapeSubPanel extends AbstractPanel {
     private CyclingButtonWidget<String> patternTop;
     private CyclingButtonWidget<String> patternBottom;
     
-    // Available pattern options - includes patterns from ALL CellTypes:
-    // SEGMENT (rings): full, alternating, sparse, quarter
-    // SECTOR (disc, caps): full, half, quarters, pinwheel
-    // TRIANGLE (polyhedra): full, alternating, sparse
-    // QUAD (spheres, cylinder sides): filled_1, triangle_1, tooth_1
+    // Available pattern options for shape arrangements
+    // These control which cells are visible (full, half, etc.)
+    // NOT the quad cell subdivision patterns (those are in ArrangementSubPanel.QuadPattern)
     private static final List<String> PATTERN_OPTIONS = List.of(
-        "full",         // Universal: SEGMENT, SECTOR, TRIANGLE
-        "alternating",  // SEGMENT, TRIANGLE
-        "sparse",       // SEGMENT, TRIANGLE
-        "half",         // SECTOR (disc, caps): every other
-        "pinwheel",     // SECTOR: alternating pattern
-        "filled_1",     // QUAD: standard filled
-        "triangle_1",   // QUAD: triangle variation
-        "tooth_1"       // QUAD: tooth/sawtooth
+        "full",         // All cells visible
+        "half",         // Every other cell
+        "filled_1"      // Standard filled
     );
     
     // Shape type selector
@@ -331,15 +324,14 @@ public class ShapeSubPanel extends AbstractPanel {
         y += step;
         
         // Row 4: Quad Pattern (cell-level arrangement for sphere quads)
-        // Convert enum name to pattern name (e.g., FILLED -> "filled_1", TRIANGLE_1 -> "triangle_1")
+        // Convert enum name to pattern name (e.g., FILLED_1 -> "filled_1", MESHED_2 -> "meshed_2")
         var quadPatternDropdown = GuiWidgets.enumDropdown(
             x, y, w, GuiConstants.COMPACT_HEIGHT, "Quad Pattern", 
-            ArrangementSubPanel.QuadPattern.class, ArrangementSubPanel.QuadPattern.FILLED,
+            net.cyberpunk042.visual.pattern.QuadPattern.class, net.cyberpunk042.visual.pattern.QuadPattern.FILLED_1,
             "Cell-level pattern for quad tessellation", 
             v -> onUserChange(() -> {
-                // Convert enum to pattern name (e.g., FILLED -> "filled_1", TRIANGLE_1 -> "triangle_1")
-                String patternName = v.name().toLowerCase() + "_1";
-                if (patternName.equals("filled_1")) patternName = "filled_1";  // already correct
+                // Convert enum to pattern name (e.g., FILLED_1 -> "filled_1", MESHED_2 -> "meshed_2")
+                String patternName = v.id();
                 state.set("arrangement.defaultPattern", patternName);
             })
         );
@@ -789,7 +781,7 @@ public class ShapeSubPanel extends AbstractPanel {
             case "capBottom" -> builder.capBottom(patternName);
         }
         
-        state.set(builder.build());
+        state.set("arrangement", builder.build());
         Logging.GUI.topic("panel").debug("Pattern changed: {} = {}", partName, patternName);
     }
     

@@ -8,12 +8,8 @@ import net.cyberpunk042.field.category.ProfileCategory;
 import net.cyberpunk042.field.category.ProfileSource;
 import net.cyberpunk042.field.profile.Profile;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.resource.Resource;
-import net.minecraft.util.Identifier;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -24,9 +20,9 @@ import java.util.stream.Stream;
  * Manages loading, saving, and filtering profiles from multiple sources.
  * 
  * Sources:
- * - BUNDLED: assets/the-virus-block/shield_profiles/ (read-only)
- * - LOCAL: config/the-virus-block/field_profiles/local/ (editable)
- * - SERVER: received via network (read-only)
+ * - SERVER: assets/the-virus-block/field_profiles/*.json (bundled, can be overridden)
+ * - BUNDLED: assets/the-virus-block/field_profiles/personal/*.json (personal presets)
+ * - LOCAL: config/the-virus-block/field_profiles/local/*.json (user-modified)
  */
 public class ProfileManager {
     
@@ -63,32 +59,153 @@ public class ProfileManager {
     }
     
     /**
-     * Load bundled profiles from mod assets.
+     * Load profiles from JAR data (data/the-virus-block/field_profiles/).
+     * - field_profiles/*.json = SERVER profiles (can be overridden by server)
+     * - field_profiles/personal/*.json = BUNDLED personal presets
      */
     private void loadBundled() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null || client.getResourceManager() == null) {
+        FabricLoader.getInstance().getModContainer(TheVirusBlock.MOD_ID).ifPresent(container -> {
+            container.findPath("data/" + TheVirusBlock.MOD_ID + "/field_profiles")
+                .ifPresent(path -> {
+                    TheVirusBlock.LOGGER.info("Loading bundled profiles from: {}", path);
+                    loadProfilesFromPath(path, ProfileSource.SERVER);
+                    
+                    // Also load personal presets
+                    try {
+                        Path personalPath = path.resolve("personal");
+                        if (Files.isDirectory(personalPath)) {
+                            loadProfilesFromPath(personalPath, ProfileSource.BUNDLED);
+                        }
+                    } catch (Exception e) {
+                        TheVirusBlock.LOGGER.debug("No personal profiles folder");
+                    }
+                });
+        });
+    }
+    
+    /**
+     * Load all profiles from a Path (can be in JAR or filesystem).
+     */
+    private void loadProfilesFromPath(Path dir, ProfileSource source) {
+        if (!Files.isDirectory(dir)) {
+            TheVirusBlock.LOGGER.debug("Profile directory does not exist: {}", dir);
             return;
         }
         
-        // Find all JSON files in assets/the-virus-block/shield_profiles/
-        String prefix = "shield_profiles";
-        Map<Identifier, Resource> resources = client.getResourceManager()
-            .findResources(prefix, path -> path.getPath().endsWith(".json"));
-        
-        for (Map.Entry<Identifier, Resource> entry : resources.entrySet()) {
-            if (!entry.getKey().getNamespace().equals(TheVirusBlock.MOD_ID)) {
-                continue;
+        try (Stream<Path> files = Files.list(dir)) {
+            files.filter(Files::isRegularFile)
+                .filter(p -> p.getFileName().toString().endsWith(".json"))
+                .forEach(file -> loadProfileFromPath(file, source));
+        } catch (IOException e) {
+            TheVirusBlock.LOGGER.error("Failed to scan profiles in: {}", dir, e);
+        }
+    }
+    
+    /**
+     * Load a single profile from a Path.
+     */
+    private void loadProfileFromPath(Path file, ProfileSource source) {
+        try {
+            String content = Files.readString(file);
+            JsonObject json = GSON.fromJson(content, JsonObject.class);
+            
+            // Derive id/name from filename
+            String filename = file.getFileName().toString();
+            String derivedId = filename.replace(".json", "");
+            
+            // Ensure JSON has id and name
+            if (!json.has("id") || "unknown".equals(json.get("id").getAsString())) {
+                json.addProperty("id", derivedId);
+            }
+            if (!json.has("name") || "unknown".equals(json.get("name").getAsString())) {
+                String prettyName = derivedId.replace("_", " ").replace("-", " ");
+                if (!prettyName.isEmpty()) {
+                    prettyName = prettyName.substring(0, 1).toUpperCase() + prettyName.substring(1);
+                }
+                json.addProperty("name", prettyName);
             }
             
-            try (InputStreamReader reader = new InputStreamReader(entry.getValue().getInputStream())) {
-                JsonObject json = GSON.fromJson(reader, JsonObject.class);
-                Profile profile = Profile.fromJson(json, ProfileSource.BUNDLED);
-                allProfiles.add(profile);
-                TheVirusBlock.LOGGER.debug("Loaded bundled profile: {}", profile.name());
-            } catch (Exception e) {
-                TheVirusBlock.LOGGER.error("Failed to load bundled profile: {}", entry.getKey(), e);
+            // Parse the profile
+            Profile profile;
+            if (!json.has("definition")) {
+                // Old format: entire JSON is the definition
+                net.cyberpunk042.field.FieldDefinition definition = 
+                    net.cyberpunk042.field.FieldDefinition.fromJson(json);
+                
+                String id = json.has("id") ? json.get("id").getAsString() : derivedId;
+                String name = json.has("name") ? json.get("name").getAsString() : derivedId;
+                
+                profile = Profile.builder()
+                    .id(id)
+                    .name(name)
+                    .source(source)
+                    .definition(definition)
+                    .build();
+            } else {
+                // New format: proper Profile structure
+                profile = Profile.fromJson(json, source);
             }
+            
+            allProfiles.add(profile);
+            TheVirusBlock.LOGGER.debug("Loaded {} profile: {}", source.name().toLowerCase(), profile.name());
+        } catch (Exception e) {
+            TheVirusBlock.LOGGER.error("Failed to load profile: {}", file, e);
+        }
+    }
+    
+    /**
+     * Load a single profile from a file.
+     */
+    private void loadProfileFromFile(Path file, ProfileSource source) {
+        try {
+            String content = Files.readString(file);
+            JsonObject json = GSON.fromJson(content, JsonObject.class);
+            
+            // Derive id/name from filename if not in JSON
+            String filename = file.getFileName().toString();
+            String derivedId = filename.replace(".json", "");
+            
+            // Ensure JSON has id and name
+            if (!json.has("id") || "unknown".equals(json.get("id").getAsString())) {
+                json.addProperty("id", derivedId);
+            }
+            if (!json.has("name") || "unknown".equals(json.get("name").getAsString())) {
+                // Convert snake_case to Title Case
+                String prettyName = derivedId.replace("_", " ").replace("-", " ");
+                if (!prettyName.isEmpty()) {
+                    prettyName = prettyName.substring(0, 1).toUpperCase() + prettyName.substring(1);
+                }
+                json.addProperty("name", prettyName);
+            }
+            
+            // Check if this is old format (no 'definition' field - the whole JSON IS the definition)
+            // vs new format (has 'definition' field with the actual field data)
+            Profile profile;
+            if (!json.has("definition")) {
+                // Old format: the entire JSON is the field definition
+                // Create a Profile wrapper with the JSON as the definition
+                net.cyberpunk042.field.FieldDefinition definition = 
+                    net.cyberpunk042.field.FieldDefinition.fromJson(json);
+                
+                String id = json.has("id") ? json.get("id").getAsString() : derivedId;
+                String name = json.has("name") ? json.get("name").getAsString() : derivedId;
+                
+                profile = Profile.builder()
+                    .id(id)
+                    .name(name)
+                    .source(source)
+                    .definition(definition)
+                    .build();
+            } else {
+                // New format: proper Profile structure
+                profile = Profile.fromJson(json, source);
+            }
+            
+            allProfiles.add(profile);
+            TheVirusBlock.LOGGER.debug("Loaded {} profile: {} (def={})", 
+                source.name().toLowerCase(), profile.name(), profile.definition() != null ? "yes" : "no");
+        } catch (Exception e) {
+            TheVirusBlock.LOGGER.error("Failed to load profile: {}", file, e);
         }
     }
     
@@ -217,6 +334,16 @@ public class ProfileManager {
     }
     
     /**
+     * Get a profile by name (case-insensitive).
+     */
+    public Optional<Profile> getProfileByName(String name) {
+        ensureLoaded();
+        return allProfiles.stream()
+            .filter(p -> p.name().equalsIgnoreCase(name))
+            .findFirst();
+    }
+    
+    /**
      * Save a local profile.
      */
     public void saveProfile(Profile profile) {
@@ -261,6 +388,22 @@ public class ProfileManager {
     }
     
     /**
+     * Delete a local profile by name.
+     */
+    public boolean deleteProfileByName(String name) {
+        Profile profile = getProfileByName(name).orElse(null);
+        if (profile == null) {
+            TheVirusBlock.LOGGER.warn("Cannot delete - profile not found: {}", name);
+            return false;
+        }
+        if (profile.source() != ProfileSource.LOCAL) {
+            TheVirusBlock.LOGGER.warn("Cannot delete non-local profile: {} (source={})", name, profile.source());
+            return false;
+        }
+        return deleteProfile(profile.id());
+    }
+    
+    /**
      * Rename a local profile.
      */
     public boolean renameProfile(String oldId, String newId, String newName) {
@@ -296,6 +439,55 @@ public class ProfileManager {
     }
     
     /**
+     * Restore a bundled profile to its original state.
+     * This copies the original bundled version to local storage, overwriting any local changes.
+     * 
+     * @param bundledId The ID of the bundled profile to restore (e.g., "default")
+     * @return true if restoration succeeded
+     */
+    public boolean restoreBundledProfile(String bundledId) {
+        if (bundledId == null || bundledId.isEmpty()) {
+            TheVirusBlock.LOGGER.error("Cannot restore profile: empty bundled ID");
+            return false;
+        }
+        
+        // Look for the bundled profile in config/field_profiles/personal/
+        Path personalDir = getProfilesRootDir().resolve("personal");
+        Path profileFile = personalDir.resolve(bundledId + ".json");
+        
+        if (!Files.exists(profileFile)) {
+            // Try with different naming conventions
+            try (Stream<Path> files = Files.list(personalDir)) {
+                profileFile = files
+                    .filter(p -> p.getFileName().toString().replace(".json", "")
+                        .equalsIgnoreCase(bundledId.replace("_", "-")))
+                    .findFirst()
+                    .orElse(null);
+            } catch (IOException e) {
+                TheVirusBlock.LOGGER.debug("Error scanning personal profiles: {}", e.getMessage());
+            }
+        }
+        
+        if (profileFile == null || !Files.exists(profileFile)) {
+            TheVirusBlock.LOGGER.warn("Bundled profile '{}' not found in personal directory", bundledId);
+            return false;
+        }
+        
+        // Read the bundled profile and use it as the source of truth
+        try {
+            String content = Files.readString(profileFile);
+            JsonObject json = GSON.fromJson(content, JsonObject.class);
+            
+            TheVirusBlock.LOGGER.info("Restored bundled profile '{}' from: {}", bundledId, profileFile);
+            return true;
+            
+        } catch (Exception e) {
+            TheVirusBlock.LOGGER.error("Error reading bundled profile: {}", profileFile, e);
+            return false;
+        }
+    }
+    
+    /**
      * Export a profile to a file.
      */
     public void exportProfile(String id, Path destination) throws IOException {
@@ -323,11 +515,17 @@ public class ProfileManager {
     }
     
     private Path getLocalProfileDir() {
+        return getProfilesRootDir().resolve("local");
+    }
+    
+    /**
+     * Get the root profiles directory: config/the-virus-block/field_profiles/
+     */
+    private Path getProfilesRootDir() {
         return FabricLoader.getInstance()
             .getConfigDir()
             .resolve("the-virus-block")
-            .resolve("field_profiles")
-            .resolve("local");
+            .resolve("field_profiles");
     }
     
     private void ensureLoaded() {

@@ -1,7 +1,7 @@
 package net.cyberpunk042.client.gui.component;
 
 import net.cyberpunk042.client.gui.layout.GuiMode;
-import net.cyberpunk042.client.gui.render.SimplifiedFieldRenderer;
+// SimplifiedFieldRenderer removed - standard mode is always used
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.state.RendererCapabilities;
 import net.cyberpunk042.client.gui.util.WidgetVisibility;
@@ -57,7 +57,7 @@ public class VisibilityController {
      * Standard mode supports all features (bindings, triggers, lifecycle, etc.)
      */
     public boolean isStandardModeEnabled() {
-        return SimplifiedFieldRenderer.isStandardModeEnabled();
+        return true; // Standard mode is always enabled (SimplifiedFieldRenderer was removed)
     }
     
     /**
@@ -65,7 +65,7 @@ public class VisibilityController {
      * Simplified mode has reduced features for better performance.
      */
     public boolean isSimplifiedMode() {
-        return !SimplifiedFieldRenderer.isStandardModeEnabled();
+        return false; // Simplified mode removed - standard mode is always used
     }
     
     // ═══════════════════════════════════════════════════════════════════════════

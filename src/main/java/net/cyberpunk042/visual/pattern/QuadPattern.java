@@ -129,6 +129,118 @@ public enum QuadPattern implements VertexPattern {
     TRIANGLE_4("triangle_4",
         new Corner[]{Corner.TOP_RIGHT, Corner.TOP_LEFT, Corner.BOTTOM_LEFT},
         new Corner[]{Corner.TOP_RIGHT, Corner.BOTTOM_RIGHT, Corner.BOTTOM_LEFT}
+    ),
+    
+    // =========================================================================
+    // Patterns from shield_triangles folder
+    // =========================================================================
+    
+    /** Meshed pattern 1. */
+    MESHED_1("meshed_1",
+        new Corner[]{Corner.TOP_RIGHT, Corner.BOTTOM_LEFT, Corner.TOP_LEFT},
+        new Corner[]{Corner.TOP_RIGHT, Corner.BOTTOM_LEFT, Corner.BOTTOM_RIGHT}
+    ),
+    
+    /** Meshed pattern 2. */
+    MESHED_2("meshed_2",
+        new Corner[]{Corner.TOP_RIGHT, Corner.BOTTOM_LEFT, Corner.TOP_LEFT},
+        new Corner[]{Corner.TOP_RIGHT, Corner.BOTTOM_RIGHT, Corner.BOTTOM_LEFT}
+    ),
+    
+    /** Meshed pattern 3. */
+    MESHED_3("meshed_3",
+        new Corner[]{Corner.TOP_RIGHT, Corner.BOTTOM_LEFT, Corner.TOP_LEFT},
+        new Corner[]{Corner.BOTTOM_RIGHT, Corner.BOTTOM_LEFT, Corner.TOP_RIGHT}
+    ),
+    
+    /** Meshed pattern 4. */
+    MESHED_4("meshed_4",
+        new Corner[]{Corner.TOP_RIGHT, Corner.BOTTOM_LEFT, Corner.TOP_LEFT},
+        new Corner[]{Corner.BOTTOM_RIGHT, Corner.TOP_RIGHT, Corner.BOTTOM_LEFT}
+    ),
+    
+    /** Meshed pattern 5. */
+    MESHED_5("meshed_5",
+        new Corner[]{Corner.BOTTOM_LEFT, Corner.TOP_RIGHT, Corner.TOP_LEFT},
+        new Corner[]{Corner.TOP_RIGHT, Corner.BOTTOM_LEFT, Corner.BOTTOM_RIGHT}
+    ),
+    
+    /** Meshed pattern 6. */
+    MESHED_6("meshed_6",
+        new Corner[]{Corner.BOTTOM_LEFT, Corner.TOP_RIGHT, Corner.TOP_LEFT},
+        new Corner[]{Corner.BOTTOM_RIGHT, Corner.BOTTOM_LEFT, Corner.TOP_RIGHT}
+    ),
+    
+    /** Meshed pattern 7. */
+    MESHED_7("meshed_7",
+        new Corner[]{Corner.BOTTOM_LEFT, Corner.TOP_RIGHT, Corner.TOP_LEFT},
+        new Corner[]{Corner.BOTTOM_RIGHT, Corner.TOP_RIGHT, Corner.BOTTOM_LEFT}
+    ),
+    
+    /** Parallelogram pattern (standard). */
+    PARALLELOGRAM("parallelogram",
+        new Corner[]{Corner.TOP_LEFT, Corner.TOP_RIGHT, Corner.BOTTOM_LEFT},
+        new Corner[]{Corner.BOTTOM_LEFT, Corner.TOP_RIGHT, Corner.BOTTOM_RIGHT}
+    ),
+    
+    /** Triangle arrow pattern. */
+    TRIANGLE_ARROW("triangle_arrow",
+        new Corner[]{Corner.TOP_LEFT, Corner.TOP_RIGHT, Corner.BOTTOM_RIGHT},
+        new Corner[]{Corner.TOP_LEFT, Corner.BOTTOM_RIGHT, Corner.BOTTOM_LEFT}
+    ),
+    
+    /** Triangle default pattern. */
+    TRIANGLE_DEFAULT("triangle_default",
+        new Corner[]{Corner.BOTTOM_LEFT, Corner.TOP_LEFT, Corner.TOP_RIGHT},
+        new Corner[]{Corner.BOTTOM_LEFT, Corner.TOP_RIGHT, Corner.BOTTOM_RIGHT}
+    ),
+    
+    /** Triangle facing pattern. */
+    TRIANGLE_FACING("triangle_facing",
+        new Corner[]{Corner.BOTTOM_LEFT, Corner.TOP_RIGHT, Corner.TOP_LEFT},
+        new Corner[]{Corner.BOTTOM_LEFT, Corner.TOP_RIGHT, Corner.BOTTOM_RIGHT}
+    ),
+    
+    /** Triangle facing spaced pattern. */
+    TRIANGLE_FACING_SPACED("triangle_facing_spaced",
+        new Corner[]{Corner.TOP_LEFT, Corner.BOTTOM_LEFT, Corner.TOP_RIGHT},
+        new Corner[]{Corner.BOTTOM_RIGHT, Corner.TOP_RIGHT, Corner.BOTTOM_LEFT}
+    ),
+    
+    /** Triangle hole pattern. */
+    TRIANGLE_HOLE("triangle_hole",
+        new Corner[]{Corner.BOTTOM_LEFT, Corner.TOP_RIGHT, Corner.TOP_LEFT},
+        new Corner[]{Corner.BOTTOM_LEFT, Corner.BOTTOM_RIGHT, Corner.TOP_RIGHT}
+    ),
+    
+    /** Triangle line pattern. */
+    TRIANGLE_LINE("triangle_line",
+        new Corner[]{Corner.TOP_LEFT, Corner.TOP_RIGHT, Corner.BOTTOM_LEFT},
+        new Corner[]{Corner.BOTTOM_LEFT, Corner.TOP_RIGHT, Corner.BOTTOM_RIGHT}
+    ),
+    
+    /** Triangle rectangle pattern. */
+    TRIANGLE_RECTANGLE("triangle_rectangle",
+        new Corner[]{Corner.BOTTOM_LEFT, Corner.TOP_LEFT, Corner.TOP_RIGHT},
+        new Corner[]{Corner.BOTTOM_RIGHT, Corner.TOP_RIGHT, Corner.BOTTOM_LEFT}
+    ),
+    
+    /** Triangle spaced pattern. */
+    TRIANGLE_SPACED("triangle_spaced",
+        new Corner[]{Corner.TOP_LEFT, Corner.BOTTOM_LEFT, Corner.TOP_RIGHT},
+        new Corner[]{Corner.BOTTOM_LEFT, Corner.TOP_RIGHT, Corner.BOTTOM_RIGHT}
+    ),
+    
+    /** Triangle square pattern. */
+    TRIANGLE_SQUARE("triangle_square",
+        new Corner[]{Corner.TOP_LEFT, Corner.TOP_RIGHT, Corner.BOTTOM_RIGHT},
+        new Corner[]{Corner.TOP_LEFT, Corner.BOTTOM_RIGHT, Corner.BOTTOM_LEFT}
+    ),
+    
+    /** Triangle triangle pattern. */
+    TRIANGLE_TRIANGLE("triangle_triangle",
+        new Corner[]{Corner.BOTTOM_LEFT, Corner.TOP_LEFT, Corner.TOP_RIGHT},
+        new Corner[]{Corner.BOTTOM_LEFT, Corner.TOP_RIGHT, Corner.BOTTOM_RIGHT}
     );
     
     // =========================================================================

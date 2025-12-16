@@ -1,7 +1,7 @@
 package net.cyberpunk042.client.gui.component;
 
 import net.cyberpunk042.client.gui.layout.Bounds;
-import net.cyberpunk042.client.gui.render.SimplifiedFieldRenderer;
+// SimplifiedFieldRenderer removed - standard mode always used
 import net.cyberpunk042.client.gui.screen.TabType;
 import net.cyberpunk042.client.gui.util.PresetRegistry;
 import net.cyberpunk042.client.gui.widget.DropdownWidget;
@@ -175,17 +175,8 @@ public class TabBar implements ScreenComponent {
             );
             widgets.add(presetDropdown);
             
-            // Renderer mode toggle
-            rendererModeToggle = GuiWidgets.boolCycler(
-                toggleX, y, toggleW, height,
-                SimplifiedFieldRenderer.isStandardModeEnabled(),
-                "Standard", "Simplified",
-                standard -> {
-                    SimplifiedFieldRenderer.setStandardModeEnabled(standard);
-                    onRendererModeChanged.run();
-                }
-            );
-            widgets.add(rendererModeToggle);
+            // Renderer mode toggle - DEPRECATED (SimplifiedFieldRenderer removed)
+            // Standard mode is now always used
         }
         
         updateTabButtonStyles();

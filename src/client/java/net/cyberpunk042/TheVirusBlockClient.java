@@ -20,7 +20,7 @@ import net.cyberpunk042.client.screen.PurificationTotemScreen;
 import net.cyberpunk042.client.screen.VirusDifficultyScreen;
 import net.cyberpunk042.config.InfectionConfigRegistry;
 import net.cyberpunk042.client.network.GuiClientHandlers;
-import net.cyberpunk042.client.gui.render.SimplifiedFieldRenderer;
+import net.cyberpunk042.client.gui.render.TestFieldRenderer;
 import net.cyberpunk042.config.ModConfigBootstrap;
 import net.cyberpunk042.infection.VirusDifficulty;
 import net.cyberpunk042.network.SkyTintPayload;
@@ -67,7 +67,7 @@ public class TheVirusBlockClient implements ClientModInitializer {
 		// GUI client handlers
 		GuiClientHandlers.register();
 		// Test field renderer for debug field preview (G145)
-		SimplifiedFieldRenderer.init();
+		TestFieldRenderer.init();
 		// Wave shader for GPU-based wave deformation
 		net.cyberpunk042.client.visual.render.WaveShaderRegistry.register();
 		SingularityVisualManager.init();
@@ -103,6 +103,8 @@ public class TheVirusBlockClient implements ClientModInitializer {
 					VirusDifficultyClientState.set(VirusDifficulty.HARD);
 					SingularityBorderClientState.reset();
 					SingularityScheduleClientState.reset();
+					// Clear test field to avoid ghost rendering on reconnect
+					net.cyberpunk042.client.gui.state.FieldEditStateHolder.despawnTestField();
 				}));
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
 			// Old shield commands moved to agent-tools/legacy-shield/

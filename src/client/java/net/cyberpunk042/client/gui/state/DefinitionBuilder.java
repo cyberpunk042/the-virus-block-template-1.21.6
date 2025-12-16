@@ -59,7 +59,9 @@ public final class DefinitionBuilder {
         try {
             return buildDefinition(state);
         } catch (Exception e) {
-            Logging.GUI.topic("builder").error("Failed to build FieldDefinition from state", e);
+            Logging.GUI.topic("builder").error("Failed to build FieldDefinition from state: {} at {}", 
+                e.getMessage(), e.getStackTrace().length > 0 ? e.getStackTrace()[0] : "unknown");
+            e.printStackTrace();
             return FieldDefinition.empty("error");
         }
     }
@@ -111,7 +113,7 @@ public final class DefinitionBuilder {
             FieldDefinition def = new FieldDefinition(
                 "preview_" + System.currentTimeMillis(),
                 FieldType.SHIELD,
-                state.getFloat("radius"),
+                state.getFloat("sphere.radius") > 0 ? state.getFloat("sphere.radius") : 1.0f,
                 null, // themeId - could be added later
                 layers,
                 modifiers,
@@ -242,9 +244,6 @@ public final class DefinitionBuilder {
      * Builds a Primitive from current @PrimitiveComponent annotated fields.
      */
     private static SimplePrimitive buildCurrentPrimitive(FieldEditState state) throws Exception {
-        // Collect primitive components
-        Map<String, Object> components = collectPrimitiveComponents(state);
-        
         // Get current shape based on shapeType
         String shapeType = state.getString("shapeType");
         Shape shape = getCurrentShape(state, shapeType);
@@ -254,18 +253,15 @@ public final class DefinitionBuilder {
         PipelineTracer.trace(PipelineTracer.S1_SHAPE_TYPE, 3, "shape", shape.getClass().getSimpleName());
         traceShapeDetails(shapeType, shape);
         
-        // Get other components with defaults
-        Transform baseTransform = (Transform) components.getOrDefault("transform", Transform.IDENTITY);
-        FillConfig fill = (FillConfig) components.getOrDefault("fill", FillConfig.SOLID);
-        VisibilityMask mask = (VisibilityMask) components.getOrDefault("mask", VisibilityMask.FULL);
-        ArrangementConfig arrangement = (ArrangementConfig) components.getOrDefault("arrangement", ArrangementConfig.DEFAULT);
+        // Get components directly from adapter accessor methods
+        Transform transform = state.transform();
+        FillConfig fill = state.fill();
+        VisibilityMask mask = state.mask();
+        ArrangementConfig arrangement = state.arrangement();
         
         // DEBUG: Log fill mode being used
-        Logging.GUI.topic("builder").debug("[FILL-DEBUG] Collected fill.mode={}, components.containsKey('fill')={}", 
-            fill.mode().name(), components.containsKey("fill"));
-        
-        // Transform already contains orbit (no separate orbit field anymore)
-        Transform transform = baseTransform;
+        Logging.GUI.topic("builder").debug("[FILL-DEBUG] Got fill from adapter: mode={}", 
+            fill != null ? fill.mode().name() : "NULL");
         
         // CP2-CP3: Fill segments (ALL)
         traceFillDetails(fill);
@@ -276,12 +272,18 @@ public final class DefinitionBuilder {
         // CP2-CP3: Visibility/Mask segments (ALL)
         traceVisibilityDetails(mask);
         
-        // Build appearance from AppearanceState
+        // Build appearance from adapter (convert AppearanceState to Appearance)
         Appearance appearance = buildAppearance(state);
         
-        // Build animation from animation configs
+        // Build animation from adapter
         Animation animation = buildAnimation(state);
         traceAnimationDetails(state, animation);
+        
+        // Get primitiveId from link adapter  
+        String primitiveId = state.getString("primitiveId");
+        if (primitiveId == null || primitiveId.isEmpty()) {
+            primitiveId = "primitive_" + System.currentTimeMillis();
+        }
         
         // Add primitive info to current scope (auto-nests into parent build-definition scope)
         LogScope.currentOrNoop().branch("primitive")
@@ -289,15 +291,15 @@ public final class DefinitionBuilder {
             .kv("shapeClass", shape != null ? shape.getClass().getSimpleName() : "null");
         
         return new SimplePrimitive(
-            state.getString("primitiveId"),
+            primitiveId,
             shapeType,
             shape,
-            transform,
-            fill,
-            mask,
-            arrangement,
-            appearance,
-            animation,
+            transform != null ? transform : Transform.IDENTITY,
+            fill != null ? fill : FillConfig.SOLID,
+            mask != null ? mask : VisibilityMask.FULL,
+            arrangement != null ? arrangement : ArrangementConfig.DEFAULT,
+            appearance != null ? appearance : Appearance.DEFAULT,
+            animation != null ? animation : Animation.NONE,
             null  // link
         );
     }
@@ -578,28 +580,14 @@ public final class DefinitionBuilder {
      * Gets the current shape object based on shapeType.
      */
     private static Shape getCurrentShape(FieldEditState state, String shapeType) {
-        return switch (shapeType.toLowerCase()) {
-            case "sphere" -> state.sphere();
-            case "ring" -> state.ring();
-            case "disc" -> state.disc();
-            case "cylinder" -> state.cylinder();
-            case "prism" -> state.prism();
-            // Polyhedra - create the correct type based on shapeType, using radius AND subdivisions from state
-            case "polyhedron" -> state.polyhedron();
-            case "cube" -> PolyhedronShape.subdivided(net.cyberpunk042.visual.shape.PolyType.CUBE, state.polyhedron().radius(), state.polyhedron().subdivisions());
-            case "octahedron" -> PolyhedronShape.subdivided(net.cyberpunk042.visual.shape.PolyType.OCTAHEDRON, state.polyhedron().radius(), state.polyhedron().subdivisions());
-            case "icosahedron" -> PolyhedronShape.subdivided(net.cyberpunk042.visual.shape.PolyType.ICOSAHEDRON, state.polyhedron().radius(), state.polyhedron().subdivisions());
-            case "tetrahedron" -> PolyhedronShape.subdivided(net.cyberpunk042.visual.shape.PolyType.TETRAHEDRON, state.polyhedron().radius(), state.polyhedron().subdivisions());
-            case "dodecahedron" -> PolyhedronShape.subdivided(net.cyberpunk042.visual.shape.PolyType.DODECAHEDRON, state.polyhedron().radius(), state.polyhedron().subdivisions());
-            // New shapes
-            case "torus" -> state.torus();
-            case "capsule" -> state.capsule();
-            case "cone" -> state.cone();
-            default -> {
-                Logging.GUI.topic("builder").warn("[SHAPE] Unknown shape type '{}', falling back to sphere", shapeType);
-                yield state.sphere();
-            }
-        };
+        // Use the adapter's currentShape() which correctly handles shape type switching
+        Shape shape = state.currentShape();
+        if (shape != null) {
+            return shape;
+        }
+        // Fallback - shouldn't happen if adapter is working
+        Logging.GUI.topic("builder").warn("[SHAPE] currentShape() returned null, falling back to sphere");
+        return state.sphere();
     }
     
     /**

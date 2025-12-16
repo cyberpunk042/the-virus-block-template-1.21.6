@@ -34,6 +34,7 @@ public class ColorButton extends ButtonWidget {
     private int currentColor;
     private int themeIndex = -1; // -1 = custom color
     private final Consumer<Integer> onChange;
+    private Runnable onRightClick; // Callback for right-click to open modal
     
     /**
      * Creates a color button.
@@ -61,6 +62,33 @@ public class ColorButton extends ButtonWidget {
         Logging.GUI.topic("widget").trace("ColorButton created: {}", label);
     }
     
+    /**
+     * Sets a callback for when the button is right-clicked.
+     * This should show a modal dialog for entering color values.
+     */
+    public void setRightClickHandler(Runnable handler) {
+        this.onRightClick = handler;
+    }
+    
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (this.active && this.visible && this.isMouseOver(mouseX, mouseY)) {
+            if (button == 1) { // Right-click
+                if (onRightClick != null) {
+                    this.playDownSound(net.minecraft.client.MinecraftClient.getInstance().getSoundManager());
+                    onRightClick.run();
+                    return true;
+                } else {
+                    // Fallback: cycle backward if no modal handler
+                    this.playDownSound(net.minecraft.client.MinecraftClient.getInstance().getSoundManager());
+                    cycleColorBackward();
+                    return true;
+                }
+            }
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+    
     private void cycleColor() {
         themeIndex = (themeIndex + 1) % THEME_COLORS.length;
         currentColor = THEME_COLORS[themeIndex];
@@ -71,13 +99,47 @@ public class ColorButton extends ButtonWidget {
         }
     }
     
+    private void cycleColorBackward() {
+        themeIndex = themeIndex <= 0 ? THEME_COLORS.length - 1 : themeIndex - 1;
+        currentColor = THEME_COLORS[themeIndex];
+        Logging.GUI.topic("widget").trace("ColorButton cycled backward to: {} ({})", 
+            THEME_NAMES[themeIndex], Integer.toHexString(currentColor));
+        if (onChange != null) {
+            onChange.accept(currentColor);
+        }
+    }
+    
     /**
-     * Sets a custom hex color.
-     * @param hexColor Color in format "#RRGGBB" or "RRGGBB"
+     * Sets a color from a string value.
+     * Supports theme references like @primary, @beam, or hex codes like #FF00FF.
+     * 
+     * @param colorString Color in format "#RRGGBB", "RRGGBB", or "@themeName"
      */
-    public void setHexColor(String hexColor) {
+    public void setColorString(String colorString) {
+        if (colorString == null || colorString.isEmpty()) return;
+        
+        String trimmed = colorString.trim();
+        
+        // Check for @theme reference
+        if (trimmed.startsWith("@")) {
+            for (int i = 0; i < THEME_NAMES.length; i++) {
+                if (THEME_NAMES[i].equalsIgnoreCase(trimmed)) {
+                    themeIndex = i;
+                    currentColor = THEME_COLORS[i];
+                    if (onChange != null) {
+                        onChange.accept(currentColor);
+                    }
+                    Logging.GUI.topic("widget").trace("ColorButton set to theme: {}", trimmed);
+                    return;
+                }
+            }
+            Logging.GUI.topic("widget").warn("Unknown theme color: {}", trimmed);
+            return;
+        }
+        
+        // Try parsing as hex color
         try {
-            String hex = hexColor.startsWith("#") ? hexColor.substring(1) : hexColor;
+            String hex = trimmed.startsWith("#") ? trimmed.substring(1) : trimmed;
             currentColor = 0xFF000000 | Integer.parseInt(hex, 16);
             themeIndex = -1; // Custom color
             if (onChange != null) {
@@ -85,8 +147,18 @@ public class ColorButton extends ButtonWidget {
             }
             Logging.GUI.topic("widget").trace("ColorButton set to hex: #{}", hex);
         } catch (NumberFormatException e) {
-            Logging.GUI.topic("widget").warn("Invalid hex color: {}", hexColor);
+            Logging.GUI.topic("widget").warn("Invalid color value: {}", colorString);
         }
+    }
+    
+    /**
+     * Sets a custom hex color.
+     * @param hexColor Color in format "#RRGGBB" or "RRGGBB"
+     * @deprecated Use {@link #setColorString(String)} instead for broader format support
+     */
+    @Deprecated
+    public void setHexColor(String hexColor) {
+        setColorString(hexColor);
     }
     
     /**
@@ -108,6 +180,14 @@ public class ColorButton extends ButtonWidget {
      */
     public String getThemeName() {
         return themeIndex >= 0 ? THEME_NAMES[themeIndex] : null;
+    }
+    
+    /**
+     * Gets the current color as a string suitable for re-input.
+     * Returns theme name (e.g., "@primary") if using a theme color, or hex code otherwise.
+     */
+    public String getColorString() {
+        return themeIndex >= 0 ? THEME_NAMES[themeIndex] : getHexColor();
     }
     
     @Override

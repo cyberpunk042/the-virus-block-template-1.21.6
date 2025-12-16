@@ -85,14 +85,22 @@ public final class AnimationApplier {
     public static void applySpin(MatrixStack matrices, SpinConfig spin, float time) {
         if (spin == null || !spin.isActive()) return;
         
+        // speed is in degrees per second from UI, convert to radians per tick
+        // time is in ticks (20 ticks/second)
+        // Therefore: angle_rad = (time / 20) * speed_deg * (π/180)
+        //                      = time * speed_deg * (π / 3600)
+        float speedRadPerTick = (float) (spin.speed() * Math.PI / 3600.0);
+        
         float angle;
         if (spin.oscillate()) {
             // Oscillate within range - MathHelper.sin is a fast lookup table
-            float progress = MathHelper.sin(time * spin.speed());
-            angle = progress * spin.range() / 2;
+            // range is in degrees, convert to radians
+            float rangeRad = (float) Math.toRadians(spin.range());
+            float progress = MathHelper.sin(time * speedRadPerTick);
+            angle = progress * rangeRad / 2;
         } else {
             // Continuous rotation
-            angle = time * spin.speed();
+            angle = time * speedRadPerTick;
         }
         
         Quaternionf rotation = switch (spin.axis()) {

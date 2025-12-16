@@ -2,7 +2,7 @@ package net.cyberpunk042.client.gui.component;
 
 import net.cyberpunk042.client.gui.layout.Bounds;
 import net.cyberpunk042.client.gui.layout.GuiMode;
-import net.cyberpunk042.client.gui.render.SimplifiedFieldRenderer;
+// SimplifiedFieldRenderer removed - standard mode always used
 import net.cyberpunk042.client.gui.state.FieldEditStateHolder;
 import net.cyberpunk042.client.gui.util.GuiWidgets;
 import net.cyberpunk042.client.gui.util.PresetRegistry;
@@ -141,19 +141,8 @@ public class HeaderBar implements ScreenComponent {
             int togglesStartX = bx - 4;  // Before the mode toggle
             int middleSpace = togglesStartX - titleEndX;
             
-            if (middleSpace > 60) {
-                int toggleW = Math.min(70, middleSpace - 8);
-                int toggleX = titleEndX + (middleSpace - toggleW) / 2;
-                rendererModeToggle = GuiWidgets.boolCycler(
-                    toggleX, y + 2, toggleW, btnHeight,
-                    SimplifiedFieldRenderer.isStandardModeEnabled(),
-                    "Std", "Sim",
-                    standard -> {
-                        SimplifiedFieldRenderer.setStandardModeEnabled(standard);
-                    }
-                );
-                widgets.add(rendererModeToggle);
-            }
+            // Renderer mode toggle - DEPRECATED (SimplifiedFieldRenderer removed, standard mode always used)
+            // Space reserved for future features if needed
             
             // WINDOWED RIGHT PANEL HEADER:
             // [Label "Context"] [Preset dropdown] .... [R] [×] (float right)

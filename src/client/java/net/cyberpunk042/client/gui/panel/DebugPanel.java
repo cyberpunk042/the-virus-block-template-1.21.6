@@ -6,7 +6,7 @@ import net.cyberpunk042.client.gui.panel.sub.BindingsSubPanel;
 import net.cyberpunk042.client.gui.panel.sub.BeamSubPanel;
 import net.cyberpunk042.client.gui.panel.sub.LifecycleSubPanel;
 import net.cyberpunk042.client.gui.panel.sub.TriggerSubPanel;
-import net.cyberpunk042.client.gui.render.SimplifiedFieldRenderer;
+// SimplifiedFieldRenderer removed - using TestFieldRenderer now
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.state.FieldEditStateHolder;
 import net.cyberpunk042.client.gui.state.PipelineTracer;
@@ -42,7 +42,7 @@ public class DebugPanel extends AbstractPanel {
     // private ArrangeSubPanel arrangePanel;
     
     private ButtonWidget testFieldBtn;
-    private ButtonWidget debounceToggleBtn;
+    // Debounce toggle removed - SimplifiedFieldRenderer was deprecated
     private ButtonWidget pipelineTraceBtn;
     
     private int scrollOffset = 0;
@@ -75,22 +75,10 @@ public class DebugPanel extends AbstractPanel {
         );
         contentY += 24;
         
-        // Debounce toggle button (for immediate preview updates)
+        // Debounce toggle removed - SimplifiedFieldRenderer was deprecated
+        
         int smallBtnWidth = 180;
         int smallBtnX = (width - smallBtnWidth) / 2;
-        debounceToggleBtn = GuiWidgets.button(
-            smallBtnX, contentY, smallBtnWidth,
-            getDebounceButtonLabel(),
-            "Toggle render debouncing (for performance vs responsiveness)",
-            () -> {
-                SimplifiedFieldRenderer.setDebounceEnabled(!SimplifiedFieldRenderer.isDebounceEnabled());
-                debounceToggleBtn.setMessage(net.minecraft.text.Text.literal(getDebounceButtonLabel()));
-                ToastNotification.info("Debounce: " + (SimplifiedFieldRenderer.isDebounceEnabled() ? "ON" : "OFF"));
-            }
-        );
-        contentY += 24;
-        
-        // Pipeline Trace button (for debugging render pipeline)
         pipelineTraceBtn = GuiWidgets.button(
             smallBtnX, contentY, smallBtnWidth,
             getPipelineTraceButtonLabel(),
@@ -167,10 +155,7 @@ public class DebugPanel extends AbstractPanel {
             testFieldBtn.render(context, mouseX, mouseY, delta);
         }
         
-        // Render debounce toggle
-        if (debounceToggleBtn != null) {
-            debounceToggleBtn.render(context, mouseX, mouseY, delta);
-        }
+        // Debounce toggle removed - SimplifiedFieldRenderer was deprecated
         
         // Render pipeline trace button
         if (pipelineTraceBtn != null) {
@@ -211,11 +196,7 @@ public class DebugPanel extends AbstractPanel {
             : "§a▶ Spawn Test Field";
     }
     
-    private String getDebounceButtonLabel() {
-        return SimplifiedFieldRenderer.isDebounceEnabled()
-            ? "§7Debounce: §aON §7(60fps)"
-            : "§7Debounce: §cOFF §7(immediate)";
-    }
+    // Debounce method removed - SimplifiedFieldRenderer was deprecated
     
     private String getPipelineTraceButtonLabel() {
         return PipelineTracer.isEnabled()
@@ -247,12 +228,7 @@ public class DebugPanel extends AbstractPanel {
         return testFieldBtn;
     }
     
-    /**
-     * Returns the debounce toggle button for Screen to add as a child widget.
-     */
-    public ButtonWidget getDebounceToggleButton() {
-        return debounceToggleBtn;
-    }
+    // Debounce getter removed - SimplifiedFieldRenderer was deprecated
     
     /**
      * Returns the pipeline trace button for Screen to add as a child widget.

@@ -1,6 +1,6 @@
 package net.cyberpunk042.client.gui.state;
 
-import net.cyberpunk042.client.gui.render.SimplifiedFieldRenderer;
+// SimplifiedFieldRenderer removed - standard mode is always used
 
 import java.util.EnumSet;
 import java.util.Set;
@@ -99,10 +99,8 @@ public final class RendererCapabilities {
      * @return true if the feature is supported and will be rendered
      */
     public static boolean isSupported(Feature feature) {
-        if (SimplifiedFieldRenderer.isStandardModeEnabled()) {
-            return FULL_FEATURES.contains(feature);
-        }
-        return SIMPLIFIED_FEATURES.contains(feature);
+        // Standard mode is always enabled - all features supported
+        return FULL_FEATURES.contains(feature);
     }
     
     /**
@@ -129,10 +127,8 @@ public final class RendererCapabilities {
      * Returns the set of features supported in the current mode.
      */
     public static Set<Feature> getSupportedFeatures() {
-        if (SimplifiedFieldRenderer.isStandardModeEnabled()) {
-            return EnumSet.copyOf(FULL_FEATURES);
-        }
-        return EnumSet.copyOf(SIMPLIFIED_FEATURES);
+        // Standard mode is always enabled - all features supported
+        return EnumSet.copyOf(FULL_FEATURES);
     }
     
     /**
@@ -140,12 +136,8 @@ public final class RendererCapabilities {
      * Useful for showing "disabled because..." tooltips.
      */
     public static Set<Feature> getUnsupportedFeatures() {
-        if (SimplifiedFieldRenderer.isStandardModeEnabled()) {
-            return EnumSet.noneOf(Feature.class);
-        }
-        EnumSet<Feature> unsupported = EnumSet.allOf(Feature.class);
-        unsupported.removeAll(SIMPLIFIED_FEATURES);
-        return unsupported;
+        // Standard mode is always enabled - no unsupported features
+        return EnumSet.noneOf(Feature.class);
     }
     
     /**
@@ -162,21 +154,21 @@ public final class RendererCapabilities {
      * Returns the current mode name for display.
      */
     public static String getCurrentModeName() {
-        return SimplifiedFieldRenderer.isStandardModeEnabled() ? "Standard" : "Simplified";
+        return "Standard"; // Simplified mode was removed
     }
     
     /**
      * Returns true if currently in standard/full mode.
      */
     public static boolean isStandardMode() {
-        return SimplifiedFieldRenderer.isStandardModeEnabled();
+        return true; // Standard mode is always enabled
     }
     
     /**
      * Returns true if currently in simplified mode.
      */
     public static boolean isSimplifiedMode() {
-        return !SimplifiedFieldRenderer.isStandardModeEnabled();
+        return false; // Simplified mode was removed
     }
 }
 

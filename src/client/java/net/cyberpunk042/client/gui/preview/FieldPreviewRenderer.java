@@ -49,8 +49,19 @@ public class FieldPreviewRenderer {
         float centerY = (y1 + y2) / 2f;
         float boundsSize = Math.min(x2 - x1, y2 - y1) - 20;
         
-        // Get field parameters
-        float radius = state.getFloat("radius");
+        // Get field parameters - get radius from current shape (default to sphere.radius)
+        String shapeType = state.getString("shapeType");
+        if (shapeType == null) shapeType = "sphere";
+        float radius = switch (shapeType.toLowerCase()) {
+            case "sphere" -> state.getFloat("sphere.radius");
+            case "ring" -> state.getFloat("ring.outerRadius");
+            case "disc" -> state.getFloat("disc.radius");
+            case "cylinder" -> state.getFloat("cylinder.radius");
+            case "prism" -> state.getFloat("prism.radius");
+            case "capsule" -> state.getFloat("capsule.radius");
+            case "cone" -> state.getFloat("cone.radius");
+            default -> state.getFloat("sphere.radius");
+        };
         if (radius <= 0) radius = 3f;
         float finalScale = (boundsSize / (radius * 2.5f)) * scale;
         
@@ -64,10 +75,8 @@ public class FieldPreviewRenderer {
         float rotX = (float) Math.toRadians(rotationX);
         float rotY = (float) Math.toRadians(rotationY);
         
-        // Render based on shape type
-        String shapeType = state.getString("shapeType").toLowerCase();
-        
-        switch (shapeType) {
+        // Render based on shape type (shapeType already determined above)
+        switch (shapeType.toLowerCase()) {
             case "sphere" -> renderSphereWireframe(context, centerX, centerY, radius, finalScale, rotX, rotY, color, state);
             case "ring" -> renderRingWireframe(context, centerX, centerY, finalScale, rotX, rotY, color, state);
             case "disc" -> renderDiscWireframe(context, centerX, centerY, finalScale, rotX, rotY, color, state);
