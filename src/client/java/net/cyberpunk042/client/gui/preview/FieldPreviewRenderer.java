@@ -49,8 +49,9 @@ public class FieldPreviewRenderer {
     /**
      * Main entry point for field preview rendering.
      * 
-     * @param useFullRenderer Currently ignored - always uses fast 2D rasterization.
-     *                        Full 3D rendering requires framebuffer approach (TODO).
+     * <p>Uses the full 3D renderer via framebuffer for best visual quality and performance.
+     * 
+     * @param useFullRenderer Deprecated - ignored, always uses full 3D rendering.
      */
     public static void drawField(DrawContext context, FieldEditState state,
                                  int x1, int y1, int x2, int y2,
@@ -85,13 +86,8 @@ public class FieldPreviewRenderer {
             scale = pulse.evaluate(timeTicks);
         }
         
-        if (useFullRenderer) {
-            // Full mode: render using real FieldRenderer via framebuffer
-            drawFieldFull(context, state, x1, y1, x2, y2, scale, rotationX, rotationY, timeTicks);
-        } else {
-            // Fast mode: 2D rasterization
-            drawFieldFast(context, state, x1, y1, x2, y2, scale, rotationX, rotationY);
-        }
+        // Always use full 3D renderer - it has better performance and visual quality
+        drawFieldFull(context, state, x1, y1, x2, y2, scale, rotationX, rotationY, timeTicks);
     }
     
     /**
@@ -200,22 +196,14 @@ public class FieldPreviewRenderer {
         float aspectFactor = aspect < 1.0f ? 1.0f / aspect : 1.0f;
         float cameraDistance = fixedCameraDistance * aspectFactor;
         
-        MatrixStack matrices = new MatrixStack();
-        matrices.push();
-        
-        // View transform: camera looking at origin from fixed distance
-        matrices.translate(0, 0, -cameraDistance);
-        
-        // Apply rotations
-        matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(rotationX));
-        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(rotationY));
-        
-        // Apply user scale
-        matrices.scale(scale, scale, scale);
-        
         // ═══════════════════════════════════════════════════════════════════════════
-        // RENDER OPAQUE BACKGROUND QUAD (using Tessellator)
+        // RENDER OPAQUE BACKGROUND QUAD (STATIC - no rotation)
         // ═══════════════════════════════════════════════════════════════════════════
+        
+        // Create a separate matrix stack for the background (only camera distance, no rotation)
+        MatrixStack bgMatrices = new MatrixStack();
+        bgMatrices.push();
+        bgMatrices.translate(0, 0, -cameraDistance);  // Only camera distance, no rotation!
         
         // Get vertex buffer provider for background
         VertexConsumerProvider.Immediate bgImmediate = client.getBufferBuilders().getEntityVertexConsumers();
@@ -232,39 +220,56 @@ public class FieldPreviewRenderer {
         int bgR = 0x1E, bgG = 0x1E, bgB = 0x2E, bgA = 0xFF;
         int maxLight = net.minecraft.client.render.LightmapTextureManager.MAX_LIGHT_COORDINATE;
         
-        // Get the matrix entry for normals
-        var entry = matrices.peek();
-        var bgMatrix = entry.getPositionMatrix();
+        // Get the static matrix entry (no rotation)
+        var bgEntry = bgMatrices.peek();
+        var bgMatrix = bgEntry.getPositionMatrix();
         
-        // Emit 4 vertices for the quad with ALL required elements:
-        // position, color, texture, overlay, light, normal
+        // Emit 4 vertices for the quad with ALL required elements
         bgConsumer.vertex(bgMatrix, -bgSize, -bgSize, bgZ)
             .color(bgR, bgG, bgB, bgA)
             .texture(0f, 0f)
             .overlay(net.minecraft.client.render.OverlayTexture.DEFAULT_UV)
             .light(maxLight)
-            .normal(entry, 0f, 0f, 1f);
+            .normal(bgEntry, 0f, 0f, 1f);
         bgConsumer.vertex(bgMatrix, -bgSize,  bgSize, bgZ)
             .color(bgR, bgG, bgB, bgA)
             .texture(0f, 1f)
             .overlay(net.minecraft.client.render.OverlayTexture.DEFAULT_UV)
             .light(maxLight)
-            .normal(entry, 0f, 0f, 1f);
+            .normal(bgEntry, 0f, 0f, 1f);
         bgConsumer.vertex(bgMatrix,  bgSize,  bgSize, bgZ)
             .color(bgR, bgG, bgB, bgA)
             .texture(1f, 1f)
             .overlay(net.minecraft.client.render.OverlayTexture.DEFAULT_UV)
             .light(maxLight)
-            .normal(entry, 0f, 0f, 1f);
+            .normal(bgEntry, 0f, 0f, 1f);
         bgConsumer.vertex(bgMatrix,  bgSize, -bgSize, bgZ)
             .color(bgR, bgG, bgB, bgA)
             .texture(1f, 0f)
             .overlay(net.minecraft.client.render.OverlayTexture.DEFAULT_UV)
             .light(maxLight)
-            .normal(entry, 0f, 0f, 1f);
+            .normal(bgEntry, 0f, 0f, 1f);
         
         // Flush background
         bgImmediate.draw();
+        bgMatrices.pop();
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // SETUP SHAPE MATRIX (with rotation for the spinning shape)
+        // ═══════════════════════════════════════════════════════════════════════════
+        
+        MatrixStack matrices = new MatrixStack();
+        matrices.push();
+        
+        // View transform: camera looking at origin from fixed distance
+        matrices.translate(0, 0, -cameraDistance);
+        
+        // Apply rotations (for spinning shape)
+        matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(rotationX));
+        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(rotationY));
+        
+        // Apply user scale
+        matrices.scale(scale, scale, scale);
         
         // ═══════════════════════════════════════════════════════════════════════════
         // RENDER THE FIELD

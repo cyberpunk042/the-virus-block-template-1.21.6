@@ -56,8 +56,8 @@ public class FieldCustomizerScreen extends Screen {
     // State - load saved tab from persistence
     private TabType currentTab = GuiConfigPersistence.loadSavedTab();
     private DropdownWidget<String> presetDropdown;
-    private ClickableWidget previewModeCheckbox;
-    private boolean useFullPreviewRenderer = false;
+    private ClickableWidget previewModeCheckbox;  // Kept for potential future use
+    // Full 3D preview is now always used (better performance and visual quality)
     private PresetConfirmDialog presetConfirmDialog;
     private ModalDialog activeModal;
     private Bounds shapePanelBounds;
@@ -552,13 +552,8 @@ public class FieldCustomizerScreen extends Screen {
     }
     
     private void initPreviewCheckbox() {
-        if (!layout.hasPreviewWidget()) { previewModeCheckbox = null; return; }
-        Bounds b = layout.getPreviewBounds();
-        previewModeCheckbox = net.minecraft.client.gui.widget.CyclingButtonWidget.<Boolean>builder(
-                v -> Text.literal(v ? "☑ Full" : "☐ Fast"))
-            .values(List.of(false, true)).initially(useFullPreviewRenderer)
-            .tooltip(v -> net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal(v ? "Uses FieldRenderer" : "Uses SimplifiedRenderer")))
-            .omitKeyText().build(b.x() + 4, b.y() + 4, 60, 12, Text.literal(""), (btn, v) -> useFullPreviewRenderer = v);
+        // Full 3D preview is now permanent - no toggle needed
+        previewModeCheckbox = null;
     }
     
     private List<String> getLayerNames() {
@@ -579,6 +574,6 @@ public class FieldCustomizerScreen extends Screen {
     
     private void render3DPreview(DrawContext context, Bounds bounds, float delta) {
         if (bounds == null || bounds.isEmpty()) return;
-        FieldPreviewRenderer.drawField(context, state, bounds.x(), bounds.y(), bounds.right(), bounds.bottom(), useFullPreviewRenderer);
+        FieldPreviewRenderer.drawField(context, state, bounds.x(), bounds.y(), bounds.right(), bounds.bottom(), true);  // Always use full 3D renderer
     }
 }
