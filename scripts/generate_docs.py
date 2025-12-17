@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
 """
-Documentation Generator v2
-===========================
-Generates documentation from Java source code.
+Documentation Generator v3 - Minimalist
+========================================
+Generates focused, interconnected documentation.
 
-Thresholds:
-- Domain < 20 classes: Single CLASS_DIAGRAM.md
-- Domain 20-80 classes: README + CLASS_DIAGRAM
-- Domain > 80 classes: README + CLASS_DIAGRAM + subdomain splits
-
-Usage:
-    python scripts/generate_docs.py           # Generate all docs
-    python scripts/generate_docs.py --dry-run # Preview without writing
+Output:
+- README.md - Navigation
+- ARCHITECTURE.md - Real system architecture  
+- 8-10 focused CLASS_DIAGRAM files (one per major system)
+- No empty folders, no useless READMEs
 """
 
 import sys
@@ -19,381 +16,380 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
-from typing import List, Dict
+from typing import List, Dict, Set
 
 SCRIPT_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from lib.java_parser import scan_project, JavaClass, is_valid_java_identifier
 from lib.graph_builder import build_graph, ClassGraph
-from lib.mermaid_generator import (
-    MermaidGenerator, 
-    DiagramConfig,
-    generate_class_diagram_md,
-    generate_readme_md
-)
-
-
-# Thresholds
-MIN_FOR_SUBFOLDER = 20      # Only split domain if > this many classes
-MIN_FOR_SUB_SUBFOLDER = 80  # Only split further if > this many classes
-MAX_CLASSES_PER_DIAGRAM = 40  # Max classes in a single mermaid diagram
+from lib.mermaid_generator import MermaidGenerator, DiagramConfig
 
 PROJECT_ROOT = SCRIPT_DIR.parent
 DOCS_DIR = PROJECT_ROOT / "docs"
 
 
+# =============================================================================
+# SYSTEM DEFINITIONS
+# Define which packages/classes belong to which "system" for documentation
+# =============================================================================
+
+SYSTEMS = {
+    "field_system": {
+        "title": "Field System",
+        "description": "Core field definitions, effects, bindings, triggers, and lifecycle management.",
+        "packages": ["field", "field.definition", "field.effect", "field.influence", "field.instance", "field.loader"],
+        "key_classes": ["FieldDefinition", "FieldLayer", "FieldManager", "BindingResolver", "TriggerProcessor"],
+    },
+    "visual_system": {
+        "title": "Visual System", 
+        "description": "Shape definitions, pattern system, color themes, animations, and fill modes.",
+        "packages": ["visual", "visual.shape", "visual.pattern", "visual.animation", "visual.color", "visual.fill", "visual.transform", "visual.layer", "visual.appearance"],
+        "key_classes": ["Shape", "QuadPattern", "AnimationConfig", "ColorTheme", "FillMode"],
+    },
+    "infection_system": {
+        "title": "Infection System",
+        "description": "Virus spreading logic, infection services, scenario management, and orchestration.",
+        "packages": ["infection", "infection.service", "infection.controller", "infection.scenario", "infection.orchestrator", "infection.event", "infection.registry"],
+        "key_classes": ["InfectionService", "InfectionController", "ScenarioConfig"],
+    },
+    "gui_system": {
+        "title": "GUI System",
+        "description": "Panel hierarchy, widgets, state management, adapters, and screen layouts.",
+        "packages": ["client.gui", "client.gui.panel", "client.gui.panel.sub", "client.gui.widget", "client.gui.state", "client.gui.state.adapter", "client.gui.preview", "client.gui.layout", "client.gui.screen"],
+        "key_classes": ["AbstractPanel", "FieldCustomizerScreen", "FieldEditState", "LayoutManager"],
+    },
+    "rendering_pipeline": {
+        "title": "Rendering Pipeline",
+        "description": "Mesh building, tessellators, primitive renderers, and render layers.",
+        "packages": ["client.visual", "client.visual.mesh", "client.visual.tessellator", "client.visual.render", "client.field.render", "client.render"],
+        "key_classes": ["MeshBuilder", "SphereTessellator", "FieldRenderer", "LayerRenderer", "PrimitiveRenderer"],
+    },
+    "blocks_growth": {
+        "title": "Blocks & Growth",
+        "description": "Custom blocks, block entities, growth system, and collisions.",
+        "packages": ["block", "block.corrupted", "block.infected", "block.entity", "block.growth", "growth", "growth.event", "collision", "entity"],
+        "key_classes": ["ProgressiveGrowthBlock", "VirusBlock", "GrowthForceHandler"],
+    },
+    "network_commands": {
+        "title": "Network & Commands",
+        "description": "Client-server payloads, command system, and packet handlers.",
+        "packages": ["network", "network.payload", "command", "command.argument"],
+        "key_classes": ["FieldSpawnC2SPayload", "FieldEditUpdateS2CPayload", "FieldCommand"],
+    },
+    "infrastructure": {
+        "title": "Infrastructure",
+        "description": "Logging, registries, configuration, utilities, and mixins.",
+        "packages": ["log", "registry", "config", "util", "mixin", "mixin.client"],
+        "key_classes": ["Logging", "LogScope", "ModConfig"],
+    },
+}
+
+
 class DocGenerator:
-    """Generates documentation from parsed Java classes."""
+    """Generates minimalist, interconnected documentation."""
     
     def __init__(self, graph: ClassGraph, dry_run: bool = False):
         self.graph = graph
         self.dry_run = dry_run
         self.files_written = 0
         self.config = DiagramConfig(
-            max_classes_per_diagram=MAX_CLASSES_PER_DIAGRAM,
-            include_external=True,  # Show external parent classes
-            show_javadoc=True
+            max_classes_per_diagram=35,
+            max_methods_per_class=5,
+            include_external=True,
+            show_composition=True
         )
+        
+        # Index classes by relative package
+        self.classes_by_package = defaultdict(list)
+        for c in graph.classes.values():
+            # Create package key matching our SYSTEMS
+            rel_pkg = c.relative_package.replace('net.cyberpunk042.', '').replace('net.cyberpunk042.client.', 'client.')
+            self.classes_by_package[rel_pkg].append(c)
     
     def write_file(self, path: Path, content: str):
-        """Write a file (respecting dry_run mode)."""
+        """Write file (respecting dry_run)."""
         if self.dry_run:
-            print(f"  [DRY-RUN] Would write: {path.relative_to(PROJECT_ROOT)}")
+            print(f"  [DRY] {path.relative_to(PROJECT_ROOT)}")
         else:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding='utf-8')
             print(f"  ✅ {path.relative_to(PROJECT_ROOT)}")
         self.files_written += 1
     
-    def generate_main_readme(self):
-        """Generate the main docs/README.md."""
+    def get_system_classes(self, system_config: dict) -> List[JavaClass]:
+        """Get all classes belonging to a system."""
+        classes = []
+        for pkg in system_config["packages"]:
+            classes.extend(self.classes_by_package.get(pkg, []))
+        # Filter valid
+        return [c for c in classes if is_valid_java_identifier(c.name)]
+    
+    def generate_readme(self):
+        """Generate minimal README with navigation."""
         stats = self.graph.get_stats()
-        domain_stats = self.graph.get_domain_stats()
-        
-        # Build domain table
-        main_domains = []
-        client_domains = []
-        shared_domains = []
-        
-        for domain, s in sorted(domain_stats.items()):
-            if domain in ['', 'net']:
-                continue
-            if domain == 'client':
-                continue  # Handle separately
-            if domain in ['mixin', 'util', 'config', 'log', 'registry']:
-                shared_domains.append((domain, s['total']))
-            elif s['main'] > 0:
-                main_domains.append((domain, s['total']))
         
         content = f"""# 📚 The Virus Block - Documentation
 
-> Auto-generated on {datetime.now().strftime('%Y-%m-%d %H:%M')}
+> Auto-generated {datetime.now().strftime('%Y-%m-%d')} | {stats['total_classes']} classes
 
-## Overview
+## Quick Navigation
 
-| Metric | Value |
-|--------|-------|
-| **Total Classes** | {stats['total_classes']} |
-| **Main-side** | {stats['main_classes']} |
-| **Client-side** | {stats['client_classes']} |
-| **Packages** | {stats['packages']} |
-
-## Main Systems
-
-| Domain | Classes | Description |
+| System | Classes | Description |
 |--------|---------|-------------|
-| [field](./main/field/) | {domain_stats.get('field', {}).get('total', 0)} | Field system - core visual effects |
-| [visual](./main/visual/) | {domain_stats.get('visual', {}).get('total', 0)} | Visual definitions - shapes, patterns |
-| [infection](./main/infection/) | {domain_stats.get('infection', {}).get('total', 0)} | Infection/virus spreading system |
-| [block](./main/block/) | {domain_stats.get('block', {}).get('total', 0)} | Custom blocks |
-| [growth](./main/growth/) | {domain_stats.get('growth', {}).get('total', 0)} | Growth block system |
-| [network](./main/network/) | {domain_stats.get('network', {}).get('total', 0)} | Network payloads |
-| [command](./main/command/) | {domain_stats.get('command', {}).get('total', 0)} | Commands |
+"""
+        for sys_id, cfg in SYSTEMS.items():
+            classes = self.get_system_classes(cfg)
+            if classes:
+                content += f"| [{cfg['title']}](./{sys_id}.md) | {len(classes)} | {cfg['description'][:50]}... |\n"
+        
+        content += f"""
+## Architecture
 
-## Client Systems
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for system overview and data flows.
 
-| Domain | Classes | Description |
-|--------|---------|-------------|
-| [gui](./client/gui/) | ~120 | GUI panels, widgets, state |
-| [visual](./client/visual/) | ~28 | Client rendering |
-| [render](./client/render/) | ~21 | Render utilities |
-| [field](./client/field/) | ~17 | Client field management |
-
-## See Also
-
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - System overview
-
-## Regenerating
+## Regenerate
 
 ```bash
 python3 scripts/generate_docs.py
 ```
 """
-        
         self.write_file(DOCS_DIR / "README.md", content)
     
     def generate_architecture(self):
-        """Generate docs/ARCHITECTURE.md."""
-        generator = MermaidGenerator(list(self.graph.classes.values()), self.config)
-        
+        """Generate REAL architecture documentation."""
         content = f"""# 🏗️ System Architecture
 
-> Auto-generated on {datetime.now().strftime('%Y-%m-%d %H:%M')}
+> The Virus Block - Minecraft 1.21.6 Fabric Mod
 
 ## Overview
 
-{generator.generate_domain_overview()}
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         SERVER/COMMON                            │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │   Field     │  │  Infection  │  │        Blocks           │  │
+│  │   System    │──│   System    │──│  ProgressiveGrowth      │  │
+│  │             │  │             │  │  VirusBlock, Corrupted  │  │
+│  └──────┬──────┘  └──────┬──────┘  └───────────┬─────────────┘  │
+│         │                │                      │                │
+│  ┌──────┴────────────────┴──────────────────────┴──────────────┐ │
+│  │                     Network Layer                            │ │
+│  │  Payloads: FieldSpawn, FieldEdit, InfectionSync, GrowthSync │ │
+│  └──────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                           CLIENT                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐    ┌─────────────────────────────────────┐ │
+│  │   GUI System    │    │        Rendering Pipeline           │ │
+│  │  ┌───────────┐  │    │  ┌────────┐  ┌────────┐  ┌───────┐ │ │
+│  │  │ Panels    │  │    │  │ Field  │──│Tessell-│──│ Mesh  │ │ │
+│  │  │ Widgets   │  │    │  │Renderer│  │ators   │  │Builder│ │ │
+│  │  │ State     │  │    │  └────────┘  └────────┘  └───────┘ │ │
+│  │  └───────────┘  │    │        │                           │ │
+│  └────────┬────────┘    │  ┌─────┴─────┐                     │ │
+│           │             │  │ RenderLayer│ → GPU               │ │
+│           └─────────────┼──│  Shaders  │                     │ │
+│                         │  └───────────┘                     │ │
+│                         └─────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-## Main Packages
+## Data Flows
+
+### Field Creation Flow
+```
+User Input (GUI)
+    │
+    ▼
+FieldEditState ─────────────────────────┐
+    │                                    │
+    ▼                                    ▼
+FieldDefinition (JSON) ◄──── FieldProfileStore
+    │
+    ▼
+FieldManager.spawn()
+    │
+    ▼
+FieldInstance (runtime) ────► Network ────► Other Clients
+    │
+    ▼
+FieldRenderer.render()
+    │
+    ▼
+LayerRenderer → PrimitiveRenderer → Tessellator → MeshBuilder → GPU
+```
+
+### Visual Rendering Pipeline
+```
+FieldLayer
+    ├── Primitive[] ─────────────────────────┐
+    │                                         │
+    ▼                                         ▼
+┌─────────┐     ┌───────────────┐     ┌─────────────┐
+│ Shape   │ ──► │  Tessellator  │ ──► │ MeshBuilder │
+│(Sphere, │     │(generates mesh│     │ (emits      │
+│ Prism)  │     │ geometry)     │     │  vertices)  │
+└─────────┘     └───────────────┘     └──────┬──────┘
+                                              │
+    ┌─────────────────────────────────────────┘
+    │
+    ▼
+┌─────────┐     ┌───────────────┐     ┌─────────────┐
+│ Pattern │ ──► │  Fill Mode    │ ──► │ RenderLayer │ ──► GPU
+│(vertex  │     │(solid/wire/   │     │ (shaders,   │
+│ order)  │     │ cage)         │     │  blend)     │
+└─────────┘     └───────────────┘     └─────────────┘
+```
+
+### GUI State Management
+```
+FieldCustomizerScreen
+         │
+         ▼
+    ┌─────────────────────────────────────────┐
+    │           FieldEditState                │
+    │  (singleton, holds all editing data)    │
+    │  ┌────────────────────────────────────┐ │
+    │  │ currentLayerIndex                  │ │
+    │  │ currentPrimitiveIndex              │ │
+    │  │ layerConfigs[]                     │ │
+    │  │ isDirty                            │ │
+    │  └────────────────────────────────────┘ │
+    └─────────────────────────────────────────┘
+              │
+              ▼
+    ┌─────────────────────────────────────────┐
+    │            Adapters                     │
+    │  ShapeAdapter, FillAdapter, ...         │
+    │  (sync UI ↔ state bidirectionally)      │
+    └─────────────────────────────────────────┘
+```
+
+## Key Entry Points
+
+| Entry Point | Purpose |
+|-------------|---------|
+| `TheVirusBlock.onInitialize()` | Mod initialization |
+| `TheVirusBlockClient.onInitializeClient()` | Client init |
+| `FieldCommand` | `/field` commands |
+| `FieldRegistry` | Field definition storage |
+| `FieldManager` | Runtime field instances |
+| `FieldCustomizerScreen` | GUI entry |
+
+## Package Map
 
 ```
 net.cyberpunk042
-├── field/          # Field system (visual effects in world)
-├── visual/         # Visual configs (shapes, animations)
+├── field/          # Field definitions & runtime
+├── visual/         # Visual configs (shapes, patterns)
 ├── infection/      # Virus spreading system
 ├── block/          # Custom blocks
-├── growth/         # Growth block behavior
-├── network/        # Client/server packets
-└── command/        # Game commands
-```
+├── growth/         # Growth block behavior  
+├── network/        # Client ↔ Server packets
+├── command/        # Game commands
+├── log/            # Logging framework
+├── registry/       # Registries
+└── config/         # Mod configuration
 
-## Client Packages
-
-```
 net.cyberpunk042.client
-├── gui/            # GUI system
-├── visual/         # Client-side rendering
-├── render/         # Render layers & utilities
-└── field/          # Client field management
-```
-
-## Key Flows
-
-### Field Creation
-```
-FieldDefinition (JSON) → FieldManager → FieldInstance → Renderer
-```
-
-### Visual Rendering
-```
-Shape → Tessellator → Mesh → Pattern → Fill → GPU
-```
-
-### GUI State
-```
-FieldCustomizerScreen → Panels → FieldEditState → Adapters
+├── gui/            # Panels, widgets, screens
+├── visual/         # Tessellators, mesh builders
+├── field/          # Primitive renderers
+└── render/         # Render layers, shaders
 ```
 """
-        
         self.write_file(DOCS_DIR / "ARCHITECTURE.md", content)
     
-    def generate_domain_docs(self, domain: str, folder: str, title: str):
-        """Generate documentation for a single domain."""
-        classes = self.graph.get_domain_classes(domain)
-        if not classes:
+    def generate_system_diagram(self, sys_id: str, cfg: dict):
+        """Generate a focused class diagram for one system."""
+        classes = self.get_system_classes(cfg)
+        
+        if len(classes) < 3:
+            # Too small, skip
             return
         
-        # Filter to valid classes only
-        classes = [c for c in classes if is_valid_java_identifier(c.name)]
-        if not classes:
-            return
+        gen = MermaidGenerator(classes, self.config)
         
-        doc_path = DOCS_DIR / folder
-        class_count = len(classes)
+        lines = []
+        lines.append(f"# {cfg['title']}")
+        lines.append("")
+        lines.append(f"> {cfg['description']}")
+        lines.append("")
+        lines.append(f"**{len(classes)} classes** across packages: {', '.join(cfg['packages'][:5])}")
+        lines.append("")
         
-        # Small domain: just CLASS_DIAGRAM.md in parent folder
-        if class_count <= MIN_FOR_SUBFOLDER:
-            diagram_content = generate_class_diagram_md(
-                classes=classes,
-                title=title,
-                description=f"{class_count} classes in the {domain} module.",
-                config=self.config
-            )
-            self.write_file(doc_path / "CLASS_DIAGRAM.md", diagram_content)
-            return
+        # Key classes callout
+        key = [c for c in classes if c.name in cfg.get('key_classes', [])]
+        if key:
+            lines.append("## Key Classes")
+            lines.append("")
+            for c in key:
+                ext = f" → `{c.extends}`" if c.extends else ""
+                lines.append(f"- **`{c.name}`** ({c.class_type}){ext}")
+            lines.append("")
         
-        # Medium/Large domain: README + CLASS_DIAGRAM
-        # Group by subdomain
-        by_subdomain = defaultdict(list)
-        for c in classes:
-            sub = c.subdomain if c.subdomain else '_root'
-            by_subdomain[sub].append(c)
+        # Main diagram
+        lines.append("## Class Diagram")
+        lines.append("")
+        lines.append(gen.generate_class_diagram(
+            classes[:35],  # Limit size
+            show_methods=True,
+            show_fields=True,
+            show_inheritance=True,
+            show_dependencies=True
+        ))
+        lines.append("")
         
-        # Build subdirs list for README
-        subdirs = []
-        for sub in sorted(by_subdomain.keys()):
-            if sub.startswith('_'):
-                continue
-            count = len(by_subdomain[sub])
-            if count >= 3:
-                subdirs.append((sub, f"{sub.title()} package", count))
+        # Add inheritance hierarchy for larger systems
+        if len(classes) > 10:
+            lines.append("## Inheritance Hierarchy")
+            lines.append("")
+            lines.append(gen.generate_inheritance_hierarchy())
+            lines.append("")
         
-        # Generate README
-        readme_content = generate_readme_md(
-            title=title,
-            description=f"Contains {class_count} classes for the {domain} system.",
-            subdirs=subdirs if class_count > MIN_FOR_SUB_SUBFOLDER else [],
-            key_classes=sorted(classes, key=lambda x: len(x.public_methods), reverse=True)[:8]
-        )
-        self.write_file(doc_path / "README.md", readme_content)
-        
-        # Generate main CLASS_DIAGRAM with top-level + root classes
-        root_classes = by_subdomain.get('_root', [])
-        main_classes = root_classes[:MAX_CLASSES_PER_DIAGRAM] if root_classes else classes[:MAX_CLASSES_PER_DIAGRAM]
-        
-        diagram_content = generate_class_diagram_md(
-            classes=main_classes,
-            title=f"{title} - Core Classes",
-            description=f"Core classes in {domain}.",
-            config=self.config
-        )
-        self.write_file(doc_path / "CLASS_DIAGRAM.md", diagram_content)
-        
-        # Only split into subfolders if domain is large enough
-        if class_count > MIN_FOR_SUB_SUBFOLDER:
-            for sub, sub_classes in by_subdomain.items():
-                if sub.startswith('_') or len(sub_classes) < 5:
-                    continue
-                
-                sub_diagram = generate_class_diagram_md(
-                    classes=sub_classes,
-                    title=f"{title} - {sub.title()}",
-                    description=f"Classes in {domain}.{sub}",
-                    config=self.config
-                )
-                self.write_file(doc_path / sub / "CLASS_DIAGRAM.md", sub_diagram)
-    
-    def generate_client_docs(self):
-        """Generate client-side documentation."""
-        client_classes = self.graph.get_domain_classes('client')
-        client_classes = [c for c in client_classes if is_valid_java_identifier(c.name)]
-        
-        # Group by subdomain (gui, visual, render, field, etc.)
-        by_subdomain = defaultdict(list)
-        for c in client_classes:
-            sub = c.subdomain if c.subdomain else '_other'
-            by_subdomain[sub].append(c)
-        
-        client_path = DOCS_DIR / "client"
-        
-        for sub, classes in sorted(by_subdomain.items()):
-            if sub.startswith('_'):
-                continue
-            
-            class_count = len(classes)
-            sub_path = client_path / sub
-            
-            # Small subdomain
-            if class_count <= MIN_FOR_SUBFOLDER:
-                diagram_content = generate_class_diagram_md(
-                    classes=classes,
-                    title=f"Client - {sub.title()}",
-                    description=f"{class_count} classes.",
-                    config=self.config
-                )
-                self.write_file(sub_path / "CLASS_DIAGRAM.md", diagram_content)
-                continue
-            
-            # Large subdomain (like gui) - may need further splitting
-            by_sub_sub = defaultdict(list)
-            for c in classes:
-                parts = c.relative_package.split('.')
-                sub_sub = parts[2] if len(parts) > 2 else '_root'
-                by_sub_sub[sub_sub].append(c)
-            
-            # README for large subdomains
-            subdirs = [(ss, f"{ss.title()} package", len(cs)) 
-                      for ss, cs in sorted(by_sub_sub.items()) 
-                      if not ss.startswith('_') and len(cs) >= 3]
-            
-            readme_content = generate_readme_md(
-                title=f"Client - {sub.title()}",
-                description=f"Contains {class_count} classes.",
-                subdirs=subdirs if class_count > MIN_FOR_SUB_SUBFOLDER else [],
-                key_classes=sorted(classes, key=lambda x: len(x.public_methods), reverse=True)[:5]
-            )
-            self.write_file(sub_path / "README.md", readme_content)
-            
-            # Main CLASS_DIAGRAM
-            root_classes = by_sub_sub.get('_root', [])
-            main_classes = root_classes if root_classes else classes[:MAX_CLASSES_PER_DIAGRAM]
-            diagram_content = generate_class_diagram_md(
-                classes=main_classes[:MAX_CLASSES_PER_DIAGRAM],
-                title=f"Client - {sub.title()}",
-                description=f"Core {sub} classes.",
-                config=self.config
-            )
-            self.write_file(sub_path / "CLASS_DIAGRAM.md", diagram_content)
-            
-            # Sub-subdomain diagrams only for very large (>80)
-            if class_count > MIN_FOR_SUB_SUBFOLDER:
-                for sub_sub, sub_sub_classes in by_sub_sub.items():
-                    if sub_sub.startswith('_') or len(sub_sub_classes) < 5:
-                        continue
-                    
-                    sub_sub_diagram = generate_class_diagram_md(
-                        classes=sub_sub_classes,
-                        title=f"{sub.title()} - {sub_sub.title()}",
-                        description=f"Classes in client.{sub}.{sub_sub}",
-                        config=self.config
-                    )
-                    self.write_file(sub_path / sub_sub / "CLASS_DIAGRAM.md", sub_sub_diagram)
+        self.write_file(DOCS_DIR / f"{sys_id}.md", '\n'.join(lines))
     
     def generate_all(self):
         """Generate all documentation."""
-        print("\n📝 Generating documentation...")
-        print(f"   Thresholds: split at >{MIN_FOR_SUBFOLDER}, sub-split at >{MIN_FOR_SUB_SUBFOLDER}")
+        print(f"\n📝 Generating documentation to {DOCS_DIR.relative_to(PROJECT_ROOT)}/")
         
-        # Main files
-        print("\n🏠 Top-level files:")
-        self.generate_main_readme()
+        # Clean old docs subdirs (but not files in root)
+        if not self.dry_run:
+            for subdir in ["main", "client", "shared"]:
+                old_path = DOCS_DIR / subdir
+                if old_path.exists():
+                    import shutil
+                    shutil.rmtree(old_path)
+                    print(f"  🗑️ Removed old {subdir}/")
+        
+        # Generate
+        print("\n📄 Core files:")
+        self.generate_readme()
         self.generate_architecture()
         
-        # Main domains
-        print("\n📦 Main domains:")
-        domains = [
-            ('field', 'main/field', 'Field System'),
-            ('visual', 'main/visual', 'Visual System'),
-            ('infection', 'main/infection', 'Infection System'),
-            ('block', 'main/block', 'Blocks'),
-            ('growth', 'main/growth', 'Growth System'),
-            ('command', 'main/command', 'Commands'),
-            ('network', 'main/network', 'Networking'),
-            ('entity', 'main/entity', 'Entities'),
-            ('item', 'main/item', 'Items'),
-        ]
+        print("\n📊 System diagrams:")
+        for sys_id, cfg in SYSTEMS.items():
+            classes = self.get_system_classes(cfg)
+            if len(classes) >= 3:
+                self.generate_system_diagram(sys_id, cfg)
+            else:
+                print(f"  ⏭️ Skipping {sys_id} ({len(classes)} classes)")
         
-        for domain, folder, title in domains:
-            self.generate_domain_docs(domain, folder, title)
-        
-        # Client
-        print("\n🖥️ Client:")
-        self.generate_client_docs()
-        
-        # Shared
-        print("\n🔗 Shared:")
-        shared = [
-            ('mixin', 'shared/mixin', 'Mixins'),
-            ('util', 'shared/util', 'Utilities'),
-            ('config', 'shared/config', 'Configuration'),
-            ('log', 'shared/log', 'Logging'),
-            ('registry', 'shared/registry', 'Registries'),
-        ]
-        
-        for domain, folder, title in shared:
-            self.generate_domain_docs(domain, folder, title)
-        
-        print(f"\n✅ Done! {self.files_written} files {'would be ' if self.dry_run else ''}written.")
+        print(f"\n✅ Done! {self.files_written} files written.")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate documentation from Java source")
-    parser.add_argument('--dry-run', action='store_true', help='Preview without writing files')
+    parser = argparse.ArgumentParser(description="Generate minimalist documentation")
+    parser.add_argument('--dry-run', action='store_true', help='Preview only')
     args = parser.parse_args()
     
     print("=" * 60)
-    print("   DOCUMENTATION GENERATOR v2")
+    print("   DOCUMENTATION GENERATOR v3 (Minimalist)")
     print("=" * 60)
     
     if args.dry_run:
@@ -403,7 +399,7 @@ def main():
     classes = scan_project(PROJECT_ROOT)
     graph = build_graph(classes)
     
-    print(f"\n📊 {len(classes)} classes, {len(graph.get_domains())} domains")
+    print(f"\n📊 Found {len(classes)} classes")
     
     generator = DocGenerator(graph, dry_run=args.dry_run)
     generator.generate_all()
