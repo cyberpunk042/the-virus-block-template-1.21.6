@@ -69,6 +69,52 @@ class JavaField:
         return 'public' in self.modifiers
 
 
+def is_valid_java_identifier(name: str) -> bool:
+    """Check if a string is a valid Java identifier."""
+    if not name:
+        return False
+    # Must start with letter or underscore, contain only letters/digits/underscores
+    # Also reject if contains special chars like (, ), <, >, newlines, spaces
+    if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', name):
+        return False
+    return True
+
+
+def sanitize_for_mermaid(name: str) -> str:
+    """Sanitize a name for use in Mermaid diagrams."""
+    if not name:
+        return "Unknown"
+    # Remove generics
+    if '<' in name:
+        name = name.split('<')[0]
+    # Remove package prefix
+    if '.' in name:
+        name = name.split('.')[-1]
+    # Remove invalid characters
+    name = re.sub(r'[^A-Za-z0-9_]', '', name)
+    # Ensure it starts with a letter
+    if name and not name[0].isalpha():
+        name = 'C' + name
+    return name if name else "Unknown"
+
+
+def extract_javadoc(content: str, class_name: str) -> str:
+    """Extract javadoc comment for a class."""
+    # Look for /** ... */ immediately before class declaration
+    pattern = rf'/\*\*([^*]|\*(?!/))*\*/\s*(?:@\w+[^@]*)*\s*(?:public|private|protected)?\s*(?:abstract|final)?\s*(?:class|interface|enum|record)\s+{re.escape(class_name)}'
+    match = re.search(pattern, content, re.DOTALL)
+    if match:
+        javadoc = match.group(0)
+        # Extract just the comment part
+        doc_match = re.search(r'/\*\*(.+?)\*/', javadoc, re.DOTALL)
+        if doc_match:
+            doc = doc_match.group(1)
+            # Clean up
+            lines = [line.strip().lstrip('*').strip() for line in doc.split('\n')]
+            return ' '.join(line for line in lines if line and not line.startswith('@'))
+    return ""
+
+
 @dataclass 
 class JavaClass:
     """Represents a parsed Java class/interface/enum."""
@@ -82,6 +128,9 @@ class JavaClass:
     class_type: str  # 'class', 'interface', 'enum', 'record'
     modifiers: List[str] = field(default_factory=list)
     annotations: List[str] = field(default_factory=list)
+    
+    # Documentation
+    javadoc: str = ""  # Extracted javadoc comment
     
     # Relationships
     extends: Optional[str] = None
@@ -100,6 +149,11 @@ class JavaClass:
     
     # Parser info
     parser_used: str = "unknown"
+    
+    @property
+    def safe_name(self) -> str:
+        """Get a mermaid-safe version of the name."""
+        return sanitize_for_mermaid(self.name)
     
     @property
     def fqn(self) -> str:
@@ -226,7 +280,11 @@ def _parse_with_tree_sitter(filepath: Path, content: str, source_root: str) -> O
         # Process class declaration
         for child in node.children:
             if child.type == 'identifier':
-                class_name = content[child.start_byte:child.end_byte]
+                potential_name = content[child.start_byte:child.end_byte]
+                # Validate the name is a proper Java identifier
+                if is_valid_java_identifier(potential_name):
+                    class_name = potential_name
+                    break  # Stop after first valid identifier
             elif child.type == 'modifiers':
                 for mod in child.children:
                     if mod.type in ['public', 'private', 'protected', 'abstract', 'final', 'static']:
@@ -315,6 +373,13 @@ def _parse_with_tree_sitter(filepath: Path, content: str, source_root: str) -> O
     for node in root.children:
         find_type_declarations(node, 0)
     
+    # Validate the class name - if invalid, fall back to filename
+    if not is_valid_java_identifier(class_name):
+        class_name = filepath.stem
+    
+    # Extract javadoc
+    javadoc = extract_javadoc(content, class_name)
+    
     return JavaClass(
         filepath=filepath,
         source_root=source_root,
@@ -323,6 +388,7 @@ def _parse_with_tree_sitter(filepath: Path, content: str, source_root: str) -> O
         class_type=class_type,
         modifiers=modifiers,
         annotations=annotations,
+        javadoc=javadoc,
         extends=extends,
         implements=implements,
         internal_imports=internal_imports,

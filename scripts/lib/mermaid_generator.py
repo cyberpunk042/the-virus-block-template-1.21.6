@@ -10,13 +10,14 @@ Features:
 - Clean, readable output
 """
 
+import re
 from dataclasses import dataclass
 from typing import List, Dict, Set, Optional, Tuple
 from collections import defaultdict
 from datetime import datetime
 
 # Import from siblings
-from .java_parser import JavaClass, JavaMethod
+from .java_parser import JavaClass, JavaMethod, sanitize_for_mermaid, is_valid_java_identifier
 
 
 @dataclass
@@ -26,7 +27,8 @@ class DiagramConfig:
     show_methods: bool = False  # Show method names in class boxes
     show_fields: bool = False   # Show field names in class boxes
     max_methods_shown: int = 5  # If showing methods, max to display
-    include_external: bool = False  # Include external (non-project) relationships
+    include_external: bool = True  # Include external parent classes in diagrams
+    show_javadoc: bool = True  # Show javadoc in class details
 
 
 class MermaidGenerator:
@@ -36,24 +38,19 @@ class MermaidGenerator:
         self.classes = classes
         self.config = config or DiagramConfig()
         
-        # Build lookup tables
-        self.by_name = {c.name: c for c in classes}
-        self.by_fqn = {c.fqn: c for c in classes}
+        # Build lookup tables using safe names
+        self.by_name = {c.name: c for c in classes if is_valid_java_identifier(c.name)}
+        self.by_safe_name = {c.safe_name: c for c in classes}
+        self.by_fqn = {c.fqn: c for c in classes if is_valid_java_identifier(c.name)}
         self.by_package = defaultdict(list)
         for c in classes:
-            self.by_package[c.package].append(c)
+            if is_valid_java_identifier(c.name):
+                self.by_package[c.package].append(c)
     
     def _sanitize_name(self, name: str) -> str:
         """Sanitize a name for Mermaid (remove special chars)."""
-        # Remove generics
-        if '<' in name:
-            name = name.split('<')[0]
-        # Remove package prefix if FQN
-        if '.' in name:
-            name = name.split('.')[-1]
-        # Replace invalid characters
-        name = name.replace('-', '_').replace(' ', '_')
-        return name
+        return sanitize_for_mermaid(name)
+
     
     def _get_class_annotation(self, jc: JavaClass) -> str:
         """Get Mermaid annotation for class type."""
@@ -368,7 +365,14 @@ def generate_class_diagram_md(
         Complete markdown file content
     """
     config = config or DiagramConfig()
-    generator = MermaidGenerator(classes, config)
+    
+    # Filter out classes with invalid names
+    valid_classes = [c for c in classes if is_valid_java_identifier(c.name)]
+    
+    if not valid_classes:
+        return f"# {title}\n\n> No valid classes found.\n"
+    
+    generator = MermaidGenerator(valid_classes, config)
     
     lines = []
     lines.append(f"# {title}")
@@ -383,10 +387,10 @@ def generate_class_diagram_md(
     # Statistics
     lines.append("## Overview")
     lines.append("")
-    lines.append(f"- **Total Classes:** {len([c for c in classes if c.class_type == 'class'])}")
-    lines.append(f"- **Interfaces:** {len([c for c in classes if c.is_interface])}")
-    lines.append(f"- **Enums:** {len([c for c in classes if c.is_enum])}")
-    lines.append(f"- **Records:** {len([c for c in classes if c.class_type == 'record'])}")
+    lines.append(f"- **Total Classes:** {len([c for c in valid_classes if c.class_type == 'class'])}")
+    lines.append(f"- **Interfaces:** {len([c for c in valid_classes if c.is_interface])}")
+    lines.append(f"- **Enums:** {len([c for c in valid_classes if c.is_enum])}")
+    lines.append(f"- **Records:** {len([c for c in valid_classes if c.class_type == 'record'])}")
     lines.append("")
     
     # Inheritance diagram
@@ -394,39 +398,55 @@ def generate_class_diagram_md(
         lines.append("## Class Hierarchy")
         lines.append("")
         lines.append(generator.generate_class_diagram(
-            classes, 
+            valid_classes, 
             include_inheritance=True, 
             include_dependencies=False
         ))
         lines.append("")
     
     # Dependency diagram (if not too many classes)
-    if include_dependencies and len(classes) <= config.max_classes_per_diagram:
+    if include_dependencies and len(valid_classes) <= config.max_classes_per_diagram:
         lines.append("## Dependencies")
         lines.append("")
         lines.append(generator.generate_class_diagram(
-            classes,
+            valid_classes,
             include_inheritance=False,
             include_dependencies=True
         ))
         lines.append("")
     
-    # Class list
+    # Class list with details
     lines.append("## Class Details")
     lines.append("")
-    lines.append("| Class | Type | Extends | Implements |")
-    lines.append("|-------|------|---------|------------|")
     
-    for jc in sorted(classes, key=lambda x: x.name):
-        name = f"`{jc.name}`"
-        ctype = jc.class_type
-        extends = f"`{jc.extends}`" if jc.extends else "-"
-        implements = ", ".join(f"`{i}`" for i in jc.implements) if jc.implements else "-"
-        lines.append(f"| {name} | {ctype} | {extends} | {implements} |")
-    
-    lines.append("")
+    for jc in sorted(valid_classes, key=lambda x: x.name):
+        lines.append(f"### `{jc.name}`")
+        lines.append("")
+        lines.append(f"**Type:** {jc.class_type}")
+        if jc.extends:
+            lines.append(f"**Extends:** `{jc.extends}`")
+        if jc.implements:
+            lines.append(f"**Implements:** {', '.join(f'`{i}`' for i in jc.implements)}")
+        if jc.annotations:
+            lines.append(f"**Annotations:** {', '.join(f'@{a}' for a in jc.annotations)}")
+        lines.append("")
+        
+        # Include javadoc if available
+        if jc.javadoc and config.show_javadoc:
+            # Truncate long javadocs
+            doc = jc.javadoc[:300] + "..." if len(jc.javadoc) > 300 else jc.javadoc
+            lines.append(f"> {doc}")
+            lines.append("")
+        
+        # Show key public methods
+        if jc.public_methods:
+            method_names = [m.name for m in jc.public_methods[:8]]
+            lines.append(f"**Key Methods:** {', '.join(f'`{m}()`' for m in method_names)}")
+            lines.append("")
     
     return '\n'.join(lines)
+
+
 
 
 def generate_readme_md(
