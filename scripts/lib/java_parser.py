@@ -369,10 +369,11 @@ def _parse_with_tree_sitter(filepath: Path, content: str, source_root: str) -> O
                                         p_text = content[p.start_byte:p.end_byte]
                                         params.append(p_text)
                         
-                        if name:
+                        # Only add method if name is a valid identifier
+                        if name and is_valid_java_identifier(name):
                             methods.append(JavaMethod(
                                 name=name,
-                                return_type=ret_type,
+                                return_type=ret_type if is_valid_java_identifier(ret_type.split('<')[0]) else "",
                                 parameters=params,
                                 modifiers=mods,
                                 annotations=anns

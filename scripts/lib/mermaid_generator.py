@@ -143,31 +143,37 @@ class MermaidGenerator:
         if include_inheritance:
             for jc in classes:
                 child_name = self._sanitize_name(jc.name)
+                if not child_name or child_name == "Unknown":
+                    continue
                 
                 # Extends
                 if jc.extends:
                     parent_name = self._sanitize_name(jc.extends)
-                    parent_class = self._resolve_type_to_class(jc.extends)
+                    if not parent_name or parent_name == "Unknown":
+                        continue
                     
-                    # Only show if parent is in diagram or we include external
-                    if parent_name in defined_classes or (self.config.include_external and parent_class):
-                        if parent_name not in defined_classes and self.config.include_external:
+                    # Add parent if not already defined (external class)
+                    if parent_name not in defined_classes:
+                        if self.config.include_external:
                             lines.append(f"    class {parent_name}")
                             defined_classes.add(parent_name)
-                        if parent_name in defined_classes:
-                            relationships.append(f"    {parent_name} <|-- {child_name}")
+                    
+                    if parent_name in defined_classes:
+                        relationships.append(f"    {parent_name} <|-- {child_name}")
                 
                 # Implements
                 for impl in jc.implements:
                     impl_name = self._sanitize_name(impl)
-                    impl_class = self._resolve_type_to_class(impl)
+                    if not impl_name or impl_name == "Unknown":
+                        continue
                     
-                    if impl_name in defined_classes or (self.config.include_external and impl_class):
-                        if impl_name not in defined_classes and self.config.include_external:
+                    if impl_name not in defined_classes:
+                        if self.config.include_external:
                             lines.append(f"    class {impl_name} <<interface>>")
                             defined_classes.add(impl_name)
-                        if impl_name in defined_classes:
-                            relationships.append(f"    {impl_name} <|.. {child_name}")
+                    
+                    if impl_name in defined_classes:
+                        relationships.append(f"    {impl_name} <|.. {child_name}")
         
         # Add dependency relationships (uses)
         if include_dependencies:
