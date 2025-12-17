@@ -152,20 +152,28 @@ class MermaidGenerator:
                         if impl_name in defined:
                             relationships.append(f"    {impl_name} <|.. {child}")
         
-        # Add composition/dependency relationships
+        # Add composition/dependency relationships (limit per class)
         if show_dependencies and self.config.show_composition:
+            MAX_DEPS_PER_CLASS = 4  # Limit to avoid clutter
             for jc in classes:
                 src = self._sanitize(jc.name)
                 if not src:
                     continue
                 
-                # Look at field types for composition
+                # Look at field types for composition (limit count)
+                deps_added = 0
                 for field in jc.fields:
+                    if deps_added >= MAX_DEPS_PER_CLASS:
+                        break
                     field_type = self._sanitize(field.type.split('<')[0]) if field.type else ""
+                    # Skip common widget types to reduce noise
+                    if field_type in ['ButtonWidget', 'LabeledSlider', 'SliderWidget', 'String', 'boolean', 'int', 'float', 'List', 'Map', 'Set']:
+                        continue
                     if field_type and field_type in defined and field_type != src:
                         rel = f"    {src} --> {field_type} : {field.name}"
                         if rel not in relationships:
                             relationships.append(rel)
+                            deps_added += 1
         
         # Add relationships (deduplicated)
         for rel in sorted(set(relationships)):

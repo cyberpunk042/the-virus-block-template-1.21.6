@@ -35,34 +35,54 @@ DOCS_DIR = PROJECT_ROOT / "docs"
 # =============================================================================
 
 SYSTEMS = {
-    "field_system": {
-        "title": "Field System",
-        "description": "Core field definitions, effects, bindings, triggers, and lifecycle management.",
-        "packages": ["field", "field.definition", "field.effect", "field.influence", "field.instance", "field.loader"],
-        "key_classes": ["FieldDefinition", "FieldLayer", "FieldManager", "BindingResolver", "TriggerProcessor"],
+    # Field System - split into core and effects
+    "field_core": {
+        "title": "Field System - Core",
+        "description": "Field definitions, layers, registry, and manager - the backbone of the field system.",
+        "packages": ["field", "field.loader"],
+        "key_classes": ["FieldDefinition", "FieldLayer", "FieldManager", "FieldRegistry", "FieldProfileStore"],
+    },
+    "field_effects": {
+        "title": "Field System - Effects & Triggers",
+        "description": "Effects, bindings, triggers, lifecycle, and instance management.",
+        "packages": ["field.effect", "field.influence", "field.instance"],
+        "key_classes": ["EffectProcessor", "BindingResolver", "TriggerProcessor", "FieldInstance", "LifecycleConfig"],
     },
     "visual_system": {
         "title": "Visual System", 
         "description": "Shape definitions, pattern system, color themes, animations, and fill modes.",
-        "packages": ["visual", "visual.shape", "visual.pattern", "visual.animation", "visual.color", "visual.fill", "visual.transform", "visual.layer", "visual.appearance"],
+        "packages": ["visual", "visual.shape", "visual.pattern", "visual.animation", "visual.color", "visual.fill", "visual.transform", "visual.appearance", "visual.visibility", "visual.layer", "visual.util", "visual.validation"],
         "key_classes": ["Shape", "QuadPattern", "AnimationConfig", "ColorTheme", "FillMode"],
     },
     "infection_system": {
         "title": "Infection System",
         "description": "Virus spreading logic, infection services, scenario management, and orchestration.",
-        "packages": ["infection", "infection.service", "infection.controller", "infection.scenario", "infection.orchestrator", "infection.event", "infection.registry"],
+        "packages": ["infection", "infection.service", "infection.controller", "infection.scenario", "infection.orchestrator", "infection.event", "infection.registry", "infection.compat", "infection.persistence", "infection.protection", "infection.spread", "infection.spawn"],
         "key_classes": ["InfectionService", "InfectionController", "ScenarioConfig"],
     },
-    "gui_system": {
-        "title": "GUI System",
-        "description": "Panel hierarchy, widgets, state management, adapters, and screen layouts.",
-        "packages": ["client.gui", "client.gui.panel", "client.gui.panel.sub", "client.gui.widget", "client.gui.state", "client.gui.state.adapter", "client.gui.preview", "client.gui.layout", "client.gui.screen"],
-        "key_classes": ["AbstractPanel", "FieldCustomizerScreen", "FieldEditState", "LayoutManager"],
+    # GUI - split into 3 focused diagrams
+    "gui_panels": {
+        "title": "GUI - Panels",
+        "description": "Panel hierarchy - main panels, sub-panels, and their composition.",
+        "packages": ["client.gui.panel", "client.gui.panel.sub"],
+        "key_classes": ["AbstractPanel", "AdvancedPanel", "QuickPanel", "LayerPanel", "PrimitivePanel"],
+    },
+    "gui_widgets": {
+        "title": "GUI - Widgets",
+        "description": "Reusable UI widgets - buttons, sliders, dropdowns, selectors.",
+        "packages": ["client.gui.widget", "client.gui.util"],
+        "key_classes": ["LabeledSlider", "ColorButton", "DropdownWidget", "CompactSelector", "ConfirmDialog"],
+    },
+    "gui_state": {
+        "title": "GUI - State & Adapters",
+        "description": "State management, adapters, layout managers, and screen orchestration.",
+        "packages": ["client.gui.state", "client.gui.state.adapter", "client.gui.layout", "client.gui.screen", "client.gui.preview", "client.gui"],
+        "key_classes": ["FieldEditState", "AbstractAdapter", "LayoutManager", "FieldCustomizerScreen"],
     },
     "rendering_pipeline": {
         "title": "Rendering Pipeline",
         "description": "Mesh building, tessellators, primitive renderers, and render layers.",
-        "packages": ["client.visual", "client.visual.mesh", "client.visual.tessellator", "client.visual.render", "client.field.render", "client.render"],
+        "packages": ["client.visual", "client.visual.mesh", "client.visual.tessellator", "client.visual.render", "client.field.render", "client.render", "client.field"],
         "key_classes": ["MeshBuilder", "SphereTessellator", "FieldRenderer", "LayerRenderer", "PrimitiveRenderer"],
     },
     "blocks_growth": {
@@ -197,6 +217,68 @@ python3 scripts/generate_docs.py
 │                         │  └───────────┘                     │ │
 │                         └─────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
+```
+
+## System Interconnections
+
+```mermaid
+graph TD
+    subgraph Server/Common
+        FD[FieldDefinition] --> FL[FieldLayer]
+        FL --> VIS[Visual System]
+        VIS --> Shape & Pattern & Animation
+        FM[FieldManager] --> FD
+        FI[FieldInstance] --> FM
+    end
+    
+    subgraph Client
+        FCS[FieldCustomizerScreen] --> PANELS[Panels]
+        PANELS --> WIDGETS[Widgets]
+        FES[FieldEditState] --> ADAPTERS[Adapters]
+        ADAPTERS --> FL
+        
+        FR[FieldRenderer] --> LR[LayerRenderer]
+        LR --> PR[PrimitiveRenderer]
+        PR --> TESS[Tessellators]
+        TESS --> MB[MeshBuilder]
+    end
+    
+    FM -->|Network| FR
+    FES -->|JSON| FD
+```
+
+## GUI System Structure
+
+```mermaid
+graph LR
+    FCS[FieldCustomizerScreen]
+    FCS --> LM[LayoutManager]
+    LM --> FullscreenLayout
+    LM --> WindowedLayout
+    
+    FCS --> Panels
+    subgraph Panels
+        AP[AbstractPanel]
+        AP --> QuickPanel
+        AP --> AdvancedPanel  
+        AP --> DebugPanel
+        AP --> ProfilesPanel
+        AdvancedPanel --> SubPanels
+    end
+    
+    subgraph SubPanels
+        ShapeSubPanel
+        FillSubPanel
+        AnimationSubPanel
+        TransformSubPanel
+    end
+    
+    SubPanels --> Widgets
+    subgraph Widgets
+        LabeledSlider
+        ColorButton
+        DropdownWidget
+    end
 ```
 
 ## Data Flows
