@@ -99,20 +99,49 @@ def sanitize_for_mermaid(name: str) -> str:
 
 
 def extract_javadoc(content: str, class_name: str) -> str:
-    """Extract javadoc comment for a class."""
-    # Look for /** ... */ immediately before class declaration
-    pattern = rf'/\*\*([^*]|\*(?!/))*\*/\s*(?:@\w+[^@]*)*\s*(?:public|private|protected)?\s*(?:abstract|final)?\s*(?:class|interface|enum|record)\s+{re.escape(class_name)}'
-    match = re.search(pattern, content, re.DOTALL)
-    if match:
-        javadoc = match.group(0)
-        # Extract just the comment part
-        doc_match = re.search(r'/\*\*(.+?)\*/', javadoc, re.DOTALL)
-        if doc_match:
-            doc = doc_match.group(1)
-            # Clean up
-            lines = [line.strip().lstrip('*').strip() for line in doc.split('\n')]
-            return ' '.join(line for line in lines if line and not line.startswith('@'))
-    return ""
+    """Extract javadoc comment for a class. Uses simple string search to avoid regex catastrophic backtracking."""
+    # Find the class declaration line
+    class_pattern = rf'\b(class|interface|enum|record)\s+{re.escape(class_name)}\b'
+    class_match = re.search(class_pattern, content)
+    
+    if not class_match:
+        return ""
+    
+    # Look backwards from the class declaration for /**
+    before_class = content[:class_match.start()]
+    
+    # Find the last /** ... */ before the class
+    last_javadoc_end = before_class.rfind('*/')
+    if last_javadoc_end == -1:
+        return ""
+    
+    # Find the matching /**
+    last_javadoc_start = before_class.rfind('/**', 0, last_javadoc_end)
+    if last_javadoc_start == -1:
+        return ""
+    
+    # Check there's no other code between javadoc and class (only whitespace/annotations allowed)
+    between = before_class[last_javadoc_end + 2:]
+    # Remove annotations and whitespace
+    between_cleaned = re.sub(r'@\w+(\([^)]*\))?\s*', '', between)
+    between_cleaned = between_cleaned.strip()
+    if between_cleaned:
+        # There's code between javadoc and class, not a class javadoc
+        return ""
+    
+    # Extract the javadoc content
+    javadoc = before_class[last_javadoc_start:last_javadoc_end + 2]
+    
+    # Clean up - remove /** and */, strip * from lines
+    doc = javadoc[3:-2]  # Remove /** and */
+    lines = [line.strip().lstrip('*').strip() for line in doc.split('\n')]
+    
+    # Filter out @param, @return, etc tags
+    result = ' '.join(line for line in lines if line and not line.startswith('@'))
+    
+    return result[:500] if result else ""  # Limit length
+
+
 
 
 @dataclass 
@@ -277,15 +306,19 @@ def _parse_with_tree_sitter(filepath: Path, content: str, source_root: str) -> O
                 find_type_declarations(child, depth)
             return
         
-        # Process class declaration
+        # Process class declaration - first pass for identifier
+        found_name = False
         for child in node.children:
-            if child.type == 'identifier':
+            if child.type == 'identifier' and not found_name:
                 potential_name = content[child.start_byte:child.end_byte]
                 # Validate the name is a proper Java identifier
                 if is_valid_java_identifier(potential_name):
                     class_name = potential_name
-                    break  # Stop after first valid identifier
-            elif child.type == 'modifiers':
+                    found_name = True
+        
+        # Second pass for everything else
+        for child in node.children:
+            if child.type == 'modifiers':
                 for mod in child.children:
                     if mod.type in ['public', 'private', 'protected', 'abstract', 'final', 'static']:
                         modifiers.append(mod.type)
