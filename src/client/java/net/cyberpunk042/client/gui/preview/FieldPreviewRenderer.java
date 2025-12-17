@@ -1,25 +1,37 @@
 package net.cyberpunk042.client.gui.preview;
 
+import com.mojang.blaze3d.textures.GpuTexture;
+import net.cyberpunk042.client.field.render.FieldRenderer;
 import net.cyberpunk042.client.gui.preview.tessellator.PreviewSphereTessellator;
+import net.cyberpunk042.client.gui.state.DefinitionBuilder;
 import net.cyberpunk042.client.gui.state.FieldEditState;
+import net.cyberpunk042.field.FieldDefinition;
 import net.cyberpunk042.visual.fill.FillMode;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.render.VertexConsumerProvider;
+import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.RotationAxis;
+import net.minecraft.util.math.Vec3d;
 
 import java.util.List;
 
 /**
  * Helper for rendering field previews in GUI screens.
  * 
- * <p>Now supports fill-mode aware rendering using tessellation and rasterization
- * for solid shapes. Falls back to wireframe for unsupported shapes.</p>
+ * <p>Supports two rendering modes:
+ * <ul>
+ *   <li><b>Fast</b> - 2D rasterization with tessellation (default)</li>
+ *   <li><b>Full</b> - Real FieldRenderer via offscreen framebuffer</li>
+ * </ul>
  * 
  * <h2>Usage</h2>
  * <pre>
  * // In your screen's render method:
- * FieldPreviewRenderer.drawField(context, state, x1, y1, x2, y2);
+ * FieldPreviewRenderer.drawField(context, state, x1, y1, x2, y2, useFullRenderer);
  * </pre>
  */
 @Environment(EnvType.CLIENT)
@@ -28,58 +40,390 @@ public class FieldPreviewRenderer {
     // Simple 3D to 2D projection parameters
     private static final float PERSPECTIVE = 0.4f;  // Perspective strength
     
+    // Cached framebuffer for full preview mode
+    private static PreviewFramebuffer previewFramebuffer = null;
+    
+    // Debug: only log once
+    private static boolean debugLogged = false;
+    
     /**
-     * Draws a field preview using 2D projected wireframe.
+     * Main entry point for field preview rendering.
+     * 
+     * @param useFullRenderer Currently ignored - always uses fast 2D rasterization.
+     *                        Full 3D rendering requires framebuffer approach (TODO).
      */
     public static void drawField(DrawContext context, FieldEditState state,
-                                 int x1, int y1, int x2, int y2) {
+                                 int x1, int y1, int x2, int y2,
+                                 boolean useFullRenderer) {
         // Time in ticks (20 ticks/sec simulation)
         float timeTicks = (System.currentTimeMillis() % 100000) / 50f;  // ~20 per second
         
         // === SPIN ANIMATION ===
         float rotationY = 0f;
-        try {
-            var spin = state.spin();
-            if (spin != null && spin.isActive()) {
-                float speed = spin.speed();
-                // Speed is in radians per tick, convert to degrees
-                rotationY = (timeTicks * speed * 57.3f) % 360f;  // 57.3 = 180/PI
-            }
-        } catch (Exception ignored) {}
+        var spin = state.spin();
+        if (spin != null && spin.isActive()) {
+            float speed = spin.speed();
+            rotationY = (timeTicks * speed * 57.3f) % 360f;  // 57.3 = 180/PI
+        }
         
         // === WOBBLE ANIMATION ===
         float rotationX = 25f;  // Base tilt
-        try {
-            var wobble = state.wobble();
-            if (wobble != null && wobble.isActive()) {
-                var amp = wobble.amplitude();
-                if (amp != null) {
-                    float speed = wobble.speed();
-                    // Add oscillating offset to rotation
-                    rotationX += (float) Math.sin(timeTicks * speed * 0.1f) * amp.x() * 100f;
-                    rotationY += (float) Math.cos(timeTicks * speed * 0.1f) * amp.z() * 100f;
-                }
+        var wobble = state.wobble();
+        if (wobble != null && wobble.isActive()) {
+            var amp = wobble.amplitude();
+            if (amp != null) {
+                float speed = wobble.speed();
+                rotationX += (float) Math.sin(timeTicks * speed * 0.1f) * amp.x() * 100f;
+                rotationY += (float) Math.cos(timeTicks * speed * 0.1f) * amp.z() * 100f;
             }
-        } catch (Exception ignored) {}
+        }
         
         // === PULSE/BREATHING ANIMATION ===
         float scale = 1.0f;
-        try {
-            var pulse = state.pulse();
-            if (pulse != null && pulse.isActive()) {
-                scale = pulse.evaluate(timeTicks);
-            }
-        } catch (Exception ignored) {}
+        var pulse = state.pulse();
+        if (pulse != null && pulse.isActive()) {
+            scale = pulse.evaluate(timeTicks);
+        }
         
-        drawField(context, state, x1, y1, x2, y2, scale, rotationX, rotationY);
+        if (useFullRenderer) {
+            // Full mode: render using real FieldRenderer via framebuffer
+            drawFieldFull(context, state, x1, y1, x2, y2, scale, rotationX, rotationY, timeTicks);
+        } else {
+            // Fast mode: 2D rasterization
+            drawFieldFast(context, state, x1, y1, x2, y2, scale, rotationX, rotationY);
+        }
     }
     
     /**
-     * Draws a field preview with specified rotation.
+     * Draws a field preview using 2D rasterization (backward compatible).
      */
     public static void drawField(DrawContext context, FieldEditState state,
-                                 int x1, int y1, int x2, int y2,
-                                 float scale, float rotationX, float rotationY) {
+                                 int x1, int y1, int x2, int y2) {
+        drawField(context, state, x1, y1, x2, y2, false);
+    }
+    
+    /**
+     * Disposes the cached framebuffer. Call when closing the screen.
+     */
+    public static void disposeFramebuffer() {
+        if (previewFramebuffer != null) {
+            previewFramebuffer.close();
+            previewFramebuffer = null;
+        }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // FULL PREVIEW (Real FieldRenderer via Framebuffer)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Draws field using real FieldRenderer to an offscreen framebuffer.
+     * This provides 100% visual fidelity with world rendering.
+     */
+    private static void drawFieldFull(DrawContext context, FieldEditState state,
+                                       int x1, int y1, int x2, int y2,
+                                       float scale, float rotationX, float rotationY,
+                                       float timeTicks) {
+        // Calculate preview dimensions - use 4x resolution for better quality
+        int width = x2 - x1;
+        int height = y2 - y1;
+        if (width <= 0 || height <= 0) return;
+        
+        int fboScale = 4;  // Render at 4x resolution for sharper preview
+        int fboWidth = width * fboScale;
+        int fboHeight = height * fboScale;
+        
+        // Ensure framebuffer exists and is correct size
+        if (previewFramebuffer == null) {
+            previewFramebuffer = new PreviewFramebuffer();
+        }
+        previewFramebuffer.ensureSize(fboWidth, fboHeight);
+        
+        var framebuffer = previewFramebuffer.getFramebuffer();
+        if (framebuffer == null) {
+            context.fill(x1, y1, x2, y2, 0xFFFF0000);  // Red = no framebuffer
+            return;
+        }
+        
+        // Build definition from current state
+        FieldDefinition definition = DefinitionBuilder.fromState(state);
+        if (definition == null || definition.layers() == null || definition.layers().isEmpty()) {
+            // Fall back to fast preview if no valid definition
+            drawFieldFast(context, state, x1, y1, x2, y2, scale, rotationX, rotationY);
+            return;
+        }
+        
+        MinecraftClient client = MinecraftClient.getInstance();
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // SAVE CURRENT STATE
+        // ═══════════════════════════════════════════════════════════════════════════
+        
+        // Save current viewport
+        int[] savedViewport = new int[4];
+        org.lwjgl.opengl.GL11.glGetIntegerv(org.lwjgl.opengl.GL11.GL_VIEWPORT, savedViewport);
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // SETUP FBO STATE
+        // ═══════════════════════════════════════════════════════════════════════════
+        
+        // Prepare and bind framebuffer
+        previewFramebuffer.prepare();
+        try {
+            var bindMethod = framebuffer.getClass().getMethod("iris$bindFramebuffer");
+            bindMethod.invoke(framebuffer);
+            if (!debugLogged) System.out.println("[FieldPreviewRenderer] Bound preview FBO");
+        } catch (Exception e) {
+            if (!debugLogged) System.out.println("[FieldPreviewRenderer] Failed to bind FBO: " + e);
+        }
+        
+        // Set viewport to FBO dimensions (fboWidth/fboHeight defined earlier)
+        org.lwjgl.opengl.GL11.glViewport(0, 0, fboWidth, fboHeight);
+        
+        // Clear FBO with OPAQUE dark background
+        // Must disable blending for clear to work as expected
+        org.lwjgl.opengl.GL11.glDisable(org.lwjgl.opengl.GL11.GL_BLEND);
+        org.lwjgl.opengl.GL11.glClearColor(0.12f, 0.12f, 0.18f, 1.0f);  // Opaque dark blue-gray
+        org.lwjgl.opengl.GL11.glClear(org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT | org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT);
+        org.lwjgl.opengl.GL11.glEnable(org.lwjgl.opengl.GL11.GL_BLEND);
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // SETUP VIEW TRANSFORM
+        // ═══════════════════════════════════════════════════════════════════════════
+        
+        // Use FIXED camera distance so shape size changes with radius
+        // Distance of 2.5 = 4x zoom compared to 10.0
+        float fixedCameraDistance = 2.5f;  // Zoomed in for better visibility
+        
+        // Account for aspect ratio (narrower preview = need more distance)
+        float aspect = (float) fboWidth / (float) fboHeight;
+        float aspectFactor = aspect < 1.0f ? 1.0f / aspect : 1.0f;
+        float cameraDistance = fixedCameraDistance * aspectFactor;
+        
+        MatrixStack matrices = new MatrixStack();
+        matrices.push();
+        
+        // View transform: camera looking at origin from fixed distance
+        matrices.translate(0, 0, -cameraDistance);
+        
+        // Apply rotations
+        matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(rotationX));
+        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(rotationY));
+        
+        // Apply user scale
+        matrices.scale(scale, scale, scale);
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // RENDER THE FIELD
+        // ═══════════════════════════════════════════════════════════════════════════
+        
+        // Get vertex buffer provider
+        VertexConsumerProvider.Immediate immediate = client.getBufferBuilders().getEntityVertexConsumers();
+        
+        // Get alpha
+        float alpha = 1.0f;
+        var appearance = state.appearance();
+        if (appearance != null) {
+            alpha = appearance.alphaMin();
+        }
+        
+        // Render field at origin
+        FieldRenderer.render(
+            matrices,
+            immediate,
+            definition,
+            Vec3d.ZERO,
+            1.0f,
+            timeTicks,
+            alpha
+        );
+        
+        // Flush vertex buffers
+        immediate.draw();
+        matrices.pop();
+        
+        if (!debugLogged) {
+            System.out.println("[FieldPreviewRenderer] Rendered field to FBO");
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // CAPTURE FBO CONTENT
+        // ═══════════════════════════════════════════════════════════════════════════
+        
+        PreviewDynamicTexture.getInstance().captureFromBoundFbo(fboWidth, fboHeight);
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // RESTORE PREVIOUS STATE
+        // ═══════════════════════════════════════════════════════════════════════════
+        
+        // Unbind FBO (bind back to main screen)
+        try {
+            var mainFb = client.getFramebuffer();
+            var unbindMethod = mainFb.getClass().getMethod("iris$bindFramebuffer");
+            unbindMethod.invoke(mainFb);
+        } catch (Exception e) {
+            // Fallback: bind FBO 0
+            org.lwjgl.opengl.GL30.glBindFramebuffer(org.lwjgl.opengl.GL30.GL_FRAMEBUFFER, 0);
+        }
+        
+        // Restore viewport
+        org.lwjgl.opengl.GL11.glViewport(savedViewport[0], savedViewport[1], savedViewport[2], savedViewport[3]);
+        
+        if (!debugLogged) {
+            System.out.println("[FieldPreviewRenderer] State restored, drawing to GUI");
+            debugLogged = true;
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // DRAW CAPTURED TEXTURE TO GUI
+        // ═══════════════════════════════════════════════════════════════════════════
+        
+        drawFramebufferToGui(context, framebuffer, x1, y1, x2, y2);
+    }
+    
+    /**
+     * Draws a Framebuffer to the GUI at the specified bounds.
+     * Uses the captured texture from PreviewDynamicTexture.
+     */
+    private static void drawFramebufferToGui(DrawContext context, net.minecraft.client.gl.Framebuffer framebuffer, 
+                                              int x1, int y1, int x2, int y2) {
+        PreviewDynamicTexture dynamicTexture = PreviewDynamicTexture.getInstance();
+        
+        if (!dynamicTexture.isReady()) {
+            context.fill(x1, y1, x2, y2, 0xFFFF0000);  // Red = texture not ready
+            if (!debugLogged) {
+                System.out.println("[FieldPreviewRenderer] Dynamic texture not ready");
+            }
+            return;
+        }
+        
+        try {
+            int width = x2 - x1;
+            int height = y2 - y1;
+            
+            // Draw opaque background first (prevents world showing through)
+            context.fill(x1, y1, x2, y2, 0xFF1E1E2E);  // Dark background matching FBO clear color
+            
+            // Draw using DrawContext with the captured texture
+            context.drawTexture(
+                net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED,
+                PreviewDynamicTexture.getTextureId(),
+                x1, y1,
+                0.0f, 0.0f,  // u, v offset
+                width, height,
+                width, height  // texture dimensions (match display size)
+            );
+            
+            if (!debugLogged) {
+                System.out.println("[FieldPreviewRenderer] Texture draw call made!");
+                debugLogged = true;
+            }
+            
+        } catch (Exception e) {
+            if (!debugLogged) {
+                System.out.println("[FieldPreviewRenderer] Error: " + e.getMessage());
+                e.printStackTrace();
+                debugLogged = true;
+            }
+            context.fill(x1, y1, x2, y2, 0xFFFF8800);  // Orange = error
+        }
+    }
+    
+    /**
+     * Attempts to extract the OpenGL texture ID from a GpuTexture using reflection.
+     * Returns -1 if unable to get the ID.
+     */
+    private static int getGlTextureId(GpuTexture texture) {
+        // Debug: Log the actual class name (only once)
+        if (!debugLogged) {
+            debugLogged = true;
+            String className = texture.getClass().getName();
+            System.out.println("[FieldPreviewRenderer] GpuTexture class: " + className);
+            
+            // Debug: List all methods
+            System.out.println("[FieldPreviewRenderer] Methods:");
+            for (var method : texture.getClass().getMethods()) {
+                if (method.getParameterCount() == 0 && !method.getName().startsWith("wait") 
+                    && !method.getName().equals("toString") && !method.getName().equals("hashCode")
+                    && !method.getName().equals("getClass") && !method.getName().equals("notify")
+                    && !method.getName().equals("notifyAll")) {
+                    System.out.println("  - " + method.getName() + "() -> " + method.getReturnType().getSimpleName());
+                }
+            }
+        }
+        
+        // Try method_68427 (obfuscated name for glId in 1.21)
+        try {
+            var method = texture.getClass().getMethod("method_68427");
+            Object result = method.invoke(texture);
+            if (result instanceof Integer id && id > 0) {
+                if (!debugLogged) System.out.println("[FieldPreviewRenderer] method_68427() returned: " + id);
+                return id;
+            }
+        } catch (Exception e) {
+            // Method not found or failed
+        }
+        
+        // Try iris$getGlId (Iris shaders compatibility)
+        try {
+            var method = texture.getClass().getMethod("iris$getGlId");
+            Object result = method.invoke(texture);
+            if (result instanceof Integer id && id > 0) {
+                if (!debugLogged) System.out.println("[FieldPreviewRenderer] iris$getGlId() returned: " + id);
+                return id;
+            }
+        } catch (Exception e) {
+            // Method not found or failed
+        }
+        
+        // Try glId (deobfuscated name, in case yarn mappings work)
+        try {
+            var method = texture.getClass().getMethod("glId");
+            Object result = method.invoke(texture);
+            if (result instanceof Integer id && id > 0) {
+                if (!debugLogged) System.out.println("[FieldPreviewRenderer] glId() returned: " + id);
+                return id;
+            }
+        } catch (Exception e) {
+            // Method not found
+        }
+        
+        if (!debugLogged) System.out.println("[FieldPreviewRenderer] Could not get GL texture ID");
+        return -1;
+    }
+    
+    /**
+     * Draws a textured quad using the given texture ID.
+     * 
+     * NOTE: In 1.21, the rendering pipeline is complex and requires proper shader setup.
+     * For now, we just log success. The actual texture display needs more research.
+     * 
+     * TODO: Research proper way to draw a raw GL texture in 1.21:
+     * - Maybe use Framebuffer.blitToScreen() with scissor
+     * - Or create a custom RenderPipeline/RenderPass
+     * - Or register the texture with TextureManager
+     */
+    private static void drawTexturedQuad(DrawContext context, int x1, int y1, int x2, int y2, int textureId) {
+        // Log success (once)
+        if (!debugLogged) {
+            System.out.println("[FieldPreviewRenderer] SUCCESS! Got GL texture ID: " + textureId);
+            System.out.println("[FieldPreviewRenderer] Note: Actual texture rendering not yet implemented.");
+        }
+        
+        // TODO: Use the textureId to actually render the framebuffer content
+        // For now, the caller draws a green rectangle to show success
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // FAST PREVIEW (2D Rasterization)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Draws a field preview with fast 2D rasterization.
+     */
+    private static void drawFieldFast(DrawContext context, FieldEditState state,
+                                       int x1, int y1, int x2, int y2,
+                                       float scale, float rotationX, float rotationY) {
         
         // Enable scissor for bounds
         context.enableScissor(x1, y1, x2, y2);
