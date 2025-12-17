@@ -91,8 +91,9 @@ public class PreviewDynamicTexture {
                 int r = buffer.get(srcIndex) & 0xFF;
                 int g = buffer.get(srcIndex + 1) & 0xFF;
                 int b = buffer.get(srcIndex + 2) & 0xFF;
-                int a = buffer.get(srcIndex + 3) & 0xFF;
-                // setColorArgb expects ARGB format, not ABGR
+                // Force alpha to 255 (fully opaque) - prevents world showing through
+                int a = 255;
+                // setColorArgb expects ARGB format
                 int color = (a << 24) | (r << 16) | (g << 8) | b;  // ARGB
                 image.setColorArgb(x, y, color);
             }

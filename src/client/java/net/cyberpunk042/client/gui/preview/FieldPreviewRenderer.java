@@ -214,6 +214,59 @@ public class FieldPreviewRenderer {
         matrices.scale(scale, scale, scale);
         
         // ═══════════════════════════════════════════════════════════════════════════
+        // RENDER OPAQUE BACKGROUND QUAD (using Tessellator)
+        // ═══════════════════════════════════════════════════════════════════════════
+        
+        // Get vertex buffer provider for background
+        VertexConsumerProvider.Immediate bgImmediate = client.getBufferBuilders().getEntityVertexConsumers();
+        
+        // Use a solid render layer for the background
+        var solidLayer = net.minecraft.client.render.RenderLayer.getEntityTranslucent(
+            net.minecraft.util.Identifier.of("minecraft", "textures/misc/white.png")
+        );
+        var bgConsumer = bgImmediate.getBuffer(solidLayer);
+        
+        // Draw a large quad behind the shape
+        float bgSize = 50f;
+        float bgZ = -5f;  // Behind the shape (in model space)
+        int bgR = 0x1E, bgG = 0x1E, bgB = 0x2E, bgA = 0xFF;
+        int maxLight = net.minecraft.client.render.LightmapTextureManager.MAX_LIGHT_COORDINATE;
+        
+        // Get the matrix entry for normals
+        var entry = matrices.peek();
+        var bgMatrix = entry.getPositionMatrix();
+        
+        // Emit 4 vertices for the quad with ALL required elements:
+        // position, color, texture, overlay, light, normal
+        bgConsumer.vertex(bgMatrix, -bgSize, -bgSize, bgZ)
+            .color(bgR, bgG, bgB, bgA)
+            .texture(0f, 0f)
+            .overlay(net.minecraft.client.render.OverlayTexture.DEFAULT_UV)
+            .light(maxLight)
+            .normal(entry, 0f, 0f, 1f);
+        bgConsumer.vertex(bgMatrix, -bgSize,  bgSize, bgZ)
+            .color(bgR, bgG, bgB, bgA)
+            .texture(0f, 1f)
+            .overlay(net.minecraft.client.render.OverlayTexture.DEFAULT_UV)
+            .light(maxLight)
+            .normal(entry, 0f, 0f, 1f);
+        bgConsumer.vertex(bgMatrix,  bgSize,  bgSize, bgZ)
+            .color(bgR, bgG, bgB, bgA)
+            .texture(1f, 1f)
+            .overlay(net.minecraft.client.render.OverlayTexture.DEFAULT_UV)
+            .light(maxLight)
+            .normal(entry, 0f, 0f, 1f);
+        bgConsumer.vertex(bgMatrix,  bgSize, -bgSize, bgZ)
+            .color(bgR, bgG, bgB, bgA)
+            .texture(1f, 0f)
+            .overlay(net.minecraft.client.render.OverlayTexture.DEFAULT_UV)
+            .light(maxLight)
+            .normal(entry, 0f, 0f, 1f);
+        
+        // Flush background
+        bgImmediate.draw();
+        
+        // ═══════════════════════════════════════════════════════════════════════════
         // RENDER THE FIELD
         // ═══════════════════════════════════════════════════════════════════════════
         
