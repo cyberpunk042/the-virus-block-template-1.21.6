@@ -73,17 +73,14 @@ public class ColorButton extends ButtonWidget {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (this.active && this.visible && this.isMouseOver(mouseX, mouseY)) {
-            if (button == 1) { // Right-click
+            if (button == 1) { // Right-click: open color input modal
                 if (onRightClick != null) {
                     this.playDownSound(net.minecraft.client.MinecraftClient.getInstance().getSoundManager());
                     onRightClick.run();
                     return true;
-                } else {
-                    // Fallback: cycle backward if no modal handler
-                    this.playDownSound(net.minecraft.client.MinecraftClient.getInstance().getSoundManager());
-                    cycleColorBackward();
-                    return true;
                 }
+                // No handler set - do nothing on right-click
+                return false;
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);

@@ -51,12 +51,12 @@ public class LabeledSlider extends SliderWidget {
     }
     
     /**
-     * Creates a labeled slider with default height.
+     * Creates a labeled slider with responsive height.
      */
     public LabeledSlider(int x, int y, int width, String label, 
                          float minValue, float maxValue, float initialValue,
                          String format, Float step, Consumer<Float> onChange) {
-        this(x, y, width, GuiConstants.WIDGET_HEIGHT, label, minValue, maxValue, initialValue, format, step, onChange);
+        this(x, y, width, GuiConstants.widgetHeight(), label, minValue, maxValue, initialValue, format, step, onChange);
     }
     
     private static double normalizeValue(float value, float min, float max) {
@@ -114,7 +114,8 @@ public class LabeledSlider extends SliderWidget {
     
     public static class Builder {
         private final String label;
-        private int x, y, width = GuiConstants.SLIDER_WIDTH, height = GuiConstants.WIDGET_HEIGHT;
+        private int x, y, width = GuiConstants.SLIDER_WIDTH;
+        private Integer height = null;  // null = use dynamic height
         private float min = 0f, max = 1f, initial = 0.5f;
         private String format = "%.2f";
         private Float step = null;
@@ -133,7 +134,8 @@ public class LabeledSlider extends SliderWidget {
         public Builder onChange(Consumer<Float> c) { this.onChange = c; return this; }
         
         public LabeledSlider build() {
-            return new LabeledSlider(x, y, width, height, label, min, max, initial, format, step, onChange);
+            int h = height != null ? height : GuiConstants.widgetHeight();
+            return new LabeledSlider(x, y, width, h, label, min, max, initial, format, step, onChange);
         }
     }
 }

@@ -86,6 +86,13 @@ public class QuickPanel extends AbstractPanel {
         // G44: Color - uses primaryColor
         colorButton = ColorButton.create(x, layout.nextRow(), "Color", 
             state.getInt("appearance.primaryColor"), this::onColorChanged);
+        // Wire up right-click to show color input modal
+        if (parent instanceof net.cyberpunk042.client.gui.screen.FieldCustomizerScreen fcs) {
+            colorButton.setRightClickHandler(() -> 
+                fcs.showColorInputModal(colorButton.getColorString(), colorString -> {
+                    colorButton.setColorString(colorString);
+                }));
+        }
         
         // G45: Alpha
         alphaSlider = LabeledSlider.builder("Alpha")

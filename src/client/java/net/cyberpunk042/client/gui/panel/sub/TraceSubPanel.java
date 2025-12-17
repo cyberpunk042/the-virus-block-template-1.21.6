@@ -1,11 +1,13 @@
 package net.cyberpunk042.client.gui.panel.sub;
 
 import net.cyberpunk042.client.gui.panel.AbstractPanel;
+import net.cyberpunk042.client.gui.preview.PreviewConfig;
 import net.cyberpunk042.client.gui.state.DefinitionBuilder;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.state.PipelineTracer;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.GuiWidgets;
+import net.cyberpunk042.client.gui.widget.LabeledSlider;
 import net.cyberpunk042.client.gui.widget.ToastNotification;
 import net.cyberpunk042.field.FieldDefinition;
 import net.cyberpunk042.log.Logging;
@@ -36,6 +38,7 @@ public class TraceSubPanel extends AbstractPanel {
     private ButtonWidget clearBtn;
     private ButtonWidget dumpStateBtn;
     private ButtonWidget dumpDefinitionBtn;
+    private LabeledSlider previewDetailSlider;
     
     private String lastSummary = "No traces yet";
     private List<String> lastResults = new ArrayList<>();
@@ -88,6 +91,20 @@ public class TraceSubPanel extends AbstractPanel {
             this::dumpDefinitionJson);
         widgets.add(dumpDefinitionBtn);
         y += 28;
+        
+        // === PREVIEW SETTINGS ===
+        // Preview Detail slider
+        previewDetailSlider = LabeledSlider.builder("Preview Detail")
+            .position(x, y)
+            .width(btnWidth)
+            .range(PreviewConfig.MIN_DETAIL, PreviewConfig.MAX_DETAIL)
+            .initial(PreviewConfig.getDetail())
+            .format("%d")
+            .step(1f)
+            .onChange(v -> PreviewConfig.setDetail(v.intValue()))
+            .build();
+        widgets.add(previewDetailSlider);
+        y += 24;
     }
     
     private String getToggleLabel() {
@@ -198,15 +215,13 @@ public class TraceSubPanel extends AbstractPanel {
         var tr = MinecraftClient.getInstance().textRenderer;
         int y = GuiConstants.PADDING;
         
-        // Render buttons
+        // Render all widgets (buttons and sliders)
         for (var widget : widgets) {
-            if (widget instanceof ButtonWidget btn) {
-                btn.render(context, mouseX, mouseY, delta);
-            }
+            widget.render(context, mouseX, mouseY, delta);
         }
         
-        // Status area - adjusted for new buttons
-        y = 88;
+        // Status area - adjusted for new buttons + slider
+        y = 116;
         
         // Tracing status
         String status = PipelineTracer.isEnabled() ? "§a● RECORDING" : "§7○ Idle";
@@ -249,6 +264,6 @@ public class TraceSubPanel extends AbstractPanel {
     
     @Override
     public int getHeight() {
-        return 220; // Increased for new buttons
+        return 250; // Increased for new slider
     }
 }

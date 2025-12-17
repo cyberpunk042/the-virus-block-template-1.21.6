@@ -259,10 +259,6 @@ public final class DefinitionBuilder {
         VisibilityMask mask = state.mask();
         ArrangementConfig arrangement = state.arrangement();
         
-        // DEBUG: Log fill mode being used
-        Logging.GUI.topic("builder").debug("[FILL-DEBUG] Got fill from adapter: mode={}", 
-            fill != null ? fill.mode().name() : "NULL");
-        
         // CP2-CP3: Fill segments (ALL)
         traceFillDetails(fill);
         

@@ -1,16 +1,20 @@
 package net.cyberpunk042.client.gui.preview;
 
+import net.cyberpunk042.client.gui.preview.tessellator.PreviewSphereTessellator;
 import net.cyberpunk042.client.gui.state.FieldEditState;
+import net.cyberpunk042.visual.fill.FillMode;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.util.math.MathHelper;
 
+import java.util.List;
+
 /**
  * Helper for rendering field previews in GUI screens.
  * 
- * <p>Uses simple 2D projected wireframe rendering that works reliably
- * in Minecraft's GUI context without needing complex 3D setup.</p>
+ * <p>Now supports fill-mode aware rendering using tessellation and rasterization
+ * for solid shapes. Falls back to wireframe for unsupported shapes.</p>
  * 
  * <h2>Usage</h2>
  * <pre>
@@ -29,9 +33,45 @@ public class FieldPreviewRenderer {
      */
     public static void drawField(DrawContext context, FieldEditState state,
                                  int x1, int y1, int x2, int y2) {
-        // Calculate animated rotation
-        float time = (System.currentTimeMillis() % 10000) / 10000f * 360f;
-        drawField(context, state, x1, y1, x2, y2, 1.0f, 25f, time);
+        // Time in ticks (20 ticks/sec simulation)
+        float timeTicks = (System.currentTimeMillis() % 100000) / 50f;  // ~20 per second
+        
+        // === SPIN ANIMATION ===
+        float rotationY = 0f;
+        try {
+            var spin = state.spin();
+            if (spin != null && spin.isActive()) {
+                float speed = spin.speed();
+                // Speed is in radians per tick, convert to degrees
+                rotationY = (timeTicks * speed * 57.3f) % 360f;  // 57.3 = 180/PI
+            }
+        } catch (Exception ignored) {}
+        
+        // === WOBBLE ANIMATION ===
+        float rotationX = 25f;  // Base tilt
+        try {
+            var wobble = state.wobble();
+            if (wobble != null && wobble.isActive()) {
+                var amp = wobble.amplitude();
+                if (amp != null) {
+                    float speed = wobble.speed();
+                    // Add oscillating offset to rotation
+                    rotationX += (float) Math.sin(timeTicks * speed * 0.1f) * amp.x() * 100f;
+                    rotationY += (float) Math.cos(timeTicks * speed * 0.1f) * amp.z() * 100f;
+                }
+            }
+        } catch (Exception ignored) {}
+        
+        // === PULSE/BREATHING ANIMATION ===
+        float scale = 1.0f;
+        try {
+            var pulse = state.pulse();
+            if (pulse != null && pulse.isActive()) {
+                scale = pulse.evaluate(timeTicks);
+            }
+        } catch (Exception ignored) {}
+        
+        drawField(context, state, x1, y1, x2, y2, scale, rotationX, rotationY);
     }
     
     /**
@@ -51,8 +91,103 @@ public class FieldPreviewRenderer {
         
         // Get field parameters - get radius from current shape (default to sphere.radius)
         String shapeType = state.getString("shapeType");
-        if (shapeType == null) shapeType = "sphere";
-        float radius = switch (shapeType.toLowerCase()) {
+        if (shapeType == null || shapeType.isEmpty()) shapeType = "sphere";
+        float radius = getRadiusForShape(state, shapeType);
+        if (radius <= 0) radius = 3f;
+        float finalScale = (boundsSize / (radius * 2.5f)) * scale;
+        
+        // Get fill mode
+        FillMode mode = FillMode.SOLID;
+        try {
+            mode = state.fill().mode();
+        } catch (Exception ignored) {}
+        
+        // Time for alpha pulse
+        float timeTicks = (System.currentTimeMillis() % 100000) / 50f;
+        
+        // Get color from state with alpha
+        // Note: UI controls 'primaryColor', not 'color' - use primaryColor!
+        int color = 0xFF00CCFF;  // Default cyan with full alpha
+        try {
+            var appearance = state.appearance();
+            if (appearance != null) {
+                color = appearance.primaryColor();  // Use primaryColor, not color()!
+                // Apply base alpha (alphaMin is the minimum opacity, matching world rendering)
+                float alpha = appearance.alphaMin();
+                
+                // === ALPHA PULSE ANIMATION ===
+                try {
+                    var alphaPulse = state.alphaPulse();
+                    if (alphaPulse != null && alphaPulse.isActive()) {
+                        // Alpha pulse modulates the alpha value
+                        float pulseAlpha = alphaPulse.evaluate(timeTicks);
+                        alpha *= pulseAlpha;
+                    }
+                } catch (Exception ignored) {}
+                
+                color = PreviewRasterizer.applyAlpha(color, alpha);
+            }
+        } catch (Exception e) {
+            // Keep default color on error
+        }
+        
+        // Rendering based on shape and fill mode
+        float rotX = (float) Math.toRadians(rotationX);
+        float rotY = (float) Math.toRadians(rotationY);
+        
+        if ("sphere".equalsIgnoreCase(shapeType)) {
+            switch (mode) {
+                case SOLID -> {
+                    // SOLID: use tessellation with filled triangles, detail from slider
+                    PreviewProjector projector = new PreviewProjector(
+                        centerX, centerY, finalScale, rotationX, rotationY);
+                    int detail = PreviewConfig.getDetail();
+                    List<PreviewTriangle> triangles = PreviewSphereTessellator.getInstance()
+                        .tessellate(projector, state, color, detail);
+                    PreviewRasterizer.render(context, triangles, mode, color);
+                }
+                case WIREFRAME -> {
+                    // WIREFRAME: use tessellation with edges, detail-1 for better performance
+                    PreviewProjector projector = new PreviewProjector(
+                        centerX, centerY, finalScale, rotationX, rotationY);
+                    int wireframeDetail = Math.max(1, PreviewConfig.getDetail() - 1);
+                    List<PreviewTriangle> triangles = PreviewSphereTessellator.getInstance()
+                        .tessellate(projector, state, color, wireframeDetail);
+                    PreviewRasterizer.render(context, triangles, mode, color);
+                }
+                case CAGE -> {
+                    // CAGE: use legacy lat/lon lines (sparse, clean look)
+                    renderSphereWireframe(context, centerX, centerY, radius, finalScale, rotX, rotY, color, state, false);
+                }
+                case POINTS -> {
+                    // POINTS: use tessellation for vertex positions
+                    PreviewProjector projector = new PreviewProjector(
+                        centerX, centerY, finalScale, rotationX, rotationY);
+                    int detail = Math.min(8, PreviewConfig.getDetail());  // Cap detail for points
+                    List<PreviewTriangle> triangles = PreviewSphereTessellator.getInstance()
+                        .tessellate(projector, state, color, detail);
+                    PreviewRasterizer.render(context, triangles, mode, color);
+                }
+            }
+        } else {
+            // Non-sphere shapes: use legacy wireframe
+            switch (shapeType.toLowerCase()) {
+                case "ring" -> renderRingWireframe(context, centerX, centerY, finalScale, rotX, rotY, color, state);
+                case "disc" -> renderDiscWireframe(context, centerX, centerY, finalScale, rotX, rotY, color, state);
+                case "cylinder", "beam" -> renderCylinderWireframe(context, centerX, centerY, radius, finalScale, rotX, rotY, color, state);
+                case "prism" -> renderPrismWireframe(context, centerX, centerY, finalScale, rotX, rotY, color, state);
+                default -> renderSphereWireframe(context, centerX, centerY, radius, finalScale, rotX, rotY, color, state, false);
+            }
+        }
+        
+        context.disableScissor();
+    }
+    
+    /**
+     * Gets the appropriate radius for a shape type.
+     */
+    private static float getRadiusForShape(FieldEditState state, String shapeType) {
+        return switch (shapeType.toLowerCase()) {
             case "sphere" -> state.getFloat("sphere.radius");
             case "ring" -> state.getFloat("ring.outerRadius");
             case "disc" -> state.getFloat("disc.radius");
@@ -62,41 +197,46 @@ public class FieldPreviewRenderer {
             case "cone" -> state.getFloat("cone.radius");
             default -> state.getFloat("sphere.radius");
         };
-        if (radius <= 0) radius = 3f;
-        float finalScale = (boundsSize / (radius * 2.5f)) * scale;
-        
-        // Get color from state
-        int color = 0xFF00CCFF;
-        try {
-            color = state.appearance().color();
-        } catch (Exception ignored) {}
-        
-        // Convert rotations to radians
-        float rotX = (float) Math.toRadians(rotationX);
-        float rotY = (float) Math.toRadians(rotationY);
-        
-        // Render based on shape type (shapeType already determined above)
-        switch (shapeType.toLowerCase()) {
-            case "sphere" -> renderSphereWireframe(context, centerX, centerY, radius, finalScale, rotX, rotY, color, state);
-            case "ring" -> renderRingWireframe(context, centerX, centerY, finalScale, rotX, rotY, color, state);
-            case "disc" -> renderDiscWireframe(context, centerX, centerY, finalScale, rotX, rotY, color, state);
-            case "cylinder", "beam" -> renderCylinderWireframe(context, centerX, centerY, radius, finalScale, rotX, rotY, color, state);
-            case "prism" -> renderPrismWireframe(context, centerX, centerY, finalScale, rotX, rotY, color, state);
-            default -> renderSphereWireframe(context, centerX, centerY, radius, finalScale, rotX, rotY, color, state);
-        }
-        
-        context.disableScissor();
     }
+    
+    /**
+     * Gets a tessellator for the given shape type, or null if not yet implemented.
+     */
+    private static PreviewTessellator getTessellatorFor(String shapeType) {
+        return switch (shapeType.toLowerCase()) {
+            case "sphere" -> PreviewSphereTessellator.getInstance();
+            // Add more as implemented:
+            // case "cylinder" -> PreviewCylinderTessellator.getInstance();
+            // case "prism" -> PreviewPrismTessellator.getInstance();
+            default -> null;  // Falls back to legacy wireframe
+        };
+    }
+
     
     // ═══════════════════════════════════════════════════════════════════════════
     // SPHERE WIREFRAME
     // ═══════════════════════════════════════════════════════════════════════════
     
+    /**
+     * Renders sphere wireframe with configurable density.
+     * @param dense If true, uses PreviewConfig.getDetail() for denser wireframe.
+     *              If false, uses shape's lat/lon settings for sparse cage lines.
+     */
     private static void renderSphereWireframe(DrawContext context, float cx, float cy,
                                               float radius, float scale, float rotX, float rotY,
-                                              int color, FieldEditState state) {
-        int latSteps = Math.min(16, Math.max(6, state.getInt("sphere.latSteps") / 4));
-        int lonSteps = Math.min(24, Math.max(8, state.getInt("sphere.lonSteps") / 4));
+                                              int color, FieldEditState state, boolean dense) {
+        int latSteps, lonSteps;
+        
+        if (dense) {
+            // Wireframe mode: use detail setting for denser lines
+            int detail = PreviewConfig.getDetail();
+            latSteps = detail;
+            lonSteps = detail * 2;
+        } else {
+            // Cage mode: use sparse lines from shape settings
+            latSteps = Math.min(16, Math.max(6, state.getInt("sphere.latSteps") / 4));
+            lonSteps = Math.min(24, Math.max(8, state.getInt("sphere.lonSteps") / 4));
+        }
         
         // Draw latitude lines (horizontal circles)
         for (int lat = 1; lat < latSteps; lat++) {
@@ -362,28 +502,9 @@ public class FieldPreviewRenderer {
     }
     
     /**
-     * Draws a line using DrawContext's fill method (1-pixel wide).
+     * Draws a line using the efficient rasterizer implementation.
      */
     private static void drawLine(DrawContext context, float x1, float y1, float x2, float y2, int color) {
-        // Use Bresenham-like approach for smooth lines
-        float dx = x2 - x1;
-        float dy = y2 - y1;
-        float length = (float) Math.sqrt(dx * dx + dy * dy);
-        
-        if (length < 1) {
-            context.fill((int) x1, (int) y1, (int) x1 + 1, (int) y1 + 1, color);
-            return;
-        }
-        
-        // Draw line as series of small rectangles
-        float steps = Math.max(length, 1);
-        float stepX = dx / steps;
-        float stepY = dy / steps;
-        
-        for (int i = 0; i <= steps; i++) {
-            int px = (int) (x1 + stepX * i);
-            int py = (int) (y1 + stepY * i);
-            context.fill(px, py, px + 1, py + 1, color);
-        }
+        PreviewRasterizer.drawLine(context, x1, y1, x2, y2, color);
     }
 }

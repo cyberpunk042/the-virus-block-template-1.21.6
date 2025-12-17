@@ -134,6 +134,18 @@ public class FillSubPanel extends AbstractPanel {
         widgets.add(depthTestToggle);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
+        // Depth write - controls whether mesh blocks objects behind it
+        depthWriteToggle = GuiWidgets.toggle(x, y, w, "See-Through Mode",
+            !state.fill().depthWrite(), "Enable see-through translucency (disable depth write)", v -> {
+                onUserChange(() -> {
+                    // Toggle is inverted: "See-Through Mode ON" = depthWrite false
+                    state.set("fill.depthWrite", !v);
+                    Logging.GUI.topic("fill").debug("Depth write: {} (see-through: {})", !v, v);
+                });
+            });
+        widgets.add(depthWriteToggle);
+        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
+        
         // Cage settings - dynamic labels from adapter
         if (cageAdapter.supportsCountOptions()) {
             primaryCountSlider = LabeledSlider.builder(cageAdapter.primaryLabel())
@@ -281,7 +293,7 @@ public class FillSubPanel extends AbstractPanel {
         if (wireThicknessSlider != null) wireThicknessSlider.setValue(state.fill().wireThickness());
         if (doubleSidedToggle != null) doubleSidedToggle.setValue(state.fill().doubleSided());
         if (depthTestToggle != null) depthTestToggle.setValue(state.fill().depthTest());
-        if (depthWriteToggle != null) depthWriteToggle.setValue(state.fill().depthWrite());
+        if (depthWriteToggle != null) depthWriteToggle.setValue(!state.fill().depthWrite()); // Inverted: See-Through = !depthWrite
         
         // Cage values from adapter
         if (primaryCountSlider != null && cageAdapter.supportsCountOptions()) {

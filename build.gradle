@@ -112,40 +112,6 @@ tasks.named('runServer').configure {
 	dependsOn copyFragmentsToRun
 }
 
-// Also copy fragments to resources for shipping with JAR (built-in defaults)
-task copyFragmentsToResources(type: Copy) {
-	description = 'Copies field fragment configs to resources for JAR distribution'
-	group = 'fabric'
-	
-	from('config/the-virus-block') {
-		include 'field_animations/**/*.json'
-		include 'field_appearances/**/*.json'
-		include 'field_arrangements/**/*.json'
-		include 'field_beams/**/*.json'
-		include 'field_fills/**/*.json'
-		include 'field_follows/**/*.json'
-		include 'field_layers/**/*.json'
-		include 'field_links/**/*.json'
-		include 'field_masks/**/*.json'
-		include 'field_orbits/**/*.json'
-		include 'field_predictions/**/*.json'
-		include 'field_presets/**/*.json'
-		include 'field_primitives/**/*.json'
-		include 'field_profiles/**/*.json'
-		include 'field_shapes/**/*.json'
-		include 'field_transforms/**/*.json'
-	}
-	into 'src/main/resources/data/the-virus-block'
-	
-	duplicatesStrategy = DuplicatesStrategy.INCLUDE
-}
-
-// Bundle fragments in processResources and sourcesJar
-processResources.dependsOn copyFragmentsToResources
-tasks.named('sourcesJar').configure {
-	dependsOn copyFragmentsToResources
-}
-
 // configure the maven publication
 publishing {
 	publications {

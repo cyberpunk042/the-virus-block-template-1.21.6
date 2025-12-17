@@ -209,10 +209,15 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
         switch (prop) {
             case "speed" -> b.speed(toFloat(value));
             case "randomize" -> b.randomize(toBool(value));
-            // For scalar amplitude, set uniform across all axes
             case "amplitude" -> {
-                float v = toFloat(value);
-                b.amplitude(new Vector3f(v, v * 0.5f, v));
+                // Handle both Vector3f and scalar float values
+                if (value instanceof Vector3f vec) {
+                    b.amplitude(vec);
+                } else {
+                    // For scalar amplitude, set uniform across all axes
+                    float v = toFloat(value);
+                    b.amplitude(new Vector3f(v, v * 0.5f, v));
+                }
             }
         }
         this.wobble = b.build();

@@ -332,6 +332,26 @@ public class FieldCustomizerScreen extends Screen {
         ModalFactory.focusTextField(activeModal, this);
     }
     
+    /**
+     * Shows a color input modal for entering color values.
+     * Called by ColorButton widgets on right-click.
+     * 
+     * @param currentColorString Current color value (e.g., "@primary" or "#FF00FF")
+     * @param onSubmit Callback when user submits a new color value
+     */
+    public void showColorInputModal(String currentColorString, java.util.function.Consumer<String> onSubmit) {
+        activeModal = ModalFactory.createColorInputModal(
+            currentColorString, textRenderer, width, height,
+            colorString -> {
+                onSubmit.accept(colorString);
+                ToastNotification.success("Color updated");
+            },
+            () -> { activeModal = null; registerWidgets(); });
+        activeModal.show();
+        registerWidgets();
+        ModalFactory.focusTextField(activeModal, this);
+    }
+    
     // ═══════════════════════════════════════════════════════════════════════════
     // TICK & RENDER (~60 lines)
     // ═══════════════════════════════════════════════════════════════════════════
@@ -559,6 +579,6 @@ public class FieldCustomizerScreen extends Screen {
     
     private void render3DPreview(DrawContext context, Bounds bounds, float delta) {
         if (bounds == null || bounds.isEmpty()) return;
-        FieldPreviewRenderer.drawField(context, state, bounds.x(), bounds.y(), bounds.right(), bounds.bottom());
+        FieldPreviewRenderer.drawField(context, state, bounds.x(), bounds.y(), bounds.right(), bounds.bottom(), useFullPreviewRenderer);
     }
 }

@@ -1,9 +1,10 @@
 package net.cyberpunk042.client.gui.widget;
 
+import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.log.Logging;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.widget.CyclingButtonWidget;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 
 import java.util.List;
@@ -11,38 +12,45 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * Enhanced cycling button that supports right-click to cycle backward.
+ * Cycling button that supports right-click to cycle backward.
  * Left-click cycles forward, right-click cycles backward.
  * 
- * <p>This is a wrapper around Minecraft's CyclingButtonWidget that adds 
- * mouse button detection for bidirectional cycling.</p>
+ * <p>This is a custom implementation that provides more control than
+ * Minecraft's CyclingButtonWidget, specifically for bidirectional cycling.</p>
  * 
  * @param <T> The type of value being cycled
  */
-public class BidirectionalCyclingButton<T> extends CyclingButtonWidget<T> {
+public class BidirectionalCyclingButton<T> extends ButtonWidget {
     
     private final List<T> values;
     private int currentIndex;
     private final Consumer<T> onChange;
+    private final Function<T, String> formatter;
+    private final String label;
     
     private BidirectionalCyclingButton(
             int x, int y, int width, int height,
-            Text message, Text optionText,
+            String label,
             List<T> values, int initialIndex,
-            Function<T, Text> valueToText,
+            Function<T, String> formatter,
             Consumer<T> onChange) {
-        super(x, y, width, height, message, optionText, initialIndex, 
-              valueToText, CyclingButtonWidget.Values.of(values), 
-              (btn, val) -> {
-                  // This is called by super on left-click
-                  onChange.accept(val);
-              }, 
-              val -> Tooltip.of(Text.empty()), // Default no tooltip
-              false); // omitKeyText
+        super(x, y, width, height, 
+              Text.literal(formatMessage(label, values.get(initialIndex), formatter)),
+              btn -> ((BidirectionalCyclingButton<?>) btn).cycleForward(),
+              DEFAULT_NARRATION_SUPPLIER);
         
         this.values = values;
         this.currentIndex = initialIndex;
         this.onChange = onChange;
+        this.formatter = formatter;
+        this.label = label;
+    }
+    
+    private static <T> String formatMessage(String label, T value, Function<T, String> formatter) {
+        if (label == null || label.isEmpty()) {
+            return formatter.apply(value);
+        }
+        return label + ": " + formatter.apply(value);
     }
     
     @Override
@@ -57,15 +65,29 @@ public class BidirectionalCyclingButton<T> extends CyclingButtonWidget<T> {
         return super.mouseClicked(mouseX, mouseY, button);
     }
     
+    private void cycleForward() {
+        if (values.isEmpty()) return;
+        
+        currentIndex = (currentIndex + 1) % values.size();
+        updateValue();
+        
+        Logging.GUI.topic("widget").trace("BidirectionalCyclingButton cycled forward to index {}: {}", 
+            currentIndex, getValue());
+    }
+    
     private void cycleBackward() {
         if (values.isEmpty()) return;
         
         currentIndex = currentIndex <= 0 ? values.size() - 1 : currentIndex - 1;
-        T newValue = values.get(currentIndex);
-        setValue(newValue);
+        updateValue();
         
         Logging.GUI.topic("widget").trace("BidirectionalCyclingButton cycled backward to index {}: {}", 
-            currentIndex, newValue);
+            currentIndex, getValue());
+    }
+    
+    private void updateValue() {
+        T newValue = values.get(currentIndex);
+        setMessage(Text.literal(formatMessage(label, newValue, formatter)));
         
         if (onChange != null) {
             onChange.accept(newValue);
@@ -73,17 +95,33 @@ public class BidirectionalCyclingButton<T> extends CyclingButtonWidget<T> {
     }
     
     /**
+     * Gets the current value.
+     */
+    public T getValue() {
+        return values.get(currentIndex);
+    }
+    
+    /**
+     * Sets the current value.
+     */
+    public void setValue(T value) {
+        int idx = values.indexOf(value);
+        if (idx >= 0) {
+            currentIndex = idx;
+            setMessage(Text.literal(formatMessage(label, value, formatter)));
+        }
+    }
+    
+    /**
      * Builder for creating bidirectional cycling buttons.
      */
     public static class Builder<T> {
-        private int x, y, width, height;
+        private int x, y, width = GuiConstants.BUTTON_WIDTH, height = GuiConstants.WIDGET_HEIGHT;
         private String label = "";
         private List<T> values;
         private T initialValue;
         private Function<T, String> formatter = Object::toString;
         private Consumer<T> onChange = v -> {};
-        private String tooltip = "";
-        private boolean omitLabel = false;
         
         public Builder<T> position(int x, int y) {
             this.x = x;
@@ -128,16 +166,6 @@ public class BidirectionalCyclingButton<T> extends CyclingButtonWidget<T> {
             return this;
         }
         
-        public Builder<T> tooltip(String tooltip) {
-            this.tooltip = tooltip;
-            return this;
-        }
-        
-        public Builder<T> omitLabel() {
-            this.omitLabel = true;
-            return this;
-        }
-        
         public BidirectionalCyclingButton<T> build() {
             if (values == null || values.isEmpty()) {
                 throw new IllegalStateException("Values must be provided");
@@ -146,18 +174,10 @@ public class BidirectionalCyclingButton<T> extends CyclingButtonWidget<T> {
             int initialIndex = initialValue != null ? values.indexOf(initialValue) : 0;
             if (initialIndex < 0) initialIndex = 0;
             
-            Function<T, Text> valueToText = omitLabel
-                ? val -> Text.literal(formatter.apply(val))
-                : val -> Text.literal(label + ": " + formatter.apply(val));
-            
-            Text optionText = omitLabel ? Text.literal("") : Text.literal(label);
-            Text initialMessage = valueToText.apply(values.get(initialIndex));
-            
             return new BidirectionalCyclingButton<>(
                 x, y, width, height,
-                initialMessage, optionText,
-                values, initialIndex,
-                valueToText, onChange
+                label, values, initialIndex,
+                formatter, onChange
             );
         }
     }

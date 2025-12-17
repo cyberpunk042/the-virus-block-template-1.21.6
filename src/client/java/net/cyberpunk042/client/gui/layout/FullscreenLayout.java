@@ -1,8 +1,11 @@
 package net.cyberpunk042.client.gui.layout;
 
+import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.widget.GridPane;
 /**
  * Fullscreen layout: 2×2 grid layout matching OLD working code.
+ * 
+ * <p>Now responsive - adapts to screen size with scaling.</p>
  * 
  * <pre>
  * ┌─────────────────────────────────────────────────────────────────────────┐
@@ -26,12 +29,12 @@ import net.cyberpunk042.client.gui.widget.GridPane;
  */
 public class FullscreenLayout implements LayoutManager {
     
-    // Configuration - must match old working code constants
-    private static final int TITLE_BAR_HEIGHT = 20;
-    private static final int TAB_BAR_HEIGHT = 22;
-    private static final int STATUS_BAR_HEIGHT = 18;
-    private static final int MARGIN = 8;
-    private static final int SELECTOR_HEIGHT = 22;
+    // Configuration - base values (scaled dynamically)
+    private static final int BASE_TITLE_BAR_HEIGHT = 20;
+    private static final int BASE_TAB_BAR_HEIGHT = 22;
+    private static final int BASE_STATUS_BAR_HEIGHT = 18;
+    private static final int BASE_MARGIN = 8;
+    private static final int BASE_SELECTOR_HEIGHT = 22;
     
     // Calculated bounds
     private Bounds panel = Bounds.EMPTY;
@@ -42,6 +45,9 @@ public class FullscreenLayout implements LayoutManager {
     private Bounds statusBar = Bounds.EMPTY;
     private GridPane grid;  // 2x2 grid for content quadrants
     
+    // Cached scaled values
+    private int selectorHeight;
+    
     @Override
     public GuiMode getMode() {
         return GuiMode.FULLSCREEN;
@@ -49,28 +55,44 @@ public class FullscreenLayout implements LayoutManager {
     
     @Override
     public void calculate(int screenWidth, int screenHeight) {
+        // Get scale factor
+        float scale = GuiConstants.getScale();
+        boolean compact = GuiConstants.isCompactMode();
+        
+        // Scale dimensions with minimums
+        int titleHeight = Math.max(16, (int)(BASE_TITLE_BAR_HEIGHT * scale));
+        int tabHeight = Math.max(18, (int)(BASE_TAB_BAR_HEIGHT * scale));
+        int statusHeight = Math.max(14, (int)(BASE_STATUS_BAR_HEIGHT * scale));
+        int margin = Math.max(4, (int)(BASE_MARGIN * scale));
+        selectorHeight = Math.max(18, (int)(BASE_SELECTOR_HEIGHT * scale));
+        
         // Full panel with margin
-        panel = new Bounds(MARGIN, MARGIN, screenWidth - MARGIN * 2, screenHeight - MARGIN * 2);
+        panel = new Bounds(margin, margin, screenWidth - margin * 2, screenHeight - margin * 2);
         
         // Title bar at top
-        titleBar = panel.sliceTop(TITLE_BAR_HEIGHT);
-        Bounds remaining = panel.withoutTop(TITLE_BAR_HEIGHT);
+        titleBar = panel.sliceTop(titleHeight);
+        Bounds remaining = panel.withoutTop(titleHeight);
         
         // Tab bar below title (NOT at bottom!)
-        tabBar = remaining.sliceTop(TAB_BAR_HEIGHT);
-        remaining = remaining.withoutTop(TAB_BAR_HEIGHT);
+        tabBar = remaining.sliceTop(tabHeight);
+        remaining = remaining.withoutTop(tabHeight);
         
         // Status bar at bottom
-        statusBar = remaining.sliceBottom(STATUS_BAR_HEIGHT);
-        remaining = remaining.withoutBottom(STATUS_BAR_HEIGHT);
+        statusBar = remaining.sliceBottom(statusHeight);
+        remaining = remaining.withoutBottom(statusHeight);
         
-        // Content area uses 2x2 grid (40% left, 50% top)
+        // Content area uses 2x2 grid
+        // In compact mode, give more space to content (less to preview)
+        float leftRatio = compact ? 0.30f : 0.40f;
+        float topRatio = compact ? 0.40f : 0.50f;
+        
         content = remaining;
-        grid = GridPane.grid2x2(0.4f, 0.5f);
+        grid = GridPane.grid2x2(leftRatio, topRatio);
         grid.setBounds(content);
         
         // Preview is top-left quadrant
-        preview = grid.topLeft().inset(4);
+        int inset = Math.max(2, (int)(4 * scale));
+        preview = grid.topLeft().inset(inset);
     }
     
     @Override
@@ -96,7 +118,8 @@ public class FullscreenLayout implements LayoutManager {
     @Override
     public Bounds getContentBounds() {
         // ContentArea only goes in right column below selectors
-        return grid.topRight().withoutTop(SELECTOR_HEIGHT * 2 + 4);
+        int padding = GuiConstants.padding();
+        return grid.topRight().withoutTop(selectorHeight * 2 + padding);
     }
     
     @Override
@@ -107,7 +130,8 @@ public class FullscreenLayout implements LayoutManager {
     @Override
     public Bounds getSelectorBounds() {
         // Selectors at top of right column
-        return grid.topRight().sliceTop(SELECTOR_HEIGHT * 2 + 4);
+        int padding = GuiConstants.padding();
+        return grid.topRight().sliceTop(selectorHeight * 2 + padding);
     }
     
     @Override
@@ -118,7 +142,8 @@ public class FullscreenLayout implements LayoutManager {
     
     /** Returns the sub-tab content bounds (right column below selectors) */
     public Bounds getSubTabBounds() {
-        return grid.topRight().withoutTop(SELECTOR_HEIGHT * 2 + 4);
+        int padding = GuiConstants.padding();
+        return grid.topRight().withoutTop(selectorHeight * 2 + padding);
     }
     
     @Override

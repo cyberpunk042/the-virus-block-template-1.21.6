@@ -1,7 +1,11 @@
 package net.cyberpunk042.client.gui.layout;
 
+import net.cyberpunk042.client.gui.util.GuiConstants;
+
 /**
  * Windowed layout: Split HUD with game world visible in center.
+ * 
+ * <p>Now responsive - adapts to screen size with scaling.</p>
  * 
  * <pre>
  * ┌─────────────────────────────────────────────────────────────┐
@@ -24,13 +28,16 @@ package net.cyberpunk042.client.gui.layout;
  */
 public class WindowedLayout implements LayoutManager {
     
-    // Configuration - match OLD working code
-    private static final int STATUS_BAR_HEIGHT = 18;  // OLD: STATUS_HEIGHT = 18
-    private static final int TITLE_BAR_HEIGHT = 16;   // OLD: titleH = 16
-    private static final int TAB_HEIGHT = 18;         // OLD: tabH = 18
-    private static final int SELECTOR_HEIGHT = 22;    // OLD: SELECTOR_HEIGHT = 22
-    private static final int MARGIN = 8;              // OLD: MARGIN = 8
-    private static final int PADDING = 4;             // OLD: padding = 4
+    // Configuration - base values (scaled dynamically)
+    private static final int BASE_STATUS_BAR_HEIGHT = 18;
+    private static final int BASE_TITLE_BAR_HEIGHT = 16;
+    private static final int BASE_TAB_HEIGHT = 18;
+    private static final int BASE_SELECTOR_HEIGHT = 22;
+    private static final int BASE_MARGIN = 8;
+    private static final int BASE_PADDING = 4;
+    private static final int BASE_PANEL_WIDTH = 200;
+    private static final int MIN_PANEL_WIDTH = 140;  // Reduced for small windows
+    private static final int SMALL_SCREEN_THRESHOLD = 700;  // Width below which to shrink aggressively
     
     // Calculated bounds
     private Bounds leftPanel = Bounds.EMPTY;
@@ -46,6 +53,9 @@ public class WindowedLayout implements LayoutManager {
     private int screenWidth;
     private int screenHeight;
     
+    // Cached scaled values
+    private int selectorHeight;
+    
     @Override
     public GuiMode getMode() {
         return GuiMode.WINDOWED;
@@ -56,38 +66,61 @@ public class WindowedLayout implements LayoutManager {
         this.screenWidth = screenWidth;
         this.screenHeight = screenHeight;
         
-        // OLD: Dynamic panel sizing - narrower for more center space
-        int panelWidth = Math.min(200, Math.max(180, (screenWidth - MARGIN * 4) / 5));
-        int panelHeight = screenHeight - MARGIN * 2 - STATUS_BAR_HEIGHT;
+        // Get scale factor
+        float scale = GuiConstants.getScale();
+        boolean compact = GuiConstants.isCompactMode();
+        
+        // Scale dimensions
+        int statusHeight = Math.max(14, (int)(BASE_STATUS_BAR_HEIGHT * scale));
+        int titleHeight = Math.max(12, (int)(BASE_TITLE_BAR_HEIGHT * scale));
+        int tabHeight = Math.max(14, (int)(BASE_TAB_HEIGHT * scale));
+        selectorHeight = Math.max(18, (int)(BASE_SELECTOR_HEIGHT * scale));
+        int margin = Math.max(4, (int)(BASE_MARGIN * scale));
+        int padding = Math.max(2, (int)(BASE_PADDING * scale));
+        
+        // Calculate panel width - scale with screen width, respecting min/max
+        int maxPanelWidth = (screenWidth - margin * 4) / 3; // Max 1/3 of usable width per panel
+        int targetWidth = (int)(BASE_PANEL_WIDTH * scale);
+        int panelWidth;
+        
+        if (screenWidth < SMALL_SCREEN_THRESHOLD) {
+            // Small window: use ~28% of screen width per panel, with minimum
+            panelWidth = Math.max(MIN_PANEL_WIDTH, (int)(screenWidth * 0.28f));
+        } else {
+            // Normal: use scaled target, capped to max
+            panelWidth = Math.max(MIN_PANEL_WIDTH, Math.min(maxPanelWidth, targetWidth));
+        }
+        
+        int panelHeight = screenHeight - margin * 2 - statusHeight;
         
         // Left panel: anchored to left side, full height
-        int leftX = MARGIN;
-        int panelY = MARGIN;
+        int leftX = margin;
+        int panelY = margin;
         leftPanel = new Bounds(leftX, panelY, panelWidth, panelHeight);
         
         // Right panel: anchored to right side, full height
-        int rightX = screenWidth - MARGIN - panelWidth;
+        int rightX = screenWidth - margin - panelWidth;
         rightPanel = new Bounds(rightX, panelY, panelWidth, panelHeight);
         
         // Status bar: spans bottom, between the panels
-        int statusY = screenHeight - MARGIN - STATUS_BAR_HEIGHT;
+        int statusY = screenHeight - margin - statusHeight;
         statusBar = new Bounds(
-            leftX + panelWidth + MARGIN,  // After left panel + margin
+            leftX + panelWidth + margin,  // After left panel + margin
             statusY,
-            screenWidth - panelWidth * 2 - MARGIN * 4,  // Width between panels
-            STATUS_BAR_HEIGHT
+            screenWidth - panelWidth * 2 - margin * 4,  // Width between panels
+            statusHeight
         );
         
-        // Sub-regions within left panel (OLD: lines 271-305)
-        leftTitleBar = leftPanel.sliceTop(TITLE_BAR_HEIGHT);
-        Bounds leftRemaining = leftPanel.withoutTop(TITLE_BAR_HEIGHT);
-        leftTabBar = leftRemaining.sliceTop(TAB_HEIGHT);
-        leftContent = leftRemaining.withoutTop(TAB_HEIGHT).inset(PADDING);
+        // Sub-regions within left panel
+        leftTitleBar = leftPanel.sliceTop(titleHeight);
+        Bounds leftRemaining = leftPanel.withoutTop(titleHeight);
+        leftTabBar = leftRemaining.sliceTop(tabHeight);
+        leftContent = leftRemaining.withoutTop(tabHeight).inset(padding);
         
-        // Sub-regions within right panel (OLD: lines 400-498)
-        rightTitleBar = rightPanel.sliceTop(TITLE_BAR_HEIGHT);
-        Bounds rightRemaining = rightPanel.withoutTop(TITLE_BAR_HEIGHT);
-        rightContent = rightRemaining.inset(PADDING);
+        // Sub-regions within right panel
+        rightTitleBar = rightPanel.sliceTop(titleHeight);
+        Bounds rightRemaining = rightPanel.withoutTop(titleHeight);
+        rightContent = rightRemaining.inset(padding);
     }
     
     @Override
@@ -117,8 +150,9 @@ public class WindowedLayout implements LayoutManager {
     
     @Override
     public Bounds getContentBounds() {
-        // In windowed mode, sub-tabs/content are in the RIGHT panel, below selectors (OLD: lines 464-491)
-        return rightContent.withoutTop(SELECTOR_HEIGHT * 2 + PADDING);
+        // In windowed mode, sub-tabs/content are in the RIGHT panel, below selectors
+        int padding = GuiConstants.padding();
+        return rightContent.withoutTop(selectorHeight * 2 + padding);
     }
     
     @Override
@@ -155,7 +189,8 @@ public class WindowedLayout implements LayoutManager {
     @Override
     public Bounds getSelectorBounds() {
         // In windowed mode, selectors are in the right panel content area
-        return rightContent.sliceTop(SELECTOR_HEIGHT * 2 + 4);
+        int padding = GuiConstants.padding();
+        return rightContent.sliceTop(selectorHeight * 2 + padding);
     }
     
     @Override

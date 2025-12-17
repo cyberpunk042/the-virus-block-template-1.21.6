@@ -1,21 +1,23 @@
 {
-	"required": true,
-	"package": "net.cyberpunk042.mixin.client",
-	"refmap": "the-virus-block.refmap.json",
-	"compatibilityLevel": "JAVA_21",
+  "required": true,
+  "package": "net.cyberpunk042.mixin.client",
+  "refmap": "the-virus-block.refmap.json",
+  "compatibilityLevel": "JAVA_21",
   "client": [
     "BackgroundRendererMixin",
     "ClientWorldMixin",
+    "CyclingButtonWidgetMixin",
     "RainSplashParticleFactoryMixin",
     "SnowflakeParticleFactoryMixin",
     "SpriteContentsAccessor",
     "WeatherRenderingMixin",
     "PlayerEntityRendererMixin",
     "WorldBorderRenderingMixin",
+    "access.CyclingButtonWidgetAccessor",
     "access.LivingEntityRendererAccessor",
     "GameRendererMixin"
   ],
-	"injectors": {
-		"defaultRequire": 1
-	}
+  "injectors": {
+    "defaultRequire": 1
+  }
 }

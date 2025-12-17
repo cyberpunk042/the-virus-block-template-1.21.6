@@ -29,7 +29,7 @@ public record SimplePrimitive(
     String type,
     @JsonField(skipIfNull = true) Shape shape,
     @JsonField(skipIfEqualsConstant = "Transform.IDENTITY", skipIfNull = true) Transform transform,
-    @JsonField(skipIfEqualsConstant = "FillConfig.SOLID", skipIfNull = true) FillConfig fill,
+    @JsonField(skipIfNull = true) FillConfig fill,
     @JsonField(skipIfEqualsConstant = "VisibilityMask.FULL", skipIfNull = true) VisibilityMask visibility,
     @JsonField(skipIfEqualsConstant = "ArrangementConfig.DEFAULT", skipIfNull = true) ArrangementConfig arrangement,
     @JsonField(skipIfEqualsConstant = "Appearance.DEFAULT", skipIfNull = true) Appearance appearance,

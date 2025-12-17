@@ -32,7 +32,7 @@ public class GuiLayout {
     }
     
     public GuiLayout(int startX, int startY) {
-        this(startX, startY, GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING);
+        this(startX, startY, GuiConstants.widgetHeight() + GuiConstants.padding());
     }
     
     public void reset() {

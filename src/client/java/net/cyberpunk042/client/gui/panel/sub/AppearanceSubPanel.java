@@ -160,12 +160,26 @@ public class AppearanceSubPanel extends AbstractPanel {
             state.set("appearance.primaryColor", color);
             Logging.GUI.topic("appearance").debug("Primary color: #{}", Integer.toHexString(color));
         });
+        // Wire up right-click to show color input modal
+        if (parent instanceof net.cyberpunk042.client.gui.screen.FieldCustomizerScreen fcs) {
+            primaryColorBtn.setRightClickHandler(() -> 
+                fcs.showColorInputModal(primaryColorBtn.getColorString(), colorString -> {
+                    primaryColorBtn.setColorString(colorString);
+                }));
+        }
         widgets.add(primaryColorBtn);
         
         secondaryColorBtn = new ColorButton(x + colorBtnWidth + GuiConstants.COMPACT_GAP, y, colorBtnWidth, "Secondary", state.getInt("appearance.secondaryColor"), color -> {
             state.set("appearance.secondaryColor", color);
             Logging.GUI.topic("appearance").debug("Secondary color: #{}", Integer.toHexString(color));
         });
+        // Wire up right-click to show color input modal
+        if (parent instanceof net.cyberpunk042.client.gui.screen.FieldCustomizerScreen fcs) {
+            secondaryColorBtn.setRightClickHandler(() -> 
+                fcs.showColorInputModal(secondaryColorBtn.getColorString(), colorString -> {
+                    secondaryColorBtn.setColorString(colorString);
+                }));
+        }
         widgets.add(secondaryColorBtn);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.COMPACT_GAP;
         

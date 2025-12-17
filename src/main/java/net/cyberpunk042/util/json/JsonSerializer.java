@@ -480,6 +480,17 @@ public final class JsonSerializer {
         FieldMeta[] metas = new FieldMeta[fields.length];
         int count = 0;
         
+        // For records, build a map of component name -> annotation
+        Map<String, JsonField> recordComponentAnnotations = new HashMap<>();
+        if (clazz.isRecord()) {
+            for (var component : clazz.getRecordComponents()) {
+                JsonField annotation = component.getAnnotation(JsonField.class);
+                if (annotation != null) {
+                    recordComponentAnnotations.put(component.getName(), annotation);
+                }
+            }
+        }
+        
         for (Field field : fields) {
             // Skip static fields
             if (Modifier.isStatic(field.getModifiers())) continue;
@@ -492,7 +503,12 @@ public final class JsonSerializer {
             FieldMeta meta = new FieldMeta();
             meta.field = field;
             
+            // Try to get annotation from field first, then from record component
             JsonField annotation = field.getAnnotation(JsonField.class);
+            if (annotation == null && clazz.isRecord()) {
+                annotation = recordComponentAnnotations.get(field.getName());
+            }
+            
             if (annotation != null) {
                 meta.jsonName = annotation.name().isEmpty() ? field.getName() : annotation.name();
                 meta.aliases = annotation.aliases();

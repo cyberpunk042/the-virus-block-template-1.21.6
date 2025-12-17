@@ -16,6 +16,7 @@ import net.cyberpunk042.visual.transform.Billboard;
 import net.cyberpunk042.visual.transform.Facing;
 import net.cyberpunk042.visual.transform.Transform;
 
+import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.VertexConsumerProvider;
 
@@ -111,8 +112,22 @@ public final class LayerRenderer {
             float effectiveAlpha = alpha * layer.alpha();
             
             int primCount = 0;
+            // Separate primitives by depth write setting
+            java.util.List<Primitive> normalPrimitives = new java.util.ArrayList<>();
+            java.util.List<Primitive> seeThroughPrimitives = new java.util.ArrayList<>();
+            
             for (Primitive primitive : layer.primitives()) {
-                // Build primitive info into scope tree
+                FillConfig fill = primitive.fill();
+                boolean depthWrite = fill == null || fill.depthWrite();
+                if (!depthWrite) {
+                    seeThroughPrimitives.add(primitive);
+                } else {
+                    normalPrimitives.add(primitive);
+                }
+            }
+            
+            // Render normal primitives first (depth write enabled)
+            for (Primitive primitive : normalPrimitives) {
                 ScopeNode primNode = scope.branch("prim:" + primCount);
                 primNode.kv("type", primitive.type());
                 
@@ -126,11 +141,45 @@ public final class LayerRenderer {
                     }
                 }
                 
-                // Get appropriate consumer based on fill mode (line width handled by render layer)
                 VertexConsumer consumer = getConsumerForPrimitive(consumers, primitive);
-                
                 renderPrimitive(matrices, consumer, primitive, resolver, light, time, effectiveAlpha, overrides);
                 primCount++;
+            }
+            
+            // Render see-through primitives with depth write disabled
+            if (!seeThroughPrimitives.isEmpty()) {
+                // If using Immediate provider, flush the normal buffer first,
+                // then apply our GL state before rendering see-through primitives
+                if (consumers instanceof VertexConsumerProvider.Immediate immediate) {
+                    // Draw any pending geometry first
+                    immediate.draw();
+                }
+                
+                // Disable depth write for see-through primitives
+                FieldRenderLayers.disableDepthWrite();
+                
+                try {
+                    for (Primitive primitive : seeThroughPrimitives) {
+                        ScopeNode primNode = scope.branch("prim:" + primCount + " (see-through)");
+                        primNode.kv("type", primitive.type());
+                        
+                        if (primitive.shape() != null) {
+                            primNode.kv("shape", primitive.shape().getClass().getSimpleName());
+                        }
+                        
+                        VertexConsumer consumer = getConsumerForPrimitive(consumers, primitive);
+                        renderPrimitive(matrices, consumer, primitive, resolver, light, time, effectiveAlpha, overrides);
+                        primCount++;
+                    }
+                    
+                    // Force immediate draw with our GL state
+                    if (consumers instanceof VertexConsumerProvider.Immediate immediate) {
+                        immediate.draw();
+                    }
+                } finally {
+                    // Restore depth write
+                    FieldRenderLayers.enableDepthWrite();
+                }
             }
             
             scope.count("rendered", primCount);
@@ -157,7 +206,7 @@ public final class LayerRenderer {
     /**
      * Gets the appropriate VertexConsumer for a primitive based on its fill mode.
      * 
-     * - SOLID → solidTranslucent or solidTranslucentNoCull (if doubleSided)
+     * - SOLID → solidTranslucent, solidTranslucentNoDepth (if depthWrite=false), or NoCull (if doubleSided)
      * - WIREFRAME, CAGE → lines with custom thickness via RenderPhase.LineWidth
      * - POINTS → solidTranslucent (uses tiny quads)
      */
@@ -165,13 +214,24 @@ public final class LayerRenderer {
         FillConfig fill = primitive.fill();
         FillMode mode = fill != null ? fill.mode() : FillMode.SOLID;
         boolean doubleSided = fill != null && fill.doubleSided();
+        boolean depthWrite = fill == null || fill.depthWrite();
         float wireThickness = fill != null ? fill.wireThickness() : 1.0f;
         
         return switch (mode) {
             case WIREFRAME, CAGE -> consumers.getBuffer(FieldRenderLayers.lines(wireThickness));
-            case SOLID, POINTS -> consumers.getBuffer(
-                doubleSided ? FieldRenderLayers.solidTranslucentNoCull() : FieldRenderLayers.solidTranslucent()
-            );
+            case SOLID, POINTS -> {
+                // Select layer based on depth write setting
+                RenderLayer layer;
+                if (!depthWrite) {
+                    // No depth write = true transparency (see-through)
+                    layer = FieldRenderLayers.solidTranslucentNoDepth();
+                } else if (doubleSided) {
+                    layer = FieldRenderLayers.solidTranslucentNoCull();
+                } else {
+                    layer = FieldRenderLayers.solidTranslucent();
+                }
+                yield consumers.getBuffer(layer);
+            }
         };
     }
     

@@ -72,7 +72,7 @@ public final class GuiWidgets {
             Logging.GUI.topic("button").trace("Clicked: {}", label);
             onClick.run();
         })
-        .dimensions(x, y, width, GuiConstants.WIDGET_HEIGHT)
+        .dimensions(x, y, width, GuiConstants.widgetHeight())
         .tooltip(Tooltip.of(Text.literal(tooltip)))
         .build();
     }
@@ -104,7 +104,7 @@ public final class GuiWidgets {
             .values(Boolean.TRUE, Boolean.FALSE)
             .initially(initial)
             .tooltip(val -> Tooltip.of(Text.literal(tooltip)))
-            .build(x, y, width, GuiConstants.WIDGET_HEIGHT, Text.literal(label), (btn, val) -> {
+            .build(x, y, width, GuiConstants.widgetHeight(), Text.literal(label), (btn, val) -> {
                 Logging.GUI.topic("toggle").trace("{} → {}", label, val);
                 onChange.accept(val);
             });
@@ -167,7 +167,7 @@ public final class GuiWidgets {
             int x, int y, int width,
             String label, Class<E> enumClass, E initial, String tooltip,
             Consumer<E> onChange) {
-        return enumDropdown(x, y, width, GuiConstants.WIDGET_HEIGHT, label, enumClass, initial, tooltip, onChange);
+        return enumDropdown(x, y, width, GuiConstants.widgetHeight(), label, enumClass, initial, tooltip, onChange);
     }
     
     /**
@@ -240,7 +240,7 @@ public final class GuiWidgets {
             .values(values)
             .initially(safeInitial)
             .tooltip(val -> Tooltip.of(Text.literal(tooltip)))
-            .build(x, y, width, GuiConstants.WIDGET_HEIGHT, Text.literal(label), (btn, val) -> {
+            .build(x, y, width, GuiConstants.widgetHeight(), Text.literal(label), (btn, val) -> {
                 Logging.GUI.topic("dropdown").trace("{} → {}", label, val);
                 onChange.accept(val);
             });
@@ -429,7 +429,7 @@ public final class GuiWidgets {
         
         double normalized = (initial - min) / (max - min);
         
-        return new SliderWidget(x, y, width, GuiConstants.WIDGET_HEIGHT, 
+        return new SliderWidget(x, y, width, GuiConstants.widgetHeight(), 
                 Text.literal(label + ": " + formatSliderValue(format, initial)), normalized) {
             
             private final float minVal = min;
@@ -474,7 +474,7 @@ public final class GuiWidgets {
         
         double normalized = (double) (initial - min) / (max - min);
         
-        return new SliderWidget(x, y, width, GuiConstants.WIDGET_HEIGHT,
+        return new SliderWidget(x, y, width, GuiConstants.widgetHeight(),
                 Text.literal(label + ": " + initial), normalized) {
             
             private final int minVal = min;
@@ -536,7 +536,7 @@ public final class GuiWidgets {
         
         Logging.GUI.topic("widget").trace("Creating text field");
         
-        TextFieldWidget field = new TextFieldWidget(textRenderer, x, y, width, GuiConstants.WIDGET_HEIGHT, Text.literal(""));
+        TextFieldWidget field = new TextFieldWidget(textRenderer, x, y, width, GuiConstants.widgetHeight(), Text.literal(""));
         field.setPlaceholder(Text.literal(placeholder));
         field.setChangedListener(text -> {
             Logging.GUI.topic("textfield").trace("Text: {}", text);
@@ -603,7 +603,7 @@ public final class GuiWidgets {
      */
     public static TextWidget label(int x, int y, int width, String text, TextRenderer textRenderer) {
         Logging.GUI.topic("widget").trace("Creating label: {}", text);
-        return new TextWidget(x, y, width, GuiConstants.WIDGET_HEIGHT, Text.literal(text), textRenderer);
+        return new TextWidget(x, y, width, GuiConstants.widgetHeight(), Text.literal(text), textRenderer);
     }
     
     /**

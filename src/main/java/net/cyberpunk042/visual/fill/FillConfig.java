@@ -47,12 +47,12 @@ import net.cyberpunk042.util.json.JsonSerializer;
  * @see CageOptions
  */
 public record FillConfig(
-    @JsonField(skipIfEqualsConstant = "SOLID") FillMode mode,
+    FillMode mode,
     @Range(ValueRange.POSITIVE_NONZERO) @JsonField(skipIfDefault = true, defaultValue = "1.0") float wireThickness,
     @Range(ValueRange.POSITIVE_NONZERO) @JsonField(skipIfDefault = true, defaultValue = "2.0") float pointSize,
     @JsonField(skipIfDefault = true) boolean doubleSided,
-    @JsonField(skipIfDefault = true, defaultValue = "true") boolean depthTest,
-    @JsonField(skipIfDefault = true) boolean depthWrite,
+    boolean depthTest,
+    boolean depthWrite,
     @Nullable @JsonField(skipIfNull = true) CageOptions cage
 ){
     /** Default solid fill. */

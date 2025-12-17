@@ -40,6 +40,11 @@ public final class FieldRenderLayers extends RenderPhase {
         Identifier.of("minecraft", "textures/misc/white.png")
     );
     
+    // For see-through mode, we use the same layer but manually control depth write
+    // via GL state before the buffer is flushed - see LayerRenderer
+    // TODO: Create custom RenderLayer with RenderPipeline that has depthWrite=false
+    private static final RenderLayer SOLID_TRANSLUCENT_NO_DEPTH = SOLID_TRANSLUCENT;
+    
     // For double-sided geometry, we use the same layer but rely on emitting 
     // both triangle windings in the tessellator. This avoids the need for
     // a custom render layer with non-standard culling.
@@ -53,6 +58,14 @@ public final class FieldRenderLayers extends RenderPhase {
      */
     public static RenderLayer solidTranslucent() {
         return SOLID_TRANSLUCENT;
+    }
+    
+    /**
+     * Translucent layer without depth writing (true see-through).
+     * <p>Objects behind this will still be visible.</p>
+     */
+    public static RenderLayer solidTranslucentNoDepth() {
+        return SOLID_TRANSLUCENT_NO_DEPTH;
     }
     
     /**
@@ -101,6 +114,46 @@ public final class FieldRenderLayers extends RenderPhase {
     // Legacy aliases
     public static RenderLayer glowTranslucent() { return SOLID_TRANSLUCENT; }
     public static RenderLayer glowAdditive() { return SOLID_TRANSLUCENT; }
+    
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Depth Write Control (call before/after rendering primitive)
+    // ─────────────────────────────────────────────────────────────────────────────
+    
+    /**
+     * Disables depth writing for true translucent rendering.
+     * 
+     * <p>When depth write is disabled, the mesh will NOT block objects behind it
+     * from rendering. This creates a true see-through effect rather than an
+     * "invisibility shield" effect.</p>
+     * 
+     * <p>Call {@link #enableDepthWrite()} after rendering to restore normal behavior!</p>
+     * 
+     * @see #enableDepthWrite()
+     */
+    public static void disableDepthWrite() {
+        GlStateManager._depthMask(false);
+    }
+    
+    /**
+     * Re-enables depth writing after translucent rendering.
+     * 
+     * <p>This restores the default behavior where rendered geometry writes to
+     * the depth buffer, occluding objects behind it.</p>
+     * 
+     * @see #disableDepthWrite()
+     */
+    public static void enableDepthWrite() {
+        GlStateManager._depthMask(true);
+    }
+    
+    /**
+     * Applies depth write state based on the provided flag.
+     * 
+     * @param depthWrite true to write to depth buffer (solid), false for true translucency
+     */
+    public static void applyDepthWrite(boolean depthWrite) {
+        GlStateManager._depthMask(depthWrite);
+    }
     
     // ─────────────────────────────────────────────────────────────────────────────
     // Blend Mode Control (call before/after rendering)
