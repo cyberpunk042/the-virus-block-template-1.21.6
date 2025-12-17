@@ -1,14 +1,25 @@
 #!/usr/bin/env python3
 """
-Documentation Generator v3 - Minimalist
-========================================
-Generates focused, interconnected documentation.
+Documentation Generator v4 - Hierarchical
+==========================================
+Generates focused, interconnected documentation with parent-child structure.
 
 Output:
-- README.md - Navigation
-- ARCHITECTURE.md - Real system architecture  
-- 8-10 focused CLASS_DIAGRAM files (one per major system)
-- No empty folders, no useless READMEs
+docs/
+├── README.md           # Root navigation
+├── ARCHITECTURE.md     # System overview
+├── field/              # Field system
+│   ├── README.md       # Field overview + summary diagram
+│   ├── core.md         # Core classes
+│   └── effects.md      # Effects & triggers
+├── gui/                # GUI system
+│   ├── README.md       # GUI overview + summary diagram
+│   ├── panels.md
+│   ├── widgets.md
+│   └── state.md
+├── visual.md           # Visual system (single file)
+├── rendering.md        # Rendering pipeline (single file)
+└── ...
 """
 
 import sys
@@ -16,7 +27,7 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
-from typing import List, Dict, Set
+from typing import List, Dict, Set, Tuple
 
 SCRIPT_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPT_DIR))
@@ -30,76 +41,130 @@ DOCS_DIR = PROJECT_ROOT / "docs"
 
 
 # =============================================================================
-# SYSTEM DEFINITIONS
-# Define which packages/classes belong to which "system" for documentation
+# SYSTEM GROUPS - Parent folders with children
 # =============================================================================
 
-SYSTEMS = {
-    # Field System - split into core and effects
-    "field_core": {
-        "title": "Field System - Core",
-        "description": "Field definitions, layers, registry, and manager - the backbone of the field system.",
-        "packages": ["field", "field.loader"],
-        "key_classes": ["FieldDefinition", "FieldLayer", "FieldManager", "FieldRegistry", "FieldProfileStore"],
+SYSTEM_GROUPS = {
+    "field": {
+        "title": "Field System",
+        "description": "Complete field system - definitions, effects, bindings, triggers, lifecycle.",
+        "children": {
+            "core": {
+                "title": "Core Classes",
+                "description": "Field definitions, layers, registry, and manager.",
+                "packages": ["field", "field.loader"],
+                "key_classes": ["FieldDefinition", "FieldLayer", "FieldManager", "FieldRegistry"],
+            },
+            "effects": {
+                "title": "Effects & Triggers",
+                "description": "Effects, bindings, triggers, and lifecycle management.",
+                "packages": ["field.effect", "field.influence", "field.instance"],
+                "key_classes": ["EffectProcessor", "BindingResolver", "TriggerProcessor", "FieldInstance"],
+            },
+        },
+        "summary_diagram": """```mermaid
+graph TD
+    subgraph Field Core
+        FD[FieldDefinition] --> FL[FieldLayer]
+        FL --> Primitive
+        FM[FieldManager] --> FD
+        FR[FieldRegistry] --> FD
+    end
+    
+    subgraph Effects & Triggers
+        FI[FieldInstance] --> FM
+        FI --> EP[EffectProcessor]
+        FI --> TP[TriggerProcessor]
+        BR[BindingResolver] --> FI
+    end
+    
+    FM --> FI
+```""",
     },
-    "field_effects": {
-        "title": "Field System - Effects & Triggers",
-        "description": "Effects, bindings, triggers, lifecycle, and instance management.",
-        "packages": ["field.effect", "field.influence", "field.instance"],
-        "key_classes": ["EffectProcessor", "BindingResolver", "TriggerProcessor", "FieldInstance", "LifecycleConfig"],
+    "gui": {
+        "title": "GUI System",
+        "description": "Complete GUI - panels, widgets, state management, and layouts.",
+        "children": {
+            "panels": {
+                "title": "Panels",
+                "description": "Panel hierarchy - main panels and sub-panels.",
+                "packages": ["client.gui.panel", "client.gui.panel.sub"],
+                "key_classes": ["AbstractPanel", "AdvancedPanel", "QuickPanel", "LayerPanel"],
+            },
+            "widgets": {
+                "title": "Widgets",
+                "description": "Reusable UI components - buttons, sliders, dropdowns.",
+                "packages": ["client.gui.widget", "client.gui.util"],
+                "key_classes": ["LabeledSlider", "ColorButton", "DropdownWidget", "CompactSelector"],
+            },
+            "state": {
+                "title": "State & Adapters",
+                "description": "State management, adapters, and layout managers.",
+                "packages": ["client.gui.state", "client.gui.state.adapter", "client.gui.layout", "client.gui.screen", "client.gui.preview", "client.gui"],
+                "key_classes": ["FieldEditState", "AbstractAdapter", "LayoutManager", "FieldCustomizerScreen"],
+            },
+        },
+        "summary_diagram": """```mermaid
+graph LR
+    FCS[FieldCustomizerScreen] --> LM[LayoutManager]
+    FCS --> Panels
+    
+    subgraph Panels
+        AP[AbstractPanel]
+        AP --> QuickPanel
+        AP --> AdvancedPanel
+        AdvancedPanel --> SubPanels[SubPanels]
+    end
+    
+    subgraph Widgets
+        LabeledSlider
+        ColorButton
+        DropdownWidget
+    end
+    
+    SubPanels --> Widgets
+    
+    FES[FieldEditState] --> Adapters
+    Adapters --> Panels
+```""",
     },
-    "visual_system": {
-        "title": "Visual System", 
-        "description": "Shape definitions, pattern system, color themes, animations, and fill modes.",
-        "packages": ["visual", "visual.shape", "visual.pattern", "visual.animation", "visual.color", "visual.fill", "visual.transform", "visual.appearance", "visual.visibility", "visual.layer", "visual.util", "visual.validation"],
+}
+
+# Single-file systems (no parent folder needed)
+SINGLE_SYSTEMS = {
+    "visual": {
+        "title": "Visual System",
+        "description": "Shape definitions, patterns, colors, animations, and fill modes.",
+        "packages": ["visual", "visual.shape", "visual.pattern", "visual.animation", "visual.color", "visual.fill", "visual.transform", "visual.appearance", "visual.visibility", "visual.layer", "visual.util"],
         "key_classes": ["Shape", "QuadPattern", "AnimationConfig", "ColorTheme", "FillMode"],
     },
-    "infection_system": {
-        "title": "Infection System",
-        "description": "Virus spreading logic, infection services, scenario management, and orchestration.",
-        "packages": ["infection", "infection.service", "infection.controller", "infection.scenario", "infection.orchestrator", "infection.event", "infection.registry", "infection.compat", "infection.persistence", "infection.protection", "infection.spread", "infection.spawn"],
-        "key_classes": ["InfectionService", "InfectionController", "ScenarioConfig"],
-    },
-    # GUI - split into 3 focused diagrams
-    "gui_panels": {
-        "title": "GUI - Panels",
-        "description": "Panel hierarchy - main panels, sub-panels, and their composition.",
-        "packages": ["client.gui.panel", "client.gui.panel.sub"],
-        "key_classes": ["AbstractPanel", "AdvancedPanel", "QuickPanel", "LayerPanel", "PrimitivePanel"],
-    },
-    "gui_widgets": {
-        "title": "GUI - Widgets",
-        "description": "Reusable UI widgets - buttons, sliders, dropdowns, selectors.",
-        "packages": ["client.gui.widget", "client.gui.util"],
-        "key_classes": ["LabeledSlider", "ColorButton", "DropdownWidget", "CompactSelector", "ConfirmDialog"],
-    },
-    "gui_state": {
-        "title": "GUI - State & Adapters",
-        "description": "State management, adapters, layout managers, and screen orchestration.",
-        "packages": ["client.gui.state", "client.gui.state.adapter", "client.gui.layout", "client.gui.screen", "client.gui.preview", "client.gui"],
-        "key_classes": ["FieldEditState", "AbstractAdapter", "LayoutManager", "FieldCustomizerScreen"],
-    },
-    "rendering_pipeline": {
+    "rendering": {
         "title": "Rendering Pipeline",
         "description": "Mesh building, tessellators, primitive renderers, and render layers.",
-        "packages": ["client.visual", "client.visual.mesh", "client.visual.tessellator", "client.visual.render", "client.field.render", "client.render", "client.field"],
+        "packages": ["client.visual", "client.visual.mesh", "client.visual.tessellator", "client.visual.render", "client.field.render", "client.field"],
         "key_classes": ["MeshBuilder", "SphereTessellator", "FieldRenderer", "LayerRenderer", "PrimitiveRenderer"],
     },
-    "blocks_growth": {
+    "blocks": {
         "title": "Blocks & Growth",
-        "description": "Custom blocks, block entities, growth system, and collisions.",
+        "description": "Custom blocks, block entities, and growth system.",
         "packages": ["block", "block.corrupted", "block.infected", "block.entity", "block.growth", "growth", "growth.event", "collision", "entity"],
         "key_classes": ["ProgressiveGrowthBlock", "VirusBlock", "GrowthForceHandler"],
     },
-    "network_commands": {
+    "infection": {
+        "title": "Infection System",
+        "description": "Virus spreading, infection services, and scenarios.",
+        "packages": ["infection", "infection.service", "infection.controller", "infection.scenario", "infection.orchestrator", "infection.event", "infection.registry", "infection.spread", "infection.spawn"],
+        "key_classes": ["InfectionService", "InfectionController", "ScenarioConfig"],
+    },
+    "network": {
         "title": "Network & Commands",
-        "description": "Client-server payloads, command system, and packet handlers.",
+        "description": "Client-server payloads and command system.",
         "packages": ["network", "network.payload", "command", "command.argument"],
-        "key_classes": ["FieldSpawnC2SPayload", "FieldEditUpdateS2CPayload", "FieldCommand"],
+        "key_classes": ["FieldSpawnC2SPayload", "FieldCommand"],
     },
     "infrastructure": {
         "title": "Infrastructure",
-        "description": "Logging, registries, configuration, utilities, and mixins.",
+        "description": "Logging, registries, configuration, and utilities.",
         "packages": ["log", "registry", "config", "util", "mixin", "mixin.client"],
         "key_classes": ["Logging", "LogScope", "ModConfig"],
     },
@@ -107,7 +172,7 @@ SYSTEMS = {
 
 
 class DocGenerator:
-    """Generates minimalist, interconnected documentation."""
+    """Generates hierarchical documentation."""
     
     def __init__(self, graph: ClassGraph, dry_run: bool = False):
         self.graph = graph
@@ -123,7 +188,6 @@ class DocGenerator:
         # Index classes by relative package
         self.classes_by_package = defaultdict(list)
         for c in graph.classes.values():
-            # Create package key matching our SYSTEMS
             rel_pkg = c.relative_package.replace('net.cyberpunk042.', '').replace('net.cyberpunk042.client.', 'client.')
             self.classes_by_package[rel_pkg].append(c)
     
@@ -137,167 +201,121 @@ class DocGenerator:
             print(f"  ✅ {path.relative_to(PROJECT_ROOT)}")
         self.files_written += 1
     
-    def get_system_classes(self, system_config: dict) -> List[JavaClass]:
-        """Get all classes belonging to a system."""
+    def get_system_classes(self, packages: list) -> List[JavaClass]:
+        """Get all classes belonging to given packages."""
         classes = []
-        for pkg in system_config["packages"]:
+        for pkg in packages:
             classes.extend(self.classes_by_package.get(pkg, []))
-        # Filter valid
         return [c for c in classes if is_valid_java_identifier(c.name)]
     
-    def generate_readme(self):
-        """Generate minimal README with navigation."""
+    def generate_root_readme(self):
+        """Generate root README with navigation."""
         stats = self.graph.get_stats()
         
         content = f"""# 📚 The Virus Block - Documentation
 
 > Auto-generated {datetime.now().strftime('%Y-%m-%d')} | {stats['total_classes']} classes
 
-## Quick Navigation
+## Systems
 
-| System | Classes | Description |
-|--------|---------|-------------|
+| System | Description |
+|--------|-------------|
 """
-        for sys_id, cfg in SYSTEMS.items():
-            classes = self.get_system_classes(cfg)
-            if classes:
-                content += f"| [{cfg['title']}](./{sys_id}.md) | {len(classes)} | {cfg['description'][:50]}... |\n"
+        # Grouped systems
+        for group_id, group in SYSTEM_GROUPS.items():
+            content += f"| [{group['title']}](./{group_id}/) | {group['description']} |\n"
         
-        content += f"""
+        # Single systems
+        for sys_id, cfg in SINGLE_SYSTEMS.items():
+            classes = self.get_system_classes(cfg['packages'])
+            if len(classes) >= 3:
+                content += f"| [{cfg['title']}](./{sys_id}.md) | {cfg['description']} |\n"
+        
+        content += """
 ## Architecture
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for system overview and data flows.
-
-## Regenerate
-
-```bash
-python3 scripts/generate_docs.py
-```
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for system flows and interconnections.
 """
         self.write_file(DOCS_DIR / "README.md", content)
     
     def generate_architecture(self):
-        """Generate REAL architecture documentation."""
+        """Generate architecture with Mermaid diagrams."""
         content = f"""# 🏗️ System Architecture
 
 > The Virus Block - Minecraft 1.21.6 Fabric Mod
 
-## Overview
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         SERVER/COMMON                            │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │   Field     │  │  Infection  │  │        Blocks           │  │
-│  │   System    │──│   System    │──│  ProgressiveGrowth      │  │
-│  │             │  │             │  │  VirusBlock, Corrupted  │  │
-│  └──────┬──────┘  └──────┬──────┘  └───────────┬─────────────┘  │
-│         │                │                      │                │
-│  ┌──────┴────────────────┴──────────────────────┴──────────────┐ │
-│  │                     Network Layer                            │ │
-│  │  Payloads: FieldSpawn, FieldEdit, InfectionSync, GrowthSync │ │
-│  └──────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                           CLIENT                                 │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────┐    ┌─────────────────────────────────────┐ │
-│  │   GUI System    │    │        Rendering Pipeline           │ │
-│  │  ┌───────────┐  │    │  ┌────────┐  ┌────────┐  ┌───────┐ │ │
-│  │  │ Panels    │  │    │  │ Field  │──│Tessell-│──│ Mesh  │ │ │
-│  │  │ Widgets   │  │    │  │Renderer│  │ators   │  │Builder│ │ │
-│  │  │ State     │  │    │  └────────┘  └────────┘  └───────┘ │ │
-│  │  └───────────┘  │    │        │                           │ │
-│  └────────┬────────┘    │  ┌─────┴─────┐                     │ │
-│           │             │  │ RenderLayer│ → GPU               │ │
-│           └─────────────┼──│  Shaders  │                     │ │
-│                         │  └───────────┘                     │ │
-│                         └─────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## System Interconnections
+## High-Level Overview
 
 ```mermaid
-graph TD
-    subgraph Server/Common
-        FD[FieldDefinition] --> FL[FieldLayer]
-        FL --> VIS[Visual System]
-        VIS --> Shape & Pattern & Animation
-        FM[FieldManager] --> FD
-        FI[FieldInstance] --> FM
+graph TB
+    subgraph Common/Server
+        FS[Field System]
+        VS[Visual System]
+        IS[Infection System]
+        BS[Blocks & Growth]
+        NET[Network]
     end
     
     subgraph Client
-        FCS[FieldCustomizerScreen] --> PANELS[Panels]
-        PANELS --> WIDGETS[Widgets]
-        FES[FieldEditState] --> ADAPTERS[Adapters]
-        ADAPTERS --> FL
-        
-        FR[FieldRenderer] --> LR[LayerRenderer]
-        LR --> PR[PrimitiveRenderer]
-        PR --> TESS[Tessellators]
-        TESS --> MB[MeshBuilder]
+        GUI[GUI System]
+        RP[Rendering Pipeline]
     end
     
-    FM -->|Network| FR
-    FES -->|JSON| FD
+    FS --> VS
+    FS --> NET
+    IS --> BS
+    BS --> NET
+    NET --> RP
+    GUI --> FS
+    RP --> VS
 ```
 
-## GUI System Structure
+## System Connections
 
 ```mermaid
-graph LR
-    FCS[FieldCustomizerScreen]
-    FCS --> LM[LayoutManager]
-    LM --> FullscreenLayout
-    LM --> WindowedLayout
-    
-    FCS --> Panels
-    subgraph Panels
-        AP[AbstractPanel]
-        AP --> QuickPanel
-        AP --> AdvancedPanel  
-        AP --> DebugPanel
-        AP --> ProfilesPanel
-        AdvancedPanel --> SubPanels
+flowchart LR
+    subgraph Input
+        User([User]) --> GUI
     end
     
-    subgraph SubPanels
-        ShapeSubPanel
-        FillSubPanel
-        AnimationSubPanel
-        TransformSubPanel
+    subgraph State
+        GUI --> FES[FieldEditState]
+        FES --> FD[FieldDefinition]
     end
     
-    SubPanels --> Widgets
-    subgraph Widgets
-        LabeledSlider
-        ColorButton
-        DropdownWidget
+    subgraph Storage
+        FD --> JSON[(JSON)]
+        JSON --> FR[FieldRegistry]
+    end
+    
+    subgraph Runtime
+        FR --> FM[FieldManager]
+        FM --> FI[FieldInstance]
+    end
+    
+    subgraph Render
+        FI --> NET[Network]
+        NET --> FRenderer[FieldRenderer]
+        FRenderer --> GPU([GPU])
     end
 ```
 
-## Data Flows
+## Data Flow
 
-### Field Creation Flow
 ```
-User Input (GUI)
+User (GUI)
     │
     ▼
-FieldEditState ─────────────────────────┐
-    │                                    │
-    ▼                                    ▼
-FieldDefinition (JSON) ◄──── FieldProfileStore
+FieldEditState ──────► FieldDefinition.toJson()
+    │                         │
+    ▼                         ▼
+Adapters ◄───────── FieldProfileStore.save()
     │
     ▼
-FieldManager.spawn()
-    │
-    ▼
-FieldInstance (runtime) ────► Network ────► Other Clients
+FieldManager.spawn() ──────────────────────┐
+    │                                       │
+    ▼                                       ▼
+FieldInstance ───────► Network Payload ───► Other Clients
     │
     ▼
 FieldRenderer.render()
@@ -306,107 +324,62 @@ FieldRenderer.render()
 LayerRenderer → PrimitiveRenderer → Tessellator → MeshBuilder → GPU
 ```
 
-### Visual Rendering Pipeline
-```
-FieldLayer
-    ├── Primitive[] ─────────────────────────┐
-    │                                         │
-    ▼                                         ▼
-┌─────────┐     ┌───────────────┐     ┌─────────────┐
-│ Shape   │ ──► │  Tessellator  │ ──► │ MeshBuilder │
-│(Sphere, │     │(generates mesh│     │ (emits      │
-│ Prism)  │     │ geometry)     │     │  vertices)  │
-└─────────┘     └───────────────┘     └──────┬──────┘
-                                              │
-    ┌─────────────────────────────────────────┘
-    │
-    ▼
-┌─────────┐     ┌───────────────┐     ┌─────────────┐
-│ Pattern │ ──► │  Fill Mode    │ ──► │ RenderLayer │ ──► GPU
-│(vertex  │     │(solid/wire/   │     │ (shaders,   │
-│ order)  │     │ cage)         │     │  blend)     │
-└─────────┘     └───────────────┘     └─────────────┘
-```
-
-### GUI State Management
-```
-FieldCustomizerScreen
-         │
-         ▼
-    ┌─────────────────────────────────────────┐
-    │           FieldEditState                │
-    │  (singleton, holds all editing data)    │
-    │  ┌────────────────────────────────────┐ │
-    │  │ currentLayerIndex                  │ │
-    │  │ currentPrimitiveIndex              │ │
-    │  │ layerConfigs[]                     │ │
-    │  │ isDirty                            │ │
-    │  └────────────────────────────────────┘ │
-    └─────────────────────────────────────────┘
-              │
-              ▼
-    ┌─────────────────────────────────────────┐
-    │            Adapters                     │
-    │  ShapeAdapter, FillAdapter, ...         │
-    │  (sync UI ↔ state bidirectionally)      │
-    └─────────────────────────────────────────┘
-```
-
 ## Key Entry Points
 
-| Entry Point | Purpose |
-|-------------|---------|
-| `TheVirusBlock.onInitialize()` | Mod initialization |
+| Entry | Purpose |
+|-------|---------|
+| `TheVirusBlock.onInitialize()` | Server init |
 | `TheVirusBlockClient.onInitializeClient()` | Client init |
-| `FieldCommand` | `/field` commands |
-| `FieldRegistry` | Field definition storage |
-| `FieldManager` | Runtime field instances |
 | `FieldCustomizerScreen` | GUI entry |
-
-## Package Map
-
-```
-net.cyberpunk042
-├── field/          # Field definitions & runtime
-├── visual/         # Visual configs (shapes, patterns)
-├── infection/      # Virus spreading system
-├── block/          # Custom blocks
-├── growth/         # Growth block behavior  
-├── network/        # Client ↔ Server packets
-├── command/        # Game commands
-├── log/            # Logging framework
-├── registry/       # Registries
-└── config/         # Mod configuration
-
-net.cyberpunk042.client
-├── gui/            # Panels, widgets, screens
-├── visual/         # Tessellators, mesh builders
-├── field/          # Primitive renderers
-└── render/         # Render layers, shaders
-```
+| `FieldCommand` | `/field` commands |
+| `FieldManager` | Runtime fields |
 """
         self.write_file(DOCS_DIR / "ARCHITECTURE.md", content)
     
-    def generate_system_diagram(self, sys_id: str, cfg: dict):
-        """Generate a focused class diagram for one system."""
-        classes = self.get_system_classes(cfg)
+    def generate_group_readme(self, group_id: str, group: dict):
+        """Generate parent README with summary diagram."""
+        children = group['children']
         
+        content = f"""# {group['title']}
+
+> {group['description']}
+
+## Overview
+
+{group.get('summary_diagram', '')}
+
+## Modules
+
+| Module | Description |
+|--------|-------------|
+"""
+        for child_id, child in children.items():
+            classes = self.get_system_classes(child['packages'])
+            content += f"| [{child['title']}](./{child_id}.md) | {len(classes)} classes - {child['description']} |\n"
+        
+        content += """
+---
+See also: [ARCHITECTURE.md](../ARCHITECTURE.md)
+"""
+        self.write_file(DOCS_DIR / group_id / "README.md", content)
+    
+    def generate_class_diagram_file(self, path: Path, title: str, description: str, classes: List[JavaClass], key_classes: list):
+        """Generate a class diagram markdown file."""
         if len(classes) < 3:
-            # Too small, skip
             return
         
         gen = MermaidGenerator(classes, self.config)
         
         lines = []
-        lines.append(f"# {cfg['title']}")
+        lines.append(f"# {title}")
         lines.append("")
-        lines.append(f"> {cfg['description']}")
+        lines.append(f"> {description}")
         lines.append("")
-        lines.append(f"**{len(classes)} classes** across packages: {', '.join(cfg['packages'][:5])}")
+        lines.append(f"**{len(classes)} classes**")
         lines.append("")
         
-        # Key classes callout
-        key = [c for c in classes if c.name in cfg.get('key_classes', [])]
+        # Key classes
+        key = [c for c in classes if c.name in key_classes]
         if key:
             lines.append("## Key Classes")
             lines.append("")
@@ -419,7 +392,7 @@ net.cyberpunk042.client
         lines.append("## Class Diagram")
         lines.append("")
         lines.append(gen.generate_class_diagram(
-            classes[:35],  # Limit size
+            classes[:35],
             show_methods=True,
             show_fields=True,
             show_inheritance=True,
@@ -427,38 +400,58 @@ net.cyberpunk042.client
         ))
         lines.append("")
         
-        # Add inheritance hierarchy for larger systems
-        if len(classes) > 10:
-            lines.append("## Inheritance Hierarchy")
-            lines.append("")
-            lines.append(gen.generate_inheritance_hierarchy())
-            lines.append("")
-        
-        self.write_file(DOCS_DIR / f"{sys_id}.md", '\n'.join(lines))
+        self.write_file(path, '\n'.join(lines))
     
     def generate_all(self):
         """Generate all documentation."""
         print(f"\n📝 Generating documentation to {DOCS_DIR.relative_to(PROJECT_ROOT)}/")
         
-        # Clean old docs subdirs (but not files in root)
+        # Clean old files
         if not self.dry_run:
-            for subdir in ["main", "client", "shared"]:
-                old_path = DOCS_DIR / subdir
-                if old_path.exists():
-                    import shutil
-                    shutil.rmtree(old_path)
-                    print(f"  🗑️ Removed old {subdir}/")
+            import shutil
+            for item in DOCS_DIR.iterdir():
+                if item.name in ['main', 'client', 'shared'] + list(SYSTEM_GROUPS.keys()):
+                    if item.is_dir():
+                        shutil.rmtree(item)
+                        print(f"  🗑️ Removed {item.name}/")
+                elif item.suffix == '.md' and item.name not in ['README.md', 'ARCHITECTURE.md']:
+                    # Remove old single-file systems
+                    if item.stem in list(SINGLE_SYSTEMS.keys()) + ['field_core', 'field_effects', 'gui_panels', 'gui_widgets', 'gui_state', 'field_system', 'gui_system']:
+                        item.unlink()
+                        print(f"  🗑️ Removed {item.name}")
         
-        # Generate
         print("\n📄 Core files:")
-        self.generate_readme()
+        self.generate_root_readme()
         self.generate_architecture()
         
-        print("\n📊 System diagrams:")
-        for sys_id, cfg in SYSTEMS.items():
-            classes = self.get_system_classes(cfg)
+        print("\n📁 System groups:")
+        for group_id, group in SYSTEM_GROUPS.items():
+            self.generate_group_readme(group_id, group)
+            
+            for child_id, child in group['children'].items():
+                classes = self.get_system_classes(child['packages'])
+                if len(classes) >= 3:
+                    self.generate_class_diagram_file(
+                        DOCS_DIR / group_id / f"{child_id}.md",
+                        child['title'],
+                        child['description'],
+                        classes,
+                        child.get('key_classes', [])
+                    )
+                else:
+                    print(f"  ⏭️ Skipping {group_id}/{child_id} ({len(classes)} classes)")
+        
+        print("\n📊 Single-file systems:")
+        for sys_id, cfg in SINGLE_SYSTEMS.items():
+            classes = self.get_system_classes(cfg['packages'])
             if len(classes) >= 3:
-                self.generate_system_diagram(sys_id, cfg)
+                self.generate_class_diagram_file(
+                    DOCS_DIR / f"{sys_id}.md",
+                    cfg['title'],
+                    cfg['description'],
+                    classes,
+                    cfg.get('key_classes', [])
+                )
             else:
                 print(f"  ⏭️ Skipping {sys_id} ({len(classes)} classes)")
         
@@ -466,12 +459,12 @@ net.cyberpunk042.client
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate minimalist documentation")
+    parser = argparse.ArgumentParser(description="Generate hierarchical documentation")
     parser.add_argument('--dry-run', action='store_true', help='Preview only')
     args = parser.parse_args()
     
     print("=" * 60)
-    print("   DOCUMENTATION GENERATOR v3 (Minimalist)")
+    print("   DOCUMENTATION GENERATOR v4 (Hierarchical)")
     print("=" * 60)
     
     if args.dry_run:

@@ -154,7 +154,9 @@ class MermaidGenerator:
         
         # Add composition/dependency relationships (limit per class)
         if show_dependencies and self.config.show_composition:
-            MAX_DEPS_PER_CLASS = 4  # Limit to avoid clutter
+            MAX_DEPS_PER_CLASS = 5  # Limit to avoid clutter
+            SKIP_TYPES = {'ButtonWidget', 'LabeledSlider', 'SliderWidget', 'String', 'boolean', 'int', 'float', 'long', 'double', 'void', 'Object', 'Optional', 'Consumer', 'Function', 'Supplier'}
+            
             for jc in classes:
                 src = self._sanitize(jc.name)
                 if not src:
@@ -165,15 +167,37 @@ class MermaidGenerator:
                 for field in jc.fields:
                     if deps_added >= MAX_DEPS_PER_CLASS:
                         break
-                    field_type = self._sanitize(field.type.split('<')[0]) if field.type else ""
-                    # Skip common widget types to reduce noise
-                    if field_type in ['ButtonWidget', 'LabeledSlider', 'SliderWidget', 'String', 'boolean', 'int', 'float', 'List', 'Map', 'Set']:
+                    if not field.type:
                         continue
-                    if field_type and field_type in defined and field_type != src:
-                        rel = f"    {src} --> {field_type} : {field.name}"
-                        if rel not in relationships:
-                            relationships.append(rel)
-                            deps_added += 1
+                    
+                    # Extract types to check (including generic inner types)
+                    types_to_check = []
+                    raw_type = field.type
+                    
+                    # Get outer type
+                    outer = raw_type.split('<')[0].split('[')[0]
+                    if outer not in ['List', 'Map', 'Set', 'Optional', 'Collection']:
+                        types_to_check.append(outer)
+                    
+                    # Get inner generic types like List<TriggerConfig> -> TriggerConfig
+                    if '<' in raw_type and '>' in raw_type:
+                        inner = raw_type.split('<')[1].split('>')[0]
+                        # Handle Map<K,V> -> just get first significant type
+                        for part in inner.replace(',', ' ').split():
+                            clean = part.strip().split('<')[0]
+                            if clean and clean[0].isupper():
+                                types_to_check.append(clean)
+                    
+                    for field_type in types_to_check:
+                        field_type = self._sanitize(field_type)
+                        if field_type in SKIP_TYPES:
+                            continue
+                        if field_type and field_type in defined and field_type != src:
+                            rel = f"    {src} --> {field_type} : {field.name}"
+                            if rel not in relationships:
+                                relationships.append(rel)
+                                deps_added += 1
+                                break  # Only one link per field
         
         # Add relationships (deduplicated)
         for rel in sorted(set(relationships)):

@@ -348,7 +348,23 @@ def _parse_with_tree_sitter(filepath: Path, content: str, source_root: str) -> O
                             if t.type in ['type_identifier', 'generic_type']:
                                 impl = get_text(t).split('<')[0]
                                 implements.append(impl)
-            elif child.type == 'class_body' or child.type == 'interface_body' or child.type == 'enum_body':
+            
+            # RECORD COMPONENTS - records have their "fields" in formal_parameters
+            elif child.type == 'formal_parameters' and class_type == 'record':
+                for param in child.children:
+                    if param.type == 'formal_parameter' or param.type == 'record_pattern_component':
+                        # Extract type and name
+                        p_type = ""
+                        p_name = ""
+                        for p in param.children:
+                            if p.type in ['type_identifier', 'generic_type', 'array_type', 'integral_type', 'floating_point_type', 'boolean_type']:
+                                p_type = get_text(p)
+                            elif p.type == 'identifier':
+                                p_name = get_text(p)
+                        if p_name and p_type and is_valid_java_identifier(p_name):
+                            fields.append(JavaField(name=p_name, type=p_type, modifiers=['public', 'final']))
+            
+            elif child.type == 'class_body' or child.type == 'interface_body' or child.type == 'enum_body' or child.type == 'record_body':
                 # Process body for methods and fields
                 for member in child.children:
                     if member.type == 'method_declaration':
