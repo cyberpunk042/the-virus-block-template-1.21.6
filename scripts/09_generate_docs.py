@@ -33,7 +33,8 @@ GROUPED_SYSTEMS = {
         "title": "Field System",
         "description": "Complete field system architecture.",
         "all_packages": ["field", "field.loader", "field.effect", "field.influence", "field.instance"],
-        "summary_key_classes": ["FieldDefinition", "FieldLayer", "FieldManager", "FieldRegistry", "FieldInstance", "TriggerProcessor", "BindingResolver", "EffectProcessor"],
+        "summary_key_classes": ["FieldDefinition", "FieldLayer", "FieldManager", "FieldRegistry", "FieldInstance", "TriggerProcessor", "BindingResolver", "EffectProcessor", "FieldLoader"],
+        "exclude_patterns": ["Utils", "Helper", "Init", "Builder"],  # Exclude utility classes
         "children": {
             "core": {
                 "title": "Core Classes",
@@ -189,38 +190,230 @@ class DocGenerator:
         self.write_file(DOCS_DIR / "README.md", content)
     
     def generate_architecture(self):
-        content = """# 🏗️ System Architecture
+        all_classes = list(self.graph.classes.values())
+        
+        # Collect package statistics
+        package_classes = {}
+        for jc in all_classes:
+            pkg = jc.package or 'default'
+            if pkg not in package_classes:
+                package_classes[pkg] = []
+            package_classes[pkg].append(jc)
+        
+        # Build package dependency graph
+        package_deps = {}
+        for jc in all_classes:
+            src_pkg = jc.package or 'default'
+            if src_pkg not in package_deps:
+                package_deps[src_pkg] = set()
+            
+            # Check extends, implements, fields
+            targets = []
+            if jc.extends:
+                targets.append(jc.extends)
+            targets.extend(jc.implements)
+            for f in jc.fields:
+                if f.type:
+                    targets.append(f.type)
+            
+            for target in targets:
+                # Find target package
+                target_name = target.split('<')[0].split('.')[-1]
+                for other in all_classes:
+                    if other.name == target_name and other.package != src_pkg:
+                        package_deps[src_pkg].add(other.package)
+        
+        # Group packages by major system
+        system_packages = {
+            'Field': [p for p in package_classes if 'field' in p and 'gui' not in p],
+            'GUI': [p for p in package_classes if 'gui' in p],
+            'Visual': [p for p in package_classes if 'visual' in p and 'gui' not in p],
+            'Rendering': [p for p in package_classes if any(x in p for x in ['render', 'mesh', 'tessell'])],
+            'Blocks': [p for p in package_classes if 'block' in p],
+            'Infection': [p for p in package_classes if any(x in p for x in ['infection', 'scenario', 'virus'])],
+            'Network': [p for p in package_classes if any(x in p for x in ['network', 'packet', 'command'])],
+        }
+        
+        content = f"""# 🏗️ System Architecture
 
-## High-Level Overview
+> Auto-generated from {len(all_classes)} classes across {len(package_classes)} packages.
+
+## Complete System Overview
 
 ```mermaid
 graph TB
-    subgraph Common
-        FS[Field System] --> VS[Visual System]
-        IS[Infection System] --> BS[Blocks]
+    subgraph TheVirusBlock["🦠 The Virus Block Mod"]
+        
+        subgraph Common["📦 Common (Server + Client)"]
+            subgraph FieldSystem["Field System"]
+                field[field<br/>FieldDefinition, FieldLayer, FieldType]
+                field_loader[field.loader<br/>FieldLoader, FieldRegistry]
+                field_effect[field.effect<br/>EffectProcessor]
+                field_influence[field.influence<br/>InfluenceHandler]
+                field_instance[field.instance<br/>FieldInstance, FieldManager]
+            end
+            
+            subgraph VisualSystem["Visual System"]
+                visual[visual<br/>Primitive, Animation]
+                visual_shape[visual.shape<br/>Shape, SphereShape, etc.]
+                visual_pattern[visual.pattern<br/>QuadPattern, TrianglePattern]
+                visual_fill[visual.fill<br/>FillConfig, FillMode]
+                visual_color[visual.color<br/>ColorTheme, GradientConfig]
+            end
+            
+            subgraph InfectionSystem["Infection System"]
+                infection[infection<br/>InfectedBlockData]
+                scenario[scenario<br/>Scenario, ScenarioManager]
+            end
+            
+            subgraph BlockSystem["Block System"]
+                blocks[block<br/>ModBlocks, VirusBlock]
+                block_entity[block.entity<br/>VirusBlockEntity]
+            end
+            
+            subgraph Util["Utilities"]
+                util[util<br/>JsonSerializer, JsonParseUtils]
+            end
+        end
+        
+        subgraph ClientOnly["🖥️ Client Only"]
+            subgraph GUISystem["GUI System"]
+                gui_screen[gui.screen<br/>FieldCustomizerScreen]
+                gui_state[gui.state<br/>FieldEditState, Adapters]
+                gui_panel[gui.panel<br/>AbstractPanel, SubPanels]
+                gui_widget[gui.widget<br/>LabeledSlider, Dropdown]
+                gui_layout[gui.layout<br/>LayoutManager, Bounds]
+            end
+            
+            subgraph RenderSystem["Rendering System"]
+                render[render<br/>FieldRenderer]
+                mesh[mesh<br/>MeshBuilder, DynamicMesh]
+                tessellator[visual.tessellator<br/>SphereTessellator, etc.]
+            end
+            
+            subgraph PreviewSystem["Preview System"]
+                preview[gui.preview<br/>PreviewRenderer, Rasterizer]
+            end
+        end
+        
+        subgraph NetworkLayer["🌐 Network"]
+            network[network<br/>PacketHandler]
+            packet[network.packet<br/>FieldSpawnPacket, etc.]
+            command[command<br/>FieldCommand]
+        end
     end
     
-    subgraph Client
-        GUI[GUI System] --> FS
-        RP[Rendering Pipeline] --> VS
-    end
+    %% Cross-system dependencies
+    gui_state --> field
+    gui_state --> visual
+    gui_panel --> gui_state
+    gui_screen --> gui_panel
     
-    FS --> NET[Network] --> RP
+    field_loader --> field
+    field_instance --> field
+    field_effect --> field_instance
+    
+    render --> visual
+    render --> field_instance
+    tessellator --> visual_shape
+    mesh --> tessellator
+    
+    preview --> visual
+    preview --> mesh
+    
+    network --> field
+    packet --> field_instance
+    
+    infection --> blocks
+    scenario --> infection
 ```
 
-## Data Flow
+## Package Breakdown
+
+"""
+        # List all packages with class counts
+        for sys_name, pkgs in sorted(system_packages.items()):
+            if pkgs:
+                content += f"### {sys_name}\n\n"
+                content += "| Package | Classes | Key Types |\n"
+                content += "|---------|---------|------------|\n"
+                for pkg in sorted(pkgs):
+                    classes_in_pkg = package_classes.get(pkg, [])
+                    key_types = ', '.join([c.name for c in classes_in_pkg[:3]])
+                    if len(classes_in_pkg) > 3:
+                        key_types += ', ...'
+                    content += f"| `{pkg}` | {len(classes_in_pkg)} | {key_types} |\n"
+                content += "\n"
+        
+        content += """## Data Flow
 
 ```
-User → GUI → FieldEditState → FieldDefinition → JSON
-                                     ↓
-                             FieldRegistry
-                                     ↓
-                             FieldManager → FieldInstance
-                                     ↓
-                               Network → Other Clients
-                                     ↓
-                             FieldRenderer → GPU
+┌─────────────────────────────────────────────────────────────────┐
+│                        USER INTERACTION                          │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  FieldCustomizerScreen (GUI)                                     │
+│  ├─ HeaderBar, StatusBar                                         │
+│  ├─ Panels: ProfilesPanel, ShapeSubPanel, FillSubPanel, etc.    │
+│  └─ Widgets: LabeledSlider, DropdownWidget, etc.                 │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  FieldEditState                                                   │
+│  ├─ Adapters: ShapeAdapter, FillAdapter, AnimationAdapter, etc. │
+│  ├─ Managers: LayerManager, ProfileManager, TriggerManager      │
+│  └─ Serialization: SerializationManager                          │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  FieldDefinition (Serializable Data Model)                       │
+│  ├─ FieldLayer[] (primitives, transform, animation)             │
+│  ├─ Modifiers, FollowConfig, LifecycleConfig                    │
+│  └─ TriggerConfig[]                                              │
+└───────────┬─────────────────────────────────┬───────────────────┘
+            │                                 │
+            ▼                                 ▼
+┌───────────────────────┐       ┌───────────────────────────────┐
+│  JSON File Storage    │       │  Network (FieldSpawnPacket)   │
+│  field_profiles/      │       │  → Server ↔ Clients           │
+└───────────┬───────────┘       └───────────────┬───────────────┘
+            │                                   │
+            ▼                                   ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  FieldRegistry (Server-side Source of Truth)                     │
+│  └─ FieldLoader → ReferenceResolver → DefaultsProvider          │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  FieldManager (Active Instance Management)                       │
+│  └─ FieldInstance (per-entity: position, radius, state)        │
+│     └─ TriggerProcessor, EffectProcessor                        │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  ClientFieldState (Client-side Rendering State)                  │
+│  └─ FieldRenderer                                                │
+│     ├─ MeshBuilder → Tessellators → DynamicMesh                 │
+│     └─ RenderLayers → GPU                                        │
+└─────────────────────────────────────────────────────────────────┘
 ```
+
+## Key Integration Points
+
+| Class | Role | Connects To |
+|-------|------|-------------|
+| `FieldDefinition` | Central data structure | GUI, Storage, Network, Registry |
+| `FieldEditState` | GUI adapter layer | All Adapters, FieldDefinition |
+| `FieldRegistry` | Server source of truth | FieldLoader, FieldManager |
+| `FieldInstance` | Active field entity | FieldManager, TriggerProcessor |
+| `MeshBuilder` | Geometry generation | Tessellators, DynamicMesh |
+| `FieldRenderer` | GPU rendering | ClientFieldState, RenderLayers |
 """
         self.write_file(DOCS_DIR / "ARCHITECTURE.md", content)
     

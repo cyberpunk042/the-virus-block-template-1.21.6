@@ -94,10 +94,52 @@ class MermaidGenerator:
         defined = set()
         relationships = []
         
-        # Define each class with members
+        # FIRST PASS: Collect all class names that will have relationships
+        connected_classes = set()
+        class_names = {self._sanitize(c.name) for c in classes}
+        
+        for jc in classes:
+            name = self._sanitize(jc.name)
+            if not name:
+                continue
+            # Check if this class has inheritance
+            if jc.extends or jc.implements:
+                connected_classes.add(name)
+                if jc.extends:
+                    connected_classes.add(self._sanitize(jc.extends.split('<')[0]))
+                for impl in jc.implements:
+                    connected_classes.add(self._sanitize(impl.split('<')[0]))
+            
+            # Check fields
+            for field in jc.fields:
+                if field.type:
+                    ftype = self._sanitize(field.type.split('<')[0].split('[')[0])
+                    if ftype in class_names:
+                        connected_classes.add(name)
+                        connected_classes.add(ftype)
+            
+            # Check method return types
+            for method in jc.methods:
+                if method.return_type:
+                    rtype = self._sanitize(method.return_type.split('<')[0])
+                    if rtype in class_names:
+                        connected_classes.add(name)
+                        connected_classes.add(rtype)
+            
+            # If class has any methods or fields, it's interesting on its own
+            if jc.public_methods or jc.fields:
+                connected_classes.add(name)
+        
+        # SECOND PASS: Define each class with members (only if connected)
         for jc in classes:
             name = self._sanitize(jc.name)
             if name in defined or not name:
+                continue
+            # Skip annotations - they're metadata and always appear standalone
+            if jc.class_type == 'annotation':
+                continue
+            # Skip classes that have no relationships
+            if name not in connected_classes:
                 continue
             defined.add(name)
             
@@ -183,20 +225,37 @@ class MermaidGenerator:
                 if not src:
                     continue
                 
-                # Look at field types for composition (limit count)
-                deps_added = 0
+                # Collect types from fields AND methods
+                types_found = []
+                
+                # From fields
                 for field in jc.fields:
+                    if field.type:
+                        types_found.append((field.type, field.name))
+                
+                # From method return types and parameters
+                for method in jc.methods:
+                    if method.return_type and method.return_type not in ['void', 'boolean', 'int', 'float', 'String', 'long', 'double']:
+                        types_found.append((method.return_type, "returns"))
+                    
+                    for param in method.parameters:
+                        if not param:
+                            continue
+                        # Just add the param as-is
+                        types_found.append((param, "uses"))
+                
+                deps_added = 0
+                for raw_type, label in types_found:
                     if deps_added >= MAX_DEPS_PER_CLASS:
                         break
-                    if not field.type:
+                    if not raw_type:
                         continue
                     
                     # Extract types to check (including generic inner types)
                     types_to_check = []
-                    raw_type = field.type
                     
                     # Get outer type
-                    outer = raw_type.split('<')[0].split('[')[0]
+                    outer = raw_type.split('<')[0].split('[')[0].strip()
                     if outer not in ['List', 'Map', 'Set', 'Optional', 'Collection']:
                         types_to_check.append(outer)
                     
@@ -216,18 +275,79 @@ class MermaidGenerator:
                         if not field_type or field_type == src:
                             continue
                         
-                        # If target not yet defined but we want external, add a stub
+                        # If target not yet defined but we want external
                         if field_type not in defined and self.config.include_external:
-                            # Add as external class stub
-                            lines.append(f"    class {field_type}")
+                            # Always add to defined so connections work
                             defined.add(field_type)
+                            
+                            # But only create stub LINE if name looks valid (not malformed)
+                            # Malformed patterns: primitive+name like "floatradius" or Class+var like "FieldDefinitiondefinition"
+                            is_malformed = False
+                            
+                            # Pattern 1: starts with primitive type
+                            for prefix in ['float', 'int', 'long', 'double', 'boolean', 'byte', 'char', 'short', 'String', 
+                                          'Identifier', 'ServerWorld', 'ResourceManager', 'JsonObject', 'Path', 'Feature',
+                                          'GuiMode', 'FieldDefinition', 'FieldLoader', 'FieldType', 'FieldEvent',
+                                          'Vec3d', 'Vec3i', 'BlockPos', 'Modifiers', 'Trigger', 'Entity',
+                                          'UUID', 'Nullable', 'Optional', 'Consumer', 'Function', 'Supplier']:
+                                if field_type.startswith(prefix) and len(field_type) > len(prefix):
+                                    # Check if next char is lowercase (variable name continuing)
+                                    if field_type[len(prefix)].islower():
+                                        is_malformed = True
+                                        break
+                            
+                            # Pattern 2: check lowercase version for primitives too
+                            if not is_malformed:
+                                lower_name = field_type.lower()
+                                for prefix in ['float', 'int', 'long', 'double', 'boolean', 'byte', 'char', 'short', 'string']:
+                                    if lower_name.startswith(prefix) and len(field_type) > len(prefix):
+                                        is_malformed = True
+                                        break
+                            
+                            # Pattern 3: single uppercase letter followed by lowercase = like "TdefaultValue"
+                            if not is_malformed and len(field_type) >= 2:
+                                if field_type[0].isupper() and field_type[1].islower() and len(field_type) > 2:
+                                    # Could be valid CamelCase or malformed T+varname
+                                    # Check if first "word" is just one letter
+                                    if field_type[0] in 'TUVKRE':  # Common generic type params
+                                        is_malformed = True
+                            
+                            # Pattern 3: detect ClassName+varname - if last word segment is all lowercase and not the whole name
+                            # e.g., "FieldTypetype" -> ends with lowercase segment "type" after "FieldType"
+                            if not is_malformed and len(field_type) > 4:
+                                # Find where lowercase starts at the end
+                                i = len(field_type) - 1
+                                while i > 0 and field_type[i].islower():
+                                    i -= 1
+                                # i is now at last uppercase or start
+                                end_segment = field_type[i:]
+                                # If there's a lowercase segment at end AND it looks like varname (not just CamelCase)
+                                if len(end_segment) > 2 and field_type[i].isupper() and i > 0 and field_type[i-1].islower():
+                                    is_malformed = True
+                            
+                            if not is_malformed:
+                                lines.append(f"    class {field_type}")
                         
+                        # Only draw relationship if target is valid (not malformed name)
+                        # Mermaid will auto-create boxes from relationships, so we need to skip them too
                         if field_type in defined:
-                            rel = f"    {src} --> {field_type} : {field.name}"
-                            if rel not in relationships:
-                                relationships.append(rel)
-                                deps_added += 1
-                                break  # Only one link per field
+                            # Re-check if it's malformed - skip relationship if target is malformed
+                            skip_rel = False
+                            for prefix in ['float', 'int', 'long', 'double', 'boolean', 'byte', 'char', 'short', 'String', 
+                                          'Identifier', 'ServerWorld', 'ResourceManager', 'JsonObject', 'Path', 'Feature',
+                                          'GuiMode', 'FieldDefinition', 'FieldLoader', 'FieldType', 'FieldEvent',
+                                          'Vec3d', 'Vec3i', 'BlockPos', 'Modifiers', 'Trigger', 'Entity',
+                                          'UUID', 'Nullable', 'Optional', 'Consumer', 'Function', 'Supplier']:
+                                if field_type.startswith(prefix) and len(field_type) > len(prefix) and field_type[len(prefix)].islower():
+                                    skip_rel = True
+                                    break
+                            
+                            if not skip_rel:
+                                rel = f"    {src} --> {field_type} : {label}"
+                                if rel not in relationships:
+                                    relationships.append(rel)
+                                    deps_added += 1
+                                    break  # Only one link per source type
         
         # Add relationships (deduplicated)
         for rel in sorted(set(relationships)):
