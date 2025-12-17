@@ -238,9 +238,20 @@ def _parse_with_tree_sitter(filepath: Path, content: str, source_root: str) -> O
     if not TREE_SITTER_AVAILABLE:
         return None
     
+    # Normalize line endings
+    content = content.replace('\r\n', '\n').replace('\r', '\n')
+    
+    # CRITICAL: Use bytes for tree-sitter since it returns byte offsets
+    # UTF-8 files with multi-byte chars cause string[offset] to differ from bytes[offset]
+    content_bytes = content.encode('utf-8')
+    
+    def get_text(node) -> str:
+        """Extract text from a node using byte offsets."""
+        return content_bytes[node.start_byte:node.end_byte].decode('utf-8', errors='replace')
+    
     try:
         parser = get_parser('java')
-        tree = parser.parse(content.encode())
+        tree = parser.parse(content_bytes)
         root = tree.root_node
     except Exception as e:
         return None
@@ -249,10 +260,9 @@ def _parse_with_tree_sitter(filepath: Path, content: str, source_root: str) -> O
     package = ""
     for node in root.children:
         if node.type == 'package_declaration':
-            # Get the package name
             for child in node.children:
                 if child.type == 'scoped_identifier' or child.type == 'identifier':
-                    package = content[child.start_byte:child.end_byte]
+                    package = get_text(child)
                     break
     
     # Extract imports
@@ -260,8 +270,7 @@ def _parse_with_tree_sitter(filepath: Path, content: str, source_root: str) -> O
     external_imports = []
     for node in root.children:
         if node.type == 'import_declaration':
-            import_text = content[node.start_byte:node.end_byte]
-            # Parse the import path
+            import_text = get_text(node)
             match = re.search(r'import\s+(?:static\s+)?([\w.]+)', import_text)
             if match:
                 imp_path = match.group(1)
@@ -289,7 +298,7 @@ def _parse_with_tree_sitter(filepath: Path, content: str, source_root: str) -> O
             if node.type in ['class_declaration', 'interface_declaration', 'enum_declaration', 'record_declaration']:
                 for child in node.children:
                     if child.type == 'identifier':
-                        inner_classes.append(content[child.start_byte:child.end_byte])
+                        inner_classes.append(get_text(child))
                         break
             return
         
@@ -310,7 +319,7 @@ def _parse_with_tree_sitter(filepath: Path, content: str, source_root: str) -> O
         found_name = False
         for child in node.children:
             if child.type == 'identifier' and not found_name:
-                potential_name = content[child.start_byte:child.end_byte]
+                potential_name = get_text(child)
                 # Validate the name is a proper Java identifier
                 if is_valid_java_identifier(potential_name):
                     class_name = potential_name
@@ -323,21 +332,21 @@ def _parse_with_tree_sitter(filepath: Path, content: str, source_root: str) -> O
                     if mod.type in ['public', 'private', 'protected', 'abstract', 'final', 'static']:
                         modifiers.append(mod.type)
                     elif mod.type == 'marker_annotation' or mod.type == 'annotation':
-                        ann_text = content[mod.start_byte:mod.end_byte]
+                        ann_text = get_text(mod)
                         match = re.search(r'@(\w+)', ann_text)
                         if match:
                             annotations.append(match.group(1))
             elif child.type == 'superclass':
                 for c in child.children:
                     if c.type == 'type_identifier' or c.type == 'generic_type':
-                        extends = content[c.start_byte:c.end_byte].split('<')[0]
+                        extends = get_text(c).split('<')[0]
                         break
             elif child.type == 'super_interfaces' or child.type == 'extends_interfaces':
                 for c in child.children:
                     if c.type == 'type_list':
                         for t in c.children:
                             if t.type in ['type_identifier', 'generic_type']:
-                                impl = content[t.start_byte:t.end_byte].split('<')[0]
+                                impl = get_text(t).split('<')[0]
                                 implements.append(impl)
             elif child.type == 'class_body' or child.type == 'interface_body' or child.type == 'enum_body':
                 # Process body for methods and fields
@@ -355,18 +364,18 @@ def _parse_with_tree_sitter(filepath: Path, content: str, source_root: str) -> O
                                     if mod.type in ['public', 'private', 'protected', 'abstract', 'final', 'static']:
                                         mods.append(mod.type)
                                     elif 'annotation' in mod.type:
-                                        ann_text = content[mod.start_byte:mod.end_byte]
+                                        ann_text = get_text(mod)
                                         match = re.search(r'@(\w+)', ann_text)
                                         if match:
                                             anns.append(match.group(1))
                             elif m.type in ['type_identifier', 'void_type', 'generic_type', 'array_type', 'integral_type', 'floating_point_type', 'boolean_type']:
-                                ret_type = content[m.start_byte:m.end_byte]
+                                ret_type = get_text(m)
                             elif m.type == 'identifier':
-                                name = content[m.start_byte:m.end_byte]
+                                name = get_text(m)
                             elif m.type == 'formal_parameters':
                                 for p in m.children:
                                     if p.type == 'formal_parameter':
-                                        p_text = content[p.start_byte:p.end_byte]
+                                        p_text = get_text(p)
                                         params.append(p_text)
                         
                         # Only add method if name is a valid identifier
@@ -390,11 +399,11 @@ def _parse_with_tree_sitter(filepath: Path, content: str, source_root: str) -> O
                                     if mod.type in ['public', 'private', 'protected', 'final', 'static']:
                                         mods.append(mod.type)
                             elif m.type in ['type_identifier', 'generic_type', 'array_type', 'integral_type', 'floating_point_type', 'boolean_type']:
-                                f_type = content[m.start_byte:m.end_byte]
+                                f_type = get_text(m)
                             elif m.type == 'variable_declarator':
                                 for v in m.children:
                                     if v.type == 'identifier':
-                                        f_names.append(content[v.start_byte:v.end_byte])
+                                        f_names.append(get_text(v))
                                         break
                         
                         for fname in f_names:
