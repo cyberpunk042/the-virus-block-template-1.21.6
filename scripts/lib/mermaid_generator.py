@@ -154,8 +154,29 @@ class MermaidGenerator:
         
         # Add composition/dependency relationships (limit per class)
         if show_dependencies and self.config.show_composition:
-            MAX_DEPS_PER_CLASS = 5  # Limit to avoid clutter
-            SKIP_TYPES = {'ButtonWidget', 'LabeledSlider', 'SliderWidget', 'String', 'boolean', 'int', 'float', 'long', 'double', 'void', 'Object', 'Optional', 'Consumer', 'Function', 'Supplier'}
+            MAX_DEPS_PER_CLASS = 4  # Limit to avoid clutter
+            # Skip Java stdlib and common Minecraft types
+            SKIP_TYPES = {
+                # Java primitives and wrappers
+                'String', 'boolean', 'int', 'float', 'long', 'double', 'void', 'byte', 'char', 'short',
+                'Boolean', 'Integer', 'Float', 'Long', 'Double', 'Byte', 'Character', 'Short',
+                # Java collections/util
+                'Object', 'Optional', 'Consumer', 'Function', 'Supplier', 'Predicate', 'Runnable',
+                'List', 'Map', 'Set', 'Collection', 'Iterator', 'Iterable', 'Stream',
+                'UUID', 'Path', 'File', 'URI', 'URL', 'Class', 'Enum',
+                'AtomicLong', 'AtomicInteger', 'AtomicBoolean', 'AtomicReference',
+                # Gson
+                'Gson', 'JsonObject', 'JsonArray', 'JsonElement', 'JsonPrimitive',
+                # Minecraft common
+                'ServerWorld', 'World', 'ClientWorld', 'MinecraftClient', 'MinecraftServer',
+                'BlockPos', 'Vec3d', 'Vec3i', 'Box', 'Direction', 'Identifier',
+                'Text', 'MutableText', 'NbtCompound', 'NbtElement',
+                'Entity', 'PlayerEntity', 'LivingEntity', 'BlockEntity',
+                'ItemStack', 'Item', 'Block', 'BlockState',
+                'ResourceManager', 'Registry',
+                # GUI widgets
+                'ButtonWidget', 'LabeledSlider', 'SliderWidget', 'TextFieldWidget', 'ClickableWidget',
+            }
             
             for jc in classes:
                 src = self._sanitize(jc.name)
@@ -192,7 +213,16 @@ class MermaidGenerator:
                         field_type = self._sanitize(field_type)
                         if field_type in SKIP_TYPES:
                             continue
-                        if field_type and field_type in defined and field_type != src:
+                        if not field_type or field_type == src:
+                            continue
+                        
+                        # If target not yet defined but we want external, add a stub
+                        if field_type not in defined and self.config.include_external:
+                            # Add as external class stub
+                            lines.append(f"    class {field_type}")
+                            defined.add(field_type)
+                        
+                        if field_type in defined:
                             rel = f"    {src} --> {field_type} : {field.name}"
                             if rel not in relationships:
                                 relationships.append(rel)
