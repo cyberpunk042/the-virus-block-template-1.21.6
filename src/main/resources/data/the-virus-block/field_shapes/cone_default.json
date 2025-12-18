@@ -1,0 +1,9 @@
+{
+    "name": "Default",
+    "description": "Standard cone",
+    "type": "cone",
+    "radius": 1.0,
+    "height": 2.0,
+    "segments": 32,
+    "capBottom": true
+}

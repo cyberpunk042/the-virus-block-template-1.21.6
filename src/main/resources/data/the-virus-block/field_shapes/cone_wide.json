@@ -1,0 +1,9 @@
+{
+    "name": "Wide",
+    "description": "Wide flat cone",
+    "type": "cone",
+    "radius": 1.5,
+    "height": 1.0,
+    "segments": 48,
+    "capBottom": true
+}

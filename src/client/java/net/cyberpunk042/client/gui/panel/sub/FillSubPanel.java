@@ -180,7 +180,7 @@ public class FillSubPanel extends AbstractPanel {
         if (currentMode == FillMode.CAGE && cageAdapter.supportsCountOptions()) {
             primaryCountSlider = LabeledSlider.builder(cageAdapter.primaryLabel())
                 .position(x, y).width(halfW)
-                .range(1, 32).initial(cageAdapter.primaryCount()).format("%d").step(1)
+                .range(1, 128).initial(cageAdapter.primaryCount()).format("%d").step(1)
                 .onChange(v -> onUserChange(() -> {
                     cageAdapter = cageAdapter.withPrimaryCount(v.intValue());
                     updateCageInState();
@@ -189,7 +189,7 @@ public class FillSubPanel extends AbstractPanel {
             
             secondaryCountSlider = LabeledSlider.builder(cageAdapter.secondaryLabel())
                 .position(x + halfW + GuiConstants.PADDING, y).width(halfW)
-                .range(1, 64).initial(cageAdapter.secondaryCount()).format("%d").step(1)
+                .range(1, 256).initial(cageAdapter.secondaryCount()).format("%d").step(1)
                 .onChange(v -> onUserChange(() -> {
                     cageAdapter = cageAdapter.withSecondaryCount(v.intValue());
                     updateCageInState();

@@ -1,0 +1,9 @@
+{
+    "name": "Default",
+    "description": "Standard torus (donut shape)",
+    "type": "torus",
+    "majorRadius": 1.0,
+    "minorRadius": 0.3,
+    "majorSegments": 48,
+    "minorSegments": 24
+}

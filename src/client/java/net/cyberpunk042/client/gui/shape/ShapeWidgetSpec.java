@@ -173,8 +173,8 @@ public final class ShapeWidgetSpec {
         EnumDropdownSpec.half("Algo", "sphere.algorithm", SphereAlgorithm.class, SphereAlgorithm.LAT_LON),
         
         // Row 2: Lat + Lon steps
-        SliderSpec.halfInt("Lat", "sphere.latSteps", 4, 256),
-        SliderSpec.halfInt("Lon", "sphere.lonSteps", 4, 256),
+        SliderSpec.halfInt("Lat", "sphere.latSteps", 4, 512),
+        SliderSpec.halfInt("Lon", "sphere.lonSteps", 4, 512),
         
         // Row 3: Lat Start + End (fraction 0-1)
         SliderSpec.half("Start", "sphere.latStart", 0f, 1f, "%.2f"),

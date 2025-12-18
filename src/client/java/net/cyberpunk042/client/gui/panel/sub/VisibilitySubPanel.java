@@ -189,7 +189,7 @@ public class VisibilitySubPanel extends AbstractPanel {
         // Count slider
         countSlider = LabeledSlider.builder("Count")
             .position(0, 0).width(halfW)
-            .range(1, 32).initial(state.getInt("mask.count")).format("%d").step(1)
+            .range(1, 128).initial(state.getInt("mask.count")).format("%d").step(1)
             .onChange(v -> onUserChange(() -> {
                 state.set("mask.count", v.intValue());
             })).build();

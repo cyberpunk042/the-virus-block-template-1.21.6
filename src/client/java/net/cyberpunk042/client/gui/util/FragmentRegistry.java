@@ -91,7 +91,8 @@ public final class FragmentRegistry {
      * Reload all presets from disk. Call this after config files change.
      */
     public static synchronized void reload() {
-        LOGGER.info("Reloading presets from config...");
+        LOGGER.info("Reloading presets from config... (caller: {})", 
+            new Throwable().getStackTrace()[1].toString());
         shapePresets.clear();
         fillPresets.clear();
         maskPresets.clear();
@@ -180,21 +181,33 @@ public final class FragmentRegistry {
     private static void loadShapeFragments() {
         // 1) User config folder
         Path configFolder = CONFIG_ROOT.resolve(SHAPES_FOLDER);
+        LOGGER.info("Looking for shape presets in config: {} (exists={})", configFolder, Files.exists(configFolder));
         if (Files.exists(configFolder)) {
             loadShapeFragmentsFromFolder(configFolder);
         }
 
         // 2) Built-in resources (fallback so presets show even on first launch)
-        FabricLoader.getInstance().getModContainer(MODID).ifPresent(container -> {
-            container.findPath("data/" + MODID + "/" + SHAPES_FOLDER)
-                .ifPresent(FragmentRegistry::loadShapeFragmentsFromFolder);
-        });
+        FabricLoader.getInstance().getModContainer(MODID).ifPresentOrElse(
+            container -> {
+                String resourcePath = "data/" + MODID + "/" + SHAPES_FOLDER;
+                container.findPath(resourcePath)
+                    .ifPresentOrElse(
+                        path -> {
+                            LOGGER.info("Found built-in shape presets at: {}", path);
+                            loadShapeFragmentsFromFolder(path);
+                        },
+                        () -> LOGGER.warn("Built-in shape presets NOT FOUND at: {}", resourcePath)
+                    );
+            },
+            () -> LOGGER.warn("Mod container not found for: {}", MODID)
+        );
     }
 
     /**
      * Load shape presets from a given folder path containing *.json files.
      */
     private static void loadShapeFragmentsFromFolder(Path folder) {
+        int count = 0;
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(folder, "*.json")) {
             for (Path file : stream) {
                 try {
@@ -204,7 +217,8 @@ public final class FragmentRegistry {
                     String type = json.has("type") ? json.get("type").getAsString().toLowerCase() : "sphere";
 
                     shapePresets.computeIfAbsent(type, k -> new LinkedHashMap<>()).put(name, json);
-                    LOGGER.debug("Loaded shape preset: {} (type={}) from {}", name, type, folder);
+                    LOGGER.info("Loaded shape preset: {} (type={}) from {}", name, type, folder);
+                    count++;
                 } catch (Exception e) {
                     LOGGER.warn("Failed to load shape preset {}: {}", file, e.getMessage());
                 }
@@ -212,19 +226,28 @@ public final class FragmentRegistry {
         } catch (IOException e) {
             LOGGER.warn("Failed to scan shapes folder {}: {}", folder, e.getMessage());
         }
+        LOGGER.info("Loaded {} shape presets from {}, types available: {}", count, folder, shapePresets.keySet());
     }
 
     private static void loadSimplePresets(String folder, Map<String, JsonObject> target) {
         // 1) User config folder
         Path configPath = CONFIG_ROOT.resolve(folder);
+        LOGGER.info("Looking for {} presets in config: {} (exists={})", folder, configPath, Files.exists(configPath));
         if (Files.exists(configPath)) {
             loadSimplePresetsFromFolder(configPath, target, folder);
         }
 
         // 2) Built-in resources (fallback) — ensures dropdowns populate even if config is empty
         FabricLoader.getInstance().getModContainer(MODID).ifPresent(container -> {
-            container.findPath("data/" + MODID + "/" + folder)
-                .ifPresent(path -> loadSimplePresetsFromFolder(path, target, folder));
+            String resourcePath = "data/" + MODID + "/" + folder;
+            container.findPath(resourcePath)
+                .ifPresentOrElse(
+                    path -> {
+                        LOGGER.info("Found built-in {} at: {}", folder, path);
+                        loadSimplePresetsFromFolder(path, target, folder);
+                    },
+                    () -> LOGGER.warn("Built-in {} NOT FOUND at: {}", folder, resourcePath)
+                );
         });
     }
 
@@ -263,6 +286,8 @@ public final class FragmentRegistry {
         // Always include Default and Custom
         if (!list.contains("Default")) list.add(0, "Default");
         if (!list.contains("Custom")) list.add("Custom");
+        LOGGER.info("listShapeFragments('{}') -> map={}, result={}", shapeType, 
+            map != null ? map.keySet() : "null", list);
         return list;
     }
 

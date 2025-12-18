@@ -142,6 +142,8 @@ public class ShapeSubPanel extends AbstractPanel {
         controlBuilder.clear();
         
         String shapeType = state.getString("shapeType");
+        Logging.GUI.topic("panel").info("ShapeSubPanel rebuild: shapeType='{}', currentShapeType='{}'", 
+            shapeType, currentShapeType);
         
         if (!shapeType.equals(currentShapeType)) {
             currentShapeType = shapeType;
@@ -173,6 +175,7 @@ public class ShapeSubPanel extends AbstractPanel {
         widgets.add(shapeTypeDropdown);
         
         List<String> presets = FragmentRegistry.listShapeFragments(shapeType);
+        Logging.GUI.topic("panel").info("ShapeSubPanel shape presets for '{}': {}", shapeType, presets);
         // Only reset to "Custom" if not currently applying a fragment
         if (!applyingFragment) {
             currentFragment = "Custom";
@@ -400,7 +403,9 @@ public class ShapeSubPanel extends AbstractPanel {
             FragmentRegistry.applyShapeFragment(state, currentShapeType, name);
         }
         
-        controlBuilder.syncFromState();
+        // Rebuild widgets to show correct fields for new values (like FillSubPanel and VisibilitySubPanel do)
+        rebuildForCurrentShape();
+        notifyWidgetsChanged();
         applyingFragment = false;
     }
 }

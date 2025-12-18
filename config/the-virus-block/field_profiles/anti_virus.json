@@ -18,13 +18,13 @@
                         "lonSteps": 23
                     },
                     "arrangement": {
-                        "defaultPattern": "stripe_1"
+                        "defaultPattern": "three_quarter_slim_1"
                     },
                     "appearance": {
                         "color": "#00FFFF",
                         "alpha": {
-                            "min": 0.6,
-                            "max": 0.6
+                            "min": 0.75,
+                            "max": 0.75
                         },
                         "glow": 0.5,
                         "emissive": 0.0,
