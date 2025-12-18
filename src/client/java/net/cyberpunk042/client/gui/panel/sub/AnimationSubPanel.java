@@ -291,7 +291,17 @@ public class AnimationSubPanel extends AbstractPanel {
         }
         applyingFragment = true;
         currentFragment = name;
-        FragmentRegistry.applyAnimationFragment(state, name);
+        
+        if ("Default".equalsIgnoreCase(name)) {
+            // Apply actual default animation config
+            net.cyberpunk042.visual.animation.Animation defaultAnim = 
+                net.cyberpunk042.field.loader.DefaultsProvider.getDefaultAnimation();
+            state.set("spin", defaultAnim.spin());
+            state.set("pulse", defaultAnim.pulse());
+        } else {
+            FragmentRegistry.applyAnimationFragment(state, name);
+        }
+        
         syncFromState();
         applyingFragment = false;
     }

@@ -86,6 +86,10 @@ public class FieldCustomizerScreen extends Screen {
     @Override
     protected void init() {
         super.init();
+        
+        // Ensure fragment presets are loaded before building panels
+        net.cyberpunk042.client.gui.util.FragmentRegistry.reload();
+        
         WidgetVisibility.clearAll();
         
         // State change listener for preview refresh

@@ -173,7 +173,10 @@ public class ShapeSubPanel extends AbstractPanel {
         widgets.add(shapeTypeDropdown);
         
         List<String> presets = FragmentRegistry.listShapeFragments(shapeType);
-        currentFragment = "Custom";
+        // Only reset to "Custom" if not currently applying a fragment
+        if (!applyingFragment) {
+            currentFragment = "Custom";
+        }
         fragmentDropdown = CyclingButtonWidget.<String>builder(v -> net.minecraft.text.Text.literal(v))
             .values(presets)
             .initially(currentFragment)
@@ -387,7 +390,16 @@ public class ShapeSubPanel extends AbstractPanel {
         }
         applyingFragment = true;
         currentFragment = name;
-        FragmentRegistry.applyShapeFragment(state, currentShapeType, name);
+        
+        if ("Default".equalsIgnoreCase(name)) {
+            // Apply actual default shape config for current shape type
+            net.cyberpunk042.visual.shape.Shape defaultShape = 
+                net.cyberpunk042.field.loader.DefaultsProvider.getDefaultShape(currentShapeType);
+            state.set("shape", defaultShape);
+        } else {
+            FragmentRegistry.applyShapeFragment(state, currentShapeType, name);
+        }
+        
         controlBuilder.syncFromState();
         applyingFragment = false;
     }

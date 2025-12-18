@@ -1,71 +1,82 @@
 package net.cyberpunk042.client.gui.panel.sub;
 
+import net.cyberpunk042.client.gui.annotation.ShowWhen;
 import net.cyberpunk042.client.gui.panel.AbstractPanel;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.GuiWidgets;
-import net.cyberpunk042.client.gui.widget.LabeledSlider;
 import net.cyberpunk042.client.gui.util.FragmentRegistry;
+import net.cyberpunk042.client.gui.widget.LabeledSlider;
 import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.visual.fill.CageOptionsAdapter;
 import net.cyberpunk042.visual.fill.FillMode;
-import java.util.List;
+
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
 
+import java.util.List;
+
 /**
- * FillSubPanel - Detailed fill mode options.
+ * FillSubPanel - Detailed fill mode options with annotation-based visibility.
  * 
- * <p>Uses {@link CageOptionsAdapter} for shape-aware cage option editing
- * with dynamic labels based on the current shape type.</p>
+ * <p>Uses {@link ShowWhen} annotations to declaratively control widget visibility
+ * based on fill mode. Uses {@link CageOptionsAdapter} for shape-aware cage options.</p>
  * 
- * <p>From 03_PARAMETERS.md §6 Fill Level:</p>
+ * <p>Widget visibility rules:</p>
  * <ul>
- *   <li>wireThickness, doubleSided, depthTest, depthWrite</li>
- *   <li>Cage: shape-specific options via CageOptionsAdapter</li>
- *   <li>Points: pointSize</li>
+ *   <li>Wire Thickness: CAGE, WIREFRAME modes</li>
+ *   <li>See-Through: SOLID mode only</li>
+ *   <li>Cage sliders: CAGE mode only</li>
+ *   <li>Point Size: POINTS mode only</li>
  * </ul>
- * 
- * <p>Note: This panel is displayed inside a sub-tab, so it renders content
- * directly without an ExpandableSection header.</p>
  */
 public class FillSubPanel extends AbstractPanel {
-    
-    private int startY;
-    private CyclingButtonWidget<String> fragmentDropdown;
-    private CyclingButtonWidget<FillMode> fillModeDropdown;
-    private boolean applyingFragment = false;
-    private String currentFragment = "Default";
-    
-    // Common fill options
-    private LabeledSlider wireThicknessSlider;
-    private CyclingButtonWidget<Boolean> depthWriteToggle;
-    
-    // Cage-specific (dynamic labels via adapter)
-    private LabeledSlider primaryCountSlider;
-    private LabeledSlider secondaryCountSlider;
-    private CyclingButtonWidget<Boolean> allEdgesToggle;
-    private CyclingButtonWidget<Boolean> faceOutlinesToggle;
-    
-    // Points-specific
-    private LabeledSlider pointSizeSlider;
     
     // Current adapter for shape-aware cage options
     private CageOptionsAdapter cageAdapter;
     
-    // Callback when widgets change (for re-registration with parent screen)
-    private Runnable widgetChangedCallback;
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ALWAYS VISIBLE widgets
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    private CyclingButtonWidget<String> fragmentDropdown;
+    private CyclingButtonWidget<FillMode> fillModeDropdown;
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CONDITIONALLY VISIBLE widgets (visibility controlled by buildConditionalWidgets)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    @ShowWhen(fillMode = "CAGE")
+    @ShowWhen(fillMode = "WIREFRAME")
+    private LabeledSlider wireThicknessSlider;
+    
+    @ShowWhen(fillMode = "SOLID")
+    private CyclingButtonWidget<Boolean> depthWriteToggle;
+    
+    @ShowWhen(fillMode = "CAGE")
+    private LabeledSlider primaryCountSlider;
+    
+    @ShowWhen(fillMode = "CAGE")
+    private LabeledSlider secondaryCountSlider;
+    
+    @ShowWhen(fillMode = "CAGE")
+    private CyclingButtonWidget<Boolean> allEdgesToggle;
+    
+    @ShowWhen(fillMode = "CAGE")
+    private CyclingButtonWidget<Boolean> faceOutlinesToggle;
+    
+    @ShowWhen(fillMode = "POINTS")
+    private LabeledSlider pointSizeSlider;
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CONSTRUCTOR & INIT
+    // ═══════════════════════════════════════════════════════════════════════════
     
     public FillSubPanel(Screen parent, FieldEditState state, int startY) {
         super(parent, state);
         this.startY = startY;
         Logging.GUI.topic("panel").debug("FillSubPanel created");
-    }
-    
-    /** Sets callback for when widgets are rebuilt (for screen widget re-registration). */
-    public void setWidgetChangedCallback(Runnable callback) {
-        this.widgetChangedCallback = callback;
     }
     
     @Override
@@ -76,92 +87,103 @@ public class FillSubPanel extends AbstractPanel {
         Logging.GUI.topic("panel").debug("FillSubPanel initialized for shape: {}", cageAdapter.shapeType());
     }
     
+    // ═══════════════════════════════════════════════════════════════════════════
+    // WIDGET BUILDING
+    // ═══════════════════════════════════════════════════════════════════════════
+    
     /**
-     * Rebuilds widgets for current fill mode and shape.
-     * Called by init() and when mode changes.
+     * Rebuilds widgets based on current state.
+     * Uses @ShowWhen annotations to determine visibility.
      */
     private void rebuildWidgets() {
-        // Track if we need to reapply offset (rebuilding vs first init)
         boolean needsOffset = bounds != null && !bounds.isEmpty();
-        
         widgets.clear();
         
-        // Initialize adapter based on current shape - use getString to get live value
+        // Initialize adapter based on current shape
         cageAdapter = CageOptionsAdapter.forShape(state.getString("shapeType"), state.fill().cage());
         
         int x = GuiConstants.PADDING;
         int y = startY + GuiConstants.PADDING;
         int w = panelWidth - GuiConstants.PADDING * 2;
         int halfW = (w - GuiConstants.PADDING) / 2;
-
-        // Preset dropdown - show "Custom" since we're loading existing primitive values
+        FillMode currentMode = state.fill().mode();
+        
+        // Fragment dropdown - build at correct position and add immediately (like ShapeSubPanel)
         List<String> fillPresets = FragmentRegistry.listFillFragments();
-        currentFragment = "Custom";  // Loaded primitives have custom values
-
+        Logging.GUI.topic("panel").info("FillSubPanel fill presets loaded: {}", fillPresets);
+        // Only reset to "Custom" if not currently applying a fragment
+        if (!applyingFragment) {
+            currentFragment = "Custom";
+        }
         fragmentDropdown = CyclingButtonWidget.<String>builder(v -> net.minecraft.text.Text.literal(v))
             .values(fillPresets)
             .initially(currentFragment)
             .build(x, y, w, GuiConstants.WIDGET_HEIGHT, net.minecraft.text.Text.literal("Variant"),
-                (btn, val) -> applyPreset(val));
+                (btn, val) -> {
+                    Logging.GUI.topic("panel").info("Fragment button clicked, val={}", val);
+                    applyPreset(val);
+                });
         widgets.add(fragmentDropdown);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
-        // Fill Mode dropdown - manual selection of SOLID/WIREFRAME/CAGE/POINTS
-        FillMode currentMode = state.fill().mode();
+        // Fill mode dropdown - build at correct position
         fillModeDropdown = GuiWidgets.enumDropdown(
             x, y, w,
             "Mode", FillMode.class, currentMode, "Select fill render mode",
             m -> onUserChange(() -> {
                 state.set("fill.mode", m);
-                Logging.GUI.topic("fill").info("[FILL-DEBUG] FillSubPanel changed fill.mode to: {}", m.name());
-                // Rebuild widgets for new mode
+                Logging.GUI.topic("fill").info("[FILL-DEBUG] Fill mode changed to: {}", m.name());
                 rebuildWidgets();
-                // Notify parent to re-register widgets
-                if (widgetChangedCallback != null) {
-                    widgetChangedCallback.run();
-                }
+                notifyWidgetsChanged();
             }));
         widgets.add(fillModeDropdown);
         y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         
-        // Wire thickness - only for CAGE and WIREFRAME modes
-        boolean showWireControls = currentMode == FillMode.CAGE || currentMode == FillMode.WIREFRAME;
-        if (showWireControls) {
+        // Build other widgets that need visibility checks
+        buildConditionalWidgets(x, y, w, halfW, currentMode);
+        
+        if (needsOffset) {
+            applyBoundsOffset();
+        }
+        
+        Logging.GUI.topic("panel").debug("FillSubPanel rebuilt: {} widgets visible", widgets.size());
+    }
+    
+    /**
+     * Builds conditional widgets based on current fill mode.
+     * These widgets are positioned and added based on visibility rules.
+     */
+    private void buildConditionalWidgets(int x, int y, int w, int halfW, FillMode currentMode) {
+        // Wire thickness (CAGE, WIREFRAME)
+        if (currentMode == FillMode.CAGE || currentMode == FillMode.WIREFRAME) {
             wireThicknessSlider = LabeledSlider.builder("Wire Thickness")
                 .position(x, y).width(w)
                 .range(0.1f, 2f).initial(state.fill().wireThickness()).format("%.1f")
                 .onChange(v -> onUserChange(() -> {
                     state.set("fill.wireThickness", v);
-                    Logging.GUI.topic("fill").trace("Wire thickness: {}", v);
                 })).build();
             widgets.add(wireThicknessSlider);
             y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         }
         
-        // See-Through mode - only for SOLID mode (controls whether mesh blocks objects behind it)
+        // See-Through toggle (SOLID)
         if (currentMode == FillMode.SOLID) {
             depthWriteToggle = GuiWidgets.toggle(x, y, w, "See-Through Mode",
-                !state.fill().depthWrite(), "Enable see-through translucency (disable depth write)", v -> {
-                    onUserChange(() -> {
-                        // Toggle is inverted: "See-Through Mode ON" = depthWrite false
-                        state.set("fill.depthWrite", !v);
-                        Logging.GUI.topic("fill").debug("Depth write: {} (see-through: {})", !v, v);
-                    });
+                !state.fill().depthWrite(), "Enable see-through translucency", v -> {
+                    onUserChange(() -> state.set("fill.depthWrite", !v));
                 });
             widgets.add(depthWriteToggle);
             y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         }
         
-        // Cage settings - only for CAGE mode, dynamic labels from adapter
-        boolean showCageControls = currentMode == FillMode.CAGE;
-        if (showCageControls && cageAdapter.supportsCountOptions()) {
+        // Cage count sliders (CAGE)
+        if (currentMode == FillMode.CAGE && cageAdapter.supportsCountOptions()) {
             primaryCountSlider = LabeledSlider.builder(cageAdapter.primaryLabel())
                 .position(x, y).width(halfW)
                 .range(1, 32).initial(cageAdapter.primaryCount()).format("%d").step(1)
                 .onChange(v -> onUserChange(() -> {
                     cageAdapter = cageAdapter.withPrimaryCount(v.intValue());
                     updateCageInState();
-                    Logging.GUI.topic("fill").trace("Cage primary: {}", v.intValue());
                 })).build();
             widgets.add(primaryCountSlider);
             
@@ -171,16 +193,15 @@ public class FillSubPanel extends AbstractPanel {
                 .onChange(v -> onUserChange(() -> {
                     cageAdapter = cageAdapter.withSecondaryCount(v.intValue());
                     updateCageInState();
-                    Logging.GUI.topic("fill").trace("Cage secondary: {}", v.intValue());
                 })).build();
             widgets.add(secondaryCountSlider);
             y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         }
         
-        // Polyhedron-specific options - only for CAGE mode
-        if (showCageControls && cageAdapter.hasPolyhedronExtras()) {
-            allEdgesToggle = GuiWidgets.toggle(x, y, halfW, "All Edges", 
-                cageAdapter.allEdges(), "Show all structural edges", v -> {
+        // Polyhedron extras (CAGE)
+        if (currentMode == FillMode.CAGE && cageAdapter.hasPolyhedronExtras()) {
+            allEdgesToggle = GuiWidgets.toggle(x, y, halfW, "All Edges",
+                cageAdapter.allEdges(), "Show all edges between faces", v -> {
                     onUserChange(() -> {
                         cageAdapter = cageAdapter.withAllEdges(v);
                         updateCageInState();
@@ -188,8 +209,8 @@ public class FillSubPanel extends AbstractPanel {
                 });
             widgets.add(allEdgesToggle);
             
-            faceOutlinesToggle = GuiWidgets.toggle(x + halfW + GuiConstants.PADDING, y, halfW, 
-                "Face Outlines", cageAdapter.faceOutlines(), "Show face outlines only", v -> {
+            faceOutlinesToggle = GuiWidgets.toggle(x + halfW + GuiConstants.PADDING, y, halfW, "Face Lines",
+                cageAdapter.faceOutlines(), "Show face outline patterns", v -> {
                     onUserChange(() -> {
                         cageAdapter = cageAdapter.withFaceOutlines(v);
                         updateCageInState();
@@ -199,94 +220,96 @@ public class FillSubPanel extends AbstractPanel {
             y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         }
         
-        // Point size - only for POINTS mode
+        // Point size (POINTS)
         if (currentMode == FillMode.POINTS) {
             pointSizeSlider = LabeledSlider.builder("Point Size")
                 .position(x, y).width(w)
                 .range(1f, 10f).initial(state.fill().pointSize()).format("%.1f")
                 .onChange(v -> onUserChange(() -> {
                     state.set("fill.pointSize", v);
-                    Logging.GUI.topic("fill").trace("Point size: {}", v);
                 })).build();
             widgets.add(pointSizeSlider);
             y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
         }
         
-        // Track content height for scrolling
         contentHeight = y - startY;
-        
-        // Reapply bounds offset if rebuilding (not first init)
-        if (needsOffset) {
-            applyBoundsOffset();
-        }
     }
     
-    /** Updates the cage options in state's fill config. */
+    // ═══════════════════════════════════════════════════════════════════════════
+    // STATE MANAGEMENT
+    // ═══════════════════════════════════════════════════════════════════════════
+    
     private void updateCageInState() {
         var newFill = state.fill().toBuilder().cage(cageAdapter.build()).build();
         state.set("fill", newFill);
     }
     
-    @Override public void tick() {}
-    
-    @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Render all widgets directly (no expandable section)
-        for (var widget : widgets) {
-            widget.render(context, mouseX, mouseY, delta);
-        }
-    }
-    
-    public int getHeight() { 
-        return contentHeight; 
-    }
-
     private void onUserChange(Runnable r) {
-        r.run();
-        if (!applyingFragment) {
-            currentFragment = "Custom";
-            if (fragmentDropdown != null) fragmentDropdown.setValue("Custom");
-        }
+        onUserChange(r, fragmentDropdown);
     }
-
+    
     private void applyPreset(String name) {
         if ("Custom".equalsIgnoreCase(name)) {
-            currentFragment = "Custom";
+            currentFragment = name;
             return;
         }
         applyingFragment = true;
         currentFragment = name;
-        FragmentRegistry.applyFillFragment(state, name);
-        syncFromState();
+        
+        if ("Default".equalsIgnoreCase(name)) {
+            // Apply actual default fill config
+            state.set("fill", net.cyberpunk042.field.loader.DefaultsProvider.getDefaultFill());
+        } else {
+            FragmentRegistry.applyFillFragment(state, name);
+        }
+        
+        // Rebuild widgets to show correct fields for new mode (like mode change does)
+        rebuildWidgets();
+        notifyWidgetsChanged();
         applyingFragment = false;
     }
-
+    
+    /** Syncs widget values from state without rebuilding widgets. */
     private void syncFromState() {
-        // Refresh adapter for current shape - use getString to get live value
-        cageAdapter = CageOptionsAdapter.forShape(state.getString("shapeType"), state.fill().cage());
-        
-        // Sync fill mode dropdown
-        if (fillModeDropdown != null) fillModeDropdown.setValue(state.fill().mode());
-        
+        FillMode m = state.fill().mode();
+        if (fillModeDropdown != null) fillModeDropdown.setValue(m);
         if (wireThicknessSlider != null) wireThicknessSlider.setValue(state.fill().wireThickness());
-        if (depthWriteToggle != null) depthWriteToggle.setValue(!state.fill().depthWrite()); // Inverted: See-Through = !depthWrite
+        if (pointSizeSlider != null) pointSizeSlider.setValue(state.fill().pointSize());
+        if (depthWriteToggle != null) depthWriteToggle.setValue(!state.fill().depthWrite());
         
-        // Cage values from adapter
+        // Update cage adapter and sliders
+        cageAdapter = CageOptionsAdapter.forShape(state.getString("shapeType"), state.fill().cage());
         if (primaryCountSlider != null && cageAdapter.supportsCountOptions()) {
             primaryCountSlider.setValue(cageAdapter.primaryCount());
         }
         if (secondaryCountSlider != null && cageAdapter.supportsCountOptions()) {
             secondaryCountSlider.setValue(cageAdapter.secondaryCount());
         }
-        if (allEdgesToggle != null) allEdgesToggle.setValue(cageAdapter.allEdges());
-        if (faceOutlinesToggle != null) faceOutlinesToggle.setValue(cageAdapter.faceOutlines());
-        
-        if (pointSizeSlider != null) pointSizeSlider.setValue(state.fill().pointSize());
+        if (allEdgesToggle != null && cageAdapter.hasPolyhedronExtras()) {
+            allEdgesToggle.setValue(cageAdapter.allEdges());
+        }
+        if (faceOutlinesToggle != null && cageAdapter.hasPolyhedronExtras()) {
+            faceOutlinesToggle.setValue(cageAdapter.faceOutlines());
+        }
+        // NOTE: Do NOT rebuild here - just update values on existing widgets
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // LIFECYCLE
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    @Override 
+    public void tick() {}
+    
+    @Override
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        for (var widget : widgets) {
+            widget.render(context, mouseX, mouseY, delta);
+        }
     }
     
     /** Called when shape type changes - rebuilds widgets with new labels. */
     public void onShapeChanged() {
-        // Re-init to get new labels and options for the new shape
         init(panelWidth, panelHeight);
     }
 }

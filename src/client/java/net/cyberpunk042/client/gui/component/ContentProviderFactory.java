@@ -63,7 +63,9 @@ public class ContentProviderFactory {
      * Creates the Visibility sub-tab content.
      */
     public SubTabPane.ContentProvider visibility() {
-        return new PanelWrapper(new VisibilitySubPanel(parent, state, 0));
+        VisibilitySubPanel panel = new VisibilitySubPanel(parent, state, 0);
+        panel.setWidgetChangedCallback(onWidgetsChanged);
+        return new PanelWrapper(panel);
     }
     
     /**

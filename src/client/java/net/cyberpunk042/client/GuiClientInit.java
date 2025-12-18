@@ -47,6 +47,9 @@ public class GuiClientInit implements ClientModInitializer {
         // G145: Register test field renderer (client-side preview)
         TestFieldRenderer.init();
         
+        // Preload fragment presets so they're ready when GUI opens
+        net.cyberpunk042.client.gui.util.FragmentRegistry.reload();
+        
         // Clear test field on disconnect to prevent double-rendering on rejoin
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register(
             (handler, client) -> {

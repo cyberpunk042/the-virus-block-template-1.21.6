@@ -58,20 +58,10 @@ public class ArrangeSubPanel extends AbstractPanel {
     private TextFieldWidget jumpField;
     private TextFieldWidget saveNameField;
     
-    // Callback for widget refresh (notifies parent to re-register widgets)
-    private Runnable widgetChangedCallback;
-    
     public ArrangeSubPanel(Screen parent, FieldEditState state, TextRenderer textRenderer) {
         super(parent, state);
         this.textRenderer = textRenderer;
         Logging.GUI.topic("panel").debug("ArrangeSubPanel created");
-    }
-    
-    /**
-     * Set callback to notify parent when widgets change (for re-registration).
-     */
-    public void setWidgetChangedCallback(Runnable callback) {
-        this.widgetChangedCallback = callback;
     }
     
     /**
@@ -149,16 +139,7 @@ public class ArrangeSubPanel extends AbstractPanel {
             currentTab = tab;
             Logging.GUI.topic("panel").debug("ArrangeSubPanel switching to tab: {}", tab);
             initWidgets();
-            notifyWidgetsChanged();
-        }
-    }
-    
-    /**
-     * Notify the parent that widgets have changed so it can re-register them.
-     */
-    private void notifyWidgetsChanged() {
-        if (widgetChangedCallback != null) {
-            widgetChangedCallback.run();
+            notifyWidgetsChanged();  // Using inherited method
         }
     }
     

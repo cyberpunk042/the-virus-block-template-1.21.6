@@ -70,6 +70,22 @@ public abstract class AbstractPanel {
      */
     protected int contentHeight = 0;
     
+    // ═══════════════════════════════════════════════════════════════════════════
+    // FRAGMENT/PRESET HANDLING (shared by Fill, Visibility, Animation, Shape)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /** Callback when widgets are rebuilt (for screen widget re-registration). */
+    protected Runnable widgetChangedCallback;
+    
+    /** Current fragment/preset name. */
+    protected String currentFragment = "Custom";
+    
+    /** True while applying a fragment to prevent feedback loops. */
+    protected boolean applyingFragment = false;
+    
+    /** Starting Y position for content. */
+    protected int startY = 0;
+    
     protected AbstractPanel(Screen parent, FieldEditState state) {
         this.parent = parent;
         this.state = state;
@@ -255,6 +271,95 @@ public abstract class AbstractPanel {
      */
     protected void clearWidgets() {
         widgets.clear();
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // FRAGMENT/PRESET METHODS (shared by Fill, Visibility, Animation, Shape)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /** Sets callback for when widgets are rebuilt (for screen widget re-registration). */
+    public void setWidgetChangedCallback(Runnable callback) {
+        this.widgetChangedCallback = callback;
+    }
+    
+    /** Notifies that widgets have changed, triggering re-registration if callback is set. */
+    protected void notifyWidgetsChanged() {
+        if (widgetChangedCallback != null) {
+            widgetChangedCallback.run();
+        }
+    }
+    
+    /**
+     * Wraps a user action, marking fragment as "Custom" if not applying a preset.
+     * Subclasses should call this in widget callbacks to track custom changes.
+     * 
+     * @param action The action to run
+     * @param fragmentDropdown The fragment dropdown to update (may be null)
+     */
+    protected void onUserChange(Runnable action, net.minecraft.client.gui.widget.CyclingButtonWidget<String> fragmentDropdown) {
+        action.run();
+        if (!applyingFragment) {
+            currentFragment = "Custom";
+            if (fragmentDropdown != null) {
+                fragmentDropdown.setValue("Custom");
+            }
+        }
+    }
+    
+    /** @return Current content height for this panel (may be larger than visible height). */
+    public int getContentHeight() {
+        return contentHeight;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // WIDGET POSITIONING HELPERS (for annotation-based visibility)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Positions and adds a widget, returning the next Y position.
+     * 
+     * @param widget The widget to add (may be null)
+     * @param x X position
+     * @param y Y position
+     * @param w Width
+     * @return Next Y position (after widget height + padding)
+     */
+    protected int positionAndAddWidget(ClickableWidget widget, int x, int y, int w) {
+        if (widget == null) return y;
+        widget.setX(x);
+        widget.setY(y);
+        widget.setWidth(w);
+        widgets.add(widget);
+        return y + net.cyberpunk042.client.gui.util.GuiConstants.WIDGET_HEIGHT 
+             + net.cyberpunk042.client.gui.util.GuiConstants.PADDING;
+    }
+    
+    /**
+     * Positions and adds two widgets side-by-side, returning the next Y position.
+     * 
+     * @param left Left widget (may be null)
+     * @param right Right widget (may be null)
+     * @param x Starting X position
+     * @param y Y position
+     * @param halfW Half width (each widget gets this width)
+     * @return Next Y position (after widget height + padding)
+     */
+    protected int positionAndAddWidgetPair(ClickableWidget left, ClickableWidget right, 
+                                            int x, int y, int halfW) {
+        int padding = net.cyberpunk042.client.gui.util.GuiConstants.PADDING;
+        if (left != null) {
+            left.setX(x);
+            left.setY(y);
+            left.setWidth(halfW);
+            widgets.add(left);
+        }
+        if (right != null) {
+            right.setX(x + halfW + padding);
+            right.setY(y);
+            right.setWidth(halfW);
+            widgets.add(right);
+        }
+        return y + net.cyberpunk042.client.gui.util.GuiConstants.WIDGET_HEIGHT + padding;
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
