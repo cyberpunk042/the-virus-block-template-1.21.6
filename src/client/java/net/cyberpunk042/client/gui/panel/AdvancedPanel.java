@@ -178,5 +178,9 @@ public class AdvancedPanel extends AbstractPanel {
         if (shapeSubPanel != null) {
             shapeSubPanel.rebuildForCurrentShape();
         }
+        // Also notify fill panel to update cage control labels for new shape
+        if (fillSubPanel != null) {
+            fillSubPanel.onShapeChanged();
+        }
     }
 }

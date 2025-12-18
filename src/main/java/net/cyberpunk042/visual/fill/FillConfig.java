@@ -114,6 +114,26 @@ public record FillConfig(
         return cage instanceof PolyhedronCageOptions p ? p : null;
     }
     
+    /** Gets cage as DiscCageOptions, or null if not disc cage. */
+    public @Nullable DiscCageOptions discCage() {
+        return cage instanceof DiscCageOptions d ? d : null;
+    }
+    
+    /** Gets cage as RingCageOptions, or null if not ring cage. */
+    public @Nullable RingCageOptions ringCage() {
+        return cage instanceof RingCageOptions r ? r : null;
+    }
+    
+    /** Gets cage as ConeCageOptions, or null if not cone cage. */
+    public @Nullable ConeCageOptions coneCage() {
+        return cage instanceof ConeCageOptions c ? c : null;
+    }
+    
+    /** Gets cage as TorusCageOptions, or null if not torus cage. */
+    public @Nullable TorusCageOptions torusCage() {
+        return cage instanceof TorusCageOptions t ? t : null;
+    }
+    
     // =========================================================================
     // Serialization
     // =========================================================================
@@ -219,6 +239,26 @@ public record FillConfig(
             return this; 
         }
         public Builder polyhedronCage(PolyhedronCageOptions c) { 
+            this.mode = FillMode.CAGE;
+            this.cage = c; 
+            return this; 
+        }
+        public Builder discCage(DiscCageOptions c) { 
+            this.mode = FillMode.CAGE;
+            this.cage = c; 
+            return this; 
+        }
+        public Builder ringCage(RingCageOptions c) { 
+            this.mode = FillMode.CAGE;
+            this.cage = c; 
+            return this; 
+        }
+        public Builder coneCage(ConeCageOptions c) { 
+            this.mode = FillMode.CAGE;
+            this.cage = c; 
+            return this; 
+        }
+        public Builder torusCage(TorusCageOptions c) { 
             this.mode = FillMode.CAGE;
             this.cage = c; 
             return this; 

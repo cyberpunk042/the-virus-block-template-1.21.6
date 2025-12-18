@@ -535,8 +535,15 @@ public class FieldCustomizerScreen extends Screen {
         shapePanelBounds = layout.getShapePanelBounds();
         shapePanel = new ShapeSubPanel(this, state, 0);
         shapePanel.setWarningCallback((w, c) -> { if (statusBar != null) { if (w != null) statusBar.setWarning(w, c); else statusBar.clearWarning(); }});
-        // IMPORTANT: Re-register widgets when shape type changes via dropdown
-        shapePanel.setShapeChangedCallback(this::registerWidgets);
+        // IMPORTANT: Re-register widgets AND rebuild content panels when shape type changes
+        shapePanel.setShapeChangedCallback(() -> {
+            // Rebuild content area (this reinitializes FillSubPanel with new shape adapter)
+            if (contentArea != null) {
+                contentArea.rebuild();
+                contentArea.setActiveMainTab(currentTab);
+            }
+            registerWidgets();
+        });
         shapePanel.init(shapePanelBounds.width(), shapePanelBounds.height());
         shapePanel.setBoundsQuiet(shapePanelBounds);
         shapePanel.applyBoundsOffset();

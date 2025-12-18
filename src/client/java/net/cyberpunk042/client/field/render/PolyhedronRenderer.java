@@ -19,6 +19,16 @@ import net.cyberpunk042.visual.shape.PolyhedronShape;
  *   <li>Icosahedron (20 faces)</li>
  * </ul>
  * 
+ * <h3>Cage vs Wireframe</h3>
+ * <p>For polyhedral shapes, <b>cage mode produces the same output as wireframe</b>.
+ * This is by design: the natural edges of a polyhedron (e.g., 12 edges of a cube,
+ * 30 edges of a dodecahedron) ARE the structural "cage". Unlike curved surfaces
+ * (sphere, torus) where a cage shows parametric grid lines distinct from tessellation
+ * edges, polyhedra have no such secondary structure.</p>
+ * 
+ * <p>If subdivisions are applied (geodesic sphere from icosahedron), a future
+ * enhancement could show only the original base polyhedron edges as the cage.</p>
+ * 
  * <p>Uses {@link PolyhedronTessellator}'s builder pattern for tessellation.</p>
  * 
  * @see PolyhedronShape
@@ -78,5 +88,37 @@ public final class PolyhedronRenderer extends AbstractPrimitiveRenderer {
             .debug("[POLY] Tessellation result");
         
         return mesh;
+    }
+    
+    /**
+     * Cage rendering for polyhedra intentionally uses wireframe.
+     * 
+     * <p>For Platonic solids, the natural edges ARE the structural cage.
+     * There is no distinct "cage" separate from wireframe because:</p>
+     * <ul>
+     *   <li>Cube has 12 edges that define its shape</li>
+     *   <li>Tetrahedron has 6 edges</li>
+     *   <li>Octahedron has 12 edges</li>
+     *   <li>Icosahedron has 30 edges</li>
+     *   <li>Dodecahedron has 30 edges</li>
+     * </ul>
+     * 
+     * <p>Unlike curved surfaces (sphere, torus) where cage shows parametric
+     * grid lines distinct from tessellation edges, polyhedra have no such
+     * secondary parametric structure.</p>
+     */
+    @Override
+    protected void emitCage(
+            net.minecraft.client.util.math.MatrixStack matrices,
+            net.minecraft.client.render.VertexConsumer consumer,
+            net.cyberpunk042.client.visual.mesh.Mesh mesh,
+            int color,
+            int light,
+            net.cyberpunk042.visual.fill.FillConfig fill,
+            Primitive primitive,
+            net.cyberpunk042.visual.animation.WaveConfig waveConfig,
+            float time) {
+        // Polyhedra: cage = wireframe by design (edges ARE the structure)
+        emitWireframe(matrices, consumer, mesh, color, light, fill, waveConfig, time);
     }
 }

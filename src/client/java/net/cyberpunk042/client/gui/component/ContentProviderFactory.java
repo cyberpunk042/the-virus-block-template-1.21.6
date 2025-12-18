@@ -47,7 +47,9 @@ public class ContentProviderFactory {
      * Creates the Fill sub-tab content.
      */
     public SubTabPane.ContentProvider fill() {
-        return new PanelWrapper(new FillSubPanel(parent, state, 0));
+        FillSubPanel panel = new FillSubPanel(parent, state, 0);
+        panel.setWidgetChangedCallback(onWidgetsChanged);
+        return new PanelWrapper(panel);
     }
     
     /**

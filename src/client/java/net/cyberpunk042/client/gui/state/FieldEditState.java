@@ -444,8 +444,9 @@ public class FieldEditState {
     public String getShapeType() { return shapeAdapter.shapeType(); }
     public void setShapeType(String type) { shapeAdapter.setShapeType(type); markDirty(); }
     
-    // shapeType field access (used by FillSubPanel)
-    public String shapeType = "sphere";
+    // shapeType field access (used by FillSubPanel) - MUST return live value from adapter!
+    // This was a bug: it was a static field initialized to "sphere" that never updated
+    public String getShapeTypeField() { return shapeAdapter.shapeType(); }
     
     // ProfileSnapshot type alias for import compatibility
     public static class ProfileSnapshot extends ProfileManager.ProfileSnapshot {

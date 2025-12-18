@@ -9,19 +9,28 @@ import net.cyberpunk042.visual.validation.ValueRange;
  * <p>Cage mode renders a structured grid rather than all tessellation edges.
  * Each shape type has its own implementation with shape-specific options.</p>
  * 
- * <h2>Implementations</h2>
+ * <h2>Curved Surface Shapes (Distinct Cage)</h2>
  * <ul>
  *   <li>{@link SphereCageOptions} - Latitude/longitude grid</li>
- *   <li>{@link PrismCageOptions} - Vertical lines and horizontal rings</li>
  *   <li>{@link CylinderCageOptions} - Vertical lines and horizontal rings</li>
- *   <li>{@link PolyhedronCageOptions} - Edges and face outlines</li>
+ *   <li>{@link PrismCageOptions} - Vertical edges and horizontal rings</li>
+ *   <li>{@link ConeCageOptions} - Radial lines to apex and base ring</li>
+ *   <li>{@link DiscCageOptions} - Radial lines and concentric rings</li>
+ *   <li>{@link RingCageOptions} - Radial lines with inner/outer rings</li>
+ *   <li>{@link TorusCageOptions} - Major and minor rings</li>
+ * </ul>
+ * 
+ * <h2>Polyhedral Shapes (Cage = Wireframe)</h2>
+ * <ul>
+ *   <li>{@link PolyhedronCageOptions} - Natural edges (same as wireframe)</li>
  * </ul>
  * 
  * @see FillConfig
  * @see FillMode#CAGE
  */
 public sealed interface CageOptions 
-    permits SphereCageOptions, PrismCageOptions, CylinderCageOptions, PolyhedronCageOptions {
+    permits SphereCageOptions, PrismCageOptions, CylinderCageOptions, PolyhedronCageOptions,
+            DiscCageOptions, RingCageOptions, ConeCageOptions, TorusCageOptions {
     
     /** Line width for cage rendering. */
     @Range(ValueRange.POSITIVE_NONZERO) 
@@ -33,3 +42,4 @@ public sealed interface CageOptions
     /** Default line width. */
     float DEFAULT_LINE_WIDTH = 1.0f;
 }
+
