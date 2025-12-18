@@ -66,6 +66,8 @@ public final class SourceControlService {
 	public void forceContainmentReset() {
 		ServerWorld world = host.world();
 		sourceService.forceContainmentReset(sourceState);
+		// End the infection when health is depleted (triggers cleanse)
+		host.infectionLifecycle().endInfection();
 	}
 
 	public void endInfection() {

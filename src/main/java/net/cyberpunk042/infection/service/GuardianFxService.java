@@ -6,6 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.cyberpunk042.infection.api.EffectBus;
 import net.cyberpunk042.infection.events.GuardianBeamEvent;
+import net.cyberpunk042.util.VirusEquipmentHelper;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -69,8 +70,10 @@ public final class GuardianFxService {
 				horizontal = new Vec3d(Math.cos(angle), 0.0D, Math.sin(angle));
 			}
 			if (applyKnockback) {
-				Vec3d pushVec = horizontal.normalize().multiply(baseStrength);
-				player.addVelocity(pushVec.x, verticalBoost, pushVec.z);
+				// Heavy Pants reduce push by 80%
+				double strengthMultiplier = VirusEquipmentHelper.hasHeavyPants(player) ? 0.2D : 1.0D;
+				Vec3d pushVec = horizontal.normalize().multiply(baseStrength * strengthMultiplier);
+				player.addVelocity(pushVec.x, verticalBoost * strengthMultiplier, pushVec.z);
 				player.velocityModified = true;
 			}
 			if (spawnGuardian && guardian.beams) {

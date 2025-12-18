@@ -174,6 +174,25 @@ public final class TierModule {
 		service.setHealthScale(state, scale);
 	}
 
+	/**
+	 * Increases the health scale by 1.0 (for each additional virus block).
+	 * This effectively doubles, triples, etc. the max health.
+	 * Current health is scaled proportionally to maintain the same health percentage.
+	 */
+	public void increaseHealthScaleForAdditionalSource() {
+		double currentScale = healthScale();
+		double newScale = currentScale + 1.0D;
+		InfectionTier tier = currentTier();
+		double previousMax = maxHealth(tier);
+		double healthPercent = previousMax > 0.0D ? currentHealth() / previousMax : 1.0D;
+		
+		setHealthScale(newScale);
+		
+		// Scale current health to maintain the same percentage
+		double newMax = maxHealth(tier);
+		setCurrentHealth(healthPercent * newMax);
+	}
+
 	public int duration(InfectionTier tier) {
 		return service.getTierDuration(state, tier);
 	}

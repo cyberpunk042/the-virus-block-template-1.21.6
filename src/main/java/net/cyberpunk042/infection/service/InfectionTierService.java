@@ -126,7 +126,8 @@ public final class InfectionTierService {
 
 	public double getMaxHealth(State state, InfectionTier tier) {
 		double base = Math.max(1.0D, tier.getBaseHealth());
-		double scale = MathHelper.clamp(state.healthScale <= 0.0D ? 1.0D : state.healthScale, 0.1D, 2.5D);
+		// Scale capped at 10.0 to support up to 10 virus blocks (1.0 per block)
+		double scale = MathHelper.clamp(state.healthScale <= 0.0D ? 1.0D : state.healthScale, 0.1D, 10.0D);
 		return Math.max(1.0D, base * scale);
 	}
 

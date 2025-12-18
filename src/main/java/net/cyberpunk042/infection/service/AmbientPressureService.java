@@ -68,6 +68,10 @@ public final class AmbientPressureService {
 			return;
 		}
 		int tierIndex = tier.getIndex();
+		// No mob spawning at tier 1 - start at tier 2
+		if (tierIndex < 1) {
+			return;
+		}
 		float tierMultiplier = tier.getMobSpawnMultiplier();
 		float scaledAttempts = difficultyScale * tierMultiplier;
 		if (host.tiers().isApocalypseMode()) {

@@ -22,7 +22,7 @@ import net.minecraft.util.math.random.Random;
  * low-level block-wrangling.
  */
 public final class ShellRebuildService {
-	private static final long BASE_SHELL_DELAY = 200L;
+	private static final long BASE_SHELL_DELAY = 0L;
 	private static final long RADIUS_DELAY = 60L;
 	private static final long LOW_TIER_DELAY = 80L;
 	private static final long SHELL_JITTER = 60L;

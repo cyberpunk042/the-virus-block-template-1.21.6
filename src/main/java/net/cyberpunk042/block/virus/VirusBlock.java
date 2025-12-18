@@ -64,6 +64,15 @@ public class VirusBlock extends BlockWithEntity {
 		if (world instanceof ServerWorld serverWorld) {
 			VirusWorldState virusState = VirusWorldState.get(serverWorld);
 			virusState.sources().registerSource(virusState.sourceState(), pos);
+			
+			// Start the infection event if not already infected
+			if (!virusState.infectionState().infected()) {
+				virusState.infectionLifecycle().startInfection(pos);
+			} else {
+				// Additional virus block: double the health (x2, x3, x4, etc.)
+				virusState.tiers().increaseHealthScaleForAdditionalSource();
+				virusState.markDirty();
+			}
 		}
 	}
 

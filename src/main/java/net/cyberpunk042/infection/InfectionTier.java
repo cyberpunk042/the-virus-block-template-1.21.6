@@ -3,11 +3,11 @@ package net.cyberpunk042.infection;
 import java.util.Arrays;
 
 public enum InfectionTier {
-	ONE(0, 2400, 3, 4.5F, 120.0D, 0.25F, 0.35F),
-	TWO(1, 3600, 5, 5.5F, 220.0D, 0.5F, 0.6F),
-	THREE(2, 4800, 7, 6.5F, 320.0D, 0.85F, 0.9F),
-	FOUR(3, 3600, 9, 8.0F, 420.0D, 1.1F, 1.2F),
-	FIVE(4, 4800, 12, 10.0F, 600.0D, 1.4F, 1.5F);
+	ONE(0, 2400, 3, 4.5F, 120.0D, 0.25F, 0.0F),
+	TWO(1, 3600, 5, 5.5F, 220.0D, 0.5F, 0.25F),
+	THREE(2, 4800, 7, 6.5F, 320.0D, 0.85F, 0.5F),
+	FOUR(3, 3600, 9, 8.0F, 420.0D, 1.1F, 0.85F),
+	FIVE(4, 4800, 12, 10.0F, 600.0D, 1.4F, 1.2F);
 
 	private final int index;
 	private final int durationTicks;
