@@ -331,4 +331,70 @@ public final class GeometryMath {
         
         return new Vector3f(nx, ny, nz);
     }
+    
+    // =========================================================================
+    // Vector Array Utilities (for tessellators using float[] vertices)
+    // =========================================================================
+    
+    /**
+     * Subtracts vector b from vector a.
+     * @param a First vector [x, y, z]
+     * @param b Second vector [x, y, z]
+     * @return New vector a - b
+     */
+    public static float[] subtract(float[] a, float[] b) {
+        return new float[]{a[0] - b[0], a[1] - b[1], a[2] - b[2]};
+    }
+    
+    /**
+     * Computes the cross product of two vectors.
+     * @param a First vector [x, y, z]
+     * @param b Second vector [x, y, z]
+     * @return New vector a × b
+     */
+    public static float[] crossProduct(float[] a, float[] b) {
+        return new float[]{
+            a[1] * b[2] - a[2] * b[1],  // x = ay*bz - az*by
+            a[2] * b[0] - a[0] * b[2],  // y = az*bx - ax*bz
+            a[0] * b[1] - a[1] * b[0]   // z = ax*by - ay*bx
+        };
+    }
+    
+    /**
+     * Normalizes a vector in place.
+     * @param v Vector to normalize [x, y, z] - modified in place
+     */
+    public static void normalizeInPlace(float[] v) {
+        float length = (float) Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+        if (length > 0.0001f) {
+            v[0] /= length;
+            v[1] /= length;
+            v[2] /= length;
+        }
+    }
+    
+    /**
+     * Returns the length of a vector.
+     * @param v Vector [x, y, z]
+     * @return Euclidean length
+     */
+    public static float length(float[] v) {
+        return (float) Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+    }
+    
+    /**
+     * Scales vertex positions by a factor.
+     * @param vertices Array of vertex positions
+     * @param scale Scale factor
+     * @return New array of scaled vertices
+     */
+    public static float[][] scaleVertices(float[][] vertices, float scale) {
+        float[][] scaled = new float[vertices.length][3];
+        for (int i = 0; i < vertices.length; i++) {
+            scaled[i][0] = vertices[i][0] * scale;
+            scaled[i][1] = vertices[i][1] * scale;
+            scaled[i][2] = vertices[i][2] * scale;
+        }
+        return scaled;
+    }
 }
