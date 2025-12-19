@@ -1,6 +1,0 @@
-{
-  "name": "Corners Only",
-  "description": "Only corner/vertex edges",
-  "cellType": "EDGE",
-  "pattern": "corners"
-}

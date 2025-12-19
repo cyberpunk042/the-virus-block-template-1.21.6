@@ -1,9 +1,0 @@
-{
-    "name": "Default",
-    "description": "Standard capsule (pill shape)",
-    "type": "capsule",
-    "radius": 0.5,
-    "height": 2.0,
-    "segments": 32,
-    "rings": 16
-}

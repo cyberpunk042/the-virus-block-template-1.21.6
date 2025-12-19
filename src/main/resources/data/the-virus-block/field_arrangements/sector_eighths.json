@@ -1,8 +1,0 @@
-{
-  "name": "Eighths",
-  "description": "Eight pie pieces",
-  "cellType": "SECTOR",
-  "pattern": "uniform",
-  "count": 8,
-  "gapRatio": 0.3
-}

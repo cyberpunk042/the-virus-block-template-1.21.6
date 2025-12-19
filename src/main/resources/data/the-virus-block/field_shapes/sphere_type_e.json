@@ -1,9 +1,0 @@
-{
-  "name": "Sphere Type E",
-  "description": "TYPE_E icosphere tessellation",
-  "type": "sphere",
-  "radius": 1.0,
-  "latSteps": 32,
-  "lonSteps": 64,
-  "algorithm": "TYPE_E"
-}

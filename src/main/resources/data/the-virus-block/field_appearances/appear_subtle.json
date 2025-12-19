@@ -1,8 +1,0 @@
-{
-  "name": "Subtle",
-  "description": "Low visibility, faint",
-  "color": "@primary",
-  "alpha": 0.4,
-  "glow": 0.1,
-  "saturation": 0.7
-}

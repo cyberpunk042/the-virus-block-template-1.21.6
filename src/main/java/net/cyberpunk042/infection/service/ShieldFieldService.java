@@ -302,6 +302,12 @@ public final class ShieldFieldService {
 	}
 
 	private void openSkyshaft(ServerWorld world, BlockPos center) {
+		// Schedule the expensive skyshaft clearing for the next tick
+		// so it doesn't block the shield spawn packet
+		world.getServer().execute(() -> openSkyshaftSync(world, center));
+	}
+	
+	private void openSkyshaftSync(ServerWorld world, BlockPos center) {
 		BlockPos.Mutable cursor = new BlockPos.Mutable();
 		int ceiling = world.getBottomY() + world.getDimension().height();
 		for (int y = center.getY() + 2; y < ceiling; y++) {

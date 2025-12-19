@@ -1,7 +1,0 @@
-{
-  "name": "4 Bands",
-  "description": "4 horizontal bands",
-  "mask": "BANDS",
-  "count": 4,
-  "thickness": 0.5
-}

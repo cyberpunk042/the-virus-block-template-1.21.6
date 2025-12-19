@@ -84,6 +84,15 @@ public final class FieldClientInit {
         // This bridges ProfileManager (client GUI) with FieldRegistry (renderer)
         registerBundledServerProfiles();
         
+        // Initialize join warmup manager (handles warmup on server join)
+        JoinWarmupManager.init();
+        
+        // Tick the warmup manager
+        ClientTickEvents.END_CLIENT_TICK.register(client -> JoinWarmupManager.tick());
+        
+        // Register warmup overlay HUD
+        WarmupOverlay.init();
+        
         Logging.RENDER.topic("field").info("Field client initialized (render + tick events registered)");
     }
     
@@ -289,6 +298,49 @@ public final class FieldClientInit {
         
         Logging.RENDER.topic("field").info(
             "Registered {} bundled SERVER profiles into FieldRegistry", registered);
+        
+        // Warm up the rendering pipeline so first spawn is fast
+        warmupRenderingPipeline();
+    }
+    
+    /**
+     * Pre-tessellates common shapes to trigger JIT compilation.
+     * This ensures the first actual field spawn renders instantly.
+     */
+    private static void warmupRenderingPipeline() {
+        long start = System.currentTimeMillis();
+        
+        try {
+            // Warm up sphere tessellation (most common shape)
+            // Using similar params to anti_virus profile
+            var sphereShape = net.cyberpunk042.visual.shape.SphereShape.builder()
+                .radius(12.0f)
+                .latSteps(19)
+                .lonSteps(23)
+                .algorithm(net.cyberpunk042.visual.shape.SphereAlgorithm.LAT_LON)
+                .build();
+            
+            // Tessellate without pattern (warmup vertex generation)
+            net.cyberpunk042.client.visual.mesh.Mesh mesh1 = 
+                net.cyberpunk042.client.visual.mesh.SphereTessellator.tessellate(sphereShape);
+            
+            // Also warm up with a pattern (different code path)
+            net.cyberpunk042.client.visual.mesh.Mesh mesh2 = 
+                net.cyberpunk042.client.visual.mesh.SphereTessellator.tessellate(
+                    sphereShape, 
+                    net.cyberpunk042.visual.pattern.QuadPattern.STRIPE_1,
+                    null, null, 0);
+            
+            long took = System.currentTimeMillis() - start;
+            Logging.RENDER.topic("field").info(
+                "Rendering pipeline warmup complete: {}ms (mesh1={} verts, mesh2={} verts)",
+                took, 
+                mesh1 != null ? mesh1.vertexCount() : 0,
+                mesh2 != null ? mesh2.vertexCount() : 0);
+                
+        } catch (Exception e) {
+            Logging.RENDER.topic("field").warn("Warmup failed (non-critical): {}", e.getMessage());
+        }
     }
     
     public static boolean isInitialized() {

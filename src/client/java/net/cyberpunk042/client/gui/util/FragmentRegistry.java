@@ -111,7 +111,11 @@ public final class FragmentRegistry {
         ensureLoaded();
     }
 
-    private static synchronized void ensureLoaded() {
+    /**
+     * Ensures presets are loaded (loads on first call, cached thereafter).
+     * Use this for normal initialization - only reloads if not yet loaded.
+     */
+    public static synchronized void ensureLoaded() {
         if (loaded) return;
 
         // Create folders if they don't exist

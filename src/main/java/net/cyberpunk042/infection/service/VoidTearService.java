@@ -47,7 +47,15 @@ public final class VoidTearService {
 	private static final int VOID_TEAR_PULL_NOTICE_INTERVAL = 5;
 	private static final int MAX_PLAYER_OFFSET_ATTEMPTS = 12;
 	private static final int SAMPLE_ATTEMPTS = 6;
-	private static final double TEAR_BURST_VERTICAL_BOOST = 0.35D;
+	private static final double TEAR_BURST_VERTICAL_BOOST = 0.25D;
+	
+	// Force application settings
+	private static final int FORCE_APPLY_INTERVAL = 4;  // Apply force every 4 ticks
+	private static final double MAX_VELOCITY = 1.2D;     // Cap velocity magnitude
+	private static final double EFFECT_RADIUS = 12.0D;   // Pull from 12 blocks away
+	private static final double ORBITAL_STRENGTH = 0.08D; // Tangential force for orbit
+	private static final double PULL_STRENGTH = 0.12D;    // Radial pull strength
+	private static final double PUSH_STRENGTH = 0.6D;     // Final burst push strength
 
 	private final VirusWorldState host;
 	private final List<VoidTearInstance> activeTears = new ArrayList<>();
@@ -128,11 +136,12 @@ public final class VoidTearService {
 
 	private void createVoidTear(ServerWorld world, BlockPos basePos, InfectionTier tier, String source) {
 		BlockPos tearPos = basePos.toImmutable();
-		double radius = (8.0D + tier.getIndex() * 2.0D) * 0.7D;
-		double pullStrength = 0.25D + tier.getIndex() * 0.08D;
-		double damageRadius = Math.max(2.0D, radius * 0.4D);
-		float damage = 1.5F + tier.getIndex() * 0.75F;
-		int durationTicks = 100;
+		// Fixed values - no tier scaling
+		double radius = EFFECT_RADIUS;
+		double pullStrength = PULL_STRENGTH;
+		double damageRadius = 3.0D;  // Fixed damage radius
+		float damage = 2.0F;          // Fixed damage
+		int durationTicks = 120;      // 6 seconds total
 		long activationTick = world.getTime() + VOID_TEAR_WARNING_DELAY;
 		long tearId = ++nextTearId;
 		pendingTears.add(new PendingVoidTear(
@@ -280,72 +289,129 @@ public final class VoidTearService {
 	}
 
 	private boolean finalBlastPhase(double lifeFraction) {
-		return lifeFraction >= 0.65D;
+		// Only final blast on expiry, pull phase is 0-85%
+		return lifeFraction >= 0.85D;
 	}
 
 	private int applyForce(ServerWorld world, VoidTearInstance tear, boolean finalBlast) {
 		long now = world.getTime();
-		double effectRadius = Math.max(6.0D, tear.radius() * 1.4D);
+		
+		// Only apply force every FORCE_APPLY_INTERVAL ticks (unless final blast)
+		if (!finalBlast && now % FORCE_APPLY_INTERVAL != 0) {
+			return 0;
+		}
+		
+		double effectRadius = EFFECT_RADIUS;
 		Box box = new Box(tear.centerBlock()).expand(effectRadius);
 		int affected = 0;
+		
 		for (LivingEntity living : world.getEntitiesByClass(LivingEntity.class, box, Entity::isAlive)) {
 			if (host.shieldFieldService().isShielding(living.getBlockPos())) {
 				continue;
 			}
+			
 			Vec3d center = tear.centerVec();
-			Vec3d offset;
-			long ticksRemaining = tear.expiryTick() - now;
-			double duration = Math.max(1.0D, tear.durationTicks());
-			double lifeFrac = MathHelper.clamp(1.0D - (ticksRemaining / duration), 0.0D, 1.0D);
-			boolean pushPhase = finalBlast || finalBlastPhase(lifeFrac);
-			boolean pullPhase = !pushPhase && lifeFrac < 0.5D;
-			if (!pullPhase && !pushPhase) {
+			Vec3d entityPos = living.getPos().add(0, living.getHeight() / 2, 0); // Center of entity
+			Vec3d toCenter = center.subtract(entityPos);
+			double distance = toCenter.length();
+			
+			if (distance < 0.5D || distance > effectRadius) {
 				continue;
 			}
-			offset = pushPhase ? living.getPos().subtract(center) : center.subtract(living.getPos());
-			double distanceSq = offset.lengthSquared();
-			if (distanceSq < 1.0E-4) {
-				continue;
-			}
-			double distance = Math.sqrt(distanceSq);
-			if (distance > effectRadius) {
-				continue;
-			}
+			
 			if (living instanceof ServerPlayerEntity player && VirusEquipmentHelper.hasHeavyPants(player)) {
 				accumulateHeavyPantsWear(player);
 				continue;
 			}
+			
+			// Calculate life fraction
+			long ticksRemaining = tear.expiryTick() - now;
+			double duration = Math.max(1.0D, tear.durationTicks());
+			double lifeFrac = MathHelper.clamp(1.0D - (ticksRemaining / duration), 0.0D, 1.0D);
+			
+			// Proximity factor: stronger when closer
 			double proximity = 1.0D - Math.min(1.0D, distance / effectRadius);
-			Vec3d direction = offset.normalize();
-			double baseStrength = tear.pullStrength() * (pushPhase ? 4.2D : 3.2D);
-			double strength = baseStrength * (0.15D + 0.85D * proximity);
-			Vec3d impulse = direction.multiply(strength);
-			double vertical = MathHelper.clamp(impulse.y + (pushPhase ? TEAR_BURST_VERTICAL_BOOST * 0.5D : 0.0D),
-					-0.25D,
-					0.25D);
-			living.addVelocity(impulse.x, vertical, impulse.z);
+			Vec3d radialDir = toCenter.normalize();
+			
+			Vec3d impulse;
+			
+			if (finalBlast) {
+				// FINAL BURST: Push outward based on current position
+				// Entities orbiting will be flung in their orbit direction
+				Vec3d velocity = living.getVelocity();
+				Vec3d pushDir = radialDir.multiply(-1); // Away from center
+				
+				// Add some of current velocity direction for "slingshot" effect
+				if (velocity.lengthSquared() > 0.01) {
+					pushDir = pushDir.add(velocity.normalize().multiply(0.5)).normalize();
+				}
+				
+				double pushForce = PUSH_STRENGTH * (0.5 + 0.5 * proximity);
+				impulse = pushDir.multiply(pushForce);
+				
+				// Add vertical boost based on proximity
+				double vertBoost = TEAR_BURST_VERTICAL_BOOST * proximity;
+				impulse = impulse.add(0, vertBoost, 0);
+				
+			} else if (lifeFrac < 0.85D) {
+				// PULL + ORBIT PHASE: Pull toward center with tangential orbit force
+				
+				// Radial pull force (toward center)
+				double pullForce = PULL_STRENGTH * (0.3 + 0.7 * proximity);
+				Vec3d pullImpulse = radialDir.multiply(pullForce);
+				
+				// Tangential orbit force (perpendicular to radial, in XZ plane)
+				// This creates the swirling/orbit effect
+				Vec3d tangent = new Vec3d(-radialDir.z, 0, radialDir.x).normalize();
+				double orbitForce = ORBITAL_STRENGTH * proximity;
+				Vec3d orbitImpulse = tangent.multiply(orbitForce);
+				
+				// Combine forces
+				impulse = pullImpulse.add(orbitImpulse);
+				
+				// Slight upward lift to keep entities from dragging on ground
+				if (living.isOnGround() && proximity > 0.3) {
+					impulse = impulse.add(0, 0.05, 0);
+				}
+			} else {
+				// 85-100%: Holding phase before burst (reduced pull)
+				impulse = radialDir.multiply(PULL_STRENGTH * 0.3 * proximity);
+			}
+			
+			// Apply impulse with velocity capping
+			Vec3d newVel = living.getVelocity().add(impulse);
+			double speed = newVel.horizontalLength();
+			if (speed > MAX_VELOCITY) {
+				double scale = MAX_VELOCITY / speed;
+				newVel = new Vec3d(newVel.x * scale, newVel.y, newVel.z * scale);
+			}
+			newVel = new Vec3d(newVel.x, MathHelper.clamp(newVel.y, -0.8, 0.8), newVel.z);
+			
+			living.setVelocity(newVel);
 			living.velocityModified = true;
 			living.velocityDirty = true;
 			living.fallDistance = 0.0F;
 			affected++;
-			if (pullPhase && distanceSq <= tear.damageRadiusSq()) {
+			
+			// Damage in core
+			if (distance * distance <= tear.damageRadiusSq()) {
 				living.damage(world, world.getDamageSources().explosion(null, null), tear.damage());
 			}
 		}
+		
+		// Items: gentle pull toward center
 		for (ItemEntity item : world.getEntitiesByClass(ItemEntity.class, box, entity -> !entity.isRemoved())) {
 			Vec3d delta = tear.centerVec().subtract(item.getPos());
 			double distance = delta.length();
-			if (distance < 0.1D) {
+			if (distance < 0.5D || distance > effectRadius) {
 				continue;
 			}
-			double proximity = 1.0D - Math.min(1.0D, distance / effectRadius);
-			if (proximity <= 0.0D) {
-				continue;
-			}
-			Vec3d impulse = delta.normalize().multiply(tear.pullStrength() * 0.5D * proximity);
+			double proximity = 1.0D - (distance / effectRadius);
+			Vec3d impulse = delta.normalize().multiply(0.04 * proximity);
 			item.addVelocity(impulse.x, impulse.y * 0.1D, impulse.z);
 			item.velocityDirty = true;
 		}
+		
 		return affected;
 	}
 

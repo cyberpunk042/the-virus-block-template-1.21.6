@@ -1,8 +1,0 @@
-{
-  "name": "Thirds",
-  "description": "Three equal segments with gaps",
-  "cellType": "SEGMENT",
-  "pattern": "uniform",
-  "count": 3,
-  "gapRatio": 0.5
-}

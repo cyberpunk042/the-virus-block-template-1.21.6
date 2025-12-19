@@ -211,14 +211,42 @@ public class ProfileManager {
     
     /**
      * Load local profiles from config directory.
+     * - config/the-virus-block/field_profiles/*.json = Override SERVER profiles (loaded as SERVER source)
+     * - config/the-virus-block/field_profiles/local/*.json = User's LOCAL profiles
      */
     private void loadLocal() {
-        Path localDir = getLocalProfileDir();
+        Path rootDir = getProfilesRootDir();
+        
+        // Create directory if needed
+        if (!Files.isDirectory(rootDir)) {
+            try {
+                Files.createDirectories(rootDir);
+            } catch (IOException e) {
+                TheVirusBlock.LOGGER.error("Failed to create profiles directory", e);
+            }
+            return;
+        }
+        
+        // Load profiles from ROOT (can override bundled SERVER profiles)
+        TheVirusBlock.LOGGER.info("Loading config override profiles from: {}", rootDir);
+        try (Stream<Path> files = Files.list(rootDir)) {
+            files.filter(Files::isRegularFile)
+                .filter(p -> p.toString().endsWith(".json"))
+                .forEach(file -> {
+                    TheVirusBlock.LOGGER.debug("Loading config profile: {}", file);
+                    loadProfileFromPath(file, ProfileSource.SERVER); // Use SERVER source to override bundled
+                });
+        } catch (IOException e) {
+            TheVirusBlock.LOGGER.error("Failed to scan root profiles", e);
+        }
+        
+        // Load profiles from LOCAL subfolder (user's own profiles)
+        Path localDir = rootDir.resolve("local");
         if (!Files.isDirectory(localDir)) {
             try {
                 Files.createDirectories(localDir);
             } catch (IOException e) {
-                TheVirusBlock.LOGGER.error("Failed to create local profiles directory", e);
+                TheVirusBlock.LOGGER.debug("Could not create local directory");
             }
             return;
         }

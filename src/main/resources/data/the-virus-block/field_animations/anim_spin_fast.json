@@ -1,9 +1,0 @@
-{
-  "name": "Spin Fast",
-  "description": "Fast Y-axis rotation",
-  "spin": {
-    "axis": "Y",
-    "speed": 90.0,
-    "oscillate": false
-  }
-}

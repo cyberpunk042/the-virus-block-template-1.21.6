@@ -1,8 +1,0 @@
-{
-  "name": "Cylinder Default",
-  "description": "Standard cylinder",
-  "type": "cylinder",
-  "radius": 0.5,
-  "height": 2.0,
-  "segments": 32
-}

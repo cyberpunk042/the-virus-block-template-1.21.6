@@ -1,9 +1,0 @@
-{
-  "name": "Prediction Subtle",
-  "description": "Minimal prediction",
-  "enabled": true,
-  "leadTicks": 1,
-  "maxDistance": 2.0,
-  "lookAhead": false,
-  "verticalBoost": 1.0
-}

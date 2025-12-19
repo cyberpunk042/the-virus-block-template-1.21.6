@@ -1,7 +1,0 @@
-{
-  "name": "Diagonal Grid",
-  "description": "Diagonal edge pattern",
-  "cellType": "EDGE",
-  "pattern": "diagonal",
-  "angle": 45
-}

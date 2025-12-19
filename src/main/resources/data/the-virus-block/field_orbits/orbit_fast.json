@@ -1,9 +1,0 @@
-{
-  "name": "Orbit Fast",
-  "description": "Fast orbiting",
-  "enabled": true,
-  "radius": 1.5,
-  "speed": 3.0,
-  "axis": "Y",
-  "phase": 0.0
-}

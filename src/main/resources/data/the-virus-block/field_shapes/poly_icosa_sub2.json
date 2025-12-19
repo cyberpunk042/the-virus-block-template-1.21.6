@@ -1,8 +1,0 @@
-{
-  "name": "Icosahedron Smooth",
-  "description": "Icosahedron with 2 subdivisions",
-  "type": "polyhedron",
-  "polyType": "ICOSAHEDRON",
-  "radius": 1.0,
-  "subdivisions": 2
-}

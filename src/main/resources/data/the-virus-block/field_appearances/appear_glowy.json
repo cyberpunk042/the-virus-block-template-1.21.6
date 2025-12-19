@@ -1,8 +1,0 @@
-{
-  "name": "Glowy",
-  "description": "High glow effect",
-  "color": "@primary",
-  "alpha": 0.9,
-  "glow": 0.8,
-  "emissive": 0.3
-}

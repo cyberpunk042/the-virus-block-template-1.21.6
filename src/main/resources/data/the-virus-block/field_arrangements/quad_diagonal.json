@@ -1,7 +1,0 @@
-{
-  "name": "Diagonal",
-  "description": "Diagonal stripe pattern",
-  "cellType": "QUAD",
-  "pattern": "diagonal",
-  "angle": 45
-}

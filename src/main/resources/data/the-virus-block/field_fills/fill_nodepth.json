@@ -1,8 +1,0 @@
-{
-  "name": "No Depth Test",
-  "description": "Always visible through geometry",
-  "mode": "SOLID",
-  "doubleSided": true,
-  "depthTest": false,
-  "depthWrite": false
-}

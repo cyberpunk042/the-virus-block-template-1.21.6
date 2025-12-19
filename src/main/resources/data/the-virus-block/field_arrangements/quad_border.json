@@ -1,7 +1,0 @@
-{
-  "name": "Border Only",
-  "description": "Only edge quads of surface",
-  "cellType": "QUAD",
-  "pattern": "border",
-  "thickness": 1
-}

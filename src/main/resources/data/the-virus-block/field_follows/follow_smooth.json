@@ -1,7 +1,0 @@
-{
-  "name": "Follow Smooth",
-  "description": "Smooth interpolated following",
-  "enabled": true,
-  "mode": "SMOOTH",
-  "playerOverride": false
-}

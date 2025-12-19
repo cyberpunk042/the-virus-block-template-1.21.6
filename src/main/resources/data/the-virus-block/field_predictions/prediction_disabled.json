@@ -1,9 +1,0 @@
-{
-  "name": "Prediction Off",
-  "description": "No prediction",
-  "enabled": false,
-  "leadTicks": 0,
-  "maxDistance": 0.0,
-  "lookAhead": false,
-  "verticalBoost": 1.0
-}

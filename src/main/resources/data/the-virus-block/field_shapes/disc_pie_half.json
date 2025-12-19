@@ -1,9 +1,0 @@
-{
-  "name": "Disc Half",
-  "description": "Half disc",
-  "type": "disc",
-  "radius": 1.0,
-  "segments": 32,
-  "arcStart": 0,
-  "arcEnd": 180
-}

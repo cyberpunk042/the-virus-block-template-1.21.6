@@ -1,7 +1,0 @@
-{
-  "name": "Follow Ghost",
-  "description": "Ghost-like floating behavior",
-  "enabled": true,
-  "mode": "GHOST",
-  "playerOverride": false
-}

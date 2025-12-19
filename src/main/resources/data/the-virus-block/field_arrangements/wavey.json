@@ -1,9 +1,0 @@
-{
-  "name": "Wavey",
-  "description": "Wave-like pattern",
-  "quad": "WAVE",
-  "segment": "DOTTED",
-  "sector": "SPIRAL",
-  "multiPart": false
-}
-

@@ -83,6 +83,13 @@ jar {
 	from("LICENSE") {
 		rename { "${it}_${inputs.properties.archivesName}"}
 	}
+	
+	// Bundle field configs into JAR for distribution
+	from('config/the-virus-block') {
+		include 'field_*/*.json'
+		include 'field_*/**/*.json'
+		into 'data/the-virus-block'
+	}
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -95,6 +102,9 @@ task copyFragmentsToRun(type: Copy) {
 	group = 'fabric'
 	
 	from('config/the-virus-block') {
+		// Direct files in field_* folders (e.g. field_profiles/anti_virus.json)
+		include 'field_*/*.json'
+		// Nested files (e.g. field_profiles/personal/something.json)
 		include 'field_*/**/*.json'
 	}
 	into 'run/config/the-virus-block'
@@ -109,6 +119,10 @@ tasks.named('runClient').configure {
 }
 
 tasks.named('runServer').configure {
+	dependsOn copyFragmentsToRun
+}
+
+tasks.named('build').configure {
 	dependsOn copyFragmentsToRun
 }
 

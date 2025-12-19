@@ -289,6 +289,11 @@ public final class ClientFieldManager {
             return;
         }
         
+        // Skip rendering during warmup phase (prevents lag on join)
+        if (!net.cyberpunk042.client.field.JoinWarmupManager.shouldRenderFields()) {
+            return;
+        }
+        
         Camera camera = context.camera();
         Vec3d camPos = camera.getPos();
         MatrixStack matrices = context.matrixStack();

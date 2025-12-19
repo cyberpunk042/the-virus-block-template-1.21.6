@@ -1,7 +1,0 @@
-{
-  "name": "Follow Delayed",
-  "description": "Delayed trailing effect",
-  "enabled": true,
-  "mode": "DELAYED",
-  "playerOverride": false
-}

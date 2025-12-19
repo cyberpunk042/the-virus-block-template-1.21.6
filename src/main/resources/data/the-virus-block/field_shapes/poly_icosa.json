@@ -1,7 +1,0 @@
-{
-  "name": "Icosahedron",
-  "description": "20-faced shape",
-  "type": "polyhedron",
-  "polyType": "ICOSAHEDRON",
-  "radius": 1.0
-}

@@ -1,7 +1,0 @@
-{
-  "name": "Sparse",
-  "description": "25% of quads visible - minimal",
-  "cellType": "QUAD",
-  "pattern": "sparse",
-  "visibility": 0.25
-}

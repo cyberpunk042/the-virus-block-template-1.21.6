@@ -1,7 +1,0 @@
-{
-  "name": "Wireframe Thick",
-  "description": "Bold wireframe lines",
-  "mode": "WIREFRAME",
-  "wireThickness": 2.0,
-  "doubleSided": true
-}

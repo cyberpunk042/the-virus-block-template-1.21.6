@@ -1,9 +1,0 @@
-{
-    "name": "Pointed",
-    "description": "Tall pointed cone",
-    "type": "cone",
-    "radius": 0.5,
-    "height": 3.0,
-    "segments": 32,
-    "capBottom": true
-}

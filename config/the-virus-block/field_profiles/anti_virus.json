@@ -18,7 +18,7 @@
                         "lonSteps": 23
                     },
                     "arrangement": {
-                        "defaultPattern": "three_quarter_slim_1"
+                        "defaultPattern": "stripe_1"
                     },
                     "appearance": {
                         "color": "#00FFFF",
@@ -52,6 +52,7 @@
         "enabled": true,
         "innerRadius": 0.045,
         "outerRadius": 0.06,
+        "height": 0,
         "color": "#FFEAFAFF"
     }
 }

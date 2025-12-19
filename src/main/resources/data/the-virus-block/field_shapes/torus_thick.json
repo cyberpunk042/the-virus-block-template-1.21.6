@@ -1,9 +1,0 @@
-{
-    "name": "Thick Ring",
-    "description": "Thick torus with large tube radius",
-    "type": "torus",
-    "majorRadius": 1.0,
-    "minorRadius": 0.5,
-    "majorSegments": 48,
-    "minorSegments": 32
-}

@@ -1,7 +1,0 @@
-{
-  "name": "Spiral",
-  "description": "Spiral out from center",
-  "cellType": "SECTOR",
-  "pattern": "spiral",
-  "turns": 2
-}

@@ -91,7 +91,14 @@ public final class BeamRenderer {
         // Scale radii by pulse
         float innerR = beam.innerRadius() * pulseScale;
         float outerR = beam.outerRadius() * pulseScale;
-        int height = (int) beam.height();
+        
+        // Height: 0 or negative means infinite (pierce the sky)
+        int height;
+        if (beam.height() <= 0) {
+            height = 1024; // Effectively infinite - extends well beyond sky
+        } else {
+            height = (int) beam.height();
+        }
         
         // CP6: Beam values to emitter
         PipelineTracer.trace(PipelineTracer.B1_BEAM_ENABLED, 6, "emit", "rendering");

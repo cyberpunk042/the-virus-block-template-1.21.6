@@ -1,8 +1,0 @@
-{
-  "name": "Wave",
-  "description": "Wavy stripe distribution",
-  "cellType": "QUAD",
-  "pattern": "wave",
-  "frequency": 3,
-  "amplitude": 0.3
-}

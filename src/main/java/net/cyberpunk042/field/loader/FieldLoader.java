@@ -619,6 +619,10 @@ public final class FieldLoader {
         if (arrObj.has("default")) {
             builder.defaultPattern(arrObj.get("default").getAsString());
         }
+        // Also check for "defaultPattern" (alternative key name)
+        if (arrObj.has("defaultPattern")) {
+            builder.defaultPattern(arrObj.get("defaultPattern").getAsString());
+        }
         return builder.build();
     }
     

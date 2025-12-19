@@ -1,7 +1,0 @@
-{
-  "name": "Longitude Only",
-  "description": "Vertical lines only",
-  "cellType": "EDGE",
-  "pattern": "longitude",
-  "showLatitude": false
-}
