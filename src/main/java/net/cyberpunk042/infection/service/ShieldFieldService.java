@@ -31,8 +31,22 @@ public final class ShieldFieldService {
 
 	/**
 	 * Represents an active shield field protecting an area from infection.
+	 * Pre-computes expensive values for fast isShielding() checks.
 	 */
-	public static record ShieldField(long id, BlockPos center, double radius, long createdTick) {}
+	public static record ShieldField(long id, BlockPos center, double radius, long createdTick,
+			double radiusSq, Vec3d centerVec, int chunkX, int chunkZ) {
+		
+		/** Creates a ShieldField with pre-computed values */
+		public static ShieldField create(long id, BlockPos center, double radius, long createdTick) {
+			return new ShieldField(id, center.toImmutable(), radius, createdTick,
+					radius * radius, Vec3d.ofCenter(center), center.getX() >> 4, center.getZ() >> 4);
+		}
+		
+		/** For deserialization - recomputes cached values */
+		public static ShieldField fromPersistence(long id, BlockPos center, double radius, long createdTick) {
+			return create(id, center, radius, createdTick);
+		}
+	}
 
 	private static final double SHIELD_FIELD_RADIUS = 12.0D;
 
@@ -146,11 +160,28 @@ public final class ShieldFieldService {
 		if (activeShields.isEmpty()) {
 			return false;
 		}
-		Vec3d sample = Vec3d.ofCenter(pos);
+		// Pre-compute sample position and chunk coords for fast filtering
+		int posChunkX = pos.getX() >> 4;
+		int posChunkZ = pos.getZ() >> 4;
+		double sampleX = pos.getX() + 0.5D;
+		double sampleY = pos.getY() + 0.5D;
+		double sampleZ = pos.getZ() + 0.5D;
+		
+		// Shield radius is 12 blocks = within ~1-2 chunks
+		final int CHUNK_FILTER_DISTANCE = 2;
+		
 		for (ShieldField field : activeShields.values()) {
-			double radius = field.radius();
-			double radiusSq = radius * radius;
-			if (field.center().toCenterPos().squaredDistanceTo(sample) <= radiusSq) {
+			// Fast chunk-distance check (skip shields that are clearly too far)
+			if (Math.abs(posChunkX - field.chunkX()) > CHUNK_FILTER_DISTANCE ||
+				Math.abs(posChunkZ - field.chunkZ()) > CHUNK_FILTER_DISTANCE) {
+				continue;
+			}
+			// Use pre-computed values for distance check
+			Vec3d center = field.centerVec();
+			double dx = sampleX - center.x;
+			double dy = sampleY - center.y;
+			double dz = sampleZ - center.z;
+			if (dx * dx + dy * dy + dz * dz <= field.radiusSq()) {
 				return true;
 			}
 		}
@@ -196,7 +227,7 @@ public final class ShieldFieldService {
 		if (activeShields.containsKey(key)) {
 			return;
 		}
-		ShieldField field = new ShieldField(key, pos.toImmutable(), SHIELD_FIELD_RADIUS, world.getTime());
+		ShieldField field = ShieldField.create(key, pos, SHIELD_FIELD_RADIUS, world.getTime());
 		activeShields.put(key, field);
 		host.markDirty();
 		world.playSound(null, pos, SoundEvents.BLOCK_BEACON_ACTIVATE, SoundCategory.BLOCKS, 1.0F, 1.05F);

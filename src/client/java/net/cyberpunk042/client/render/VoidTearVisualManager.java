@@ -34,7 +34,8 @@ import net.minecraft.util.math.Vec3d;
 public final class VoidTearVisualManager {
     
     private static final float VISUAL_DURATION_MULTIPLIER = 4.0f;
-    private static final String DEFINITION_PREFIX = "the-virus-block:void_tear_t";
+    private static final Identifier VOID_TEAR_DEFINITION_ID = 
+        Identifier.of("the-virus-block", "void_tear");
     
     private VoidTearVisualManager() {}
 
@@ -74,11 +75,8 @@ public final class VoidTearVisualManager {
         // Calculate visual duration (same multiplier as before)
         int visualDuration = Math.max(1, MathHelper.floor(payload.durationTicks() * VISUAL_DURATION_MULTIPLIER));
         
-        // Clamp tier to 0-5
+        // Tier is still available from payload for potential future use (logging, effects)
         int tier = MathHelper.clamp(payload.tierIndex(), 0, 5);
-        
-        // Get the tier-specific definition
-        Identifier definitionId = Identifier.of(DEFINITION_PREFIX + tier);
         
         // Create position
         Vec3d position = new Vec3d(payload.x(), payload.y(), payload.z());
@@ -87,8 +85,8 @@ public final class VoidTearVisualManager {
         // Use payload.id() as the field ID for tracking
         ClientFieldState state = ClientFieldState.atPosition(
                 payload.id(),
-                definitionId,
-                FieldType.SHIELD,
+                VOID_TEAR_DEFINITION_ID,
+                FieldType.FORCE,
                 position)
             .withScale(payload.radius())  // Use radius as scale
             .withPhase((float) (client.world.random.nextFloat() * Math.PI * 2))

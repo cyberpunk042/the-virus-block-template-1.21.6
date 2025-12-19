@@ -10,10 +10,12 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
 public enum VirusDifficulty {
-	EASY("easy", Items.TOTEM_OF_UNDYING::getDefaultStack, 1.6D, 0.0D, true, 0, 0.5D, 0.8D, 0.6D, 0.75D, "difficulty_easy"),
-	MEDIUM("medium", Items.SHIELD::getDefaultStack, 1.2D, 0.5D, false, 0, 0.85D, 0.9D, 0.8D, 0.9D, "difficulty_medium"),
-	HARD("hard", Items.NETHERITE_SWORD::getDefaultStack, 1.0D, 1.0D, false, 0, 1.0D, 1.0D, 1.0D, 1.0D, "difficulty_hard"),
-	EXTREME("extreme", Items.WITHER_SKELETON_SKULL::getDefaultStack, 0.85D, 1.2D, false, -2, 1.25D, 1.15D, 1.3D, 1.2D, "difficulty_extreme");
+	// Recalibrated difficulties - EASY should be relaxed, EXTREME should be intense but playable
+	// Format: id, icon, durationMult, knockbackMult, bleedOption, healthPenalty, wormSpawn, eventOdds, guardianDmg, matrixDmg, corruptionSpread, texture
+	EASY("easy", Items.TOTEM_OF_UNDYING::getDefaultStack, 2.0D, 0.0D, true, 0, 0.3D, 0.5D, 0.4D, 0.5D, 0.3D, "difficulty_easy"),
+	MEDIUM("medium", Items.SHIELD::getDefaultStack, 1.4D, 0.4D, false, 0, 0.6D, 0.75D, 0.7D, 0.75D, 0.6D, "difficulty_medium"),
+	HARD("hard", Items.NETHERITE_SWORD::getDefaultStack, 1.0D, 1.0D, false, 0, 1.0D, 1.0D, 1.0D, 1.0D, 1.0D, "difficulty_hard"),
+	EXTREME("extreme", Items.WITHER_SKELETON_SKULL::getDefaultStack, 0.8D, 1.3D, false, -2, 1.4D, 1.2D, 1.4D, 1.3D, 1.5D, "difficulty_extreme");
 
 	private final String id;
 	private final Supplier<ItemStack> iconSupplier;
@@ -25,6 +27,7 @@ public enum VirusDifficulty {
 	private final double eventOddsMultiplier;
 	private final double guardianBeamDamageMultiplier;
 	private final double matrixCubeDamageMultiplier;
+	private final double corruptionSpreadMultiplier;
 	private final Identifier iconTexture;
 
 	VirusDifficulty(String id,
@@ -37,6 +40,7 @@ public enum VirusDifficulty {
 	                double eventOddsMultiplier,
 	                double guardianBeamDamageMultiplier,
 	                double matrixCubeDamageMultiplier,
+	                double corruptionSpreadMultiplier,
 	                String iconTexturePath) {
 		this.id = id.toLowerCase(Locale.ROOT);
 		this.iconSupplier = iconSupplier;
@@ -48,6 +52,7 @@ public enum VirusDifficulty {
 		this.eventOddsMultiplier = eventOddsMultiplier;
 		this.guardianBeamDamageMultiplier = guardianBeamDamageMultiplier;
 		this.matrixCubeDamageMultiplier = matrixCubeDamageMultiplier;
+		this.corruptionSpreadMultiplier = corruptionSpreadMultiplier;
 		this.iconTexture = Identifier.of(TheVirusBlock.MOD_ID, "textures/gui/" + iconTexturePath + ".png");
 	}
 
@@ -99,12 +104,16 @@ public enum VirusDifficulty {
 		return matrixCubeDamageMultiplier;
 	}
 
+	public double getCorruptionSpreadMultiplier() {
+		return corruptionSpreadMultiplier;
+	}
+
 	public float getTeleportChance() {
 		return switch (this) {
-			case EASY -> 0.20F;
-			case MEDIUM -> 0.30F;
-			case HARD -> 0.40F;
-			case EXTREME -> 0.50F;
+			case EASY -> 0.10F;    // Very predictable
+			case MEDIUM -> 0.20F;  // Occasionally moves
+			case HARD -> 0.40F;    // Moves around more
+			case EXTREME -> 0.60F; // Very mobile
 		};
 	}
 

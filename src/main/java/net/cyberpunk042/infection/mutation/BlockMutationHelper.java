@@ -40,27 +40,42 @@ public final class BlockMutationHelper {
 		Random random = world.getRandom();
 		VirusWorldState state = VirusWorldState.get(world);
 		boolean mutated = false;
+		
+		// Scale attempts by difficulty AND tier corruption spread multipliers
+		// Combined: difficulty scale × tier scale (e.g., EASY tier 1 = 0.3 × 0.2 = 0.06 = 6% of base)
+		double difficultyScale = state.tiers().difficulty().getCorruptionSpreadMultiplier();
+		double tierScale = tier.getCorruptionSpreadMultiplier();
+		double combinedScale = difficultyScale * tierScale;
 
 		List<ServerPlayerEntity> players = world.getPlayers(ServerPlayerEntity::isAlive);
 		int surfaceAttemptsRule = MathHelper.clamp(world.getGameRules().getInt(TheVirusBlock.VIRUS_SURFACE_CORRUPT_ATTEMPTS), 0, 4096);
+		// Apply combined scaling to surface attempts
+		int scaledSurfaceAttempts = Math.max(1, (int) Math.round(surfaceAttemptsRule * combinedScale));
+		
 		if (!players.isEmpty()) {
 			List<BlockPos> playerAnchors = players.stream().map(ServerPlayerEntity::getBlockPos).toList();
 			int attemptsRule = MathHelper.clamp(world.getGameRules().getInt(TheVirusBlock.VIRUS_SPREAD_PLAYER_ATTEMPTS), 0, 4096);
+			// Apply combined difficulty+tier scaling
+			int scaledAttempts = Math.max(1, (int) Math.round(attemptsRule * combinedScale));
 			int radiusRule = MathHelper.clamp(world.getGameRules().getInt(TheVirusBlock.VIRUS_SPREAD_PLAYER_RADIUS), 4, 256);
-			mutated |= mutateFromAnchors(world, playerAnchors, attemptsRule, radiusRule, tier, apocalypseMode, random, state);
-			mutated |= mutateSurfaceLayers(world, playerAnchors, radiusRule, surfaceAttemptsRule, tier, apocalypseMode, random, state);
+			mutated |= mutateFromAnchors(world, playerAnchors, scaledAttempts, radiusRule, tier, apocalypseMode, random, state);
+			mutated |= mutateSurfaceLayers(world, playerAnchors, radiusRule, scaledSurfaceAttempts, tier, apocalypseMode, random, state);
 		}
 
 		if (!sources.isEmpty()) {
 			List<BlockPos> sourceAnchors = new ArrayList<>(sources);
 			int attemptsRule = MathHelper.clamp(world.getGameRules().getInt(TheVirusBlock.VIRUS_SPREAD_SOURCE_ATTEMPTS), 0, 4096);
+			// Apply combined difficulty+tier scaling
+			int scaledAttempts = Math.max(1, (int) Math.round(attemptsRule * combinedScale));
 			int radiusRule = MathHelper.clamp(world.getGameRules().getInt(TheVirusBlock.VIRUS_SPREAD_SOURCE_RADIUS), 4, 256);
-			mutated |= mutateFromAnchors(world, sourceAnchors, attemptsRule, radiusRule, tier, apocalypseMode, random, state);
-			mutated |= mutateSurfaceLayers(world, sourceAnchors, radiusRule, surfaceAttemptsRule, tier, apocalypseMode, random, state);
+			mutated |= mutateFromAnchors(world, sourceAnchors, scaledAttempts, radiusRule, tier, apocalypseMode, random, state);
+			mutated |= mutateSurfaceLayers(world, sourceAnchors, radiusRule, scaledSurfaceAttempts, tier, apocalypseMode, random, state);
 		}
 
 		if (!mutated && !sources.isEmpty()) {
-			mutateFromAnchors(world, new ArrayList<>(sources), 32, 16, tier, apocalypseMode, random, state);
+			// Fallback also scaled by difficulty+tier
+			int fallbackAttempts = Math.max(8, (int) Math.round(32 * combinedScale));
+			mutateFromAnchors(world, new ArrayList<>(sources), fallbackAttempts, 16, tier, apocalypseMode, random, state);
 		}
 	}
 

@@ -14,13 +14,11 @@ import net.minecraft.block.BedBlock;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
-import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.BlockPos.Mutable;
 import net.minecraft.util.math.ChunkPos;
-import net.minecraft.world.Heightmap;
 import net.minecraft.world.chunk.WorldChunk;
 
 public final class GlobalTerrainCorruption {
@@ -41,32 +39,13 @@ public final class GlobalTerrainCorruption {
 		if (!state.infectionLifecycle().enableTerrainCorruption()) {
 			return;
 		}
+		// Initialize the tracker for this corruption phase (used for cleansing later)
 		ChunkWorkTracker tracker = tracker(world);
 		tracker.startCorruptionPhase();
-		ChunkPos originChunk = new ChunkPos(origin);
-		corruptActiveChunk(world, tracker, originChunk, origin.getY());
-		for (ServerPlayerEntity player : world.getPlayers()) {
-			BlockPos playerPos = player.getBlockPos();
-			ChunkPos pos = new ChunkPos(playerPos);
-			corruptActiveChunk(world, tracker, pos, playerPos.getY());
-		}
-	}
-
-	static BlockState convert(BlockState state) {
-		Block block = state.getBlock();
-		if (isPortalCriticalBlock(block)) {
-			return null;
-		}
-		if (block == Blocks.GRASS_BLOCK) {
-			return ModBlocks.INFECTED_GRASS.getDefaultState();
-		}
-		if (block == Blocks.DIRT || block == Blocks.COARSE_DIRT || block == Blocks.ROOTED_DIRT || block == Blocks.DIRT_PATH || block == Blocks.FARMLAND) {
-			return ModBlocks.CORRUPTED_DIRT.getDefaultState();
-		}
-		if (state.isIn(BlockTags.BASE_STONE_OVERWORLD)) {
-			return ModBlocks.CORRUPTED_STONE.getDefaultState();
-		}
-		return null;
+		// Mark terrain as corrupted - actual spread handled by BlockMutationHelper
+		// which runs every tick with proper difficulty×tier scaling
+		state.infectionState().setTerrainCorrupted(true);
+		state.markDirty();
 	}
 
 	public static void cleanse(ServerWorld world) {
@@ -136,12 +115,10 @@ public final class GlobalTerrainCorruption {
 			return;
 		}
 		tracker = tracker(world);
-		if (corrupting) {
-			for (ServerPlayerEntity player : world.getPlayers()) {
-				BlockPos playerPos = player.getBlockPos();
-				corruptActiveChunk(world, tracker, new ChunkPos(playerPos), playerPos.getY());
-			}
-		}
+		// NOTE: Player-following corruption is handled by BlockMutationHelper.mutateAroundSources()
+		// which is called every tick from InfectionOperations.runActiveFrame().
+		// It uses radius-based spread with proper difficulty×tier scaling.
+		// GlobalTerrainCorruption only handles cleansing now.
 		if (cleansing) {
 			tracker.ensureCleansingPrimed();
 			for (int i = 0; i < CLEANSE_CHUNKS_PER_TICK; i++) {
@@ -159,27 +136,6 @@ public final class GlobalTerrainCorruption {
 
 	private static ChunkWorkTracker tracker(ServerWorld world) {
 		return TRACKERS.computeIfAbsent(world, w -> new ChunkWorkTracker());
-	}
-
-	private static void corruptActiveChunk(ServerWorld world, ChunkWorkTracker tracker, ChunkPos pos, int centerY) {
-		long chunkLong = pos.toLong();
-		long currentTick = world.getTime();
-		if (!tracker.canProcess(chunkLong, currentTick)) {
-			return;
-		}
-		if (!world.isChunkLoaded(chunkLong)) {
-			return;
-		}
-		int verticalRange = Math.max(1, world.getGameRules().getInt(TheVirusBlock.VIRUS_SPREAD_VERTICAL_RADIUS));
-		int minY = Math.max(world.getBottomY(), centerY - verticalRange);
-		int maxY = Math.min(worldTop(world) - 1, centerY + verticalRange);
-		if (minY > maxY) {
-			tracker.markProcessed(chunkLong, currentTick);
-			return;
-		}
-		WorldChunk chunk = world.getChunk(pos.x, pos.z);
-		corruptRange(world, chunk, minY, maxY + 1, tracker, chunkLong);
-		tracker.markProcessed(chunkLong, currentTick);
 	}
 
 	private static void cleanseActiveChunk(ServerWorld world, ChunkWorkTracker tracker, ChunkPos pos, boolean forceLoad) {
@@ -203,54 +159,19 @@ public final class GlobalTerrainCorruption {
 		}
 	}
 
-	private static boolean corruptRange(ServerWorld world, WorldChunk chunk, int minY, int maxY, ChunkWorkTracker tracker, long chunkLong) {
-		Mutable mutable = new Mutable();
-		int startX = chunk.getPos().getStartX();
-		int startZ = chunk.getPos().getStartZ();
-		int conversions = 0;
-		for (int x = 0; x < 16; x++) {
-			for (int z = 0; z < 16; z++) {
-				for (int y = minY; y < maxY; y++) {
-					mutable.set(startX + x, y, startZ + z);
-					BlockState current = chunk.getBlockState(mutable);
-					if (VirusWorldState.get(world).shieldFieldService().isShielding(mutable)) {
-						continue;
-					}
-					BlockState replacement = convert(current);
-					if (replacement != null) {
-						BoobytrapHelper.TrapSelection trap = BoobytrapHelper.selectTrap(world);
-						if (trap != null) {
-							BlockPos placed = BoobytrapHelper.placeTrap(world, chunk, mutable, current, trap);
-							tracker.recordMutation(chunkLong, placed.asLong());
-							conversions++;
-							continue;
-						}
-						world.setBlockState(mutable, replacement, Block.NOTIFY_LISTENERS);
-						world.getChunkManager().markForUpdate(mutable);
-						tracker.recordMutation(chunkLong, mutable.asLong());
-						conversions++;
-					}
-				}
-			}
-		}
-		if (conversions > 0) {
-			CorruptionProfiler.logChunkRewrite(world, chunk.getPos(), conversions, false);
-		}
-		plantSurfaceTraps(world, chunk, tracker);
-		return conversions > 0;
-	}
-
 	private static boolean cleanseRecorded(ServerWorld world, WorldChunk chunk, LongOpenHashSet recorded) {
 		if (recorded.isEmpty()) {
 			return false;
 		}
 		Mutable mutable = new Mutable();
 		int conversions = 0;
+		// Cache shield service to avoid repeated VirusWorldState.get() lookups
+		var shieldService = VirusWorldState.get(world).shieldFieldService();
 		LongIterator iterator = recorded.iterator();
 		while (iterator.hasNext()) {
 			long posLong = iterator.nextLong();
 			mutable.set(BlockPos.fromLong(posLong));
-			if (VirusWorldState.get(world).shieldFieldService().isShielding(mutable)) {
+			if (shieldService.isShielding(mutable)) {
 				continue;
 			}
 			BlockState replacement = cleanseBlock(chunk.getBlockState(mutable));
@@ -272,11 +193,13 @@ public final class GlobalTerrainCorruption {
 		int startX = chunk.getPos().getStartX();
 		int startZ = chunk.getPos().getStartZ();
 		int conversions = 0;
+		// Cache shield service to avoid repeated VirusWorldState.get() lookups
+		var shieldService = VirusWorldState.get(world).shieldFieldService();
 		for (int x = 0; x < 16; x++) {
 			for (int z = 0; z < 16; z++) {
 				for (int y = minY; y < maxY; y++) {
 					mutable.set(startX + x, y, startZ + z);
-					if (VirusWorldState.get(world).shieldFieldService().isShielding(mutable)) {
+					if (shieldService.isShielding(mutable)) {
 						continue;
 					}
 					BlockState replacement = cleanseBlock(chunk.getBlockState(mutable));
@@ -309,35 +232,6 @@ public final class GlobalTerrainCorruption {
 
 	private static int worldTop(ServerWorld world) {
 		return world.getBottomY() + world.getDimension().height();
-	}
-
-	private static void plantSurfaceTraps(ServerWorld world, WorldChunk chunk, ChunkWorkTracker tracker) {
-		BoobytrapHelper.TrapSelection trapSample;
-		int startX = chunk.getPos().getStartX();
-		int startZ = chunk.getPos().getStartZ();
-		BlockPos.Mutable mutable = new BlockPos.Mutable();
-		for (int x = 0; x < 16; x++) {
-			for (int z = 0; z < 16; z++) {
-				int surfaceY = world.getTopY(Heightmap.Type.MOTION_BLOCKING, startX + x, startZ + z) - 1;
-				if (surfaceY < world.getBottomY()) {
-					continue;
-				}
-				mutable.set(startX + x, surfaceY, startZ + z);
-				BlockState state = chunk.getBlockState(mutable);
-				if (VirusWorldState.get(world).shieldFieldService().isShielding(mutable)) {
-					continue;
-				}
-				if (!BoobytrapHelper.canReplaceSurface(state)) {
-					continue;
-				}
-				trapSample = BoobytrapHelper.selectTrap(world);
-				if (trapSample == null) {
-					continue;
-				}
-				BlockPos placed = BoobytrapHelper.placeTrap(world, chunk, mutable, state, trapSample);
-				tracker.recordMutation(chunk.getPos().toLong(), placed.asLong());
-			}
-		}
 	}
 
 	private static final class ChunkWorkTracker {

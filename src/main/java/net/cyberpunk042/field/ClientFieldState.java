@@ -54,7 +54,8 @@ public final class ClientFieldState {
     private int shuffleIndex = -1;
     
     // Follow mode and prediction (for personal shields)
-    private String followMode = "snap";
+    // null = no follow (use world position), "snap"/"smooth"/"glide" = follow player
+    private String followMode = null;
     private boolean predictionEnabled = false;
     private int predictionLeadTicks = 0;
     private float predictionMaxDistance = 0;

@@ -87,8 +87,8 @@ public class FieldCustomizerScreen extends Screen {
     protected void init() {
         super.init();
         
-        // Ensure fragment presets are loaded before building panels
-        net.cyberpunk042.client.gui.util.FragmentRegistry.reload();
+        // Ensure fragment presets are loaded (cached, only loads once)
+        net.cyberpunk042.client.gui.util.FragmentRegistry.ensureLoaded();
         
         WidgetVisibility.clearAll();
         

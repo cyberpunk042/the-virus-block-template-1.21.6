@@ -80,6 +80,10 @@ public final class FieldClientInit {
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> 
             client.execute(() -> ClientFieldManager.get().clear()));
         
+        // Register bundled SERVER profiles into FieldRegistry for rendering
+        // This bridges ProfileManager (client GUI) with FieldRegistry (renderer)
+        registerBundledServerProfiles();
+        
         Logging.RENDER.topic("field").info("Field client initialized (render + tick events registered)");
     }
     
@@ -196,7 +200,7 @@ public final class FieldClientInit {
      * This maps legacy ShieldFieldSpawnPayload to the new field system.
      */
     private static final Identifier ANTI_VIRUS_FIELD_ID = 
-        Identifier.of("the-virus-block", "alpha_antivirus");
+        Identifier.of("the-virus-block", "anti_virus");
     
     /**
      * Handles legacy shield spawn payload from ShieldFieldService.
@@ -236,6 +240,55 @@ public final class FieldClientInit {
         
         Logging.RENDER.topic("field").debug(
             "Removed anti-virus field: id={}", payload.id());
+    }
+    
+    // =========================================================================
+    // Profile → Registry Bridge
+    // =========================================================================
+    
+    /**
+     * Registers bundled SERVER profiles from ProfileManager into FieldRegistry.
+     * 
+     * <p>This bridges the gap between:
+     * <ul>
+     *   <li>ProfileManager - loads profiles from JAR (field_profiles/*.json)</li>
+     *   <li>FieldRegistry - provides definitions for rendering</li>
+     * </ul>
+     * 
+     * <p>Only SERVER-source profiles are registered (bundled with mod JAR).
+     * Network-synced definitions are handled separately via handleDefinitionSync().
+     */
+    private static void registerBundledServerProfiles() {
+        var profileManager = net.cyberpunk042.client.profile.ProfileManager.getInstance();
+        
+        // Ensure profiles are loaded
+        profileManager.loadAll();
+        
+        int registered = 0;
+        for (var profile : profileManager.getAllProfiles()) {
+            // Only register SERVER source (bundled with JAR, not local or network)
+            if (profile.source() != net.cyberpunk042.field.category.ProfileSource.SERVER) {
+                continue;
+            }
+            
+            // Get the definition from the profile
+            net.cyberpunk042.field.FieldDefinition definition = profile.definition();
+            if (definition == null) {
+                Logging.RENDER.topic("field").debug(
+                    "Profile '{}' has no definition, skipping registry", profile.id());
+                continue;
+            }
+            
+            // Register in FieldRegistry for rendering lookup
+            FieldRegistry.register(definition);
+            registered++;
+            
+            Logging.RENDER.topic("field").debug(
+                "Registered bundled profile: {} (def={})", profile.id(), definition.id());
+        }
+        
+        Logging.RENDER.topic("field").info(
+            "Registered {} bundled SERVER profiles into FieldRegistry", registered);
     }
     
     public static boolean isInitialized() {

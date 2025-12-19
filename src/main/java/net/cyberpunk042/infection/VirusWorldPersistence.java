@@ -37,7 +37,7 @@ public final class VirusWorldPersistence {
 			BlockPos.CODEC.fieldOf("center").forGetter(ShieldFieldService.ShieldField::center),
 			Codec.DOUBLE.fieldOf("radius").forGetter(ShieldFieldService.ShieldField::radius),
 			Codec.LONG.fieldOf("createdTick").forGetter(ShieldFieldService.ShieldField::createdTick)
-	).apply(instance, ShieldFieldService.ShieldField::new));
+	).apply(instance, ShieldFieldService.ShieldField::fromPersistence));
 
 	private static final Codec<BoobytrapDefaults> BOOBYTRAP_CODEC = RecordCodecBuilder.create(instance -> instance.group(
 			Codec.BOOL.fieldOf("captured").forGetter(BoobytrapDefaults::captured),

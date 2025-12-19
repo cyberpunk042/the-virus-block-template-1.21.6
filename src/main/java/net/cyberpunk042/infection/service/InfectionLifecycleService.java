@@ -131,7 +131,8 @@ public final class InfectionLifecycleService {
 		host.shell().setRebuildPending(false);
 		host.singularity().phase().resetSingularityState();
 		host.singularity().barrier().deactivate();
-		beginCleansing();
+		// Trigger actual terrain cleansing (removes virus blocks and corrupted terrain)
+		GlobalTerrainCorruption.cleanse(world);
 		host.infectionState().eventHistory().clear();
 		host.shell().clearCooldowns();
 		host.pillarChunks().clear();

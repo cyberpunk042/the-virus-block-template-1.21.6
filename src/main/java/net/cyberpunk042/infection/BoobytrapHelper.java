@@ -91,7 +91,7 @@ public final class BoobytrapHelper {
 			if (state.shieldFieldService().isShielding(target)) {
 				continue;
 			}
-			BlockState replacement = GlobalTerrainCorruption.convert(world.getBlockState(target));
+			BlockState replacement = simpleConvert(world.getBlockState(target));
 			if (replacement == null) {
 				continue;
 			}
@@ -154,6 +154,22 @@ public final class BoobytrapHelper {
 	private static int scaleChance(int value, float intensity) {
 		int scaled = Math.round(value * intensity);
 		return clampChance(scaled);
+	}
+
+	@Nullable
+	private static BlockState simpleConvert(BlockState state) {
+		Block block = state.getBlock();
+		if (block == Blocks.GRASS_BLOCK) {
+			return ModBlocks.INFECTED_GRASS.getDefaultState();
+		}
+		if (block == Blocks.DIRT || block == Blocks.COARSE_DIRT || block == Blocks.ROOTED_DIRT 
+				|| block == Blocks.DIRT_PATH || block == Blocks.FARMLAND) {
+			return ModBlocks.CORRUPTED_DIRT.getDefaultState();
+		}
+		if (block == Blocks.STONE || block == Blocks.DEEPSLATE || block == Blocks.TUFF) {
+			return ModBlocks.CORRUPTED_STONE.getDefaultState();
+		}
+		return null;
 	}
 
 	private static float getPower(ServerWorld world, Type type) {

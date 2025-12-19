@@ -95,17 +95,17 @@ public class TheVirusBlock implements ModInitializer {
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_SPREAD_PLAYER_RADIUS =
 			GameRuleRegistry.register("virusSpreadPlayerRadius", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(48, 8, 256));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_SPREAD_PLAYER_ATTEMPTS =
-			GameRuleRegistry.register("virusSpreadPlayerAttempts", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(96, 1, 1024));
+			GameRuleRegistry.register("virusSpreadPlayerAttempts", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(24, 1, 1024));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_SPREAD_SOURCE_RADIUS =
 			GameRuleRegistry.register("virusSpreadSourceRadius", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(64, 8, 256));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_SPREAD_SOURCE_ATTEMPTS =
-			GameRuleRegistry.register("virusSpreadSourceAttempts", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(48, 1, 1024));
+			GameRuleRegistry.register("virusSpreadSourceAttempts", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(16, 1, 1024));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_SPREAD_VERTICAL_RADIUS =
 			GameRuleRegistry.register("virusSpreadVerticalRadius", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(16, 4, 80));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_SPREAD_INITIAL_RADIUS =
 			GameRuleRegistry.register("virusSpreadInitialRadius", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(96, 8, 512));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_SPREAD_INITIAL_ATTEMPTS =
-			GameRuleRegistry.register("virusSpreadInitialAttempts", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(600, 1, 8192));
+			GameRuleRegistry.register("virusSpreadInitialAttempts", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(150, 1, 8192));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_SPREAD_CLEANSE_ATTEMPTS =
 			GameRuleRegistry.register("virusSpreadCleanseAttempts", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(1500, 1, 16384));
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_CORRUPTION_PROFILER =
@@ -143,7 +143,7 @@ public class TheVirusBlock implements ModInitializer {
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_CORRUPT_SNOW_ENABLED =
 			GameRuleRegistry.register("virusCorruptSnowEnabled", GameRules.Category.UPDATES, GameRuleFactory.createBooleanRule(true));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_SURFACE_CORRUPT_ATTEMPTS =
-			GameRuleRegistry.register("virusSurfaceCorruptAttempts", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(640, 0, 4096));
+			GameRuleRegistry.register("virusSurfaceCorruptAttempts", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(80, 0, 4096));
 	public static final GameRules.Key<GameRules.IntRule> VIRUS_BOOBYTRAP_PLAYER_DAMAGE =
 			GameRuleRegistry.register("virusBoobytrapPlayerDamage", GameRules.Category.PLAYER, GameRuleFactory.createIntRule(8, 0, 40));
 	public static final GameRules.Key<GameRules.BooleanRule> VIRUS_BOOBYTRAP_DAMAGE_PLAYERS_ONLY =
