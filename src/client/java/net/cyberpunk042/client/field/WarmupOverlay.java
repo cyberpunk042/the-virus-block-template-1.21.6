@@ -60,8 +60,8 @@ public final class WarmupOverlay {
             context.fill(barLeft, barTop, barLeft + fillWidth, barBottom, color);
         }
         
-        // Text
-        String loadingText = "Loading Field Effects...";
+        // Text - show current stage
+        String loadingText = JoinWarmupManager.getCurrentStageLabel();
         int textWidth = client.textRenderer.getWidth(loadingText);
         context.drawText(
             client.textRenderer,

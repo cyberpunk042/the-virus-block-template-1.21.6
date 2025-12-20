@@ -1,0 +1,38 @@
+{
+    "id": "black_hole",
+    "name": "Black Hole",
+    "description": "Inescapable gravity - pure attraction with no escape",
+    "zones": [
+        {
+            "radius": 20,
+            "strength": 0.05,
+            "falloff": "quadratic"
+        },
+        {
+            "radius": 12,
+            "strength": 0.12,
+            "falloff": "quadratic"
+        },
+        {
+            "radius": 6,
+            "strength": 0.25,
+            "falloff": "gaussian"
+        },
+        {
+            "radius": 2,
+            "strength": 0.60,
+            "falloff": "constant"
+        }
+    ],
+    "phases": [
+        {
+            "start": 0,
+            "end": 100,
+            "polarity": "pull",
+            "strength": 1.0
+        }
+    ],
+    "maxVelocity": 2.5,
+    "verticalBoost": 0.0,
+    "damping": 0.04
+}

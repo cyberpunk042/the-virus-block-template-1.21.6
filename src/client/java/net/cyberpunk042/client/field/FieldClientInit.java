@@ -39,16 +39,25 @@ public final class FieldClientInit {
      * Safe to call multiple times.
      */
     public static void init() {
+        Logging.GUI.topic("field").info("test 00000");
         if (initialized) {
+            Logging.GUI.topic("field").info("Initializing field client... already initialized");
             return;
         }
         initialized = true;
         
-        Logging.RENDER.topic("field").info("Initializing field client...");
+        Logging.GUI.topic("field").info("Initializing field client...");
         
         // Register payload receivers
-        ClientPlayNetworking.registerGlobalReceiver(FieldSpawnPayload.ID, (payload, context) ->
-            context.client().execute(() -> handleSpawn(payload)));
+        Logging.GUI.topic("field").info("Registering receiver for FieldSpawnPayload.ID = {}", FieldSpawnPayload.ID.id());
+        ClientPlayNetworking.registerGlobalReceiver(FieldSpawnPayload.ID, (payload, context) -> {
+            try {
+                Logging.GUI.topic("field").info(">>> CLIENT RECEIVED FieldSpawnPayload id={} <<<", payload.id());
+                context.client().execute(() -> handleSpawn(payload));
+            } catch (Exception e) {
+                Logging.RENDER.topic("field").error(">>> ERROR receiving FieldSpawnPayload <<<", e);
+            }
+        });
         
         ClientPlayNetworking.registerGlobalReceiver(FieldRemovePayload.ID, (payload, context) ->
             context.client().execute(() -> handleRemove(payload)));
@@ -66,54 +75,123 @@ public final class FieldClientInit {
         ClientPlayNetworking.registerGlobalReceiver(ShieldFieldRemovePayload.ID, (payload, context) ->
             context.client().execute(() -> handleLegacyShieldRemove(payload)));
         
-        Logging.RENDER.topic("field").info("Registered field payload receivers (incl. legacy shield payloads)");
+        Logging.GUI.topic("field").info("Registered field payload receivers (incl. legacy shield payloads)");
         
+        Logging.GUI.topic("field").info("DEBUG: Before WorldRenderEvents registration");
         // Register render event
         WorldRenderEvents.AFTER_ENTITIES.register(context -> 
             ClientFieldManager.get().render(context));
         
+        Logging.GUI.topic("field").info("DEBUG: Before ClientTickEvents registration");
         // Register tick event
-        ClientTickEvents.END_CLIENT_TICK.register(client -> 
-            ClientFieldManager.get().tick());
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            ClientFieldManager.get().tick();
+            processPendingSpawns();
+            ClientForceApplicator.tick();
+        });
         
+        Logging.GUI.topic("field").info("DEBUG: Before DISCONNECT registration");
         // Clear on disconnect
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> 
             client.execute(() -> ClientFieldManager.get().clear()));
         
+        Logging.GUI.topic("field").info("DEBUG: Before registerBundledServerProfiles");
         // Register bundled SERVER profiles into FieldRegistry for rendering
         // This bridges ProfileManager (client GUI) with FieldRegistry (renderer)
         registerBundledServerProfiles();
         
+        Logging.GUI.topic("field").info("DEBUG: Before JoinWarmupManager.init");
         // Initialize join warmup manager (handles warmup on server join)
         JoinWarmupManager.init();
         
+        Logging.GUI.topic("field").info("DEBUG: Before warmup tick registration");
         // Tick the warmup manager
         ClientTickEvents.END_CLIENT_TICK.register(client -> JoinWarmupManager.tick());
         
+        Logging.GUI.topic("field").info("DEBUG: Before WarmupOverlay.init");
         // Register warmup overlay HUD
         WarmupOverlay.init();
         
-        Logging.RENDER.topic("field").info("Field client initialized (render + tick events registered)");
+        Logging.GUI.topic("field").info("Field client initialized (render + tick events registered)");
     }
     
     /**
      * Handles field spawn payload from server.
      */
     private static void handleSpawn(FieldSpawnPayload payload) {
-        Identifier defId = payload.definitionIdentifier();
-        if (defId == null) {
-            Logging.RENDER.topic("field").warn(
-                "Invalid definition ID in spawn payload: {}", payload.definitionId());
-            return;
+        try {
+            Logging.GUI.topic("field").info(">>> handleSpawn() CALLED for field {} <<<", payload.id());
+            Logging.GUI.topic("field").info("    definitionId string = '{}'", payload.definitionId());
+            
+            Identifier defId = payload.definitionIdentifier();
+            Logging.GUI.topic("field").info("    parsed defId = {}", defId);
+            
+            if (defId == null) {
+                Logging.GUI.topic("field").warn(
+                    "Invalid definition ID in spawn payload: {}", payload.definitionId());
+                return;
+            }
+            
+            FieldDefinition def = FieldRegistry.get(defId);
+            Logging.GUI.topic("field").info("    FieldRegistry.get({}) = {}", defId, def != null ? def.id() : "NULL");
+            
+            if (def == null) {
+                Logging.GUI.topic("field").info(
+                    "Definition {} not found yet, queuing retry...", defId);
+                queueSpawnRetry(payload, 5);
+                return;
+            }
+            
+            Logging.GUI.topic("field").info("    Calling spawnFieldFromPayload...");
+            spawnFieldFromPayload(payload, defId, def);
+        } catch (Exception e) {
+            Logging.GUI.topic("field").error(">>> EXCEPTION in handleSpawn: {} <<<", e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    private static final java.util.List<PendingSpawn> pendingSpawns = new java.util.ArrayList<>();
+    
+    private static void queueSpawnRetry(FieldSpawnPayload payload, int ticksDelay) {
+        pendingSpawns.add(new PendingSpawn(payload, ticksDelay));
+    }
+    
+    private record PendingSpawn(FieldSpawnPayload payload, int ticksRemaining) {}
+    
+    // Called from tick handler to process pending spawns
+    private static void processPendingSpawns() {
+        if (pendingSpawns.isEmpty()) return;
+        
+        java.util.List<PendingSpawn> toRequeue = new java.util.ArrayList<>();
+        var it = pendingSpawns.iterator();
+        
+        while (it.hasNext()) {
+            PendingSpawn pending = it.next();
+            it.remove(); // Always remove from current list
+            
+            if (pending.ticksRemaining <= 0) {
+                // Timer expired, try to spawn
+                Identifier defId = pending.payload.definitionIdentifier();
+                if (defId != null) {
+                    FieldDefinition def = FieldRegistry.get(defId);
+                    if (def != null) {
+                        spawnFieldFromPayload(pending.payload, defId, def);
+                    } else {
+                        Logging.RENDER.topic("field").warn(
+                            "Definition {} still not found after retry, giving up", defId);
+                    }
+                }
+            } else {
+                // Timer not expired, requeue with decremented counter
+                toRequeue.add(new PendingSpawn(pending.payload, pending.ticksRemaining - 1));
+            }
         }
         
-        FieldDefinition def = FieldRegistry.get(defId);
-        if (def == null) {
-            Logging.RENDER.topic("field").warn(
-                "Unknown field definition: {}", defId);
-            return;
-        }
-        
+        // Add back the items that need to wait longer
+        pendingSpawns.addAll(toRequeue);
+    }
+    
+    private static void spawnFieldFromPayload(FieldSpawnPayload payload, Identifier defId, FieldDefinition def) {
         Vec3d pos = new Vec3d(payload.x(), payload.y(), payload.z());
         ClientFieldState state = ClientFieldState.atPosition(
             payload.id(), defId, def.type(), pos)
@@ -182,21 +260,23 @@ public final class FieldClientInit {
      * Stores the definition in client-side registry so fields can be rendered.
      */
     private static void handleDefinitionSync(FieldDefinitionSyncPayload payload) {
+        Logging.GUI.topic("field").info(">>> handleDefinitionSync CALLED: id='{}' <<<", payload.definitionId());
+        
         Identifier id = payload.definitionIdentifier();
         if (id == null) {
-            Logging.RENDER.topic("field").warn("Invalid definition ID: {}", payload.definitionId());
+            Logging.GUI.topic("field").warn("Invalid definition ID: {}", payload.definitionId());
             return;
         }
         
         try {
             var json = com.google.gson.JsonParser.parseString(payload.definitionJson()).getAsJsonObject();
-            // Parse definition using FieldLoader
             net.cyberpunk042.field.loader.FieldLoader loader = new net.cyberpunk042.field.loader.FieldLoader();
             var definition = loader.parseDefinition(json);
             FieldRegistry.register(definition);
-            Logging.RENDER.topic("field").debug("Received definition: {}", id);
+            Logging.GUI.topic("field").info(">>> Definition REGISTERED: {} <<<", id);
         } catch (Exception e) {
-            Logging.RENDER.topic("field").error("Failed to parse definition {}: {}", id, e.getMessage());
+            Logging.GUI.topic("field").error("Failed to parse definition {}: {}", id, e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -216,6 +296,7 @@ public final class FieldClientInit {
      * Maps to an anti-virus field definition in the new system.
      */
     private static void handleLegacyShieldSpawn(ShieldFieldSpawnPayload payload) {
+        Logging.GUI.topic("field").info(">>> handleLegacyShieldSpawn CALLED id={} <<<", payload.id());
         FieldDefinition def = FieldRegistry.get(ANTI_VIRUS_FIELD_ID);
         if (def == null) {
             Logging.RENDER.topic("field").warn(

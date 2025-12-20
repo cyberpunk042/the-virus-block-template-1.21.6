@@ -1,0 +1,23 @@
+{
+    "id": "gentle_pull",
+    "name": "Gentle Pull",
+    "description": "Soft, slow attraction - good for gathering items",
+    "zones": [
+        {
+            "radius": 8,
+            "strength": 0.03,
+            "falloff": "linear"
+        }
+    ],
+    "phases": [
+        {
+            "start": 0,
+            "end": 100,
+            "polarity": "pull",
+            "strength": 1.0
+        }
+    ],
+    "maxVelocity": 0.5,
+    "verticalBoost": 0.0,
+    "damping": 0.0
+}

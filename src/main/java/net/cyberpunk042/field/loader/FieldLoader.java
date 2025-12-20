@@ -335,12 +335,16 @@ public final class FieldLoader {
         net.cyberpunk042.field.influence.LifecycleConfig lifecycle = 
             JsonParseUtils.parseOptional(json, "lifecycle", net.cyberpunk042.field.influence.LifecycleConfig::fromJson);
         
+        // Parse force config (only meaningful for type == FORCE)
+        net.cyberpunk042.field.force.ForceFieldConfig forceConfig = 
+            JsonParseUtils.parseOptional(json, "forceConfig", net.cyberpunk042.field.force.ForceFieldConfig::fromJson);
+        
         Logging.FIELD.topic("parse").debug("Parsed FieldDefinition '{}' with {} layers, {} bindings, {} triggers", 
             id, layers.size(), bindings.size(), triggers.size());
         return new FieldDefinition(
             id, fieldType, baseRadius, theme, layers,
             modifiers, follow, beam,
-            bindings, triggers, lifecycle);
+            bindings, triggers, lifecycle, forceConfig);
     }
     
     /**

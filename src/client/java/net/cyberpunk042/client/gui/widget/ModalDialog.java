@@ -115,7 +115,10 @@ public class ModalDialog {
     // BUILD
     // ═══════════════════════════════════════════════════════════════════════════
     
-    private void rebuild() {
+    /**
+     * Rebuilds the dialog content. Call after dynamic changes to content.
+     */
+    public void rebuild() {
         widgets.clear();
         
         // Center dialog

@@ -1,0 +1,46 @@
+{
+    "id": "pulsing_heart",
+    "name": "Pulsing Heart",
+    "description": "Rhythmic pull-push-pull cycle - breathing effect",
+    "zones": [
+        {
+            "radius": 10,
+            "strength": 0.12,
+            "falloff": "gaussian"
+        },
+        {
+            "radius": 4,
+            "strength": 0.20,
+            "falloff": "constant"
+        }
+    ],
+    "phases": [
+        {
+            "start": 0,
+            "end": 30,
+            "polarity": "pull",
+            "strength": 1.0
+        },
+        {
+            "start": 30,
+            "end": 50,
+            "polarity": "push",
+            "strength": 0.8
+        },
+        {
+            "start": 50,
+            "end": 80,
+            "polarity": "pull",
+            "strength": 1.2
+        },
+        {
+            "start": 80,
+            "end": 100,
+            "polarity": "push",
+            "strength": 1.0
+        }
+    ],
+    "maxVelocity": 1.2,
+    "verticalBoost": 0.1,
+    "damping": 0.01
+}

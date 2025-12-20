@@ -587,10 +587,14 @@ public class FieldEditState {
     @StateField @DefinitionField("lifecycle") 
     private net.cyberpunk042.field.influence.LifecycleConfig lifecycle = net.cyberpunk042.field.influence.LifecycleConfig.DEFAULT;
     
+    @StateField @DefinitionField("forceConfig") 
+    private net.cyberpunk042.field.force.ForceFieldConfig forceConfig = null;
+    
     public net.cyberpunk042.field.BeamConfig beam() { return beam; }
     public net.cyberpunk042.field.instance.FollowConfig follow() { return follow; }
     public net.cyberpunk042.field.Modifiers modifiers() { return modifiers; }
     public net.cyberpunk042.field.influence.LifecycleConfig lifecycle() { return lifecycle; }
+    public net.cyberpunk042.field.force.ForceFieldConfig forceConfig() { return forceConfig; }
     
     public FieldEditState() {
         // Initialize managers with required references

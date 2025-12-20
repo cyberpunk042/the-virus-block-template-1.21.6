@@ -20,34 +20,34 @@ public final class Logging {
     public static final Channel SINGULARITY   = register(Channel.of("singularity",   "Singularity",   LogLevel.INFO));
     public static final Channel COLLAPSE      = register(Channel.of("collapse",      "Collapse",      LogLevel.INFO));
     public static final Channel FUSE          = register(Channel.of("fuse",          "Fuse",          LogLevel.INFO));
-    public static final Channel CHUNKS        = register(Channel.of("chunks",        "Chunks",        LogLevel.WARN));
-    public static final Channel GROWTH        = register(Channel.of("growth",        "Growth",        LogLevel.WARN));
-    public static final Channel RENDER        = register(Channel.of("render",        "Render",        LogLevel.WARN));
-    public static final Channel COLLISION     = register(Channel.of("collision",     "Collision",     LogLevel.OFF));
-    public static final Channel PROFILER      = register(Channel.of("profiler",      "Profiler",      LogLevel.OFF));
-    public static final Channel ORCHESTRATOR  = register(Channel.of("orchestrator",  "Orchestrator",  LogLevel.WARN));
-    public static final Channel SCENARIO      = register(Channel.of("scenario",      "Scenario",      LogLevel.WARN));
-    public static final Channel PHASE         = register(Channel.of("phase",         "Phase",         LogLevel.WARN));
-    public static final Channel SCHEDULER     = register(Channel.of("scheduler",     "Scheduler",     LogLevel.OFF));
+    public static final Channel CHUNKS        = register(Channel.of("chunks",        "Chunks",        LogLevel.INFO));
+    public static final Channel GROWTH        = register(Channel.of("growth",        "Growth",        LogLevel.INFO));
+    public static final Channel RENDER        = register(Channel.of("render",        "Render",        LogLevel.INFO));
+    public static final Channel COLLISION     = register(Channel.of("collision",     "Collision",     LogLevel.INFO));
+    public static final Channel PROFILER      = register(Channel.of("profiler",      "Profiler",      LogLevel.INFO));
+    public static final Channel ORCHESTRATOR  = register(Channel.of("orchestrator",  "Orchestrator",  LogLevel.INFO));
+    public static final Channel SCENARIO      = register(Channel.of("scenario",      "Scenario",      LogLevel.INFO));
+    public static final Channel PHASE         = register(Channel.of("phase",         "Phase",         LogLevel.INFO));
+    public static final Channel SCHEDULER     = register(Channel.of("scheduler",     "Scheduler",     LogLevel.INFO));
     public static final Channel CONFIG        = register(Channel.of("config",        "Config",        LogLevel.INFO));
-    public static final Channel REGISTRY      = register(Channel.of("registry",      "Registry",      LogLevel.WARN));
+    public static final Channel REGISTRY      = register(Channel.of("registry",      "Registry",      LogLevel.INFO));
     public static final Channel COMMANDS      = register(Channel.of("commands",      "Commands",      LogLevel.INFO));
-    public static final Channel EFFECTS       = register(Channel.of("effects",       "Effects",       LogLevel.OFF));
-    public static final Channel INFECTION     = register(Channel.of("infection",     "Infection",     LogLevel.OFF));
-    public static final Channel CALLBACKS     = register(Channel.of("callbacks",     "Callbacks",     LogLevel.WARN));
+    public static final Channel EFFECTS       = register(Channel.of("effects",       "Effects",       LogLevel.INFO));
+    public static final Channel INFECTION     = register(Channel.of("infection",     "Infection",     LogLevel.INFO));
+    public static final Channel CALLBACKS     = register(Channel.of("callbacks",     "Callbacks",     LogLevel.INFO));
     public static final Channel FIELD         = register(Channel.of("field",         "Field",         LogLevel.INFO));
     public static final Channel GUI = register(Channel.of("gui", "GUI", LogLevel.INFO));
     
     // ========== FIELD SYSTEM CHANNELS ==========
     
-    /** Binding evaluation (player state → field properties). Very verbose - OFF by default. */
-    public static final Channel BINDING       = register(Channel.of("binding",       "Binding",       LogLevel.OFF));
+    /** Binding evaluation (player state → field properties). */
+    public static final Channel BINDING       = register(Channel.of("binding",       "Binding",       LogLevel.INFO));
     
-    /** Animation updates (spin, pulse, wobble). Every-frame - OFF by default. */
-    public static final Channel ANIMATION     = register(Channel.of("animation",     "Animation",     LogLevel.OFF));
+    /** Animation updates (spin, pulse, wobble). */
+    public static final Channel ANIMATION     = register(Channel.of("animation",     "Animation",     LogLevel.INFO));
     
     /** Network sync (field packets, state sync). */
-    public static final Channel NETWORK       = register(Channel.of("network",       "Network",       LogLevel.WARN));
+    public static final Channel NETWORK       = register(Channel.of("network",       "Network",       LogLevel.INFO));
     
     // ========== REGISTRY ==========
     

@@ -52,15 +52,11 @@ public final class GrowthCollisionMixinHelper {
 			Box queryBox,
 			@Nullable Iterable<VoxelShape> vanillaCollisions) {
 		if (entity == null || world == null || world.isClient) {
-			logSkippedNull(entity, world, queryBox);
 			return Collections.emptyList();
 		}
 
 		Collection<ProgressiveGrowthBlockEntity> actives = GrowthCollisionTracker.active(world);
-		int vanillaSize = sizeOf(vanillaCollisions);
-		logStart(entity, world, queryBox, vanillaSize, actives.size());
 		if (actives.isEmpty()) {
-			logTrackerEmpty(entity, world, queryBox, vanillaSize);
 			return Collections.emptyList();
 		}
 
@@ -70,14 +66,12 @@ public final class GrowthCollisionMixinHelper {
 		EnumSet<CollisionScenario> scenariosLogged = EnumSet.noneOf(CollisionScenario.class);
 		for (ProgressiveGrowthBlockEntity growth : actives) {
 			if (growth == null || growth.isRemoved() || growth.getWorld() != world || !growth.hasCollision()) {
-				logSkippedGrowth(entity, growth, world);
 				continue;
 			}
 			List<Box> panelBoxes = growth.getCollisionPanels();
 			boolean usedPanels = panelBoxes != null && !panelBoxes.isEmpty();
 			VoxelShape worldShape = growth.worldShape(ProgressiveGrowthBlock.ShapeType.COLLISION);
 			if (!usedPanels && (worldShape == null || worldShape.isEmpty())) {
-				logEmptyShape(entity, growth);
 				continue;
 			}
 			Iterable<Box> boxes = usedPanels ? panelBoxes : worldShape.getBoundingBoxes();
@@ -126,68 +120,6 @@ public final class GrowthCollisionMixinHelper {
 				queryBox);
 	}
 
-	private static void logStart(
-			Entity entity,
-			World world,
-			Box queryBox,
-			int vanillaSize,
-			int actives) {
-		if (!GrowthCollisionDebug.shouldLog(entity)) {
-			return;
-		}
-		PlayerEntity player = (PlayerEntity) entity;
-		Logging.COLLISION.info(
-				"[GrowthCollision:debug] player={} world={} query={} baseCollisions={} actives={}",
-				player.getName().getString(),
-				world.getRegistryKey().getValue(),
-				queryBox,
-				vanillaSize,
-				actives);
-	}
-
-	private static void logTrackerEmpty(
-			Entity entity,
-			World world,
-			Box queryBox,
-			int vanillaSize) {
-		if (!GrowthCollisionDebug.shouldLog(entity)) {
-			return;
-		}
-		PlayerEntity player = (PlayerEntity) entity;
-		Logging.COLLISION.info(
-				"[GrowthCollision:debug] player={} world={} query={} baseCollisions={} trackerEmpty=1",
-				player.getName().getString(),
-				world.getRegistryKey().getValue(),
-				queryBox,
-				vanillaSize);
-	}
-
-	private static void logSkippedGrowth(Entity entity, @Nullable ProgressiveGrowthBlockEntity growth, World expectedWorld) {
-		if (!GrowthCollisionDebug.shouldLog(entity) || growth == null) {
-			return;
-		}
-		PlayerEntity player = (PlayerEntity) entity;
-		BlockPos pos = growth.getPos();
-		Logging.COLLISION.info(
-				"[GrowthCollision:debug] player={} skippedGrowth pos={} removed={} worldMatch={} hasCollision={}",
-				player.getName().getString(),
-				pos,
-				growth.isRemoved(),
-				growth.getWorld() == expectedWorld,
-				growth.hasCollision());
-	}
-
-	private static void logEmptyShape(Entity entity, ProgressiveGrowthBlockEntity growth) {
-		if (!GrowthCollisionDebug.shouldLog(entity)) {
-			return;
-		}
-		PlayerEntity player = (PlayerEntity) entity;
-		Logging.COLLISION.info(
-				"[GrowthCollision:debug] player={} growth={} yielded empty world shape",
-				player.getName().getString(),
-				growth.getPos());
-	}
-
 	private static int logBox(
 			Entity entity,
 			ProgressiveGrowthBlockEntity growth,
@@ -220,19 +152,6 @@ public final class GrowthCollisionMixinHelper {
 				formatOverlap(overlapY),
 				formatOverlap(overlapZ));
 		return 1;
-	}
-
-	private static void logSkippedNull(@Nullable Entity entity, @Nullable World world, Box queryBox) {
-		if (!GrowthCollisionDebug.shouldLog(entity)) {
-			return;
-		}
-		PlayerEntity player = (PlayerEntity) entity;
-		Logging.COLLISION.info(
-				"[GrowthCollision:debug] player={} skipped (entity/world missing) world={} isClient={} query={}",
-				player.getName().getString(),
-				world,
-				world != null && world.isClient,
-				queryBox);
 	}
 
 	private static double overlap(double minA, double maxA, double minB, double maxB) {

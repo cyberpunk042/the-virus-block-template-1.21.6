@@ -4,6 +4,7 @@ package net.cyberpunk042.client.gui.panel;
 // import net.cyberpunk042.client.gui.panel.sub.ArrangeSubPanel;
 import net.cyberpunk042.client.gui.panel.sub.BindingsSubPanel;
 import net.cyberpunk042.client.gui.panel.sub.BeamSubPanel;
+import net.cyberpunk042.client.gui.panel.sub.ForceSubPanel;
 import net.cyberpunk042.client.gui.panel.sub.LifecycleSubPanel;
 import net.cyberpunk042.client.gui.panel.sub.TriggerSubPanel;
 // SimplifiedFieldRenderer removed - using TestFieldRenderer now
@@ -38,6 +39,7 @@ public class DebugPanel extends AbstractPanel {
     private TriggerSubPanel triggerPanel;
     private BindingsSubPanel bindingsPanel;
     private BeamSubPanel beamPanel;
+    private ForceSubPanel forcePanel;
     // COMMENTED OUT - see init method for details
     // private ArrangeSubPanel arrangePanel;
     
@@ -97,6 +99,12 @@ public class DebugPanel extends AbstractPanel {
         triggerPanel.init(width, height);
         contentY += triggerPanel.getHeight() + GuiConstants.SECTION_SPACING;
         
+        // Force Field controls
+        forcePanel = new ForceSubPanel(parent, state, contentY);
+        forcePanel.init(width, height);
+        // Modal opener will be set by screen if available
+        contentY += forcePanel.getHeight() + GuiConstants.SECTION_SPACING;
+        
         // Bindings panel (property <- source mappings)
         bindingsPanel = new BindingsSubPanel(parent, state, contentY);
         contentY += bindingsPanel.getHeight() + GuiConstants.SECTION_SPACING;
@@ -119,7 +127,7 @@ public class DebugPanel extends AbstractPanel {
         
         contentHeight = contentY;
         
-        Logging.GUI.topic("panel").debug("DebugPanel initialized with 4 sub-panels");
+        Logging.GUI.topic("panel").debug("DebugPanel initialized with 5 sub-panels");
     }
     
     @Override
@@ -169,6 +177,10 @@ public class DebugPanel extends AbstractPanel {
         if (triggerPanel != null) {
             triggerPanel.setScrollOffset(scrollOffset);
             triggerPanel.render(context, mouseX, mouseY + scrollOffset, delta);
+        }
+        if (forcePanel != null) {
+            forcePanel.setScrollOffset(scrollOffset);
+            forcePanel.render(context, mouseX, mouseY + scrollOffset, delta);
         }
         if (bindingsPanel != null) {
             bindingsPanel.render(context, mouseX, mouseY + scrollOffset, delta);

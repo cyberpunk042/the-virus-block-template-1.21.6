@@ -1,0 +1,60 @@
+{
+    "id": "void_tear",
+    "name": "Void Tear",
+    "description": "Intense pull with violent expulsion - like a collapsing singularity",
+    "zones": [
+        {
+            "radius": 12,
+            "strength": 0.10,
+            "falloff": "quadratic"
+        },
+        {
+            "radius": 6,
+            "strength": 0.25,
+            "falloff": "quadratic"
+        },
+        {
+            "radius": 2,
+            "strength": 0.50,
+            "falloff": "constant"
+        }
+    ],
+    "phases": [
+        {
+            "start": 0,
+            "end": 75,
+            "polarity": "pull",
+            "strength": 1.0,
+            "notification": {
+                "message": "Reality tears...",
+                "offset": 0,
+                "type": "warning"
+            }
+        },
+        {
+            "start": 75,
+            "end": 90,
+            "polarity": "hold",
+            "strength": 0.3,
+            "notification": {
+                "message": "⚠ COLLAPSE IMMINENT",
+                "offset": -20,
+                "type": "danger"
+            }
+        },
+        {
+            "start": 90,
+            "end": 100,
+            "polarity": "push",
+            "strength": 3.5,
+            "notification": {
+                "message": "RELEASE!",
+                "offset": 0,
+                "type": "danger"
+            }
+        }
+    ],
+    "maxVelocity": 1.8,
+    "verticalBoost": 0.5,
+    "damping": 0.015
+}

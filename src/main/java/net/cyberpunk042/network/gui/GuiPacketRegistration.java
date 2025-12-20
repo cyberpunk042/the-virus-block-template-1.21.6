@@ -28,8 +28,9 @@ public final class GuiPacketRegistration {
         PayloadTypeRegistry.playC2S().register(ProfileLoadC2SPayload.ID, ProfileLoadC2SPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(DebugFieldC2SPayload.ID, DebugFieldC2SPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(RequestProfilesC2SPayload.ID, RequestProfilesC2SPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(FieldSpawnC2SPayload.ID, FieldSpawnC2SPayload.CODEC);
         
-        Logging.GUI.topic("network").info("GUI packets registered (5 S2C, 4 C2S)");
+        Logging.GUI.topic("network").info("GUI packets registered (5 S2C, 5 C2S)");
     }
     
     /**
@@ -135,6 +136,82 @@ public final class GuiPacketRegistration {
                     java.util.List<String> profiles = ServerProfileProvider.listProfiles();
                     net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(
                         player, new ServerProfilesS2CPayload(profiles));
+                });
+            }
+        );
+        
+        // Field spawn handler - spawn force fields from GUI
+        net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.registerGlobalReceiver(
+            FieldSpawnC2SPayload.ID, (payload, context) -> {
+                context.server().execute(() -> {
+                    var player = context.player();
+                    var world = player.getWorld();
+                    
+                    Logging.GUI.topic("network").info(">>> FIELD SPAWN PACKET RECEIVED <<<");
+                    Logging.GUI.topic("network").info("Player {} spawning field", player.getName().getString());
+                    
+                    try {
+                        // Parse the field definition from JSON
+                        net.cyberpunk042.field.loader.FieldLoader loader = new net.cyberpunk042.field.loader.FieldLoader();
+                        net.cyberpunk042.field.FieldDefinition definition = loader.parseDefinition(
+                            com.google.gson.JsonParser.parseString(payload.configJson()).getAsJsonObject()
+                        );
+                        
+                        if (definition == null) {
+                            Logging.GUI.topic("network").warn("Failed to parse field definition");
+                            return;
+                        }
+                        
+                        // Create unique ID for this spawn
+                        String fullId = "force_" + java.util.UUID.randomUUID().toString().substring(0, 8) + "_" + System.currentTimeMillis();
+                        net.minecraft.util.Identifier defId = net.minecraft.util.Identifier.of("the-virus-block", fullId);
+                        
+                        // Build the spawn definition with unique ID
+                        net.cyberpunk042.field.FieldDefinition spawnDef = net.cyberpunk042.field.FieldDefinition.builder(fullId)
+                            .type(definition.type())
+                            .baseRadius(definition.baseRadius())
+                            .themeId(definition.themeId())
+                            .layers(definition.layers())
+                            .modifiers(definition.modifiers())
+                            .follow(definition.follow())
+                            .beam(definition.beam())
+                            .bindings(definition.bindings())
+                            .triggers(definition.triggers())
+                            .lifecycle(definition.lifecycle())
+                            .forceConfig(definition.forceConfig())
+                            .build();
+                        net.cyberpunk042.field.FieldRegistry.register(spawnDef);
+                        
+                        // Sync definition to client - use full identifier with namespace!
+                        String spawnDefJson = spawnDef.toJson().toString();
+                        net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(
+                            player,
+                            new net.cyberpunk042.network.FieldDefinitionSyncPayload(defId.toString(), spawnDefJson)
+                        );
+                        
+                        // Calculate spawn position
+                        net.minecraft.util.math.Vec3d playerPos = player.getPos();
+                        net.minecraft.util.math.Vec3d lookDir = player.getRotationVector();
+                        double spawnX = playerPos.x + lookDir.x * payload.offsetX();
+                        double spawnY = playerPos.y + payload.offsetY() + 1.0;
+                        double spawnZ = playerPos.z + lookDir.z * payload.offsetX();
+                        net.minecraft.util.math.Vec3d spawnPos = new net.minecraft.util.math.Vec3d(spawnX, spawnY, spawnZ);
+                        
+                        // Spawn the field (this triggers onSpawn callback which sends FieldSpawnPayload)
+                        net.cyberpunk042.field.FieldManager manager = net.cyberpunk042.field.FieldManager.get(world);
+                        var instance = manager.spawnAt(defId, spawnPos, 1.0f, payload.durationTicks());
+                        
+                        if (instance != null) {
+                            // onSpawn callback sends FieldSpawnPayload to all players
+                            Logging.GUI.topic("network").info("Field {} spawned at {} for {} ticks", 
+                                instance.id(), spawnPos, payload.durationTicks());
+                        } else {
+                            Logging.GUI.topic("network").warn("Failed to spawn field");
+                        }
+                    } catch (Exception e) {
+                        Logging.GUI.topic("network").error("Failed to spawn field: {}", e.getMessage());
+                        e.printStackTrace();
+                    }
                 });
             }
         );

@@ -100,6 +100,13 @@ public final class ClientFieldManager {
         return states.size();
     }
     
+    /**
+     * @return all active field states (unmodifiable view)
+     */
+    public java.util.Collection<ClientFieldState> allStates() {
+        return java.util.Collections.unmodifiableCollection(states.values());
+    }
+    
     // =========================================================================
     // Personal field
     // =========================================================================

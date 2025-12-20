@@ -3,6 +3,7 @@ package net.cyberpunk042.field;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonArray;
 
+import net.cyberpunk042.field.force.ForceFieldConfig;
 import net.cyberpunk042.field.influence.BindingConfig;
 import net.cyberpunk042.field.influence.LifecycleConfig;
 import net.cyberpunk042.field.influence.TriggerConfig;
@@ -33,6 +34,7 @@ import net.cyberpunk042.util.json.JsonSerializer;
  *   <li><b>bindings</b> - Reactive bindings (property → external value)</li>
  *   <li><b>triggers</b> - Event-triggered effects</li>
  *   <li><b>lifecycle</b> - Spawn/despawn animation config</li>
+ *   <li><b>forceConfig</b> - Force field physics (only for type=FORCE)</li>
  * </ul>
  * 
  * <h2>JSON Format</h2>
@@ -61,6 +63,7 @@ import net.cyberpunk042.util.json.JsonSerializer;
  * @see FollowConfig
  * @see BeamConfig
  * @see LifecycleConfig
+ * @see ForceFieldConfig
  */
 public record FieldDefinition(
     String id,
@@ -73,7 +76,8 @@ public record FieldDefinition(
     @Nullable @JsonField(skipIfNull = true) BeamConfig beam,
     @JsonField(skipIfEmpty = true) Map<String, BindingConfig> bindings,
     @JsonField(skipIfEmpty = true) List<TriggerConfig> triggers,
-    @Nullable @JsonField(skipIfNull = true) LifecycleConfig lifecycle
+    @Nullable @JsonField(skipIfNull = true) LifecycleConfig lifecycle,
+    @Nullable @JsonField(skipIfNull = true) ForceFieldConfig forceConfig
 ){
     
     /**
@@ -93,7 +97,7 @@ public record FieldDefinition(
     public static FieldDefinition empty(String id) {
         return new FieldDefinition(
             id, FieldType.SHIELD, 1.0f, null, List.of(),
-            null, null, null, Map.of(), List.of(), null);
+            null, null, null, Map.of(), List.of(), null, null);
     }
     
     /**
@@ -102,7 +106,7 @@ public record FieldDefinition(
     public static FieldDefinition of(String id, List<FieldLayer> layers) {
         return new FieldDefinition(
             id, FieldType.SHIELD, 1.0f, null, layers,
-            null, null, null, Map.of(), List.of(), null);
+            null, null, null, Map.of(), List.of(), null, null);
     }
     
     /**
@@ -111,7 +115,7 @@ public record FieldDefinition(
     public static FieldDefinition of(String id, List<FieldLayer> layers, String themeId) {
         return new FieldDefinition(
             id, FieldType.SHIELD, 1.0f, themeId, layers,
-            null, null, null, Map.of(), List.of(), null);
+            null, null, null, Map.of(), List.of(), null, null);
     }
     
     /**
@@ -143,6 +147,20 @@ public record FieldDefinition(
     }
     
     /**
+     * Whether this field has force physics.
+     */
+    public boolean hasForceConfig() {
+        return forceConfig != null;
+    }
+    
+    /**
+     * Whether this is a force-type field.
+     */
+    public boolean isForceField() {
+        return type == FieldType.FORCE && forceConfig != null;
+    }
+    
+    /**
      * Serializes this field definition to JSON.
      * 
      * @return JSON representation of this definition
@@ -170,6 +188,7 @@ public record FieldDefinition(
         private Map<String, BindingConfig> bindings = Map.of();
         private List<TriggerConfig> triggers = List.of();
         private LifecycleConfig lifecycle = null;
+        private ForceFieldConfig forceConfig = null;
         
         public Builder(String id) { this.id = id; }
         
@@ -184,12 +203,13 @@ public record FieldDefinition(
         public Builder bindings(Map<String, BindingConfig> b) { this.bindings = b; return this; }
         public Builder triggers(List<TriggerConfig> t) { this.triggers = t; return this; }
         public Builder lifecycle(LifecycleConfig l) { this.lifecycle = l; return this; }
+        public Builder forceConfig(ForceFieldConfig f) { this.forceConfig = f; return this; }
         
         public FieldDefinition build() {
             return new FieldDefinition(
                 id, type, baseRadius, themeId, layers,
                 modifiers, follow, beam,
-                bindings, triggers, lifecycle);
+                bindings, triggers, lifecycle, forceConfig);
         }
     }
 }

@@ -1,0 +1,160 @@
+{
+    "id": "gravity_well",
+    "type": "force",
+    "baseRadius": 15,
+    "forceConfig": {
+        "zones": [
+            {
+                "radius": 15,
+                "strength": 0.08,
+                "falloff": "linear"
+            },
+            {
+                "radius": 8,
+                "strength": 0.15,
+                "falloff": "quadratic"
+            },
+            {
+                "radius": 3,
+                "strength": 0.30,
+                "falloff": "constant"
+            }
+        ],
+        "phases": [
+            {
+                "start": 0,
+                "end": 70,
+                "polarity": "pull",
+                "strengthMultiplier": 1.0,
+                "notification": {
+                    "message": "Gravity intensifying...",
+                    "offset": 0,
+                    "type": "info"
+                }
+            },
+            {
+                "start": 70,
+                "end": 85,
+                "polarity": "hold",
+                "strengthMultiplier": 0.5,
+                "notification": {
+                    "message": "⚠️ Collapse imminent!",
+                    "offset": -30,
+                    "type": "warning"
+                }
+            },
+            {
+                "start": 85,
+                "end": 100,
+                "polarity": "push",
+                "strengthMultiplier": 2.5,
+                "notification": {
+                    "message": "RELEASE!",
+                    "offset": 0,
+                    "type": "danger"
+                }
+            }
+        ],
+        "maxVelocity": 1.5,
+        "verticalBoost": 0.35,
+        "damping": 0.02
+    },
+    "layers": [
+        {
+            "id": "outer_field",
+            "primitives": [
+                {
+                    "id": "outer_sphere",
+                    "type": "sphere",
+                    "shape": {
+                        "radius": 15,
+                        "latSteps": 16,
+                        "lonSteps": 24,
+                        "algorithm": "LAT_LON"
+                    },
+                    "fill": {
+                        "mode": "WIREFRAME",
+                        "wireThickness": 1.5
+                    },
+                    "appearance": {
+                        "color": "#4488FF",
+                        "alpha": {
+                            "min": 0.15,
+                            "max": 0.3
+                        },
+                        "glow": 0.4
+                    }
+                }
+            ]
+        },
+        {
+            "id": "mid_field",
+            "primitives": [
+                {
+                    "id": "mid_sphere",
+                    "type": "sphere",
+                    "shape": {
+                        "radius": 8,
+                        "latSteps": 12,
+                        "lonSteps": 18,
+                        "algorithm": "LAT_LON"
+                    },
+                    "fill": {
+                        "mode": "WIREFRAME",
+                        "wireThickness": 2.0
+                    },
+                    "appearance": {
+                        "color": "#6644FF",
+                        "alpha": {
+                            "min": 0.25,
+                            "max": 0.5
+                        },
+                        "glow": 0.6
+                    }
+                }
+            ]
+        },
+        {
+            "id": "core",
+            "primitives": [
+                {
+                    "id": "core_sphere",
+                    "type": "sphere",
+                    "shape": {
+                        "radius": 3,
+                        "latSteps": 8,
+                        "lonSteps": 12,
+                        "algorithm": "UV"
+                    },
+                    "fill": {
+                        "mode": "SOLID"
+                    },
+                    "appearance": {
+                        "color": "#AA22FF",
+                        "alpha": {
+                            "min": 0.6,
+                            "max": 0.9
+                        },
+                        "glow": 1.0,
+                        "emissive": true
+                    },
+                    "animation": {
+                        "pulse": {
+                            "speed": 2.0,
+                            "scale": 0.15,
+                            "mode": "SMOOTH"
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "beam": {
+        "enabled": true,
+        "innerRadius": 0.3,
+        "outerRadius": 0.8,
+        "height": 0,
+        "color": "#8844FF",
+        "glow": 0.8
+    }
+}

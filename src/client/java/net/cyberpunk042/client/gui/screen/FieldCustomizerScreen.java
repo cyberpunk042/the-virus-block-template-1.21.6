@@ -356,6 +356,33 @@ public class FieldCustomizerScreen extends Screen {
         ModalFactory.focusTextField(activeModal, this);
     }
     
+    /**
+     * Shows the force field configuration modal.
+     * Called by ForceSubPanel when Configure button is clicked.
+     * 
+     * @param currentConfig Current force config to edit (or null for default)
+     * @param onSave Callback when user saves the config
+     */
+    public void showForceModal(net.cyberpunk042.field.force.ForceFieldConfig currentConfig, 
+                               java.util.function.Consumer<net.cyberpunk042.field.force.ForceFieldConfig> onSave) {
+        // Use current config or default
+        net.cyberpunk042.field.force.ForceFieldConfig config = currentConfig != null 
+            ? currentConfig 
+            : net.cyberpunk042.field.force.ForceFieldConfig.DEFAULT;
+        
+        ForceConfigModal forceModal = new ForceConfigModal(
+            width, height, textRenderer, config,
+            savedConfig -> {
+                onSave.accept(savedConfig);
+                ToastNotification.success("Force config saved");
+            });
+        
+        activeModal = forceModal.getDialog();
+        activeModal.onClose(() -> { activeModal = null; registerWidgets(); });
+        activeModal.show();
+        registerWidgets();
+    }
+    
     // ═══════════════════════════════════════════════════════════════════════════
     // TICK & RENDER (~60 lines)
     // ═══════════════════════════════════════════════════════════════════════════
@@ -431,6 +458,21 @@ public class FieldCustomizerScreen extends Screen {
     
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        // ═══════════════════════════════════════════════════════════════════
+        // MODAL HANDLING - MUST be first to block ALL background interaction
+        // ═══════════════════════════════════════════════════════════════════
+        if (activeModal != null && activeModal.isVisible()) {
+            // ONLY process modal widgets, NOT super.mouseClicked which would hit background
+            for (ClickableWidget w : activeModal.getWidgets()) {
+                if (w.isMouseOver(mouseX, mouseY)) {
+                    w.mouseClicked(mouseX, mouseY, button);
+                    return true;
+                }
+            }
+            // Click was outside modal widgets but modal is visible - block it
+            return true;
+        }
+        
         // Forward to ProfilesPanel dialog first (if visible)
         if (profilesPanel != null && profilesPanel.isDialogVisible()) {
             if (profilesPanel.mouseClicked(mouseX, mouseY, button)) {
@@ -451,7 +493,6 @@ public class FieldCustomizerScreen extends Screen {
             if (presetDropdown.handleClick(mouseX, mouseY, button)) return true;
             presetDropdown.close();
         }
-        if (activeModal != null && activeModal.isVisible()) return super.mouseClicked(mouseX, mouseY, button);
         return super.mouseClicked(mouseX, mouseY, button);
     }
     

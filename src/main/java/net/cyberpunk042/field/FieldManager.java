@@ -148,12 +148,123 @@ public final class FieldManager {
             Map.Entry<Long, FieldInstance> entry = it.next();
             FieldInstance instance = entry.getValue();
             
+            // Apply force physics if this field has a forceConfig
+            FieldDefinition def = FieldRegistry.get(instance.definitionId());
+            if (def == null) {
+                // Log once per second (every 20 ticks) to avoid spam
+                if (instance.age() % 20 == 0) {
+                    Logging.REGISTRY.topic("force").debug(
+                        "No definition found for field {} (defId={})", 
+                        instance.id(), instance.definitionId());
+                }
+            } else if (def.forceConfig() != null) {
+                applyFieldForces(instance, def);
+            }
+            
             if (instance.tick()) {
                 it.remove();
                 if (instance.ownerUuid() != null) playerFields.remove(instance.ownerUuid());
                 if (onRemove != null) onRemove.accept(entry.getKey());
             }
         }
+    }
+    
+    /**
+     * Applies force physics to entities near the field.
+     */
+    private void applyFieldForces(FieldInstance instance, FieldDefinition def) {
+        var forceConfig = def.forceConfig();
+        float maxRadius = forceConfig.maxRadius() * instance.scale();
+        
+        // Build search box around field position
+        Vec3d center = instance.position();
+        net.minecraft.util.math.Box searchBox = new net.minecraft.util.math.Box(
+            center.x - maxRadius, center.y - maxRadius, center.z - maxRadius,
+            center.x + maxRadius, center.y + maxRadius, center.z + maxRadius
+        );
+        
+        // Calculate normalized time for phase effects
+        float normalizedTime = instance.maxLifeTicks() > 0 
+            ? (float) instance.age() / instance.maxLifeTicks() 
+            : 0.5f; // Default to middle of cycle for infinite fields
+        
+        // Create force field calculator
+        net.cyberpunk042.field.force.field.RadialForceField forceField = 
+            new net.cyberpunk042.field.force.field.RadialForceField(forceConfig);
+        
+        // Find and affect entities - EXCLUDE players (they get client-side forces for smooth feedback)
+        for (net.minecraft.entity.Entity entity : world.getEntitiesByClass(
+                net.minecraft.entity.LivingEntity.class, searchBox, 
+                e -> e.isAlive() && !e.isSpectator() && !(e instanceof net.minecraft.server.network.ServerPlayerEntity))) {
+            
+            applyForceToEntity((net.minecraft.entity.LivingEntity) entity, center, 
+                forceField, forceConfig, normalizedTime, instance.age(), instance.maxLifeTicks());
+        }
+    }
+    
+    /**
+     * Applies force to a single entity.
+     */
+    private void applyForceToEntity(net.minecraft.entity.LivingEntity entity, Vec3d center,
+                                    net.cyberpunk042.field.force.field.ForceField forceField,
+                                    net.cyberpunk042.field.force.ForceFieldConfig config,
+                                    float normalizedTime, int ticksElapsed, int durationTicks) {
+        // Create force context
+        net.cyberpunk042.field.force.core.ForceContext context = 
+            net.cyberpunk042.field.force.core.ForceContext.forEntity(
+                entity, center, normalizedTime, ticksElapsed, durationTicks);
+        
+        // Check if in range
+        double distance = context.distance();
+        if (!forceField.affectsDistance(distance)) {
+            // Log once per second if out of range
+            if (ticksElapsed % 20 == 0) {
+                Logging.REGISTRY.topic("force").trace(
+                    "Entity {} at distance {:.1f} outside force range", 
+                    entity.getName().getString(), distance);
+            }
+            return;
+        }
+        
+        // Calculate force
+        Vec3d force = forceField.calculateForce(context);
+        if (force.lengthSquared() < 0.0001) {
+            return;
+        }
+        
+        // Log force application (once per second to avoid spam)
+        if (ticksElapsed % 20 == 0) {
+            Logging.REGISTRY.topic("force").debug(
+                "Applying force to {} at dist={:.1f}: force=({:.3f},{:.3f},{:.3f}) time={:.1f}%", 
+                entity.getName().getString(), distance, 
+                force.x, force.y, force.z, normalizedTime * 100);
+        }
+        
+        // Apply damping
+        Vec3d currentVel = entity.getVelocity();
+        if (config.damping() > 0) {
+            currentVel = currentVel.multiply(1.0 - config.damping());
+        }
+        
+        // Add force
+        Vec3d newVel = currentVel.add(force);
+        
+        // Cap velocity
+        float maxVel = config.maxVelocity();
+        double hSpeed = newVel.horizontalLength();
+        if (hSpeed > maxVel) {
+            double scale = maxVel / hSpeed;
+            newVel = new Vec3d(newVel.x * scale, newVel.y, newVel.z * scale);
+        }
+        newVel = new Vec3d(newVel.x, 
+            net.minecraft.util.math.MathHelper.clamp(newVel.y, -maxVel, maxVel), 
+            newVel.z);
+        
+        // Apply
+        entity.setVelocity(newVel);
+        entity.velocityModified = true;
+        entity.velocityDirty = true;
+        entity.fallDistance = 0.0f;
     }
     
     public void clear() {

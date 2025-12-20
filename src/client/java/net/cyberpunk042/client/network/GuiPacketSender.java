@@ -61,4 +61,25 @@ public final class GuiPacketSender {
         Logging.GUI.topic("network").debug("Requesting server profiles");
         ClientPlayNetworking.send(new RequestProfilesC2SPayload());
     }
+    
+    /**
+     * Spawn force field at player position with offset.
+     * 
+     * @param fieldJson Complete field definition JSON
+     * @param durationTicks Duration in ticks
+     * @param offsetForward Forward offset from player (negative = behind)
+     * @param offsetVertical Vertical offset from player
+     * @param offsetSide Side offset from player (positive = right)
+     */
+    public static void spawnForceField(String fieldJson, int durationTicks,
+                                        float offsetForward, float offsetVertical, float offsetSide) {
+        Logging.GUI.topic("network").info("Sending force field spawn: duration={} ticks, offset=({}, {}, {})", 
+            durationTicks, offsetForward, offsetVertical, offsetSide);
+        
+        // Send the spawn request with the complete field definition JSON
+        var payload = FieldSpawnC2SPayload.create(
+            fieldJson, durationTicks, offsetForward, offsetVertical, offsetSide);
+        Logging.GUI.topic("network").info(">>> SENDING FieldSpawnC2SPayload (ID={}) <<<", payload.getId().id());
+        ClientPlayNetworking.send(payload);
+    }
 }

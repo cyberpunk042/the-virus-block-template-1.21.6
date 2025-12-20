@@ -21,6 +21,7 @@ public final class GuiPacketIds {
     public static final Identifier PROFILE_LOAD_C2S = id("profile_load");
     public static final Identifier DEBUG_FIELD_C2S = id("debug_field_c2s");
     public static final Identifier REQUEST_PROFILES_C2S = id("request_profiles");
+    public static final Identifier FORCE_FIELD_SPAWN_C2S = id("force_field_spawn");
     
     private static Identifier id(String path) {
         return Identifier.of(NAMESPACE, path);

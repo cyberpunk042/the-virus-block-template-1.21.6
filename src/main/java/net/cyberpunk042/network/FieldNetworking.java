@@ -37,11 +37,13 @@ public final class FieldNetworking {
         
         int playerCount = world.getPlayers().size();
         for (ServerPlayerEntity player : world.getPlayers()) {
+            Logging.REGISTRY.topic("field").info(">>> Sending to player: {} <<<", player.getName().getString());
             ServerPlayNetworking.send(player, payload);
         }
         
-        Logging.REGISTRY.topic("field").debug(
-            "Sent spawn for field {} to {} players", instance.id(), playerCount);
+        Logging.REGISTRY.topic("field").info(
+            ">>> SENDING FieldSpawnPayload (ID={}) for field {} to {} players <<<", 
+            payload.getId().id(), instance.id(), playerCount);
     }
     
     public static void sendSpawn(ServerPlayerEntity player, FieldInstance instance) {

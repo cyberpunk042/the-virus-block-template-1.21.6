@@ -40,9 +40,6 @@ public interface CollisionViewGrowthCollisionMixin {
 		if (entity == null || !(this instanceof World world) || world.isClient) {
 			return;
 		}
-		if (GrowthCollisionDebug.shouldLog(entity)) {
-			Logging.CALLBACKS.info("[GrowthCollision:cv-hook] entity={} query={}", entity, queryBox);
-		}
 		Iterable<VoxelShape> vanilla = cir.getReturnValue();
 		List<VoxelShape> extras = GrowthCollisionMixinHelper.gatherGrowthCollisions(entity, world, queryBox, vanilla);
 		if (extras.isEmpty()) {

@@ -11,15 +11,32 @@ package net.cyberpunk042.field.influence;
  *   <li>PLAYER_RESPAWN - Player respawns</li>
  *   <li>FIELD_SPAWN - Field is created</li>
  *   <li>FIELD_DESPAWN - Field is removed</li>
+ *   <li>FORCE_PHASE_ENTER - Force field entering a new phase</li>
+ *   <li>FORCE_PHASE_EXIT - Force field exiting a phase</li>
+ *   <li>FORCE_PHASE_PULL - Force field entering pull phase</li>
+ *   <li>FORCE_PHASE_PUSH - Force field entering push phase</li>
+ *   <li>FORCE_PHASE_HOLD - Force field entering hold phase</li>
+ *   <li>FORCE_WARNING - Pre-warning before force phase change</li>
  * </ul>
  */
 public enum FieldEvent {
+    // Player events
     PLAYER_DAMAGE,
     PLAYER_HEAL,
     PLAYER_DEATH,
     PLAYER_RESPAWN,
+    
+    // Field lifecycle events
     FIELD_SPAWN,
-    FIELD_DESPAWN;
+    FIELD_DESPAWN,
+    
+    // Force phase events
+    FORCE_PHASE_ENTER,
+    FORCE_PHASE_EXIT,
+    FORCE_PHASE_PULL,
+    FORCE_PHASE_PUSH,
+    FORCE_PHASE_HOLD,
+    FORCE_WARNING;
     
     /**
      * Parses from string (e.g., "player.damage" or "PLAYER_DAMAGE").

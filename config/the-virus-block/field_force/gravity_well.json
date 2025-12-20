@@ -1,0 +1,45 @@
+{
+    "id": "gravity_well",
+    "name": "Gravity Well",
+    "description": "Draws entities toward center, then releases with a burst",
+    "zones": [
+        {
+            "radius": 15,
+            "strength": 0.08,
+            "falloff": "linear"
+        },
+        {
+            "radius": 8,
+            "strength": 0.15,
+            "falloff": "quadratic"
+        },
+        {
+            "radius": 3,
+            "strength": 0.30,
+            "falloff": "constant"
+        }
+    ],
+    "phases": [
+        {
+            "start": 0,
+            "end": 70,
+            "polarity": "pull",
+            "strength": 1.0
+        },
+        {
+            "start": 70,
+            "end": 85,
+            "polarity": "hold",
+            "strength": 0.5
+        },
+        {
+            "start": 85,
+            "end": 100,
+            "polarity": "push",
+            "strength": 2.5
+        }
+    ],
+    "maxVelocity": 1.5,
+    "verticalBoost": 0.35,
+    "damping": 0.02
+}

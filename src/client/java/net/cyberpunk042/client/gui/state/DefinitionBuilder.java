@@ -121,7 +121,8 @@ public final class DefinitionBuilder {
                 (BeamConfig) defFields.get("beam"),
                 buildBindings(state),
                 buildTriggers(state),
-                null // lifecycle - handled separately
+                null, // lifecycle - handled separately
+                (net.cyberpunk042.field.force.ForceFieldConfig) defFields.get("forceConfig")
             );
             
             // CP3: Field-level in definition - modifiers should never be null now

@@ -111,6 +111,7 @@ public class ContentArea implements ScreenComponent {
         debugSubTabs = new SubTabPane(textRenderer)
             .addTab("Beam", contentFactory.beam())
             .addTab("Trigger", contentFactory.trigger())
+            .addTab("Force", contentFactory.force())
             .addTab("Life", contentFactory.lifecycle())
             .addTab("Bindings", contentFactory.bindings())
             .addTab("Trace", contentFactory.trace())

@@ -17,8 +17,7 @@ public record FieldDefinitionSyncPayload(
         String definitionJson
 ) implements CustomPayload {
     
-    public static final Identifier PACKET_ID = Identifier.of(TheVirusBlock.MOD_ID, "field_def_sync");
-    public static final Id<FieldDefinitionSyncPayload> ID = new Id<>(PACKET_ID);
+    public static final Id<FieldDefinitionSyncPayload> ID = new Id<>(TheVirusBlock.FIELD_DEFINITION_SYNC_PACKET);
     public static final PacketCodec<PacketByteBuf, FieldDefinitionSyncPayload> CODEC =
             PacketCodec.of(FieldDefinitionSyncPayload::write, FieldDefinitionSyncPayload::read);
     

@@ -61,12 +61,7 @@ public final class FieldSystemInit {
         
         Logging.REGISTRY.topic("field").info("Initializing field system...");
         
-        // Register network payloads (server -> client)
-        PayloadTypeRegistry.playS2C().register(FieldSpawnPayload.ID, FieldSpawnPayload.CODEC);
-        PayloadTypeRegistry.playS2C().register(FieldRemovePayload.ID, FieldRemovePayload.CODEC);
-        PayloadTypeRegistry.playS2C().register(FieldUpdatePayload.ID, FieldUpdatePayload.CODEC);
-        PayloadTypeRegistry.playS2C().register(FieldDefinitionSyncPayload.ID, FieldDefinitionSyncPayload.CODEC);
-        Logging.REGISTRY.topic("field").info("Registered field payloads");
+        // Network payloads are now registered in TheVirusBlock.java alongside other working payloads
         
         // Register commands
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, env) -> {
@@ -103,15 +98,23 @@ public final class FieldSystemInit {
         Logging.REGISTRY.topic("field").info("Registered field definition reload listener");
         
         // Wire FieldManager to FieldNetworking for automatic sync
+        // Use a set to track which managers have been wired (to avoid re-registering callbacks)
+        java.util.Set<ServerWorld> wiredWorlds = java.util.Collections.newSetFromMap(new java.util.WeakHashMap<>());
+        
         ServerTickEvents.END_WORLD_TICK.register(world -> {
             FieldManager manager = FieldManager.get(world);
-            // Wire callbacks if not already done
             if (manager != null) {
-                manager.onSpawn(instance -> FieldNetworking.sendSpawn(world, instance));
-                manager.onRemove(id -> FieldNetworking.sendRemove(world, id));
-                manager.onUpdate(instance -> FieldNetworking.sendUpdate(world, instance));
+                // Only wire callbacks once per world
+                if (!wiredWorlds.contains(world)) {
+                    manager.onSpawn(instance -> FieldNetworking.sendSpawn(world, instance));
+                    manager.onRemove(id -> FieldNetworking.sendRemove(world, id));
+                    manager.onUpdate(instance -> FieldNetworking.sendUpdate(world, instance));
+                    wiredWorlds.add(world);
+                }
+                // Tick handles both field lifetime AND force physics
                 manager.tick();
             }
+            // Note: ForceFieldService.tick() removed - FieldManager now handles force physics
         });
         
         // Sync existing fields to players who join

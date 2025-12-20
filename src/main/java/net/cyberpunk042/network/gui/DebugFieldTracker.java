@@ -70,9 +70,11 @@ public final class DebugFieldTracker {
             Identifier defId = Identifier.of("the-virus-block", debugId);
             
             // Sync the definition to client BEFORE spawning
+            // IMPORTANT: Send the rebuilt definition with the correct ID, not the original JSON
+            String syncJson = debugDef.toJson().toString();
             net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(
                 player,
-                new net.cyberpunk042.network.FieldDefinitionSyncPayload(defId.toString(), definitionJson)
+                new net.cyberpunk042.network.FieldDefinitionSyncPayload(defId.toString(), syncJson)
             );
             
             // Remove existing debug field if any

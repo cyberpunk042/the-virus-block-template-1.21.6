@@ -63,7 +63,7 @@
         "swirl": 0.6
     },
     "beam": {
-        "enabled": true,
+        "enabled": false,
         "innerRadius": 0.045,
         "outerRadius": 0.06,
         "height": 0,

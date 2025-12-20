@@ -33,6 +33,7 @@ import net.cyberpunk042.network.SingularityVisualStopPayload;
 import net.cyberpunk042.registry.ModBlockEntities;
 import net.cyberpunk042.registry.ModBlocks;
 import net.cyberpunk042.registry.ModEntities;
+import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.screen.ModScreenHandlers;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
@@ -49,21 +50,31 @@ import net.minecraft.client.render.entity.TntEntityRenderer;
 public class TheVirusBlockClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
+        Logging.GUI.topic("test").info("test 1");
 		ModConfigBootstrap.prepareClient();
+        Logging.GUI.topic("test").info("test 2");
 		InfectionConfigRegistry.loadClient();
+        Logging.GUI.topic("test").info("test 3");
 		BlockRenderLayerMap.putBlocks(BlockRenderLayer.TRANSLUCENT,
 				ModBlocks.CORRUPTED_GLASS,
 				ModBlocks.CORRUPTED_ICE,
 				ModBlocks.CORRUPTED_PACKED_ICE,
 				ModBlocks.PROGRESSIVE_GROWTH_BLOCK);
+        Logging.GUI.topic("test").info("test 4");
 		BlockEntityRendererFactories.register(ModBlockEntities.SINGULARITY_BLOCK, SingularityBlockEntityRenderer::new);
 		BlockEntityRendererFactories.register(ModBlockEntities.PROGRESSIVE_GROWTH, ProgressiveGrowthBlockEntityRenderer::new);
 		ProgressiveGrowthItemRenderer.bootstrap();
+        Logging.GUI.topic("test").info("test 5");
 		CorruptedColorProviders.register();
+        Logging.GUI.topic("test").info("test 6");
 		VoidTearVisualManager.init();
+        Logging.GUI.topic("test").info("test 7");
 		// New field system - register definitions on client too (server loads JSON, client needs code defaults)
 		net.cyberpunk042.field.FieldRegistry.registerDefaults();
+        Logging.RENDER.topic("field").info("FieldClientInit b4");
 		net.cyberpunk042.client.field.FieldClientInit.init();
+        Logging.GUI.topic("test").info("test 8");
+        Logging.GUI.topic("field").info("FieldClientInit after");
 		// GUI client handlers
 		GuiClientHandlers.register();
 		// Test field renderer for debug field preview (G145)

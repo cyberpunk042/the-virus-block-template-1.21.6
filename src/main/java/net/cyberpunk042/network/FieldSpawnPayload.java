@@ -20,13 +20,12 @@ public record FieldSpawnPayload(
         int lifetimeTicks
 ) implements CustomPayload {
     
-    public static final Identifier PACKET_ID = Identifier.of(TheVirusBlock.MOD_ID, "field_spawn");
-    public static final Id<FieldSpawnPayload> ID = new Id<>(PACKET_ID);
+    public static final Id<FieldSpawnPayload> ID = new Id<>(TheVirusBlock.FIELD_SPAWN_PACKET);
     public static final PacketCodec<PacketByteBuf, FieldSpawnPayload> CODEC =
-            PacketCodec.of(FieldSpawnPayload::write, FieldSpawnPayload::read);
+            PacketCodec.of(FieldSpawnPayload::write, FieldSpawnPayload::new);
     
-    public static FieldSpawnPayload read(PacketByteBuf buf) {
-        return new FieldSpawnPayload(
+    public FieldSpawnPayload(PacketByteBuf buf) {
+        this(
             buf.readVarLong(),
             buf.readString(),
             buf.readDouble(),

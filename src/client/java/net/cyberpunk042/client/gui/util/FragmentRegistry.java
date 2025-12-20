@@ -62,6 +62,7 @@ public final class FragmentRegistry {
     private static final String PREDICTIONS_FOLDER = "field_predictions";
     private static final String PRIMITIVES_FOLDER = "field_primitives";
     private static final String TRANSFORMS_FOLDER = "field_transforms";
+    private static final String FORCE_FOLDER = "field_force";
 
     // Caches: presetName -> JsonObject
     private static final Map<String, Map<String, JsonObject>> shapePresets = new ConcurrentHashMap<>();
@@ -78,6 +79,7 @@ public final class FragmentRegistry {
     private static final Map<String, JsonObject> predictionPresets = new ConcurrentHashMap<>();
     private static final Map<String, JsonObject> primitivePresets = new ConcurrentHashMap<>();
     private static final Map<String, JsonObject> transformPresets = new ConcurrentHashMap<>();
+    private static final Map<String, JsonObject> forcePresets = new ConcurrentHashMap<>();
 
     private static boolean loaded = false;
 
@@ -107,6 +109,7 @@ public final class FragmentRegistry {
         predictionPresets.clear();
         primitivePresets.clear();
         transformPresets.clear();
+        forcePresets.clear();
         loaded = false;
         ensureLoaded();
     }
@@ -133,6 +136,7 @@ public final class FragmentRegistry {
         ensureFolder(PREDICTIONS_FOLDER);
         ensureFolder(PRIMITIVES_FOLDER);
         ensureFolder(TRANSFORMS_FOLDER);
+        ensureFolder(FORCE_FOLDER);
 
         // Load each category
         loadShapeFragments();
@@ -149,6 +153,7 @@ public final class FragmentRegistry {
         loadSimplePresets(PREDICTIONS_FOLDER, predictionPresets);
         loadSimplePresets(PRIMITIVES_FOLDER, primitivePresets);
         loadSimplePresets(TRANSFORMS_FOLDER, transformPresets);
+        loadSimplePresets(FORCE_FOLDER, forcePresets);
 
         LOGGER.info("Presets loaded: shapes={}, fills={}, masks={}, arrangements={}, animations={}, beams={}, follow={}, appearances={}, layers={}, links={}, orbits={}, predictions={}, primitives={}, transforms={}",
             shapePresets.values().stream().mapToInt(Map::size).sum(),
@@ -724,4 +729,28 @@ public final class FragmentRegistry {
             default -> LOGGER.warn("Unknown fragment category: {}", category);
         }
     }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // FORCE FRAGMENTS
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Lists available force field presets.
+     * Returns preset names suitable for dropdown display.
+     */
+    public static List<String> listForceFragments() {
+        ensureLoaded();
+        List<String> names = new ArrayList<>(forcePresets.keySet());
+        names.sort(String.CASE_INSENSITIVE_ORDER);
+        return names;
+    }
+    
+    /**
+     * Gets the JSON for a force preset.
+     */
+    public static Optional<JsonObject> getForceJson(String presetName) {
+        ensureLoaded();
+        return Optional.ofNullable(forcePresets.get(presetName));
+    }
+    
 }
