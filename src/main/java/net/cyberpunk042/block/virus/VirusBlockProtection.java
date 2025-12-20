@@ -18,11 +18,16 @@ public final class VirusBlockProtection {
 	private static final int COOLDOWN_TICKS = 10;
 
 	private static final Map<UUID, Long> blockedUntil = new ConcurrentHashMap<>();
+	
+	private static volatile boolean initialized = false;
 
 	private VirusBlockProtection() {
 	}
 
 	public static void init() {
+		if (initialized) return;
+		initialized = true;
+		
 		PlayerBlockBreakEvents.BEFORE.register((world, player, pos, state, blockEntity) -> {
 			if (!(world instanceof ServerWorld serverWorld)
 					|| !(player instanceof ServerPlayerEntity serverPlayer)

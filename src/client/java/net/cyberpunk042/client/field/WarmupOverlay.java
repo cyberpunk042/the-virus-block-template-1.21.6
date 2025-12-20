@@ -18,10 +18,14 @@ public final class WarmupOverlay {
     
     private WarmupOverlay() {}
     
+    private static volatile boolean registered = false;
+    
     /**
      * Registers the HUD render callback.
      */
     public static void init() {
+        if (registered) return;
+        registered = true;
         HudRenderCallback.EVENT.register(WarmupOverlay::render);
     }
     

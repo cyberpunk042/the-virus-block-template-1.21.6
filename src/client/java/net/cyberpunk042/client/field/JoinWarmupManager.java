@@ -44,7 +44,12 @@ public final class JoinWarmupManager {
     
     private JoinWarmupManager() {}
     
+    private static volatile boolean hookRegistered = false;
+    
     public static void init() {
+        if (hookRegistered) return;
+        hookRegistered = true;
+        
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
             Logging.RENDER.topic("warmup").info("Player joined - starting smooth warmup");
             startWarmup();

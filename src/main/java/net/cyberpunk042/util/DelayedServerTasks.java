@@ -13,11 +13,15 @@ import net.minecraft.server.MinecraftServer;
 
 public final class DelayedServerTasks {
 	private static final Map<MinecraftServer, Long2ObjectMap<List<Runnable>>> TASKS = new WeakHashMap<>();
+	
+	private static volatile boolean initialized = false;
 
 	private DelayedServerTasks() {
 	}
 
 	public static void init() {
+		if (initialized) return;
+		initialized = true;
 		ServerTickEvents.END_SERVER_TICK.register(DelayedServerTasks::run);
 	}
 

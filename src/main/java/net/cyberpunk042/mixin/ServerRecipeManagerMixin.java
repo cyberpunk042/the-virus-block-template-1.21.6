@@ -23,10 +23,12 @@ public class ServerRecipeManagerMixin {
 
 	@Inject(method = "apply", at = @At("TAIL"))
 	private void theVirusBlock$injectFallbackRecipes(PreparedRecipes preparedRecipes, ResourceManager resourceManager, Profiler profiler, CallbackInfo ci) {
+		var ctx = net.cyberpunk042.util.MixinProfiler.enter("RecipeMgr.apply");
 		List<RecipeEntry<?>> mutable = new ArrayList<>(preparedRecipes.recipes());
 		if (VirusFallbackRecipes.appendMissingRecipes(preparedRecipes, mutable)) {
 			this.preparedRecipes = PreparedRecipes.of(mutable);
 		}
+		ctx.exit();
 	}
 }
 

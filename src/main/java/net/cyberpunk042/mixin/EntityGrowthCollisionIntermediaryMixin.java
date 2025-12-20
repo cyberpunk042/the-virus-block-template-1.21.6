@@ -42,14 +42,18 @@ public abstract class EntityGrowthCollisionIntermediaryMixin {
 			List<VoxelShape> original,
 			Box queryBox,
 			CallbackInfoReturnable<List<VoxelShape>> cir) {
-		if (!world.isClient && GrowthCollisionDebug.shouldLog(entity)) {
-			PlayerEntity player = (PlayerEntity) entity;
-			Logging.CALLBACKS.info(
-					"[GrowthCollision:hook] intermediary entity={} query={}",
-					player.getGameProfile().getName(),
-					queryBox);
+		var ctx = net.cyberpunk042.util.MixinProfiler.enter("Entity.findCollisions.Int");
+		// Fast exit when no growth blocks exist
+		if (!net.cyberpunk042.block.entity.GrowthCollisionTracker.hasAny()) {
+			ctx.exit();
+			return;
+		}
+		if (world.isClient) {
+			ctx.exit();
+			return;
 		}
 		GrowthCollisionMixinHelper.appendGrowthCollisions(entity, world, original, queryBox, cir);
+		ctx.exit();
 	}
 
 	@Inject(

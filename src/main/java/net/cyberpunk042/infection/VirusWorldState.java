@@ -101,6 +101,11 @@ public class VirusWorldState extends PersistentState {
 	private final CollapseOperations collapseOperations;
 	private final InfectionOperations infectionOperations;
 
+	// ========== Cached Contexts (avoid allocation every tick) ==========
+	
+	private transient VirusWorldContext cachedVirusContext;
+	private transient SingularityContext cachedSingularityContext;
+
 	// ========== Instance Initializers ==========
 
 	{
@@ -334,31 +339,58 @@ public class VirusWorldState extends PersistentState {
 
 	// ========== Context Factories for Orchestrator ==========
 
+	/**
+	 * Gets or creates the cached VirusWorldContext.
+	 * Context is created once and reused to avoid allocation every tick.
+	 * The world reference is updated via tick() which sets currentWorld.
+	 */
 	private VirusWorldContext createVirusWorldContext(ServerWorld world) {
-		return new BasicVirusWorldContext(
-				world,
-				this,
-				orchestrator.effectBusOrNoop(),
-				orchestrator.schedulerOrNoop(),
-				createSingularityContext(world)
-		);
+		if (cachedVirusContext == null || cachedVirusContext.world() != world) {
+			cachedVirusContext = new BasicVirusWorldContext(
+					world,
+					this,
+					orchestrator.effectBusOrNoop(),
+					orchestrator.schedulerOrNoop(),
+					getOrCreateSingularityContext(world)
+			);
+		}
+		return cachedVirusContext;
 	}
 
+	/**
+	 * Gets or creates the cached SingularityContext.
+	 * Context is created once and reused to avoid allocation every tick.
+	 */
 	public SingularityContext createSingularityContext(ServerWorld world) {
-		net.minecraft.util.Identifier scenarioId = orchestrator.getAttachedScenarioId();
-		DimensionProfile profile = scenarioId != null
-				? DimensionProfileRegistry.resolve(scenarioId)
-				: DimensionProfile.defaults();
-		InfectionServiceContainer services = InfectionServices.container();
-		return new BasicSingularityContext(
-				world,
-				this,
-				orchestrator.effectBusOrNoop(),
-				orchestrator.schedulerOrNoop(),
-				orchestrator.collapseBroadcastManagerOrNoop(),
-				profile,
-				services
-		);
+		return getOrCreateSingularityContext(world);
+	}
+	
+	private SingularityContext getOrCreateSingularityContext(ServerWorld world) {
+		if (cachedSingularityContext == null || cachedSingularityContext.world() != world) {
+			net.minecraft.util.Identifier scenarioId = orchestrator.getAttachedScenarioId();
+			DimensionProfile profile = scenarioId != null
+					? DimensionProfileRegistry.resolve(scenarioId)
+					: DimensionProfile.defaults();
+			InfectionServiceContainer services = InfectionServices.container();
+			cachedSingularityContext = new BasicSingularityContext(
+					world,
+					this,
+					orchestrator.effectBusOrNoop(),
+					orchestrator.schedulerOrNoop(),
+					orchestrator.collapseBroadcastManagerOrNoop(),
+					profile,
+					services
+			);
+		}
+		return cachedSingularityContext;
+	}
+	
+	/**
+	 * Invalidates cached contexts. Call when scenario changes or services are reinstalled.
+	 */
+	public void invalidateContexts() {
+		cachedVirusContext = null;
+		cachedSingularityContext = null;
 	}
 
 	private IWorldCallbacks createCallbacks(OrchestratorDependencies.ServiceAccessor serviceAccessor) {

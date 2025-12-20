@@ -19,12 +19,20 @@ public abstract class AbstractSkeletonEntityMixin extends HostileEntity {
 
 	@Inject(method = "tickMovement", at = @At("TAIL"))
 	private void theVirusBlock$extinguishDuringInfection(CallbackInfo ci) {
-		if (!(getWorld() instanceof ServerWorld serverWorld)) {
+		var ctx = net.cyberpunk042.util.MixinProfiler.enter("Skeleton.tick");
+		// Fast exit: Only do anything if skeleton is on fire
+		if (!this.isOnFire()) {
+			ctx.exit();
 			return;
 		}
-		if (VirusWorldState.get(serverWorld).infectionState().infected() && this.isOnFire()) {
+		if (!(getWorld() instanceof ServerWorld serverWorld)) {
+			ctx.exit();
+			return;
+		}
+		if (VirusWorldState.get(serverWorld).infectionState().infected()) {
 			this.setFireTicks(0);
 		}
+		ctx.exit();
 	}
 }
 

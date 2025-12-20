@@ -10,6 +10,9 @@ import net.minecraft.entity.FallingBlockEntity;
 public interface FallingBlockEntityAccessor {
 	@Accessor("blockState")
 	void virus$setBlockState(BlockState state);
+	
+	@Accessor("timeFalling")
+	int virus$getTimeFalling();
 }
 
 

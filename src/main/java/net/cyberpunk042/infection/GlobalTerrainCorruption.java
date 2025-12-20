@@ -26,12 +26,21 @@ public final class GlobalTerrainCorruption {
 	private static final Map<ServerWorld, ChunkWorkTracker> TRACKERS = new WeakHashMap<>();
 	private static final int CLEANSE_CHUNKS_PER_TICK = 3;
 	private static final int PROCESS_INTERVAL_TICKS = 5;
+	
+	private static volatile boolean initialized = false;
 
 	private GlobalTerrainCorruption() {
 	}
 
 	public static void init() {
-		ServerTickEvents.END_WORLD_TICK.register(GlobalTerrainCorruption::tickWorld);
+		if (initialized) return;
+		initialized = true;
+		ServerTickEvents.END_WORLD_TICK.register(world -> {
+			String dim = world.getRegistryKey().getValue().getPath();
+			net.cyberpunk042.util.SuperProfiler.start("Terrain:" + dim);
+			tickWorld(world);
+			net.cyberpunk042.util.SuperProfiler.end("Terrain:" + dim);
+		});
 	}
 
 	public static void trigger(ServerWorld world, BlockPos origin) {

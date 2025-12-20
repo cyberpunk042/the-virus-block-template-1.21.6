@@ -20,16 +20,22 @@ abstract class MobEntityMixin extends LivingEntity {
 
 	@Inject(method = "setTarget", at = @At("HEAD"), cancellable = true)
 	private void thevirus$blockAllyTargets(LivingEntity target, CallbackInfo ci) {
+		var ctx = net.cyberpunk042.util.MixinProfiler.enter("Mob.setTarget");
 		if (target == null || !(this.getWorld() instanceof ServerWorld serverWorld)) {
+			ctx.exit();
 			return;
 		}
 		if (serverWorld.getGameRules().getBoolean(TheVirusBlock.VIRUS_MOB_FRIENDLY_FIRE)) {
+			ctx.exit();
 			return;
 		}
 		MobEntity self = (MobEntity) (Object) this;
 		if (VirusMobAllyHelper.isAlly(self) && VirusMobAllyHelper.isAlly(target)) {
+			ctx.exit();
 			ci.cancel();
+			return;
 		}
+		ctx.exit();
 	}
 }
 

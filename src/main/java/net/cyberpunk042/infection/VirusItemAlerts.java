@@ -10,10 +10,15 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 
 public final class VirusItemAlerts {
+	private static volatile boolean initialized = false;
+	
 	private VirusItemAlerts() {
 	}
 
 	public static void init() {
+		if (initialized) return;
+		initialized = true;
+		
 		ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
 			if (!(world instanceof ServerWorld serverWorld)) {
 				return;

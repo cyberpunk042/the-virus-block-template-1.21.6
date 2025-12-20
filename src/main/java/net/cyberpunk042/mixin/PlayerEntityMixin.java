@@ -20,8 +20,10 @@ public abstract class PlayerEntityMixin {
 	 */
 	@Inject(method = "onDeath(Lnet/minecraft/entity/damage/DamageSource;)V", at = @At("HEAD"), require = 1)
 	private void theVirusBlock$dispatchDeathEvent(DamageSource damageSource, CallbackInfo ci) {
+		var ctx = net.cyberpunk042.util.MixinProfiler.enter("Player.onDeath");
 		PlayerEntity self = (PlayerEntity) (Object) this;
 		TriggerEventDispatcher.dispatch(FieldEvent.PLAYER_DEATH, self, damageSource);
+		ctx.exit();
 	}
 }
 

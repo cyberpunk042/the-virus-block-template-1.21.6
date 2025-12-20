@@ -22,11 +22,13 @@ public abstract class ServerPlayerEntityMixin {
 	 */
 	@Inject(method = "copyFrom(Lnet/minecraft/server/network/ServerPlayerEntity;Z)V", at = @At("TAIL"), require = 1)
 	private void theVirusBlock$dispatchRespawnEvent(ServerPlayerEntity oldPlayer, boolean alive, CallbackInfo ci) {
+		var ctx = net.cyberpunk042.util.MixinProfiler.enter("ServerPlayer.copyFrom");
 		ServerPlayerEntity self = (ServerPlayerEntity) (Object) this;
 		// Only dispatch if this is a respawn (not just copying data while alive)
 		if (!alive) {
 			TriggerEventDispatcher.dispatch(FieldEvent.PLAYER_RESPAWN, self, null);
 		}
+		ctx.exit();
 	}
 }
 

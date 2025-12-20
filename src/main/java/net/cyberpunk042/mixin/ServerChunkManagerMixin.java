@@ -25,12 +25,17 @@ public abstract class ServerChunkManagerMixin {
     
     private static final Topic LOG = Logging.CHUNKS.topic("guard");
     
+    // Per-tick cache to avoid 100k+ redundant shouldGuard() checks
+    private long cachedTick = -1;
+    private boolean cachedShouldGuard = false;
+    
     @Shadow
     @Final
     private ServerWorld world;
 
     @Inject(method = "getWorldChunk", at = @At("HEAD"), cancellable = true)
     private void theVirusBlock$guardFullChunks(int chunkX, int chunkZ, CallbackInfoReturnable<WorldChunk> cir) {
+        // Fast-path: skip everything if guarding is disabled (most common case)
         if (!shouldGuard()) {
             return;
         }
@@ -48,6 +53,7 @@ public abstract class ServerChunkManagerMixin {
 
     @Inject(method = "getChunk", at = @At("HEAD"), cancellable = true)
     private void theVirusBlock$guardChunkGeneration(int chunkX, int chunkZ, ChunkStatus status, boolean create, CallbackInfoReturnable<Chunk> cir) {
+        // Fast-path: skip everything if guarding is disabled (most common case)
         if (!shouldGuard()) {
             return;
         }
@@ -55,8 +61,7 @@ public abstract class ServerChunkManagerMixin {
         if (!collapseContext) {
             return;
         }
-        boolean outsideAllowed = allowOutsideBorderLoad();
-        if (outsideAllowed) {
+        if (allowOutsideBorderLoad()) {
             return;
         }
         if (isOutsideBorder(chunkX, chunkZ) && !SingularityChunkContext.isBypassingChunk(chunkX, chunkZ)) {
@@ -80,7 +85,15 @@ public abstract class ServerChunkManagerMixin {
     }
 
     private boolean shouldGuard() {
-        return SingularityChunkContext.shouldGuard(world);
+        // Fast-path: cache result per tick to avoid 100k+ redundant checks
+        long currentTick = world.getTime();
+        if (currentTick == cachedTick) {
+            return cachedShouldGuard; // Cache hit - no overhead!
+        }
+        // Cache miss - compute and store
+        cachedTick = currentTick;
+        cachedShouldGuard = SingularityChunkContext.shouldGuard(world);
+        return cachedShouldGuard;
     }
 
     private boolean allowChunkGeneration() {

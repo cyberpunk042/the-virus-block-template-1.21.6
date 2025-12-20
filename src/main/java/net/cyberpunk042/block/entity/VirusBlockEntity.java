@@ -25,6 +25,7 @@ import net.minecraft.world.World;
 
 public class VirusBlockEntity extends BlockEntity {
 	private int auraTick;
+	private boolean registered = false; // Track if already registered
 	private final Object2LongMap<UUID> auraCooldowns = new Object2LongOpenHashMap<>();
 
 	public VirusBlockEntity(BlockPos pos, BlockState state) {
@@ -36,12 +37,17 @@ public class VirusBlockEntity extends BlockEntity {
 			return;
 		}
 
-		VirusWorldState infection = VirusWorldState.get(serverWorld);
-		infection.sources().registerSource(infection.sourceState(), pos);
+		// Only register once, not every tick
+		if (!entity.registered) {
+			VirusWorldState infection = VirusWorldState.get(serverWorld);
+			infection.sources().registerSource(infection.sourceState(), pos);
+			entity.registered = true;
+		}
 
 		entity.auraTick++;
 
 		if (entity.auraTick % 5 == 0) {
+			VirusWorldState infection = VirusWorldState.get(serverWorld);
 			entity.applyAura(serverWorld, pos, infection);
 		}
 

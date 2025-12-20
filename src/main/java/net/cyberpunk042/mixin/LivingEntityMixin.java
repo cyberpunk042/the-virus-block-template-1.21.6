@@ -116,22 +116,40 @@ public abstract class LivingEntityMixin extends Entity {
 
 	@Inject(method = "baseTick", at = @At("TAIL"))
 	private void theVirusBlock$lavaBlessing(CallbackInfo ci) {
+		net.cyberpunk042.util.SuperProfiler.start("Mixin:LivingEntity.tick");
+		
 		LivingEntity self = (LivingEntity) (Object) this;
 		if (!(self instanceof PlayerEntity player) || !(player.getWorld() instanceof ServerWorld serverWorld)) {
+			net.cyberpunk042.util.SuperProfiler.end("Mixin:LivingEntity.tick");
 			return;
 		}
 
+		// Only do work if player is in lava or water
+		boolean inLava = player.isInLava();
+		boolean inWater = player.isTouchingWater() || player.isSubmergedInWater();
+		if (!inLava && !inWater) {
+			net.cyberpunk042.util.SuperProfiler.end("Mixin:LivingEntity.tick");
+			return; // Fast exit if not in liquid
+		}
+		
 		VirusWorldState state = VirusWorldState.get(serverWorld);
-		int tier = state.tiers().currentTier().getIndex();
 		boolean liquidsCorrupted = state.tiers().areLiquidsCorrupted(serverWorld);
-		if (liquidsCorrupted && player.isInLava()) {
+		if (!liquidsCorrupted) {
+			net.cyberpunk042.util.SuperProfiler.end("Mixin:LivingEntity.tick");
+			return;
+		}
+		
+		if (inLava) {
 			player.extinguish();
 			theVirusBlock$grantCorruptedRegen(player);
 		}
 
-		if (liquidsCorrupted && (player.isTouchingWater() || player.isSubmergedInWater()) && player instanceof ServerPlayerEntity serverPlayer) {
+		if (inWater && player instanceof ServerPlayerEntity serverPlayer) {
+			int tier = state.tiers().currentTier().getIndex();
 			theVirusBlock$degradeArmorInWater(serverPlayer, tier, serverWorld);
 		}
+		
+		net.cyberpunk042.util.SuperProfiler.end("Mixin:LivingEntity.tick");
 	}
 
 	private void theVirusBlock$degradeArmorInWater(ServerPlayerEntity player, int tier, ServerWorld world) {

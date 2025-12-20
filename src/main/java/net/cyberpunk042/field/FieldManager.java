@@ -143,13 +143,21 @@ public final class FieldManager {
     public int count() { return instances.size(); }
     
     public void tick() {
+        if (instances.isEmpty()) return; // Fast exit when no fields
+        
         Iterator<Map.Entry<Long, FieldInstance>> it = instances.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<Long, FieldInstance> entry = it.next();
             FieldInstance instance = entry.getValue();
             
             // Apply force physics if this field has a forceConfig
-            FieldDefinition def = FieldRegistry.get(instance.definitionId());
+            // Use cached definition from instance to avoid registry lookup every tick
+            FieldDefinition def = instance.cachedDefinition();
+            if (def == null) {
+                def = FieldRegistry.get(instance.definitionId());
+                instance.cacheDefinition(def);
+            }
+            
             if (def == null) {
                 // Log once per second (every 20 ticks) to avoid spam
                 if (instance.age() % 20 == 0) {

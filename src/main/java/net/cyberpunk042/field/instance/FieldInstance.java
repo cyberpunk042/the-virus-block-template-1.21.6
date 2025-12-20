@@ -45,6 +45,9 @@ public abstract class FieldInstance {
     // F163: Fade progress (0.0 → 1.0 during transitions)
     protected float fadeProgress = 0.0f;
     
+    // Cached definition to avoid registry lookup every tick
+    private transient net.cyberpunk042.field.FieldDefinition cachedDef;
+    
     protected FieldInstance(long id, Identifier definitionId, FieldType type, Vec3d position) {
         this.id = id;
         this.definitionId = definitionId;
@@ -82,6 +85,10 @@ public abstract class FieldInstance {
     public boolean isActive() { return lifecycleState == LifecycleState.ACTIVE; }
     public boolean isDespawning() { return lifecycleState == LifecycleState.DESPAWNING; }
     public boolean isComplete() { return lifecycleState == LifecycleState.COMPLETE; }
+    
+    // Definition caching to avoid registry lookup every tick
+    public net.cyberpunk042.field.FieldDefinition cachedDefinition() { return cachedDef; }
+    public void cacheDefinition(net.cyberpunk042.field.FieldDefinition def) { this.cachedDef = def; }
     
     // ─────────────────────────────────────────────────────────────────────────────
     // Modifiers

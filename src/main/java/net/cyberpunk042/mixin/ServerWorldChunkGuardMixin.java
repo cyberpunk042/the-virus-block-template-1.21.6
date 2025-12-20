@@ -12,7 +12,9 @@ import net.minecraft.server.world.ServerWorld;
 public abstract class ServerWorldChunkGuardMixin {
 	@Inject(method = "close", at = @At("HEAD"))
 	private void theVirusBlock$clearChunkGuard(CallbackInfo ci) {
+		var ctx = net.cyberpunk042.util.MixinProfiler.enter("ServerWorld.close");
 		SingularityChunkContext.disableBorderGuard((ServerWorld) (Object) this);
+		ctx.exit();
 	}
 }
  

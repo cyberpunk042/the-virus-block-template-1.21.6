@@ -57,8 +57,50 @@ public final class VirusDebugCommands {
                 .handler(VirusDebugCommands::spawnVoidTearAction)
                 .attach(voidtear);
             dispatcher.register(voidtear);
+
+            // TEST: Spawn a fresh falling block to see if it ticks
+            var testFallingBlock = CommandManager.literal("virustest_fallingblock")
+                .requires(source -> source.hasPermissionLevel(2))
+                .executes(ctx -> testFallingBlockTick(ctx.getSource()));
+            dispatcher.register(testFallingBlock);
         });
     }
+
+    /**
+     * TEST COMMAND: Spawn a fresh FallingBlockEntity to verify if newly spawned entities tick.
+     * This helps distinguish between "entities don't tick at all" vs "only loaded entities don't tick".
+     */
+    private static int testFallingBlockTick(ServerCommandSource source) {
+        var player = source.getPlayer();
+        if (player == null) {
+            CommandFeedback.error(source, "Player-only command.");
+            return 0;
+        }
+        ServerWorld world = source.getWorld();
+        BlockPos above = player.getBlockPos().up(5);
+        
+        // Spawn a fresh falling sand entity
+        net.minecraft.entity.FallingBlockEntity entity = net.minecraft.entity.FallingBlockEntity.spawnFromBlock(
+            world, above, net.minecraft.block.Blocks.SAND.getDefaultState()
+        );
+        
+        if (entity != null) {
+            source.sendFeedback(() -> Text.literal(
+                "[TEST] Spawned FallingBlockEntity at " + above.toShortString() + 
+                " uuid=" + entity.getUuid() + 
+                " age=" + entity.age +
+                " timeFalling=" + entity.timeFalling
+            ), false);
+            net.cyberpunk042.log.Logging.PROFILER.warn(
+                "[TEST] Fresh FallingBlockEntity spawned: uuid={} age={} timeFalling={}", 
+                entity.getUuid(), entity.age, entity.timeFalling
+            );
+        } else {
+            CommandFeedback.error(source, "FallingBlockEntity.spawnFromBlock returned null!");
+        }
+        return 1;
+    }
+
 
     private static int debugBoobytraps(ServerCommandSource source, int radiusChunks) {
         // Protection check

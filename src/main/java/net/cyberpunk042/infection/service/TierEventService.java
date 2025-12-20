@@ -212,7 +212,9 @@ public final class TierEventService {
 			if (!state.isIn(BlockTags.BASE_STONE_OVERWORLD)) {
 				continue;
 			}
-			FallingBlockEntity.spawnFromBlock(world, target, state);
+			// FIX: Don't spawn FallingBlockEntity - it creates zombie entities that never despawn.
+			// Instead, just break the block directly. This simulates the collapse without entity overhead.
+			world.breakBlock(target, false);
 			columns++;
 		}
 		CorruptionProfiler.logTierEvent(world, VirusEventType.COLLAPSE_SURGE, origin, "columns=" + columns);

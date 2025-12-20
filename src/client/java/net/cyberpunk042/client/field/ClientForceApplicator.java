@@ -63,12 +63,6 @@ public final class ClientForceApplicator {
         // Get all active field states from ClientFieldManager
         var allStates = ClientFieldManager.get().allStates();
         
-        // Log periodically (once per second) to help debug
-        if (client.world.getTime() % 20 == 0) {
-            Logging.GUI.topic("force").info(
-                "ClientForceApplicator: {} field states active", allStates.size());
-        }
-        
         // Apply forces from each field that has a forceConfig
         for (ClientFieldState state : allStates) {
             applyForceFromField(player, state);
@@ -83,16 +77,6 @@ public final class ClientForceApplicator {
         Identifier defId = state.definitionId();
         FieldDefinition def = FieldRegistry.get(defId);
         
-        // Log ALL fields once per second to see what's being processed
-        if (state.age() % 20 == 0) {
-            String defIdStr = defId != null ? defId.toString() : "NULL";
-            String defStr = def != null ? def.id() : "NULL";
-            ForceFieldConfig fc = def != null ? def.forceConfig() : null;
-            Logging.GUI.topic("force").info(
-                "Field {} check: defId={} def={} forceConfig={}", 
-                state.id(), defIdStr, defStr, fc != null ? "EXISTS" : "NULL");
-        }
-        
         if (def == null) {
             return;
         }
@@ -106,20 +90,7 @@ public final class ClientForceApplicator {
         // Get field position - use base position (interpolation is for rendering only)
         Vec3d fieldPos = state.position();
         if (fieldPos == null) {
-            Logging.GUI.topic("force").warn("Field {} has null position!", state.id());
             return;
-        }
-        
-        // Calculate player position (center of body)
-        Vec3d playerPos = player.getPos().add(0, player.getHeight() / 2.0, 0);
-        
-        // Log positions for debugging
-        if (state.age() % 20 == 0) {
-            Logging.GUI.topic("force").info(
-                "Field {} positions: field=({},{},{}) player=({},{},{})",
-                state.id(),
-                String.format("%.1f", fieldPos.x), String.format("%.1f", fieldPos.y), String.format("%.1f", fieldPos.z),
-                String.format("%.1f", playerPos.x), String.format("%.1f", playerPos.y), String.format("%.1f", playerPos.z));
         }
         
         // Calculate normalized time for phase effects
@@ -136,25 +107,12 @@ public final class ClientForceApplicator {
         
         // Check if in range
         double distance = context.distance();
-        if (state.age() % 20 == 0) {
-            Logging.GUI.topic("force").info(
-                "Distance check: dist={} affectsDistance={}", 
-                String.format("%.1f", distance), forceField.affectsDistance(distance));
-        }
         if (!forceField.affectsDistance(distance)) {
             return;
         }
         
         // Calculate force
         Vec3d force = forceField.calculateForce(context);
-        if (state.age() % 20 == 0) {
-            Logging.GUI.topic("force").info(
-                "Force calculated: ({}, {}, {}) lengthSq={}", 
-                String.format("%.3f", force.x), 
-                String.format("%.3f", force.y), 
-                String.format("%.3f", force.z),
-                String.format("%.4f", force.lengthSquared()));
-        }
         if (force.lengthSquared() < 0.0001) {
             return;
         }
@@ -183,16 +141,5 @@ public final class ClientForceApplicator {
         
         // Apply final velocity
         player.setVelocity(newVel);
-        
-        // Log occasionally for debugging
-        if (state.age() % 20 == 0) {
-            Logging.GUI.topic("force").info(
-                "FORCE APPLIED: dist={} force=({},{},{}) time={}%",
-                String.format("%.1f", distance), 
-                String.format("%.3f", force.x), 
-                String.format("%.3f", force.y), 
-                String.format("%.3f", force.z), 
-                String.format("%.0f", normalizedTime * 100));
-        }
     }
 }

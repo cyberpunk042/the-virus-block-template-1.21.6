@@ -34,17 +34,21 @@ public abstract class ExplosionMixin {
 
 	@Inject(method = "explode", at = @At("TAIL"))
 	private void theVirusBlock$handleExplosion(CallbackInfo ci) {
+		var ctx = net.cyberpunk042.util.MixinProfiler.enter("Explosion.explode");
 		VirusWorldState state = VirusWorldState.get(world);
 		if (!state.infectionState().infected()) {
+			ctx.exit();
 			return;
 		}
 
 		if (entity != null && entity.getCommandTags().contains(TheVirusBlock.CORRUPTION_EXPLOSIVE_TAG)) {
+			ctx.exit();
 			return;
 		}
 
 		double radius = Math.max(3.0D, power * 6.0F);
 		state.disturbance().handleExplosionImpact(entity, pos, radius);
+		ctx.exit();
 	}
 }
 

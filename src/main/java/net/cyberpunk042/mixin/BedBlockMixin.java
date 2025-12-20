@@ -22,7 +22,9 @@ public abstract class BedBlockMixin {
 	@Inject(method = "onUse", at = @At("HEAD"), cancellable = true)
 	private void theVirusBlock$explodeInInfection(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit,
 												 CallbackInfoReturnable<ActionResult> cir) {
+		var ctx = net.cyberpunk042.util.MixinProfiler.enter("BedBlock.onUse");
 		if (world.isClient || !(world instanceof ServerWorld serverWorld)) {
+			ctx.exit();
 			return;
 		}
 		BedBlock bedBlock = (BedBlock) (Object) this;
@@ -32,17 +34,21 @@ public abstract class BedBlockMixin {
 			headPos = pos.offset(state.get(BedBlock.FACING));
 			headState = world.getBlockState(headPos);
 			if (!headState.isOf(bedBlock)) {
+				ctx.exit();
 				return;
 			}
 		}
 		VirusWorldState infection = VirusWorldState.get(serverWorld);
 		if (!infection.combat().isWithinAura(headPos)) {
+			ctx.exit();
 			return;
 		}
 		if (infection.shieldFieldService().isShielding(headPos)) {
+			ctx.exit();
 			return;
 		}
 		explode(serverWorld, headPos, headState, bedBlock);
+		ctx.exit();
 		cir.setReturnValue(ActionResult.SUCCESS_SERVER);
 	}
 

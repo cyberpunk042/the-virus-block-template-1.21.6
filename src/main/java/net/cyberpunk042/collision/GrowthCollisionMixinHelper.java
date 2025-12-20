@@ -30,6 +30,15 @@ public final class GrowthCollisionMixinHelper {
 
 	private GrowthCollisionMixinHelper() {
 	}
+	
+	/**
+	 * Returns the count of active growth blocks with collision in the given world.
+	 * Used for diagnostics.
+	 */
+	public static int countActiveGrowth(World world) {
+		Collection<ProgressiveGrowthBlockEntity> actives = GrowthCollisionTracker.active(world);
+		return actives != null ? actives.size() : 0;
+	}
 
 	public static void appendGrowthCollisions(
 			@Nullable Entity entity,
@@ -59,15 +68,45 @@ public final class GrowthCollisionMixinHelper {
 		if (actives.isEmpty()) {
 			return Collections.emptyList();
 		}
+		
+		// Profile the expensive collision gathering
+		net.cyberpunk042.util.SuperProfiler.start("Mixin:GrowthCollision");
 
-		List<VoxelShape> extras = new ArrayList<>();
+		// Pre-compute query bounds for fast rejection
+		double queryMinX = queryBox.minX;
+		double queryMaxX = queryBox.maxX;
+		double queryMinY = queryBox.minY;
+		double queryMaxY = queryBox.maxY;
+		double queryMinZ = queryBox.minZ;
+		double queryMaxZ = queryBox.maxZ;
+		
+		// Maximum possible radius of a growth block (with scale and wobble)
+		// Growth blocks can scale up to ~2x and wobble, so use generous bounds
+		final double MAX_GROWTH_RADIUS = 4.0;
+
+		List<VoxelShape> extras = null; // Lazy init - most checks find nothing
 		int appended = 0;
-		int debugBoxesLogged = 0;
-		EnumSet<CollisionScenario> scenariosLogged = EnumSet.noneOf(CollisionScenario.class);
+		
 		for (ProgressiveGrowthBlockEntity growth : actives) {
 			if (growth == null || growth.isRemoved() || growth.getWorld() != world || !growth.hasCollision()) {
 				continue;
 			}
+			
+			// FAST PRE-CHECK: Skip if growth block center is too far from query box
+			// This avoids expensive worldShape() and getCollisionPanels() calls
+			net.minecraft.util.math.BlockPos pos = growth.getPos();
+			double cx = pos.getX() + 0.5;
+			double cy = pos.getY() + 0.5;
+			double cz = pos.getZ() + 0.5;
+			
+			// Quick AABB distance check
+			if (cx + MAX_GROWTH_RADIUS < queryMinX || cx - MAX_GROWTH_RADIUS > queryMaxX ||
+				cy + MAX_GROWTH_RADIUS < queryMinY || cy - MAX_GROWTH_RADIUS > queryMaxY ||
+				cz + MAX_GROWTH_RADIUS < queryMinZ || cz - MAX_GROWTH_RADIUS > queryMaxZ) {
+				continue; // Too far away, skip expensive shape computation
+			}
+			
+			// Only now do the expensive shape retrieval
 			List<Box> panelBoxes = growth.getCollisionPanels();
 			boolean usedPanels = panelBoxes != null && !panelBoxes.isEmpty();
 			VoxelShape worldShape = growth.worldShape(ProgressiveGrowthBlock.ShapeType.COLLISION);
@@ -76,23 +115,23 @@ public final class GrowthCollisionMixinHelper {
 			}
 			Iterable<Box> boxes = usedPanels ? panelBoxes : worldShape.getBoundingBoxes();
 			for (Box localBox : boxes) {
-				Box worldBox = usedPanels ? localBox : localBox.offset(growth.getPos());
-				boolean intersects = worldBox.intersects(queryBox);
-				debugBoxesLogged += logBox(entity, growth, worldBox, queryBox, intersects, debugBoxesLogged, scenariosLogged);
-				if (!intersects) {
+				Box worldBox = usedPanels ? localBox : localBox.offset(pos);
+				if (!worldBox.intersects(queryBox)) {
 					continue;
+				}
+				if (extras == null) {
+					extras = new ArrayList<>(4); // Lazy init with small capacity
 				}
 				extras.add(VoxelShapes.cuboid(worldBox));
 				appended++;
 			}
 		}
 
-		if (appended > 0) {
+		if (GrowthCollisionDebug.isEnabled() && appended > 0) {
 			logCollision(entity, actives.size(), appended, queryBox);
-		} else {
-			logNoCollision(entity, actives.size(), queryBox);
 		}
-		return extras;
+		net.cyberpunk042.util.SuperProfiler.end("Mixin:GrowthCollision");
+		return extras != null ? extras : Collections.emptyList();
 	}
 
 	private static void logCollision(Entity entity, int actives, int appended, Box queryBox) {

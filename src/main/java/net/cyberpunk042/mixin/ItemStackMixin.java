@@ -15,11 +15,14 @@ import net.minecraft.registry.tag.ItemTags;
 public abstract class ItemStackMixin {
 	@Inject(method = "isSuitableFor", at = @At("RETURN"), cancellable = true)
 	private void theVirusBlock$ensureCorruptedMetalsArePickaxeable(BlockState state, CallbackInfoReturnable<Boolean> cir) {
+		var ctx = net.cyberpunk042.util.MixinProfiler.enter("ItemStack.isSuitable");
 		if (state == null || cir.getReturnValue()) {
+			ctx.exit();
 			return;
 		}
 		ItemStack self = (ItemStack) (Object) this;
 		if (!self.isIn(ItemTags.PICKAXES)) {
+			ctx.exit();
 			return;
 		}
 		Block block = state.getBlock();
@@ -29,6 +32,7 @@ public abstract class ItemStackMixin {
 				|| block == ModBlocks.CORRUPTED_CRYING_OBSIDIAN) {
 			cir.setReturnValue(true);
 		}
+		ctx.exit();
 	}
 }
 

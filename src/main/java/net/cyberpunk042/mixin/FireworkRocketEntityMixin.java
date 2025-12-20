@@ -28,13 +28,16 @@ abstract class FireworkRocketEntityMixin {
 			)
 	)
 	private void thevirus$slowCompositeBoost(CallbackInfo ci) {
+		var ctx = net.cyberpunk042.util.MixinProfiler.enter("Firework.tick");
 		if (shooter == null || !shooter.isGliding() || !VirusEquipmentHelper.hasCompositeElytra(shooter)) {
+			ctx.exit();
 			return;
 		}
 		Vec3d velocity = shooter.getVelocity();
 		shooter.setVelocity(velocity.multiply(COMPOSITE_SPEED_FACTOR, 1.0D, COMPOSITE_SPEED_FACTOR));
 		shooter.velocityModified = true;
 		shooter.velocityDirty = true;
+		ctx.exit();
 	}
 }
 

@@ -28,11 +28,15 @@ public final class VirusInventoryAnnouncements {
 	private static final int CHAT_INTERVAL_TICKS = 1500;
 	private static final int TOAST_INTERVAL_TICKS = 1000;
 	private static final Map<ServerWorld, Set<BlockEntity>> TRACKED_CONTAINERS = new WeakHashMap<>();
+	
+	private static volatile boolean initialized = false;
 
 	private VirusInventoryAnnouncements() {
 	}
 
 	public static void init() {
+		if (initialized) return;
+		initialized = true;
 		ServerBlockEntityEvents.BLOCK_ENTITY_LOAD.register((blockEntity, world) -> {
 			if (!(world instanceof ServerWorld serverWorld) || !(blockEntity instanceof Inventory)) {
 				return;

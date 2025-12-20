@@ -1,128 +1,67 @@
 package net.cyberpunk042;
 
-import net.cyberpunk042.client.color.CorruptedColorProviders;
-import net.cyberpunk042.client.render.CorruptedFireTextures;
-import net.cyberpunk042.client.render.SingularityBorderClientState;
-import net.cyberpunk042.client.state.SingularityScheduleClientState;
-import net.cyberpunk042.client.render.SingularityVisualManager;
-import net.cyberpunk042.client.render.blockentity.SingularityBlockEntityRenderer;
-import net.cyberpunk042.client.render.blockentity.ProgressiveGrowthBlockEntityRenderer;
-import net.cyberpunk042.client.render.item.ProgressiveGrowthItemRenderer;
-import net.cyberpunk042.client.render.VoidTearVisualManager;
-import net.cyberpunk042.client.render.VirusFluidRenderers;
-import net.cyberpunk042.client.render.beam.GrowthBeamRenderer;
-import net.cyberpunk042.client.render.field.GrowthRingFieldRenderer;
-import net.cyberpunk042.client.render.VirusHorizonClientState;
-import net.cyberpunk042.client.render.VirusSkyClientState;
-import net.cyberpunk042.client.render.entity.CorruptedWormRenderer;
-import net.cyberpunk042.client.state.VirusDifficultyClientState;
-import net.cyberpunk042.client.screen.PurificationTotemScreen;
-import net.cyberpunk042.client.screen.VirusDifficultyScreen;
-import net.cyberpunk042.config.InfectionConfigRegistry;
-import net.cyberpunk042.client.network.GuiClientHandlers;
-import net.cyberpunk042.client.gui.render.TestFieldRenderer;
-import net.cyberpunk042.config.ModConfigBootstrap;
-import net.cyberpunk042.infection.VirusDifficulty;
-import net.cyberpunk042.network.SkyTintPayload;
-import net.cyberpunk042.network.DifficultySyncPayload;
-import net.cyberpunk042.network.HorizonTintPayload;
-import net.cyberpunk042.network.SingularityBorderPayload;
-import net.cyberpunk042.network.SingularitySchedulePayload;
-import net.cyberpunk042.network.SingularityVisualStartPayload;
-import net.cyberpunk042.network.SingularityVisualStopPayload;
-import net.cyberpunk042.registry.ModBlockEntities;
-import net.cyberpunk042.registry.ModBlocks;
-import net.cyberpunk042.registry.ModEntities;
-import net.cyberpunk042.log.Logging;
-import net.cyberpunk042.screen.ModScreenHandlers;
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
-import net.fabricmc.fabric.api.client.rendering.v1.BlockRenderLayerMap;
-import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
-import net.minecraft.client.gui.screen.ingame.HandledScreens;
-import net.minecraft.client.render.BlockRenderLayer;
-import net.minecraft.client.render.block.entity.BlockEntityRendererFactories;
-import net.minecraft.client.render.entity.FallingBlockEntityRenderer;
-import net.minecraft.client.render.entity.TntEntityRenderer;
 
 public class TheVirusBlockClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
-        Logging.GUI.topic("test").info("test 1");
-		ModConfigBootstrap.prepareClient();
-        Logging.GUI.topic("test").info("test 2");
-		InfectionConfigRegistry.loadClient();
-        Logging.GUI.topic("test").info("test 3");
-		BlockRenderLayerMap.putBlocks(BlockRenderLayer.TRANSLUCENT,
-				ModBlocks.CORRUPTED_GLASS,
-				ModBlocks.CORRUPTED_ICE,
-				ModBlocks.CORRUPTED_PACKED_ICE,
-				ModBlocks.PROGRESSIVE_GROWTH_BLOCK);
-        Logging.GUI.topic("test").info("test 4");
-		BlockEntityRendererFactories.register(ModBlockEntities.SINGULARITY_BLOCK, SingularityBlockEntityRenderer::new);
-		BlockEntityRendererFactories.register(ModBlockEntities.PROGRESSIVE_GROWTH, ProgressiveGrowthBlockEntityRenderer::new);
-		ProgressiveGrowthItemRenderer.bootstrap();
-        Logging.GUI.topic("test").info("test 5");
-		CorruptedColorProviders.register();
-        Logging.GUI.topic("test").info("test 6");
-		VoidTearVisualManager.init();
-        Logging.GUI.topic("test").info("test 7");
-		// New field system - register definitions on client too (server loads JSON, client needs code defaults)
-		net.cyberpunk042.field.FieldRegistry.registerDefaults();
-        Logging.RENDER.topic("field").info("FieldClientInit b4");
-		net.cyberpunk042.client.field.FieldClientInit.init();
-        Logging.GUI.topic("test").info("test 8");
-        Logging.GUI.topic("field").info("FieldClientInit after");
-		// GUI client handlers
-		GuiClientHandlers.register();
-		// Test field renderer for debug field preview (G145)
-		TestFieldRenderer.init();
-		// Preload GUI fragment presets so first GUI open is faster
-		net.cyberpunk042.client.gui.util.FragmentRegistry.ensureLoaded();
-		// Wave shader for GPU-based wave deformation
-		net.cyberpunk042.client.visual.render.WaveShaderRegistry.register();
-		SingularityVisualManager.init();
-		SingularityBorderClientState.init();
-		VirusFluidRenderers.register();
-		EntityRendererRegistry.register(ModEntities.FALLING_MATRIX_CUBE, FallingBlockEntityRenderer::new);
-		EntityRendererRegistry.register(ModEntities.CORRUPTED_WORM, CorruptedWormRenderer::new);
-		EntityRendererRegistry.register(ModEntities.CORRUPTED_TNT, TntEntityRenderer::new);
-		EntityRendererRegistry.register(ModEntities.VIRUS_FUSE, TntEntityRenderer::new);
-		HandledScreens.register(ModScreenHandlers.PURIFICATION_TOTEM, PurificationTotemScreen::new);
-		HandledScreens.register(ModScreenHandlers.VIRUS_DIFFICULTY, VirusDifficultyScreen::new);
-		CorruptedFireTextures.bootstrap();
-		GrowthBeamRenderer.init();
-		GrowthRingFieldRenderer.init();
-		ClientPlayNetworking.registerGlobalReceiver(SkyTintPayload.ID, (payload, context) ->
-				context.client().execute(() -> VirusSkyClientState.setState(payload.skyCorrupted(), payload.fluidsCorrupted())));
-		ClientPlayNetworking.registerGlobalReceiver(HorizonTintPayload.ID, (payload, context) ->
-				context.client().execute(() -> VirusHorizonClientState.apply(payload.enabled(), payload.intensity(), payload.argb())));
-		ClientPlayNetworking.registerGlobalReceiver(DifficultySyncPayload.ID, (payload, context) ->
-				context.client().execute(() -> VirusDifficultyClientState.set(payload.difficulty())));
-		ClientPlayNetworking.registerGlobalReceiver(SingularityVisualStartPayload.ID, (payload, context) ->
-				context.client().execute(() -> SingularityVisualManager.add(payload.pos())));
-		ClientPlayNetworking.registerGlobalReceiver(SingularityVisualStopPayload.ID, (payload, context) ->
-				context.client().execute(() -> SingularityVisualManager.remove(payload.pos())));
-		ClientPlayNetworking.registerGlobalReceiver(SingularityBorderPayload.ID, (payload, context) ->
-				context.client().execute(() -> SingularityBorderClientState.apply(payload)));
-		ClientPlayNetworking.registerGlobalReceiver(SingularitySchedulePayload.ID, (payload, context) ->
-				context.client().execute(() -> SingularityScheduleClientState.apply(payload)));
-		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) ->
-				client.execute(() -> {
-					VirusSkyClientState.reset();
-					VirusHorizonClientState.reset();
-					VirusDifficultyClientState.set(VirusDifficulty.HARD);
-					SingularityBorderClientState.reset();
-					SingularityScheduleClientState.reset();
-					// Clear test field to avoid ghost rendering on reconnect
-					net.cyberpunk042.client.gui.state.FieldEditStateHolder.despawnTestField();
-				}));
+		// Wire State store to client Init framework for observable progress
+		net.cyberpunk042.state.StateInit.connectClient();
+		
+		// Execute staged client initialization
+		net.cyberpunk042.init.Init.clientOrchestrator()
+			// Stage 1: Client core (config, render layers)
+			.stage(net.cyberpunk042.init.InitStage.of("client_core", "Client Core")
+				.add(net.cyberpunk042.client.init.nodes.ClientCoreNodes.CONFIG)
+				.add(net.cyberpunk042.client.init.nodes.ClientCoreNodes.RENDER_LAYERS)
+				.add(net.cyberpunk042.client.init.nodes.ClientCoreNodes.BLOCK_ENTITY_RENDERERS))
+			
+			// Stage 2: Visual rendering (colors, textures, entity renderers)
+			.stage(net.cyberpunk042.init.InitStage.of("client_visual", "Visuals")
+				.add(net.cyberpunk042.client.init.nodes.ClientVisualNodes.COLOR_PROVIDERS)
+				.add(net.cyberpunk042.client.init.nodes.ClientVisualNodes.FIRE_TEXTURES)
+				.add(net.cyberpunk042.client.init.nodes.ClientVisualNodes.FLUID_RENDERERS)
+				.add(net.cyberpunk042.client.init.nodes.ClientVisualNodes.ENTITY_RENDERERS))
+			
+			// Stage 3: Field system client
+			.stage(net.cyberpunk042.init.InitStage.of("client_field", "Field System")
+				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.FIELD_REGISTRY)
+				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.FIELD_NETWORK_RECEIVERS)
+				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.FIELD_RENDER_EVENT)
+				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.FIELD_TICK_EVENT)
+				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.FIELD_DISCONNECT_HANDLER)
+				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.BUNDLED_PROFILES)
+				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.JOIN_WARMUP)
+				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.WARMUP_OVERLAY)
+				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.RENDER_WARMUP)
+				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.TEST_RENDERER)
+				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.FRAGMENT_PRESETS)
+				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.WAVE_SHADER))
+			
+			// Stage 4: GUI
+			.stage(net.cyberpunk042.init.InitStage.of("client_gui", "GUI")
+				.add(net.cyberpunk042.client.init.nodes.ClientGuiNodes.SCREENS)
+				.add(net.cyberpunk042.client.init.nodes.ClientGuiNodes.GUI_HANDLERS))
+			
+			// Stage 5: Visual effects
+			.stage(net.cyberpunk042.init.InitStage.of("client_fx", "Effects")
+				.add(net.cyberpunk042.client.init.nodes.ClientFxNodes.VOID_TEAR)
+				.add(net.cyberpunk042.client.init.nodes.ClientFxNodes.SINGULARITY)
+				.add(net.cyberpunk042.client.init.nodes.ClientFxNodes.BORDER_STATE)
+				.add(net.cyberpunk042.client.init.nodes.ClientFxNodes.GROWTH_BEAM)
+				.add(net.cyberpunk042.client.init.nodes.ClientFxNodes.GROWTH_RING))
+			
+			// Stage 6: Network receivers
+			.stage(net.cyberpunk042.init.InitStage.of("client_network", "Network")
+				.add(net.cyberpunk042.client.init.nodes.ClientNetworkNodes.RECEIVERS)
+				.add(net.cyberpunk042.client.init.nodes.ClientNetworkNodes.DISCONNECT_HANDLER))
+			
+			.execute();
+		
+		// Client command registration (not in generic nodes)
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
-			// Old shield commands moved to agent-tools/legacy-shield/
-			// New field system uses /fieldtest (server-side command)
-			// SingularityVisualCommand removed - using new field system
+			// Reserved for future client commands
 		});
 	}
 }

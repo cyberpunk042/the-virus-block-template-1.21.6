@@ -38,6 +38,9 @@ public final class Logging {
     public static final Channel FIELD         = register(Channel.of("field",         "Field",         LogLevel.INFO));
     public static final Channel GUI = register(Channel.of("gui", "GUI", LogLevel.INFO));
     
+    /** Global state store (State.java). */
+    public static final Channel STATE         = register(Channel.of("state",         "State",         LogLevel.INFO));
+    
     // ========== FIELD SYSTEM CHANNELS ==========
     
     /** Binding evaluation (player state → field properties). */

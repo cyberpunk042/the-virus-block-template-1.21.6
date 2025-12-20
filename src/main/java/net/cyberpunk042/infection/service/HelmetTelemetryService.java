@@ -3,6 +3,7 @@ package net.cyberpunk042.infection.service;
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -40,18 +41,27 @@ public final class HelmetTelemetryService {
 		Object2IntMap<UUID> helmetTimers = host.infectionState().helmetPingTimers();
 		Object2DoubleMap<UUID> heavyPantsWear = host.infectionState().heavyPantsVoidWear();
 		if (!host.infectionState().infected() || !host.hasVirusSources()) {
-			helmetTimers.clear();
-			heavyPantsWear.clear();
+			if (!helmetTimers.isEmpty()) helmetTimers.clear();
+			if (!heavyPantsWear.isEmpty()) heavyPantsWear.clear();
 			return;
 		}
-		Set<UUID> tracked = new HashSet<>();
-		for (ServerPlayerEntity player : world.getPlayers(PlayerEntity::isAlive)) {
+		
+		// Fast path: if no timers and only need to check for new helmet wearers
+		List<ServerPlayerEntity> players = world.getPlayers(PlayerEntity::isAlive);
+		if (players.isEmpty()) {
+			if (!helmetTimers.isEmpty()) helmetTimers.clear();
+			return;
+		}
+		
+		// Count tracked players directly without HashSet allocation
+		int trackedCount = 0;
+		for (ServerPlayerEntity player : players) {
 			if (player.isSpectator() || player.isCreative() || !VirusEquipmentHelper.hasAugmentedHelmet(player)) {
 				helmetTimers.removeInt(player.getUuid());
 				continue;
 			}
 			UUID uuid = player.getUuid();
-			tracked.add(uuid);
+			trackedCount++;
 			int ticks = helmetTimers.getOrDefault(uuid, 0) + 1;
 			if (ticks >= AUGMENTED_HELMET_PING_INTERVAL) {
 				helmetTimers.put(uuid, 0);
@@ -60,10 +70,16 @@ public final class HelmetTelemetryService {
 				helmetTimers.put(uuid, ticks);
 			}
 		}
-		if (tracked.isEmpty()) {
-			helmetTimers.clear();
-		} else {
-			helmetTimers.object2IntEntrySet().removeIf(entry -> !tracked.contains(entry.getKey()));
+		
+		// Only clean stale entries if we have more timers than tracked players
+		if (helmetTimers.size() > trackedCount) {
+			Set<UUID> activeUuids = new HashSet<>(trackedCount);
+			for (ServerPlayerEntity p : players) {
+				if (!p.isSpectator() && !p.isCreative() && VirusEquipmentHelper.hasAugmentedHelmet(p)) {
+					activeUuids.add(p.getUuid());
+				}
+			}
+			helmetTimers.object2IntEntrySet().removeIf(entry -> !activeUuids.contains(entry.getKey()));
 		}
 	}
 

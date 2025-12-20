@@ -144,10 +144,20 @@ public final class AmbientPressureService {
 
 	private void applyDifficultyRulesInternal(ServerWorld world, InfectionTier tier) {
 		VirusDifficulty difficulty = host.tiers().difficulty();
+		// Only EXTREME has health penalties - skip player iteration for other difficulties
 		if (difficulty == VirusDifficulty.EXTREME) {
 			applyExtremeHealthPenalty(world, difficulty, tier);
 		} else {
-			clearExtremeHealthPenalty(world);
+			// Only clear if we might have applied penalties before
+			// Check first player to avoid iterating if no modifiers exist
+			List<ServerPlayerEntity> players = world.getPlayers(PlayerEntity::isAlive);
+			if (!players.isEmpty()) {
+				ServerPlayerEntity first = players.get(0);
+				EntityAttributeInstance attr = first.getAttributeInstance(EntityAttributes.MAX_HEALTH);
+				if (attr != null && attr.getModifier(EXTREME_HEALTH_MODIFIER_ID) != null) {
+					clearExtremeHealthPenalty(world);
+				}
+			}
 		}
 	}
 

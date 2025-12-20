@@ -129,17 +129,23 @@ public class DefaultWorldOrchestrator implements WorldOrchestrator, Orchestrator
 		}
 
 		// Tick services (scheduler, broadcasts)
+		net.cyberpunk042.util.SuperProfiler.start("Orch.services");
 		services.tick(world);
+		net.cyberpunk042.util.SuperProfiler.end("Orch.services");
 
 		// Tick scenario
+		net.cyberpunk042.util.SuperProfiler.start("Orch.scenarios");
 		scenarios.tick(world);
+		net.cyberpunk042.util.SuperProfiler.end("Orch.scenarios");
 	}
 
 	/**
 	 * Tick phases - called by VirusWorldState which has access to state.
 	 */
 	public void tickPhases(ServerWorld world, VirusWorldState state) {
+		net.cyberpunk042.util.SuperProfiler.start("Orch.phases");
 		phases.tick(world, state);
+		net.cyberpunk042.util.SuperProfiler.end("Orch.phases");
 	}
 
 	@Override

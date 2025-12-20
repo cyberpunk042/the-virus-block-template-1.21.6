@@ -37,23 +37,37 @@ public interface CollisionViewGrowthCollisionMixin {
 			Box queryBox,
 			Vec3d movementReference,
 			CallbackInfoReturnable<Iterable<VoxelShape>> cir) {
+		// Count all calls (even early exits) for profiling
+		net.cyberpunk042.util.SuperProfiler.start("Mixin:Collision.getAll");
+		
+		// Ultra-fast early exit - if no growth blocks exist globally, skip everything
+		if (!net.cyberpunk042.block.entity.GrowthCollisionTracker.hasAny()) {
+			net.cyberpunk042.util.SuperProfiler.end("Mixin:Collision.getAll");
+			return;
+		}
 		if (entity == null || !(this instanceof World world) || world.isClient) {
+			net.cyberpunk042.util.SuperProfiler.end("Mixin:Collision.getAll");
 			return;
 		}
 		Iterable<VoxelShape> vanilla = cir.getReturnValue();
 		List<VoxelShape> extras = GrowthCollisionMixinHelper.gatherGrowthCollisions(entity, world, queryBox, vanilla);
 		if (extras.isEmpty()) {
+			net.cyberpunk042.util.SuperProfiler.end("Mixin:Collision.getAll");
 			return;
 		}
 
-		List<VoxelShape> merged = new ArrayList<>();
-		if (vanilla != null) {
+		// Avoid allocation if possible
+		if (vanilla == null || !vanilla.iterator().hasNext()) {
+			cir.setReturnValue(extras);
+		} else {
+			List<VoxelShape> merged = new ArrayList<>();
 			for (VoxelShape shape : vanilla) {
 				merged.add(shape);
 			}
+			merged.addAll(extras);
+			cir.setReturnValue(merged);
 		}
-		merged.addAll(extras);
-		cir.setReturnValue(merged);
+		net.cyberpunk042.util.SuperProfiler.end("Mixin:Collision.getAll");
 	}
 
 	@Inject(
@@ -65,26 +79,36 @@ public interface CollisionViewGrowthCollisionMixin {
 			@Nullable Entity entity,
 			Box queryBox,
 			CallbackInfoReturnable<Iterable<VoxelShape>> cir) {
-		if (entity == null || !(this instanceof World world) || world.isClient) {
+		net.cyberpunk042.util.SuperProfiler.start("Mixin:Collision.getBlock");
+		
+		// Ultra-fast early exit
+		if (!net.cyberpunk042.block.entity.GrowthCollisionTracker.hasAny()) {
+			net.cyberpunk042.util.SuperProfiler.end("Mixin:Collision.getBlock");
 			return;
 		}
-		if (GrowthCollisionDebug.shouldLog(entity)) {
-			Logging.CALLBACKS.info("[GrowthCollision:cv-blockHook] entity={} query={}", entity, queryBox);
+		if (entity == null || !(this instanceof World world) || world.isClient) {
+			net.cyberpunk042.util.SuperProfiler.end("Mixin:Collision.getBlock");
+			return;
 		}
 		Iterable<VoxelShape> vanilla = cir.getReturnValue();
 		List<VoxelShape> extras = GrowthCollisionMixinHelper.gatherGrowthCollisions(entity, world, queryBox, vanilla);
 		if (extras.isEmpty()) {
+			net.cyberpunk042.util.SuperProfiler.end("Mixin:Collision.getBlock");
 			return;
 		}
 
-		List<VoxelShape> merged = new ArrayList<>();
-		if (vanilla != null) {
+		// Avoid allocation if possible
+		if (vanilla == null || !vanilla.iterator().hasNext()) {
+			cir.setReturnValue(extras);
+		} else {
+			List<VoxelShape> merged = new ArrayList<>();
 			for (VoxelShape shape : vanilla) {
 				merged.add(shape);
 			}
+			merged.addAll(extras);
+			cir.setReturnValue(merged);
 		}
-		merged.addAll(extras);
-		cir.setReturnValue(merged);
+		net.cyberpunk042.util.SuperProfiler.end("Mixin:Collision.getBlock");
 	}
 }
 

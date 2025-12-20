@@ -33,11 +33,16 @@ public final class VirusTierBossBar {
 
 	private static final Map<RegistryKey<World>, BossBars> BARS = new HashMap<>();
 	private static final Object2ByteMap<UUID> SKY_TINT = new Object2ByteOpenHashMap<>();
+	
+	private static volatile boolean initialized = false;
 
 	private VirusTierBossBar() {
 	}
 
 	public static void init() {
+		if (initialized) return;
+		initialized = true;
+		
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> SKY_TINT.removeByte(handler.player.getUuid()));
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
 			SKY_TINT.removeByte(handler.player.getUuid());
@@ -220,14 +225,20 @@ public final class VirusTierBossBar {
 	}
 
 	private static void syncPlayers(ServerWorld world, ServerBossBar bar) {
-		for (ServerPlayerEntity player : List.copyOf(bar.getPlayers())) {
-			if (player.getWorld() != world) {
+		// Use Set for O(1) contains check instead of O(n) List.contains
+		java.util.Set<ServerPlayerEntity> currentPlayers = new java.util.HashSet<>(bar.getPlayers());
+		java.util.Set<ServerPlayerEntity> worldPlayers = new java.util.HashSet<>(world.getPlayers());
+		
+		// Remove players not in world
+		for (ServerPlayerEntity player : currentPlayers) {
+			if (!worldPlayers.contains(player)) {
 				bar.removePlayer(player);
 			}
 		}
-
-		for (ServerPlayerEntity player : world.getPlayers()) {
-			if (!bar.getPlayers().contains(player)) {
+		
+		// Add players in world not yet in bar
+		for (ServerPlayerEntity player : worldPlayers) {
+			if (!currentPlayers.contains(player)) {
 				bar.addPlayer(player);
 			}
 		}

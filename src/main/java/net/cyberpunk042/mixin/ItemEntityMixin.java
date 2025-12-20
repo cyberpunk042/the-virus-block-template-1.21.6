@@ -37,48 +37,63 @@ public abstract class ItemEntityMixin extends Entity {
 			at = @At("HEAD"))
 	private void theVirusBlock$onDamage(ServerWorld world, DamageSource source, float amount,
 	                                    CallbackInfoReturnable<Boolean> cir) {
+		var ctx = net.cyberpunk042.util.MixinProfiler.enter("ItemEntity.damage");
 		if (theVirusBlock$burnAlertSent) {
+			ctx.exit();
 			return;
 		}
 		if (!source.isIn(DamageTypeTags.IS_FIRE)) {
+			ctx.exit();
 			return;
 		}
 		ItemStack stack = ((ItemEntity) (Object) this).getStack();
 		if (!stack.isOf(ModBlocks.VIRUS_BLOCK.asItem())) {
+			ctx.exit();
 			return;
 		}
 		VirusItemAlerts.broadcastBurn(world);
 		theVirusBlock$burnAlertSent = true;
+		ctx.exit();
 	}
 
 	@Inject(method = "onPlayerCollision(Lnet/minecraft/entity/player/PlayerEntity;)V", at = @At("HEAD"))
 	private void theVirusBlock$preparePickup(PlayerEntity player, CallbackInfo ci) {
+		var ctx = net.cyberpunk042.util.MixinProfiler.enter("ItemEntity.prepPickup");
 		if (getWorld().isClient() || theVirusBlock$pickupAlertSent) {
 			theVirusBlock$trackPickup = false;
+			ctx.exit();
 			return;
 		}
 		ItemStack stack = ((ItemEntity) (Object) this).getStack();
 		theVirusBlock$trackPickup = stack.isOf(ModBlocks.VIRUS_BLOCK.asItem());
+		ctx.exit();
 	}
 
 	@Inject(method = "onPlayerCollision(Lnet/minecraft/entity/player/PlayerEntity;)V", at = @At("TAIL"))
 	private void theVirusBlock$announcePickup(PlayerEntity player, CallbackInfo ci) {
+		var ctx = net.cyberpunk042.util.MixinProfiler.enter("ItemEntity.announce");
 		if (!theVirusBlock$trackPickup || theVirusBlock$pickupAlertSent || getWorld().isClient()) {
+			ctx.exit();
 			return;
 		}
 		if (!this.isRemoved()) {
+			ctx.exit();
 			return;
 		}
 		if (!(player instanceof ServerPlayerEntity serverPlayer)) {
+			ctx.exit();
 			return;
 		}
 		World world = getWorld();
 		if (!(world instanceof ServerWorld serverWorld)) {
+			ctx.exit();
 			return;
 		}
 		VirusItemAlerts.broadcastPickup(serverWorld, serverPlayer);
 		theVirusBlock$pickupAlertSent = true;
 		theVirusBlock$trackPickup = false;
+		ctx.exit();
 	}
 }
+
 

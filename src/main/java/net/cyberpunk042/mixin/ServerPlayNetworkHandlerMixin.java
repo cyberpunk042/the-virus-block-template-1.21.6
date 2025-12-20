@@ -143,24 +143,38 @@ public abstract class ServerPlayNetworkHandlerMixin {
 			Box queryBox,
 			Vec3d movementReference,
 			Operation<Iterable<VoxelShape>> original) {
+		net.cyberpunk042.util.SuperProfiler.start("Mixin:AntiCheat.collision");
+		
+		// Fast exit when no growth blocks exist - most common case
+		if (!net.cyberpunk042.block.entity.GrowthCollisionTracker.hasAny()) {
+			net.cyberpunk042.util.SuperProfiler.end("Mixin:AntiCheat.collision");
+			return original.call(collisionView, entity, queryBox, movementReference);
+		}
 		Iterable<VoxelShape> vanilla = original.call(collisionView, entity, queryBox, movementReference);
 		if (GrowthCollisionDebug.disableAntiCheatCollisions()) {
+			net.cyberpunk042.util.SuperProfiler.end("Mixin:AntiCheat.collision");
 			return vanilla;
 		}
 		if (!(entity instanceof ServerPlayerEntity) || !(collisionView instanceof World world) || world.isClient) {
+			net.cyberpunk042.util.SuperProfiler.end("Mixin:AntiCheat.collision");
 			return vanilla;
 		}
 		List<VoxelShape> extras = GrowthCollisionMixinHelper.gatherGrowthCollisions(entity, world, queryBox, vanilla);
 		if (extras.isEmpty()) {
+			net.cyberpunk042.util.SuperProfiler.end("Mixin:AntiCheat.collision");
 			return vanilla;
 		}
+		// Optimize merging
+		if (vanilla == null || !vanilla.iterator().hasNext()) {
+			net.cyberpunk042.util.SuperProfiler.end("Mixin:AntiCheat.collision");
+			return extras;
+		}
 		List<VoxelShape> merged = new ArrayList<>();
-		if (vanilla != null) {
-			for (VoxelShape shape : vanilla) {
-				merged.add(shape);
-			}
+		for (VoxelShape shape : vanilla) {
+			merged.add(shape);
 		}
 		merged.addAll(extras);
+		net.cyberpunk042.util.SuperProfiler.end("Mixin:AntiCheat.collision");
 		return merged;
 	}
 

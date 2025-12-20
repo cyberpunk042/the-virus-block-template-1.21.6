@@ -25,7 +25,9 @@ public abstract class WitherEntityMixin {
 
 	@Inject(method = "mobTick", at = @At("TAIL"))
 	private void theVirusBlock$mobTick(CallbackInfo ci) {
+		var ctx = net.cyberpunk042.util.MixinProfiler.enter("Wither.mobTick");
 		hideBossBar();
+		ctx.exit();
 	}
 
 	private void hideBossBar() {

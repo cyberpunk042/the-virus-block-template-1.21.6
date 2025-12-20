@@ -31,6 +31,7 @@ public class FallingMatrixCubeEntity extends FallingBlockEntity {
 	public FallingMatrixCubeEntity(EntityType<? extends FallingBlockEntity> type, World world) {
 		super(type, world);
 		this.noClip = true;
+		this.dropItem = false;  // Prevent vanilla from spawning items - we handle lifecycle manually
 		this.registeredWithTracker = false;
 	}
 

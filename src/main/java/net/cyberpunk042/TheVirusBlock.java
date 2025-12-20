@@ -3,59 +3,21 @@ package net.cyberpunk042;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.cyberpunk042.command.VirusDebugCommands;
 import net.cyberpunk042.command.VirusDifficultyCommand;
-import net.cyberpunk042.command.GrowthBlockCommands;
-import net.cyberpunk042.command.GrowthCollisionCommand;
-import net.cyberpunk042.config.InfectionConfigRegistry;
-import net.cyberpunk042.config.ModConfigBootstrap;
-import net.cyberpunk042.infection.VirusInfectionSystem;
-import net.cyberpunk042.infection.VirusInventoryAnnouncements;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.infection.VirusDifficulty;
 import net.cyberpunk042.item.PurificationOption;
-import net.cyberpunk042.network.DifficultySyncPayload;
-import net.cyberpunk042.network.GrowthBeamPayload;
-import net.cyberpunk042.network.GrowthRingFieldPayload;
-import net.cyberpunk042.network.HorizonTintPayload;
 import net.cyberpunk042.network.PurificationTotemSelectPayload;
-import net.cyberpunk042.network.ShieldFieldRemovePayload;
-import net.cyberpunk042.network.ShieldFieldSpawnPayload;
-import net.cyberpunk042.network.SingularityBorderPayload;
-import net.cyberpunk042.network.SingularityVisualStartPayload;
-import net.cyberpunk042.network.SingularityVisualStopPayload;
-import net.cyberpunk042.network.SingularitySchedulePayload;
-import net.cyberpunk042.network.SkyTintPayload;
 import net.cyberpunk042.network.VirusDifficultySelectPayload;
-import net.cyberpunk042.network.VoidTearBurstPayload;
-import net.cyberpunk042.network.VoidTearSpawnPayload;
-import net.cyberpunk042.network.FieldSpawnPayload;
-import net.cyberpunk042.network.FieldRemovePayload;
-import net.cyberpunk042.network.FieldUpdatePayload;
-import net.cyberpunk042.network.FieldDefinitionSyncPayload;
-import net.cyberpunk042.network.gui.GuiPacketRegistration;
-import net.cyberpunk042.registry.ModBlockEntities;
 import net.cyberpunk042.registry.ModBlocks;
-import net.cyberpunk042.registry.ModEntities;
-import net.cyberpunk042.registry.ModItemGroups;
 import net.cyberpunk042.registry.ModItems;
-import net.cyberpunk042.registry.ModStatusEffects;
-import net.cyberpunk042.screen.ModScreenHandlers;
 import net.cyberpunk042.screen.handler.PurificationTotemScreenHandler;
 import net.cyberpunk042.screen.handler.VirusDifficultyScreenHandler;
 import net.cyberpunk042.util.DelayedServerTasks;
-import net.cyberpunk042.util.ServerRef;
-import net.cyberpunk042.growth.scheduler.GrowthScheduler;
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.cyberpunk042.log.Logging;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
-import net.cyberpunk042.log.LogConfig;
-import net.cyberpunk042.log.LogCommands;
-import net.cyberpunk042.log.LogChatBridge;
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleFactory;
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleRegistry;
-import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.item.ItemStack;
@@ -219,59 +181,65 @@ public class TheVirusBlock implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
-		ServerRef.init();
-		GrowthScheduler.registerSchedulerTasks();
-		ModConfigBootstrap.prepareCommon();
-		InfectionConfigRegistry.loadCommon();
+		// Wire State store to Init framework for observable progress
+		net.cyberpunk042.state.StateInit.connect();
 		
-		// Initialize command protection system
-		net.cyberpunk042.command.util.CommandKnobConfig.reload();
-		net.cyberpunk042.command.util.CommandProtection.reload();
-		net.cyberpunk042.command.util.CommandProtection.auditDeviations();
+		// Execute staged initialization
+		net.cyberpunk042.init.Init.orchestrator()
+			// Stage 1: Core systems (no dependencies)
+			.stage(net.cyberpunk042.init.InitStage.of("core", "Core Systems")
+				.add(net.cyberpunk042.init.nodes.CoreNodes.SERVER_REF)
+				.add(net.cyberpunk042.init.nodes.CoreNodes.CONFIG)
+				.add(net.cyberpunk042.init.nodes.CoreNodes.LOGGING)
+				.add(net.cyberpunk042.init.nodes.CoreNodes.COMMANDS))
+			
+			// Stage 2: Registries (blocks, items, entities, etc.)
+			.stage(net.cyberpunk042.init.InitStage.of("registry", "Registries")
+				.add(net.cyberpunk042.init.nodes.RegistryNodes.BLOCKS)
+				.add(net.cyberpunk042.init.nodes.RegistryNodes.ITEMS)
+				.add(net.cyberpunk042.init.nodes.RegistryNodes.BLOCK_ENTITIES)
+				.add(net.cyberpunk042.init.nodes.RegistryNodes.ENTITIES)
+				.add(net.cyberpunk042.init.nodes.RegistryNodes.EFFECTS)
+				.add(net.cyberpunk042.init.nodes.RegistryNodes.ITEM_GROUPS)
+				.add(net.cyberpunk042.init.nodes.RegistryNodes.SCREEN_HANDLERS))
+			
+			// Stage 3: Network (payloads + handlers)
+			.stage(net.cyberpunk042.init.InitStage.of("network", "Networking")
+				.add(net.cyberpunk042.init.nodes.NetworkNodes.S2C_PAYLOADS)
+				.add(net.cyberpunk042.init.nodes.NetworkNodes.C2S_PAYLOADS)
+				.add(net.cyberpunk042.init.nodes.NetworkNodes.GUI_PAYLOADS)
+				.add(net.cyberpunk042.init.nodes.NetworkNodes.SERVER_HANDLERS))
+			
+			// Stage 4: Commands
+			.stage(net.cyberpunk042.init.InitStage.of("commands", "Commands")
+				.add(net.cyberpunk042.init.nodes.CommandNodes.LOG_COMMANDS)
+				.add(net.cyberpunk042.init.nodes.CommandNodes.DEBUG_COMMANDS)
+				.add(net.cyberpunk042.init.nodes.CommandNodes.GROWTH_COMMANDS))
+			
+			// Stage 5: Field system
+			.stage(net.cyberpunk042.init.InitStage.of("field", "Field System")
+				.add(net.cyberpunk042.init.nodes.FieldNodes.GROWTH_SCHEDULER)
+				.add(net.cyberpunk042.init.nodes.FieldNodes.FIELD_COMMANDS)
+				.add(net.cyberpunk042.init.nodes.FieldNodes.FIELD_RELOAD_LISTENER)
+				.add(net.cyberpunk042.init.nodes.FieldNodes.FIELD_MANAGER_WIRING)
+				.add(net.cyberpunk042.init.nodes.FieldNodes.FIELD_PLAYER_SYNC)
+				.add(net.cyberpunk042.init.nodes.FieldNodes.COLOR_THEMES)
+				.add(net.cyberpunk042.init.nodes.FieldNodes.FIELD_REGISTRY))
+			
+			// Stage 6: Infection system
+			.stage(net.cyberpunk042.init.InitStage.of("infection", "Infection System")
+				.add(net.cyberpunk042.init.nodes.InfectionNodes.BLOCK_PROTECTION)
+				.add(net.cyberpunk042.init.nodes.InfectionNodes.TIER_BOSS_BAR)
+				.add(net.cyberpunk042.init.nodes.InfectionNodes.INVENTORY_ANNOUNCEMENTS)
+				.add(net.cyberpunk042.init.nodes.InfectionNodes.TERRAIN_CORRUPTION)
+				.add(net.cyberpunk042.init.nodes.InfectionNodes.ITEM_ALERTS)
+				.add(net.cyberpunk042.init.nodes.InfectionNodes.DELAYED_TASKS)
+				.add(net.cyberpunk042.init.nodes.InfectionNodes.VIRUS_COMMANDS)
+				.add(net.cyberpunk042.init.nodes.InfectionNodes.VIRUS_WORLD_STATE))
+			
+			.execute();
 		
-		// Initialize logging system
-		LogConfig.load();
-		
-		// Initialize field system
-		net.cyberpunk042.field.FieldSystemInit.init();
-		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, env) -> 
-			LogCommands.register(dispatcher));
-		ServerLifecycleEvents.SERVER_STARTED.register(LogChatBridge::setServer);
-		ServerLifecycleEvents.SERVER_STOPPED.register(s -> LogChatBridge.setServer(null));
-		PayloadTypeRegistry.playS2C().register(SkyTintPayload.ID, SkyTintPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(HorizonTintPayload.ID, HorizonTintPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(DifficultySyncPayload.ID, DifficultySyncPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(VoidTearSpawnPayload.ID, VoidTearSpawnPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(VoidTearBurstPayload.ID, VoidTearBurstPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(FieldSpawnPayload.ID, FieldSpawnPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(ShieldFieldSpawnPayload.ID, ShieldFieldSpawnPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(ShieldFieldRemovePayload.ID, ShieldFieldRemovePayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(FieldRemovePayload.ID, FieldRemovePayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(FieldUpdatePayload.ID, FieldUpdatePayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(FieldDefinitionSyncPayload.ID, FieldDefinitionSyncPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(SingularityVisualStartPayload.ID, SingularityVisualStartPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(SingularityVisualStopPayload.ID, SingularityVisualStopPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(SingularityBorderPayload.ID, SingularityBorderPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(SingularitySchedulePayload.ID, SingularitySchedulePayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(GrowthBeamPayload.ID, GrowthBeamPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(GrowthRingFieldPayload.ID, GrowthRingFieldPayload.CODEC);
-		PayloadTypeRegistry.playC2S().register(PurificationTotemSelectPayload.ID, PurificationTotemSelectPayload.CODEC);
-		PayloadTypeRegistry.playC2S().register(VirusDifficultySelectPayload.ID, VirusDifficultySelectPayload.CODEC);
-		// GUI packet registration
-		GuiPacketRegistration.registerAll();
-		GuiPacketRegistration.registerServerHandlers();
-		ModBlocks.bootstrap();
-		ModItems.bootstrap();
-		ModBlockEntities.bootstrap();
-		ModEntities.bootstrap();
-		ModStatusEffects.bootstrap();
-		ModItemGroups.bootstrap();
-		ModScreenHandlers.bootstrap();
-		VirusDebugCommands.register();
-		GrowthBlockCommands.register();
-		GrowthCollisionCommand.register();
-		VirusInfectionSystem.init();
-		VirusInventoryAnnouncements.init();
+		// Register mod-specific server handlers (not in generic nodes)
 		ServerPlayNetworking.registerGlobalReceiver(PurificationTotemSelectPayload.ID, (payload, context) ->
 				context.player().getServer().execute(() -> handlePurificationSelection(context.player(), payload)));
 		ServerPlayNetworking.registerGlobalReceiver(VirusDifficultySelectPayload.ID, (payload, context) ->

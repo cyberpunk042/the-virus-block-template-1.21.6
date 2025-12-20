@@ -14,11 +14,16 @@ import java.util.Map;
 /**
  * Configuration management for the logging system.
  * Loads/saves logs.json from the mod config directory.
+ * 
+ * <p>Config is regenerated when version changes to ensure all channels are present.
  */
 public final class LogConfig {
     
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final String FILE_NAME = "logs.json";
+    
+    // Increment this whenever channels are added/removed to force config regeneration
+    private static final int CONFIG_VERSION = 2;
     
     private static volatile boolean chatEnabled = true;
     private static volatile ChatRecipients chatRecipients = ChatRecipients.OPS;
@@ -44,6 +49,15 @@ public final class LogConfig {
         try {
             String content = Files.readString(file);
             JsonObject root = GSON.fromJson(content, JsonObject.class);
+            
+            // Check version - regenerate if outdated
+            int fileVersion = root.has("_version") ? root.get("_version").getAsInt() : 0;
+            if (fileVersion < CONFIG_VERSION) {
+                TheVirusBlock.LOGGER.info("[LogConfig] Config version {} is outdated (current: {}), regenerating with all channels",
+                    fileVersion, CONFIG_VERSION);
+                save();
+                return;
+            }
             
             // Load channels
             if (root.has("channels")) {
@@ -101,6 +115,9 @@ public final class LogConfig {
             Files.createDirectories(configDir);
             
             JsonObject root = new JsonObject();
+            
+            // Save version for upgrade detection
+            root.addProperty("_version", CONFIG_VERSION);
             
             // Save channels
             JsonObject channels = new JsonObject();
