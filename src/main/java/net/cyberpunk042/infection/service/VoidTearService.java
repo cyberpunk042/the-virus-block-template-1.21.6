@@ -294,92 +294,68 @@ public final class VoidTearService {
 	}
 
 	private int applyForce(ServerWorld world, VoidTearInstance tear, boolean finalBlast) {
-		Vec3d center = tear.centerVec();
-		double effectRadius = EFFECT_RADIUS;
+		long now = world.getTime();
+		double effectRadius = Math.max(6.0D, tear.radius() * 1.4D);
 		Box box = new Box(tear.centerBlock()).expand(effectRadius);
 		int affected = 0;
-		
 		for (LivingEntity living : world.getEntitiesByClass(LivingEntity.class, box, Entity::isAlive)) {
-			// Skip shielded entities
 			if (host.shieldFieldService().isShielding(living.getBlockPos())) {
 				continue;
 			}
-			
-			// Calculate distance to center
-			Vec3d entityPos = living.getPos().add(0, living.getHeight() / 2, 0);
-			Vec3d toCenter = center.subtract(entityPos);
-			double distance = toCenter.length();
-			
-			// Skip if too close or too far
-			if (distance < 0.5D || distance > effectRadius) {
+			Vec3d center = tear.centerVec();
+			Vec3d offset;
+			long ticksRemaining = tear.expiryTick() - now;
+			double duration = Math.max(1.0D, tear.durationTicks());
+			double lifeFrac = MathHelper.clamp(1.0D - (ticksRemaining / duration), 0.0D, 1.0D);
+			boolean pushPhase = finalBlast || finalBlastPhase(lifeFrac);
+			boolean pullPhase = !pushPhase && lifeFrac < 0.5D;
+			if (!pullPhase && !pushPhase) {
 				continue;
 			}
-			
-			// Heavy pants protection
+			offset = pushPhase ? living.getPos().subtract(center) : center.subtract(living.getPos());
+			double distanceSq = offset.lengthSquared();
+			if (distanceSq < 1.0E-4) {
+				continue;
+			}
+			double distance = Math.sqrt(distanceSq);
+			if (distance > effectRadius) {
+				continue;
+			}
 			if (living instanceof ServerPlayerEntity player && VirusEquipmentHelper.hasHeavyPants(player)) {
 				accumulateHeavyPantsWear(player);
 				continue;
 			}
-			
-			// Strength based on distance (stronger when closer)
-			double strength = 1.0D - (distance / effectRadius);  // 1.0 at center, 0 at edge
-			Vec3d direction = toCenter.normalize();
-			
-			Vec3d impulse;
-			if (finalBlast) {
-				// PUSH OUTWARD on final burst
-				double force = PUSH_STRENGTH * (0.5 + 0.5 * strength);
-				impulse = direction.multiply(-force);  // Negative = away from center
-				impulse = impulse.add(0, TEAR_BURST_VERTICAL_BOOST * strength, 0);
-			} else {
-				// PULL TOWARD CENTER during active phase
-				double force = PULL_STRENGTH * (0.4 + 0.6 * strength);
-				impulse = direction.multiply(force);
-				
-				// Small lift to prevent ground dragging
-				if (living.isOnGround()) {
-					impulse = impulse.add(0, 0.04, 0);
-				}
-			}
-			
-			// Apply velocity change
-			Vec3d newVel = living.getVelocity().add(impulse);
-			
-			// Cap horizontal speed
-			double hSpeed = newVel.horizontalLength();
-			if (hSpeed > MAX_VELOCITY) {
-				double scale = MAX_VELOCITY / hSpeed;
-				newVel = new Vec3d(newVel.x * scale, newVel.y, newVel.z * scale);
-			}
-			
-			// Cap vertical speed
-			newVel = new Vec3d(newVel.x, MathHelper.clamp(newVel.y, -1.0, 1.0), newVel.z);
-			
-			living.setVelocity(newVel);
+			double proximity = 1.0D - Math.min(1.0D, distance / effectRadius);
+			Vec3d direction = offset.normalize();
+			double baseStrength = tear.pullStrength() * (pushPhase ? 4.2D : 3.2D);
+			double strength = baseStrength * (0.15D + 0.85D * proximity);
+			Vec3d impulse = direction.multiply(strength);
+			double vertical = MathHelper.clamp(impulse.y + (pushPhase ? TEAR_BURST_VERTICAL_BOOST * 0.5D : 0.0D),
+					-0.25D,
+					0.25D);
+			living.addVelocity(impulse.x, vertical, impulse.z);
 			living.velocityModified = true;
 			living.velocityDirty = true;
 			living.fallDistance = 0.0F;
 			affected++;
-			
-			// Damage if in core
-			if (distance * distance <= tear.damageRadiusSq()) {
+			if (pullPhase && distanceSq <= tear.damageRadiusSq()) {
 				living.damage(world, world.getDamageSources().explosion(null, null), tear.damage());
 			}
 		}
-		
-		// Items: gentle pull
 		for (ItemEntity item : world.getEntitiesByClass(ItemEntity.class, box, entity -> !entity.isRemoved())) {
-			Vec3d delta = center.subtract(item.getPos());
+			Vec3d delta = tear.centerVec().subtract(item.getPos());
 			double distance = delta.length();
-			if (distance < 0.5D || distance > effectRadius) {
+			if (distance < 0.1D) {
 				continue;
 			}
-			double strength = 1.0D - (distance / effectRadius);
-			Vec3d impulse = delta.normalize().multiply(0.05 * strength);
-			item.addVelocity(impulse.x, impulse.y * 0.2D, impulse.z);
+			double proximity = 1.0D - Math.min(1.0D, distance / effectRadius);
+			if (proximity <= 0.0D) {
+				continue;
+			}
+			Vec3d impulse = delta.normalize().multiply(tear.pullStrength() * 0.5D * proximity);
+			item.addVelocity(impulse.x, impulse.y * 0.1D, impulse.z);
 			item.velocityDirty = true;
 		}
-		
 		return affected;
 	}
 
