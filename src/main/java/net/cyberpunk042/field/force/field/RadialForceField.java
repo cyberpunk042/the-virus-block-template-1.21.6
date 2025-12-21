@@ -51,16 +51,55 @@ public class RadialForceField implements ForceField {
             return Vec3d.ZERO;
         }
         
-        // Direction toward center
+        // Direction toward center (standard gravitational direction)
         Vec3d towardCenter = context.directionToCenter();
+        double normalizedDist = distance / radius;
         
         // ═══════════════════════════════════════════════════════════════════════
         // PURE GRAVITATIONAL FORCE
         // ═══════════════════════════════════════════════════════════════════════
-        double normalizedDist = distance / radius;
         double gravityStrength = calculateGravity(distance, normalizedDist);
-        
         Vec3d force = towardCenter.multiply(gravityStrength);
+        
+        // ═══════════════════════════════════════════════════════════════════════
+        // ORBIT PLANE EVOLUTION - adds perpendicular nudges to evolve orbit
+        // TILT (X axis): Tips orbit forward/backward - uses cross with X axis
+        // ORIENTATION (Z axis): Tips orbit left/right - uses cross with Z axis
+        // ═══════════════════════════════════════════════════════════════════════
+        if (shouldRotateOrbit()) {
+            int ticks = context.ticksElapsed();
+            double nudgeStrength = gravityStrength * 0.25;
+            
+            // TILT: Cross with X axis (1,0,0) for forward/backward tilt
+            // Result is perpendicular in YZ plane
+            if (!"fixed".equals(config.tiltMode()) && config.tiltRate() > 0) {
+                double phase = ticks * config.tiltRate();
+                double amplitude = "wobble".equals(config.tiltMode()) ? 0.6 : 1.0;
+                double nudge = Math.sin(phase) * nudgeStrength * amplitude;
+                
+                Vec3d xAxis = new Vec3d(1, 0, 0);
+                Vec3d tiltPerp = towardCenter.crossProduct(xAxis);
+                if (tiltPerp.lengthSquared() > 0.001) {
+                    tiltPerp = tiltPerp.normalize();
+                    force = force.add(tiltPerp.multiply(nudge));
+                }
+            }
+            
+            // ORIENTATION: Cross with Z axis (0,0,1) for left/right tilt
+            // Result is perpendicular in XY plane
+            if (!"fixed".equals(config.orientationMode()) && config.orientationRate() > 0) {
+                double phase = ticks * config.orientationRate();
+                double amplitude = "wobble".equals(config.orientationMode()) ? 0.6 : 1.0;
+                double nudge = Math.sin(phase) * nudgeStrength * amplitude;
+                
+                Vec3d zAxis = new Vec3d(0, 0, 1);
+                Vec3d orientPerp = towardCenter.crossProduct(zAxis);
+                if (orientPerp.lengthSquared() > 0.001) {
+                    orientPerp = orientPerp.normalize();
+                    force = force.add(orientPerp.multiply(nudge));
+                }
+            }
+        }
         
         // ═══════════════════════════════════════════════════════════════════════
         // CENTER PERTURBATION - breaks single-axis oscillation
@@ -91,6 +130,65 @@ public class RadialForceField implements ForceField {
         }
         
         return force;
+    }
+    
+    /**
+     * Checks if orbit rotation is enabled.
+     */
+    private boolean shouldRotateOrbit() {
+        return (!"fixed".equals(config.tiltMode()) && config.tiltRate() > 0) ||
+               (!"fixed".equals(config.orientationMode()) && config.orientationRate() > 0);
+    }
+    
+    /**
+     * Gets the rotation angle based on mode and rate.
+     */
+    private double getRotationAngle(String mode, float rate, int ticks) {
+        if ("wobble".equals(mode)) {
+            // Oscillate: sin wave
+            return ticks * rate;  // Sin applied in caller
+        } else {
+            // fullcycle: continuous rotation
+            return ticks * rate;
+        }
+    }
+    
+    /**
+     * Applies rotation to a vector based on mode and rate.
+     * @param vec The vector to rotate
+     * @param mode "fixed", "wobble", or "fullcycle"
+     * @param rate Radians per tick
+     * @param ticks Current tick count
+     * @param aroundY true for Y-axis (orientation), false for X-axis (tilt)
+     */
+    private Vec3d applyRotation(Vec3d vec, String mode, float rate, int ticks, boolean aroundY) {
+        if ("fixed".equals(mode) || rate <= 0) {
+            return vec;
+        }
+        
+        double angle;
+        if ("wobble".equals(mode)) {
+            // Oscillate: sin wave from -rate to +rate
+            angle = Math.sin(ticks * rate) * rate * 10;  // Multiply for visible effect
+        } else {
+            // fullcycle: continuous rotation
+            angle = ticks * rate;
+        }
+        
+        double cos = Math.cos(angle);
+        double sin = Math.sin(angle);
+        
+        if (aroundY) {
+            // Rotate around Y axis (horizontal spin)
+            double nx = vec.x * cos - vec.z * sin;
+            double nz = vec.x * sin + vec.z * cos;
+            return new Vec3d(nx, vec.y, nz);
+        } else {
+            // Rotate around X axis (tilt up/down)
+            double ny = vec.y * cos - vec.z * sin;
+            double nz = vec.y * sin + vec.z * cos;
+            return new Vec3d(vec.x, ny, nz);
+        }
     }
     
     /**

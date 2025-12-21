@@ -225,12 +225,8 @@ public final class FieldManager {
         // Check if in range
         double distance = context.distance();
         if (!forceField.affectsDistance(distance)) {
-            // Log once per second if out of range
-            if (ticksElapsed % 20 == 0) {
-                Logging.REGISTRY.topic("force").trace(
-                    "Entity {} at distance {:.1f} outside force range", 
-                    entity.getName().getString(), distance);
-            }
+            // Restore entity state when leaving force field
+            restoreEntityState(entity);
             return;
         }
         
@@ -267,7 +263,23 @@ public final class FieldManager {
         entity.setVelocity(newVel);
         entity.velocityModified = true;
         entity.velocityDirty = true;
+        
+        // Make entity appear to float/fly rather than walk
         entity.fallDistance = 0.0f;
+        
+        // Disable gravity while in force field (entity is being controlled by force)
+        if (!entity.hasNoGravity()) {
+            entity.setNoGravity(true);
+        }
+    }
+    
+    /**
+     * Called when entity leaves the force field - restore normal state.
+     */
+    private void restoreEntityState(net.minecraft.entity.LivingEntity entity) {
+        if (entity.hasNoGravity()) {
+            entity.setNoGravity(false);
+        }
     }
     
     public void clear() {

@@ -9,6 +9,7 @@
 		"ZombieEntityMixin",
 		"AbstractSkeletonEntityMixin",
 		"FallingBlockEntityAccessor",
+		"EntityAccessor",
 		"ServerRecipeManagerMixin",
 		"BedBlockMixin",
 		"GuardianEntityAccessor",

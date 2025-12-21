@@ -39,7 +39,18 @@ public record ForceFieldConfig(
     @JsonField(skipIfDefault = true, defaultValue = "0.05") float groundLift,
     
     // Falloff
-    @JsonField(skipIfDefault = true, defaultValue = "linear") String falloff
+    @JsonField(skipIfDefault = true, defaultValue = "linear") String falloff,
+    
+    // Orbit Plane Rotation - makes the orbit tilt/spin in 3D
+    // Modes: "fixed" (no rotation), "wobble" (oscillates back and forth), "fullcycle" (continuous rotation)
+    @JsonField(skipIfDefault = true, defaultValue = "fixed") String tiltMode,
+    @JsonField(skipIfDefault = true, defaultValue = "0.0") float tiltRate,
+    @JsonField(skipIfDefault = true, defaultValue = "fixed") String orientationMode,
+    @JsonField(skipIfDefault = true, defaultValue = "0.0") float orientationRate,
+    
+    // Motion Law System toggle
+    @JsonField(skipIfDefault = true, defaultValue = "false") boolean useMotionLaw,
+    @JsonField(skipIfDefault = true, defaultValue = "") String motionLawPreset
 ) {
     
     /** Default configuration - CENTER mode with slingshot. */
@@ -53,7 +64,13 @@ public record ForceFieldConfig(
         1.5f,    // maxVelocity
         0.02f,   // damping
         0.05f,   // groundLift
-        "linear" // falloff
+        "linear", // falloff
+        "fixed", // tiltMode
+        0.0f,    // tiltRate
+        "fixed", // orientationMode
+        0.0f,    // orientationRate
+        false,   // useMotionLaw
+        ""       // motionLawPreset
     );
     
     /**
@@ -70,6 +87,11 @@ public record ForceFieldConfig(
         damping = Math.max(0f, Math.min(1f, damping));
         groundLift = Math.max(0f, groundLift);
         if (falloff == null || falloff.isBlank()) falloff = "linear";
+        if (tiltMode == null || tiltMode.isBlank()) tiltMode = "fixed";
+        tiltRate = Math.max(0f, Math.min(0.2f, tiltRate));
+        if (orientationMode == null || orientationMode.isBlank()) orientationMode = "fixed";
+        orientationRate = Math.max(0f, Math.min(0.2f, orientationRate));
+        if (motionLawPreset == null) motionLawPreset = "";
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -113,7 +135,13 @@ public record ForceFieldConfig(
             json.has("maxVelocity") ? json.get("maxVelocity").getAsFloat() : 1.5f,
             json.has("damping") ? json.get("damping").getAsFloat() : 0.02f,
             json.has("groundLift") ? json.get("groundLift").getAsFloat() : 0.05f,
-            json.has("falloff") ? json.get("falloff").getAsString() : "linear"
+            json.has("falloff") ? json.get("falloff").getAsString() : "linear",
+            json.has("tiltMode") ? json.get("tiltMode").getAsString() : "fixed",
+            json.has("tiltRate") ? json.get("tiltRate").getAsFloat() : 0.0f,
+            json.has("orientationMode") ? json.get("orientationMode").getAsString() : "fixed",
+            json.has("orientationRate") ? json.get("orientationRate").getAsFloat() : 0.0f,
+            json.has("useMotionLaw") ? json.get("useMotionLaw").getAsBoolean() : false,
+            json.has("motionLawPreset") ? json.get("motionLawPreset").getAsString() : ""
         );
     }
     
@@ -140,6 +168,12 @@ public record ForceFieldConfig(
         private float damping = 0.02f;
         private float groundLift = 0.05f;
         private String falloff = "linear";
+        private String tiltMode = "fixed";
+        private float tiltRate = 0.0f;
+        private String orientationMode = "fixed";
+        private float orientationRate = 0.0f;
+        private boolean useMotionLaw = false;
+        private String motionLawPreset = "";
         
         public Builder strength(float v) { this.strength = v; return this; }
         public Builder radius(float v) { this.radius = v; return this; }
@@ -151,6 +185,12 @@ public record ForceFieldConfig(
         public Builder damping(float v) { this.damping = v; return this; }
         public Builder groundLift(float v) { this.groundLift = v; return this; }
         public Builder falloff(String v) { this.falloff = v; return this; }
+        public Builder tiltMode(String v) { this.tiltMode = v; return this; }
+        public Builder tiltRate(float v) { this.tiltRate = v; return this; }
+        public Builder orientationMode(String v) { this.orientationMode = v; return this; }
+        public Builder orientationRate(float v) { this.orientationRate = v; return this; }
+        public Builder useMotionLaw(boolean v) { this.useMotionLaw = v; return this; }
+        public Builder motionLawPreset(String v) { this.motionLawPreset = v; return this; }
         
         /** Preset: CENTER mode for void tear slingshot effect. */
         public Builder centerMode() {
@@ -164,9 +204,27 @@ public record ForceFieldConfig(
             return this;
         }
         
+        /** Preset: Motion law mode with specified preset. */
+        public Builder motionLaw(String preset) {
+            this.useMotionLaw = true;
+            this.motionLawPreset = preset;
+            return this;
+        }
+        
+        /** Preset: 3D orbit rotation effect. */
+        public Builder rotating3D(float tiltRate, float orientationRate) {
+            this.tiltMode = "fullcycle";
+            this.tiltRate = tiltRate;
+            this.orientationMode = "fullcycle";
+            this.orientationRate = orientationRate;
+            return this;
+        }
+        
         public ForceFieldConfig build() {
             return new ForceFieldConfig(strength, radius, orbitRadius, coreRadius,
-                tangentialStrength, slingshotFactor, maxVelocity, damping, groundLift, falloff);
+                tangentialStrength, slingshotFactor, maxVelocity, damping, groundLift, falloff,
+                tiltMode, tiltRate, orientationMode, orientationRate,
+                useMotionLaw, motionLawPreset);
         }
     }
 }
