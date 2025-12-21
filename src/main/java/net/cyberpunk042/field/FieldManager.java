@@ -200,10 +200,10 @@ public final class FieldManager {
         net.cyberpunk042.field.force.field.RadialForceField forceField = 
             new net.cyberpunk042.field.force.field.RadialForceField(forceConfig);
         
-        // Find and affect entities - EXCLUDE players (they get client-side forces for smooth feedback)
+        // Find and affect all living entities (server-authoritative forces)
         for (net.minecraft.entity.Entity entity : world.getEntitiesByClass(
                 net.minecraft.entity.LivingEntity.class, searchBox, 
-                e -> e.isAlive() && !e.isSpectator() && !(e instanceof net.minecraft.server.network.ServerPlayerEntity))) {
+                e -> e.isAlive() && !e.isSpectator())) {
             
             applyForceToEntity((net.minecraft.entity.LivingEntity) entity, center, 
                 forceField, forceConfig, normalizedTime, instance.age(), instance.maxLifeTicks());
@@ -254,7 +254,7 @@ public final class FieldManager {
             currentVel = currentVel.multiply(1.0 - config.damping());
         }
         
-        // Add force
+        // Add force directly - no negation
         Vec3d newVel = currentVel.add(force);
         
         // Cap velocity

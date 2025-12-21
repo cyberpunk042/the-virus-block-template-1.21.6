@@ -1,7 +1,10 @@
 package net.cyberpunk042.field.force.field;
 
-import net.cyberpunk042.field.force.ForceFieldConfig;
+import net.cyberpunk042.field.force.*;
 import net.cyberpunk042.field.force.core.ForceContext;
+import net.cyberpunk042.field.force.mode.*;
+import net.cyberpunk042.field.force.path.ForcePath;
+import net.cyberpunk042.field.force.path.PathForce;
 import net.cyberpunk042.field.force.phase.ForcePhase;
 import net.cyberpunk042.field.force.phase.ForcePolarity;
 import net.cyberpunk042.field.force.zone.ForceZone;
@@ -9,40 +12,21 @@ import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Radial force field implementation.
+ * Multi-mode force field implementation.
  * 
- * <p>Applies force toward or away from a center point based on:
+ * <p>CLEAN SLATE - only working modes implemented:
  * <ul>
- *   <li><b>Zones</b>: Different strengths at different radii</li>
- *   <li><b>Phases</b>: Time-based polarity changes (pull → push)</li>
- *   <li><b>Falloff</b>: Strength decreases with distance</li>
+ *   <li><b>PUSH</b>: Simple outward force (WORKS)</li>
+ *   <li><b>ORBIT</b>: Tangential with distance stabilization (WORKS)</li>
+ *   <li><b>EXPLOSION</b>: Outward blast (WORKS - uses PUSH logic)</li>
+ *   <li><b>TORNADO</b>: Spin + lift (WORKS)</li>
+ *   <li>Others: STUBBED - return zero until implemented properly</li>
  * </ul>
- * 
- * <p>This is the primary force field type for gravity wells, repulsors,
- * singularities, and similar effects.
- * 
- * <h2>How It Works</h2>
- * <ol>
- *   <li>Determine which zone contains the entity</li>
- *   <li>Calculate base strength from zone + falloff</li>
- *   <li>Determine polarity from current phase</li>
- *   <li>Apply strength multiplier from phase</li>
- *   <li>Return force vector (direction × strength)</li>
- * </ol>
- * 
- * @see ForceFieldConfig
- * @see ForceZone
- * @see ForcePhase
  */
 public class RadialForceField implements ForceField {
     
     private final ForceFieldConfig config;
     
-    /**
-     * Creates a radial force field from configuration.
-     * 
-     * @param config The force field configuration
-     */
     public RadialForceField(@NotNull ForceFieldConfig config) {
         this.config = config;
     }
@@ -51,131 +35,280 @@ public class RadialForceField implements ForceField {
     public Vec3d calculateForce(ForceContext context) {
         double distance = context.distance();
         
-        // Outside all zones → no force
-        if (distance > config.maxRadius() || distance < 0.5) {
+        // Outside effect range or too close to center
+        if (distance > config.maxRadius() || distance < 0.3) {
             return Vec3d.ZERO;
         }
         
-        // Find the applicable zone
-        ForceZone zone = config.zoneAt((float) distance);
-        if (zone == null) {
+        // Get phase modifiers
+        float normalizedTime = context.normalizedTime();
+        ForcePolarity polarity = config.polarityAt(normalizedTime);
+        float phaseMultiplier = config.phaseMultiplier(normalizedTime);
+        
+        // HOLD phase = no force
+        if (polarity == ForcePolarity.HOLD) {
             return Vec3d.ZERO;
         }
         
-        // Calculate base strength from zone (includes falloff)
-        float baseStrength = zone.strengthAt((float) distance);
+        // Calculate base force by mode
+        Vec3d baseForce = switch (config.mode()) {
+            case RADIAL -> calculateRadial(context, distance);
+            case PULL -> calculatePull(context, distance);
+            case PUSH -> calculatePush(context, distance);
+            case VORTEX -> calculateVortex(context, distance);
+            case ORBIT -> calculateOrbit(context, distance);
+            case TORNADO -> calculateTornado(context, distance);
+            case RING -> calculateRing(context, distance);
+            case IMPLOSION -> calculateImplosion(context, distance);
+            case EXPLOSION -> calculateExplosion(context, distance);
+            case CUSTOM -> calculateCustom(context, distance);
+            case PATH -> calculatePath(context, distance);
+        };
         
-        // Get current phase
-        ForcePhase phase = config.phaseAt(context.normalizedTime());
-        ForcePolarity polarity = phase != null ? phase.polarity() : ForcePolarity.PULL;
-        float phaseMultiplier = phase != null ? phase.strengthMultiplier() : 1.0f;
-        
-        // Calculate final strength
-        float finalStrength = baseStrength * phaseMultiplier;
-        
-        // Get direction based on polarity
-        Vec3d direction;
-        switch (polarity) {
-            case PULL -> direction = context.directionToCenter();
-            case PUSH -> direction = context.directionFromCenter();
-            case HOLD -> { return Vec3d.ZERO; }
-            default -> direction = context.directionToCenter();
+        // Apply phase multiplier and polarity override
+        if (polarity == ForcePolarity.PUSH && config.mode() == ForceMode.PULL) {
+            baseForce = baseForce.multiply(-1);
         }
         
-        // Apply force vector
-        Vec3d force = direction.multiply(finalStrength);
+        return baseForce.multiply(phaseMultiplier);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // WORKING MODES
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * PUSH: Simple outward force - WORKS
+     */
+    private Vec3d calculatePush(ForceContext context, double distance) {
+        PushModeConfig cfg = config.push() != null ? config.push() : PushModeConfig.DEFAULT;
         
-        // Add vertical boost on push phase
-        if (polarity == ForcePolarity.PUSH && config.verticalBoost() > 0) {
-            // Stronger vertical boost when closer to center
-            float proximityFactor = 1.0f - (float)(distance / config.maxRadius());
-            force = force.add(0, config.verticalBoost() * proximityFactor, 0);
+        if (distance > cfg.radius()) return Vec3d.ZERO;
+        
+        float strength = calculateFalloff(cfg.strength(), (float) distance, cfg.radius(), cfg.falloff());
+        Vec3d force = context.directionFromCenter().multiply(strength);
+        
+        // Vertical boost
+        if (cfg.verticalBoost() > 0) {
+            float proximityFactor = 1f - (float)(distance / cfg.radius());
+            force = force.add(0, cfg.verticalBoost() * proximityFactor, 0);
         }
         
         return force;
     }
     
-    @Override
-    public float maxRadius() {
-        return config.maxRadius();
+    /**
+     * ORBIT: Tangential with distance stabilization - WORKS
+     */
+    private Vec3d calculateOrbit(ForceContext context, double distance) {
+        OrbitModeConfig cfg = config.orbit() != null ? config.orbit() : OrbitModeConfig.DEFAULT;
+        
+        if (distance > cfg.maxRadius()) return Vec3d.ZERO;
+        
+        // Find nearest orbit ring
+        int nearestRing = cfg.nearestRing((float) distance);
+        float targetRadius = cfg.ringRadius(nearestRing);
+        float distToRing = (float) distance - targetRadius;
+        
+        Vec3d force = Vec3d.ZERO;
+        
+        // Radial correction to maintain orbit
+        if (Math.abs(distToRing) > 0.1f) {
+            float correctionStrength = cfg.stability() * cfg.entryForce() * Math.signum(distToRing);
+            Vec3d radialDir = distToRing > 0 ? context.directionToCenter() : context.directionFromCenter();
+            force = radialDir.multiply(Math.abs(correctionStrength));
+        }
+        
+        // Tangential force for orbit motion
+        Vec3d tangent = cfg.orbitAxis().tangentFor(context.directionToCenter());
+        float orbitSpeed = cfg.signedOrbitSpeed(nearestRing);
+        force = force.add(tangent.multiply(orbitSpeed));
+        
+        return force;
     }
+    
+    /**
+     * TORNADO: Spin + lift - WORKS
+     */
+    private Vec3d calculateTornado(ForceContext context, double distance) {
+        TornadoModeConfig cfg = config.tornado() != null ? config.tornado() : TornadoModeConfig.DEFAULT;
+        
+        double entityY = context.entityPosition().y;
+        double centerY = context.fieldCenter().y;
+        double height = entityY - centerY;
+        
+        if (height < 0 && distance > cfg.suckRadius()) return Vec3d.ZERO;
+        if (height >= 0 && height > cfg.height()) return Vec3d.ZERO;
+        
+        Vec3d force = Vec3d.ZERO;
+        
+        if (height < 0) {
+            // Below tornado base - pull toward center
+            float pullStrength = cfg.groundPull() * (1f - (float)(distance / cfg.suckRadius()));
+            force = context.directionToCenter().multiply(pullStrength);
+        } else {
+            // Inside tornado funnel
+            float radiusAtHeight = cfg.radiusAtHeight((float) height);
+            float distFromFunnel = (float) distance - radiusAtHeight;
+            
+            // Push/pull to maintain funnel wall
+            if (Math.abs(distFromFunnel) > 0.5f) {
+                Vec3d radialDir = distFromFunnel > 0 ? context.directionToCenter() : context.directionFromCenter();
+                force = radialDir.multiply(Math.abs(distFromFunnel) * 0.1f);
+            }
+            
+            // Spin around vertical axis
+            Vec3d tangent = cfg.spinAxis().tangentFor(context.directionToCenter());
+            force = force.add(tangent.multiply(cfg.signedSpinSpeed()));
+            
+            // Vertical lift
+            float heightFactor = 1f - (float)(height / cfg.height());
+            force = force.add(0, cfg.liftSpeed() * heightFactor, 0);
+        }
+        
+        return force;
+    }
+    
+    /**
+     * EXPLOSION: Outward blast - WORKS (uses PUSH logic)
+     */
+    private Vec3d calculateExplosion(ForceContext context, double distance) {
+        ExplosionModeConfig cfg = config.explosion() != null ? config.explosion() : ExplosionModeConfig.DEFAULT;
+        
+        if (distance > cfg.blastRadius()) return Vec3d.ZERO;
+        
+        float strength = cfg.strengthAt((float) distance);
+        Vec3d force = context.directionFromCenter().multiply(strength);
+        
+        // Vertical boost
+        float vertForce = cfg.verticalForce();
+        if (vertForce > 0) {
+            float proximityFactor = 1f - (float)(distance / cfg.blastRadius());
+            force = force.add(0, vertForce * proximityFactor, 0);
+        }
+        
+        return force;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // STUBBED MODES - TO BE IMPLEMENTED ONE BY ONE
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * RADIAL: Zone-based forces - STUBBED
+     * TODO: Implement properly
+     */
+    private Vec3d calculateRadial(ForceContext context, double distance) {
+        // For now, use PUSH logic as fallback
+        ForcePolarity polarity = config.polarityAt(context.normalizedTime());
+        if (polarity == ForcePolarity.PUSH) {
+            return calculatePush(context, distance);
+        }
+        // PULL polarity - stubbed, return zero
+        return Vec3d.ZERO;
+    }
+    
+    /**
+     * PULL: Simple inward force - STUBBED
+     * TODO: This is the most important one to fix!
+     */
+    private Vec3d calculatePull(ForceContext context, double distance) {
+        // STUBBED - return zero
+        return Vec3d.ZERO;
+    }
+    
+    /**
+     * VORTEX: Spiral motion - STUBBED
+     * TODO: Implement properly
+     */
+    private Vec3d calculateVortex(ForceContext context, double distance) {
+        // STUBBED - return zero
+        return Vec3d.ZERO;
+    }
+    
+    /**
+     * RING: Orbit band - STUBBED
+     * TODO: Implement properly
+     */
+    private Vec3d calculateRing(ForceContext context, double distance) {
+        // STUBBED - return zero
+        return Vec3d.ZERO;
+    }
+    
+    /**
+     * IMPLOSION: Accelerating pull - STUBBED
+     * TODO: Implement properly
+     */
+    private Vec3d calculateImplosion(ForceContext context, double distance) {
+        // STUBBED - return zero
+        return Vec3d.ZERO;
+    }
+    
+    /**
+     * CUSTOM: Zone-by-zone control - STUBBED
+     */
+    private Vec3d calculateCustom(ForceContext context, double distance) {
+        ForceZone zone = config.zoneAt((float) distance);
+        if (zone == null) return Vec3d.ZERO;
+        
+        Vec3d force = Vec3d.ZERO;
+        
+        // Only tangential for now (since radial pull is broken)
+        if (zone.hasTangential()) {
+            float tangentStr = zone.tangentialStrengthAt((float) distance);
+            Vec3d tangent = zone.tangentAxis().tangentFor(context.directionToCenter());
+            force = force.add(tangent.multiply(tangentStr));
+        }
+        
+        // Lift works
+        if (zone.hasLift()) {
+            float liftStr = zone.liftStrengthAt((float) distance);
+            force = force.add(0, liftStr, 0);
+        }
+        
+        return force;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PATH MODE - The new approach!
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * PATH: Entities follow a curved path.
+     * CAPTURE → FOLLOW → RELEASE
+     */
+    private Vec3d calculatePath(ForceContext context, double distance) {
+        // SIMPLEST POSSIBLE PULL toward center
+        Vec3d toCenter = context.directionToCenter();
+        Vec3d force = toCenter.multiply(0.3);
+        
+        if (context.entity() != null && context.entity().age % 20 == 0) {
+            System.out.println("[PULL] toCenter=" + toCenter + " force=" + force);
+        }
+        
+        return force;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Utilities
+    // ═══════════════════════════════════════════════════════════════════════════
     
     @Override
     public boolean affectsDistance(double distance) {
-        return distance >= 0.5 && distance <= config.maxRadius();
+        return distance <= config.maxRadius() && distance >= 0.3;
     }
     
-    /**
-     * Returns the underlying configuration.
-     */
-    public ForceFieldConfig config() {
-        return config;
-    }
-    
-    /**
-     * Returns the maximum velocity cap from config.
-     */
-    public float maxVelocity() {
-        return config.maxVelocity();
-    }
-    
-    /**
-     * Returns the damping factor from config.
-     */
-    public float damping() {
-        return config.damping();
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Factory
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    /**
-     * Creates a simple gravity well.
-     * 
-     * @param radius Effect radius
-     * @param strength Pull strength
-     */
-    public static RadialForceField gravityWell(float radius, float strength) {
-        ForceFieldConfig config = ForceFieldConfig.builder()
-            .zone(radius, strength, "quadratic")
-            .pullPhase(0, 100)
-            .build();
-        return new RadialForceField(config);
-    }
-    
-    /**
-     * Creates a repulsor field (push only).
-     * 
-     * @param radius Effect radius
-     * @param strength Push strength
-     */
-    public static RadialForceField repulsor(float radius, float strength) {
-        ForceFieldConfig config = ForceFieldConfig.builder()
-            .zone(radius, strength, "linear")
-            .pushPhase(0, 100, 1.0f)
-            .build();
-        return new RadialForceField(config);
-    }
-    
-    /**
-     * Creates a void tear style field (pull then push).
-     * 
-     * @param radius Effect radius
-     * @param pullStrength Pull phase strength
-     * @param pushStrength Push phase strength
-     */
-    public static RadialForceField voidTear(float radius, float pullStrength, float pushStrength) {
-        ForceFieldConfig config = ForceFieldConfig.builder()
-            .zone(radius, pullStrength, "quadratic")
-            .zone(radius * 0.5f, pullStrength * 1.5f, "quadratic")
-            .zone(radius * 0.2f, pullStrength * 2.5f, "constant")
-            .pullPhase(0, 75)
-            .holdPhase(75, 90)
-            .pushPhase(90, 100, pushStrength / pullStrength)
-            .verticalBoost(0.3f)
-            .maxVelocity(1.5f)
-            .build();
-        return new RadialForceField(config);
+    private float calculateFalloff(float baseStrength, float distance, float maxDistance, String falloffType) {
+        if (maxDistance <= 0) return baseStrength;
+        float normalized = Math.min(1f, distance / maxDistance);
+        
+        return switch (falloffType != null ? falloffType.toLowerCase() : "linear") {
+            case "constant" -> baseStrength;
+            case "inverse" -> baseStrength / (1f + normalized * 2f);
+            case "quadratic" -> baseStrength * (1f - normalized * normalized);
+            case "exponential" -> baseStrength * (float) Math.exp(-normalized * 2);
+            case "gaussian" -> baseStrength * (float) Math.exp(-normalized * normalized * 2);
+            default -> baseStrength * (1f - normalized); // linear
+        };
     }
 }

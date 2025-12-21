@@ -1,36 +1,33 @@
 {
     "id": "gravity_well",
     "name": "Gravity Well",
-    "description": "Draws entities toward center, then releases with a burst",
+    "description": "Strong orbital attraction with fast spinning",
     "zones": [
         {
             "radius": 15,
-            "strength": 0.08,
-            "falloff": "linear"
+            "strength": 0.25,
+            "tangentialStrength": 0.35,
+            "falloff": "quadratic"
         },
         {
             "radius": 8,
-            "strength": 0.15,
+            "strength": 0.45,
+            "tangentialStrength": 0.60,
             "falloff": "quadratic"
         },
         {
             "radius": 3,
-            "strength": 0.30,
+            "strength": 0.80,
+            "tangentialStrength": 1.0,
             "falloff": "constant"
         }
     ],
     "phases": [
         {
             "start": 0,
-            "end": 70,
+            "end": 85,
             "polarity": "pull",
             "strength": 1.0
-        },
-        {
-            "start": 70,
-            "end": 85,
-            "polarity": "hold",
-            "strength": 0.5
         },
         {
             "start": 85,
@@ -39,7 +36,6 @@
             "strength": 2.5
         }
     ],
-    "maxVelocity": 1.5,
-    "verticalBoost": 0.35,
-    "damping": 0.02
+    "maxVelocity": 2.5,
+    "damping": 0.01
 }

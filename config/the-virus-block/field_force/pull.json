@@ -1,0 +1,14 @@
+{
+    "id": "pull",
+    "name": "Pull",
+    "description": "Strong spiral pull with fast orbit",
+    "mode": "pull",
+    "pull": {
+        "strength": 0.40,
+        "radius": 12.0,
+        "falloff": "quadratic",
+        "groundLift": 0.15
+    },
+    "maxVelocity": 2.0,
+    "damping": 0.015
+}

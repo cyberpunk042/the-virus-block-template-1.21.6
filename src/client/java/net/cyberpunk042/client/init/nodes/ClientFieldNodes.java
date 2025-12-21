@@ -101,7 +101,8 @@ public final class ClientFieldNodes {
         () -> {
             ClientTickEvents.END_CLIENT_TICK.register(client -> {
                 ClientFieldManager.get().tick();
-                ClientForceApplicator.tick();
+                // Server-authoritative forces - client prediction disabled
+                // ClientForceApplicator.tick();
             });
             return 1;
         }

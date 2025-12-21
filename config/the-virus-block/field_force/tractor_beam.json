@@ -1,16 +1,18 @@
 {
     "id": "tractor_beam",
     "name": "Tractor Beam",
-    "description": "Steady controlled pull with damping - like a tractor beam",
+    "description": "Focused pull with orbital stabilization",
     "zones": [
         {
-            "radius": 18,
-            "strength": 0.08,
+            "radius": 12,
+            "strength": 0.10,
+            "tangentialStrength": 0.05,
             "falloff": "linear"
         },
         {
-            "radius": 8,
-            "strength": 0.15,
+            "radius": 5,
+            "strength": 0.16,
+            "tangentialStrength": 0.08,
             "falloff": "linear"
         }
     ],
@@ -23,6 +25,5 @@
         }
     ],
     "maxVelocity": 1.0,
-    "verticalBoost": 0.0,
-    "damping": 0.05
+    "damping": 0.025
 }

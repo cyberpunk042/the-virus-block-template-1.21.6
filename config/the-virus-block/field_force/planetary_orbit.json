@@ -1,0 +1,34 @@
+{
+    "id": "planetary_orbit",
+    "name": "Planetary Orbit",
+    "description": "Stable circular orbits at multiple radii like planets",
+    "mode": "orbit",
+    "zones": [
+        {
+            "radius": 18,
+            "strength": 0.06,
+            "falloff": "linear"
+        }
+    ],
+    "orbit": {
+        "ringCount": 3,
+        "baseRadius": 5.0,
+        "ringSpacing": 4.5,
+        "orbitSpeed": 0.08,
+        "orbitAxis": "Y",
+        "clockwise": true,
+        "stability": 0.9,
+        "entryForce": 0.12,
+        "alternateDirection": false
+    },
+    "phases": [
+        {
+            "start": 0,
+            "end": 100,
+            "polarity": "pull",
+            "strength": 1.0
+        }
+    ],
+    "maxVelocity": 1.0,
+    "damping": 0.008
+}

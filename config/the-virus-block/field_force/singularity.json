@@ -1,0 +1,50 @@
+{
+    "id": "singularity",
+    "name": "Singularity",
+    "description": "Extreme vortex with violent spinning and hard core",
+    "mode": "vortex",
+    "vortex": {
+        "radialStrength": 0.6,
+        "tangentialStrength": 1.0,
+        "spinAxis": "Y",
+        "clockwise": true,
+        "radius": 18.0,
+        "falloff": "inverse"
+    },
+    "zones": [
+        {
+            "radius": 18,
+            "strength": 0.40,
+            "tangentialStrength": 0.60,
+            "falloff": "inverse"
+        },
+        {
+            "radius": 10,
+            "strength": 0.70,
+            "tangentialStrength": 1.00,
+            "falloff": "quadratic"
+        },
+        {
+            "radius": 4,
+            "strength": 1.20,
+            "tangentialStrength": 1.80,
+            "falloff": "constant"
+        }
+    ],
+    "phases": [
+        {
+            "start": 0,
+            "end": 90,
+            "polarity": "pull",
+            "strength": 1.0
+        },
+        {
+            "start": 90,
+            "end": 100,
+            "polarity": "push",
+            "strength": 4.0
+        }
+    ],
+    "maxVelocity": 4.0,
+    "damping": 0.002
+}

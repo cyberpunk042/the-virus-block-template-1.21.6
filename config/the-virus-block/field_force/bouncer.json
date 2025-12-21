@@ -1,0 +1,54 @@
+{
+    "id": "bouncer",
+    "name": "Bouncer",
+    "description": "Rapid alternating with spin - chaotic but fun",
+    "zones": [
+        {
+            "radius": 10,
+            "strength": 0.20,
+            "tangentialStrength": 0.12,
+            "falloff": "linear"
+        }
+    ],
+    "phases": [
+        {
+            "start": 0,
+            "end": 15,
+            "polarity": "pull",
+            "strength": 1.5
+        },
+        {
+            "start": 15,
+            "end": 30,
+            "polarity": "push",
+            "strength": 1.8
+        },
+        {
+            "start": 30,
+            "end": 45,
+            "polarity": "pull",
+            "strength": 1.2
+        },
+        {
+            "start": 45,
+            "end": 60,
+            "polarity": "push",
+            "strength": 1.5
+        },
+        {
+            "start": 60,
+            "end": 75,
+            "polarity": "pull",
+            "strength": 1.0
+        },
+        {
+            "start": 75,
+            "end": 100,
+            "polarity": "push",
+            "strength": 2.0
+        }
+    ],
+    "maxVelocity": 1.8,
+    "verticalBoost": 0.3,
+    "damping": 0.0
+}

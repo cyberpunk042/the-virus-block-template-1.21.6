@@ -1,12 +1,19 @@
 {
     "id": "gentle_pull",
     "name": "Gentle Pull",
-    "description": "Soft, slow attraction - good for gathering items",
+    "description": "Moderate spiral attraction",
     "zones": [
         {
-            "radius": 8,
-            "strength": 0.03,
+            "radius": 10,
+            "strength": 0.18,
+            "tangentialStrength": 0.25,
             "falloff": "linear"
+        },
+        {
+            "radius": 4,
+            "strength": 0.30,
+            "tangentialStrength": 0.40,
+            "falloff": "constant"
         }
     ],
     "phases": [
@@ -17,7 +24,6 @@
             "strength": 1.0
         }
     ],
-    "maxVelocity": 0.5,
-    "verticalBoost": 0.0,
-    "damping": 0.0
+    "maxVelocity": 1.5,
+    "damping": 0.02
 }

@@ -1,0 +1,17 @@
+{
+    "id": "cyclone",
+    "name": "Cyclone",
+    "description": "Tornado-like with extreme spin and lift",
+    "mode": "tornado",
+    "tornado": {
+        "baseRadius": 8.0,
+        "topRadius": 2.0,
+        "height": 20.0,
+        "spinSpeed": 1.2,
+        "liftSpeed": 0.6,
+        "suckRadius": 15.0,
+        "groundPull": 0.5
+    },
+    "maxVelocity": 3.5,
+    "damping": 0.005
+}

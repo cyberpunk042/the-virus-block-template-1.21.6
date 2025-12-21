@@ -1,0 +1,17 @@
+{
+    "id": "implosion",
+    "name": "Implosion",
+    "description": "Accelerating inward spiral with event horizon",
+    "mode": "implosion",
+    "implosion": {
+        "coreStrength": 1.2,
+        "suctionRadius": 16.0,
+        "suctionStrength": 0.35,
+        "accelerationCurve": 3.0,
+        "eventHorizon": 3.5,
+        "crushDamage": 0,
+        "preventEscape": false
+    },
+    "maxVelocity": 3.0,
+    "damping": 0.008
+}

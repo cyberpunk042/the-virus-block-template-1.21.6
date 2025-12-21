@@ -6,7 +6,8 @@ import net.cyberpunk042.client.gui.util.GuiWidgets;
 import net.cyberpunk042.client.gui.widget.CompactSelector;
 import net.cyberpunk042.client.gui.widget.LabeledSlider;
 import net.cyberpunk042.client.gui.widget.ModalDialog;
-import net.cyberpunk042.field.force.ForceFieldConfig;
+import net.cyberpunk042.field.force.*;
+import net.cyberpunk042.field.force.mode.*;
 import net.cyberpunk042.field.force.phase.ForcePhase;
 import net.cyberpunk042.field.force.phase.ForcePolarity;
 import net.cyberpunk042.field.force.zone.ForceZone;
@@ -18,27 +19,27 @@ import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import net.minecraft.text.Text;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 
 /**
  * Full configuration modal for force fields.
  * 
- * <p>Two-column layout with CompactSelector navigation:
+ * <h2>Layout Structure</h2>
  * <pre>
  * ┌─────────────────────────────────────────────────────────────────┐
  * │  ⚡ Force Field Configuration                              [×]  │
  * ├────────────────────────────────┬────────────────────────────────┤
- * │  [+] ◀│ Zone 1 │▶ [+]         │  [+] ◀│ Phase 1 │▶ [+]         │
- * ├────────────────────────────────┼────────────────────────────────┤
- * │  Radius: ═══════════⬤══ 10.0  │  Start %: ═══════⬤════ 0%      │
- * │  Strength: ══⬤═════════ 0.15  │  End %: ══════════════⬤ 100%   │
- * │  Falloff: [Linear        ▼]   │  Polarity: [● PULL ▼]          │
- * │           [🗑 Delete Zone]     │  Multiplier: ════⬤═══ 1.0x     │
- * │                                │           [🗑 Delete Phase]    │
- * ├────────────────────────────────┴────────────────────────────────┤
- * │  CONSTRAINTS                                                     │
- * │  Max Velocity: ═══⬤═══  Vert Boost: ═══⬤═══  Damping: ═⬤═══   │
+ * │  ═══ ZONES ═══                │  ═══ PHASES ═══                │
+ * │  [+] ◀│ Zone 1 │▶ [🗑]        │  [+] ◀│ Phase 1 │▶ [🗑]        │
+ * │  Radius: ═══════════⬤══       │  Start %: ═══════⬤════        │
+ * │  Strength: ══⬤═════════       │  End %: ══════════════⬤       │
+ * │  Falloff: [Linear      ▼]     │  Polarity: [● PULL ▼]          │
+ * │                               │  Multiplier: ════⬤═══          │
+ * ├─────────────────────────────────────────────────────────────────┤
+ * │  MODE: [Radial ▼]  Max Vel: ═══⬤═══  Damping: ═⬤═══           │
+ * │  Vertical Boost: ══⬤═══                                        │
  * ├─────────────────────────────────────────────────────────────────┤
  * │                                          [Save]    [Cancel]      │
  * └─────────────────────────────────────────────────────────────────┘
@@ -46,74 +47,152 @@ import java.util.function.Consumer;
  */
 public class ForceConfigModal {
     
-    // Falloff options (display name only, no prefix)
     private static final String[] FALLOFF_OPTIONS = {
-        "Linear", "Quadratic", "Cubic", "Gaussian", "Exponential", "Constant"
+        "Linear", "Quadratic", "Cubic", "Gaussian", "Exponential", "Constant", "Inverse"
     };
     
     private final ModalDialog dialog;
     private final TextRenderer textRenderer;
     private final Consumer<ForceFieldConfig> onSave;
     
-    // Centralized state management (following LayerManager pattern)
-    private final ForceConfigState state = new ForceConfigState();
+    // ═══════════════════════════════════════════════════════════════════════════
+    // State
+    // ═══════════════════════════════════════════════════════════════════════════
     
-    // Constraint fields
+    private final List<ZoneState> zones = new ArrayList<>();
+    private final List<PhaseState> phases = new ArrayList<>();
+    private int selectedZoneIndex = 0;
+    private int selectedPhaseIndex = 0;
+    
+    // Mode and global constraints
+    private ForceMode mode = ForceMode.RADIAL;
     private float maxVelocity = 1.5f;
-    private float verticalBoost = 0.35f;
+    private float verticalBoost = 0f;
     private float damping = 0.02f;
+    
+    // Mode-specific configs (initialized with defaults)
+    private VortexModeConfig vortexConfig = VortexModeConfig.DEFAULT;
+    private OrbitModeConfig orbitConfig = OrbitModeConfig.DEFAULT;
+    private TornadoModeConfig tornadoConfig = TornadoModeConfig.DEFAULT;
+    private RingModeConfig ringConfig = RingModeConfig.DEFAULT;
+    private ImplosionModeConfig implosionConfig = ImplosionModeConfig.DEFAULT;
+    private ExplosionModeConfig explosionConfig = ExplosionModeConfig.DEFAULT;
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Constructor
+    // ═══════════════════════════════════════════════════════════════════════════
     
     public ForceConfigModal(int screenWidth, int screenHeight, TextRenderer textRenderer,
                             ForceFieldConfig initialConfig, Consumer<ForceFieldConfig> onSave) {
         this.textRenderer = textRenderer;
         this.onSave = onSave;
         
-        // Load initial config into state
-        state.loadFrom(initialConfig != null ? initialConfig : ForceFieldConfig.DEFAULT);
+        loadFrom(initialConfig != null ? initialConfig : ForceFieldConfig.DEFAULT);
         
-        // Load constraints
-        if (initialConfig != null) {
-            maxVelocity = initialConfig.maxVelocity();
-            verticalBoost = initialConfig.verticalBoost();
-            damping = initialConfig.damping();
-        }
-        
-        // Create modal - 80% of screen, centered
-        int modalW = (int)(screenWidth * 0.8);
-        int modalH = (int)(screenHeight * 0.75);
+        // Modal size: 75% of screen width, 70% height
+        int modalW = Math.min((int)(screenWidth * 0.75), 500);
+        int modalH = Math.min((int)(screenHeight * 0.70), 400);
         
         dialog = new ModalDialog("⚡ Force Field Configuration", textRenderer, screenWidth, screenHeight)
             .size(modalW, modalH)
             .content(this::buildContent)
             .addAction("Save", this::save, true)
             .addAction("Cancel", () -> {});
-        
-        // Wire up selection change to rebuild UI
-        state.setOnSelectionChange(() -> dialog.rebuild());
     }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Load Config
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    private void loadFrom(ForceFieldConfig config) {
+        mode = config.mode();
+        maxVelocity = config.maxVelocity();
+        verticalBoost = config.verticalBoost();
+        damping = config.damping();
+        
+        // Load zones
+        zones.clear();
+        for (ForceZone zone : config.zones()) {
+            zones.add(new ZoneState(zone.radius(), zone.strength(), zone.falloffName()));
+        }
+        if (zones.isEmpty()) {
+            zones.add(new ZoneState(10f, 0.1f, "linear"));
+        }
+        
+        // Load phases
+        phases.clear();
+        for (ForcePhase phase : config.phases()) {
+            phases.add(new PhaseState(phase.startPercent(), phase.endPercent(),
+                                      phase.polarity(), phase.strengthMultiplier()));
+        }
+        if (phases.isEmpty()) {
+            phases.add(new PhaseState(0, 100, ForcePolarity.PULL, 1.0f));
+        }
+        
+        // Load mode-specific configs
+        if (config.vortex() != null) vortexConfig = config.vortex();
+        if (config.orbit() != null) orbitConfig = config.orbit();
+        if (config.tornado() != null) tornadoConfig = config.tornado();
+        if (config.ring() != null) ringConfig = config.ring();
+        if (config.implosion() != null) implosionConfig = config.implosion();
+        if (config.explosion() != null) explosionConfig = config.explosion();
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Build Content
+    // ═══════════════════════════════════════════════════════════════════════════
     
     private List<ClickableWidget> buildContent(Bounds bounds, TextRenderer tr) {
         List<ClickableWidget> widgets = new ArrayList<>();
         
         int padding = GuiConstants.PADDING;
         int rowH = GuiConstants.WIDGET_HEIGHT;
+        int gap = 3;
         
-        // Calculate two-column layout
+        // Calculate layout
         int contentW = bounds.width() - padding * 2;
         int colW = (contentW - padding) / 2;
-        
         int leftX = bounds.x() + padding;
         int rightX = leftX + colW + padding;
         int topY = bounds.y() + padding;
         
-        // ═══════════════════════════════════════════════════════════════════
-        // LEFT COLUMN: ZONES
-        // ═══════════════════════════════════════════════════════════════════
-        int leftY = topY;
+        // Reserve space for bottom controls (mode + constraints)
+        int bottomSectionHeight = rowH * 2 + padding * 4;
+        int bottomY = bounds.y() + bounds.height() - bottomSectionHeight;
         
-        // Zone selector (CompactSelector)
+        // Available height for zone/phase editors
+        int editorMaxHeight = bottomY - topY - padding;
+        
+        // ─────────────────────────────────────────────────────────────────────
+        // LEFT COLUMN: ZONES
+        // ─────────────────────────────────────────────────────────────────────
+        widgets.addAll(buildZoneColumn(leftX, topY, colW, editorMaxHeight, tr));
+        
+        // ─────────────────────────────────────────────────────────────────────
+        // RIGHT COLUMN: PHASES
+        // ─────────────────────────────────────────────────────────────────────
+        widgets.addAll(buildPhaseColumn(rightX, topY, colW, editorMaxHeight, tr));
+        
+        // ─────────────────────────────────────────────────────────────────────
+        // BOTTOM: Mode Selector + Global Constraints
+        // ─────────────────────────────────────────────────────────────────────
+        widgets.addAll(buildBottomControls(leftX, bottomY, contentW, tr));
+        
+        return widgets;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Zone Column
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    private List<ClickableWidget> buildZoneColumn(int x, int y, int w, int maxH, TextRenderer tr) {
+        List<ClickableWidget> widgets = new ArrayList<>();
+        int rowH = GuiConstants.WIDGET_HEIGHT;
+        int gap = 3;
+        
+        // Header with selector
         List<String> zoneNames = new ArrayList<>();
-        for (int i = 0; i < state.getZones().size(); i++) {
+        for (int i = 0; i < zones.size(); i++) {
             zoneNames.add("Zone " + (i + 1));
         }
         if (zoneNames.isEmpty()) zoneNames.add("(none)");
@@ -121,164 +200,238 @@ public class ForceConfigModal {
         CompactSelector<String> zoneSelector = new CompactSelector<>("", tr, zoneNames, s -> s)
             .onSelect(name -> {
                 int idx = zoneNames.indexOf(name);
-                if (idx >= 0 && idx < state.getZones().size()) {
-                    state.setSelectedZoneIndex(idx);
+                if (idx >= 0 && idx < zones.size()) {
+                    selectedZoneIndex = idx;
+                    dialog.rebuild();
                 }
             })
-            .onAdd(state::addZone)
-            .selectIndex(state.getSelectedZoneIndex());
-        zoneSelector.setBounds(new Bounds(leftX, leftY, colW, 20));
+            .onAdd(() -> {
+                // Add new zone with reasonable defaults
+                float maxRadius = zones.stream().map(z -> z.radius).max(Float::compare).orElse(10f);
+                zones.add(new ZoneState(maxRadius + 5f, 0.1f, "linear"));
+                selectedZoneIndex = zones.size() - 1;
+                dialog.rebuild();
+            })
+            .selectIndex(selectedZoneIndex);
+        zoneSelector.setBounds(new Bounds(x, y, w, 20));
         widgets.addAll(zoneSelector.getWidgets());
-        leftY += 24;
+        y += 24;
         
-        // Zone controls (only if zone exists)
-        ZoneState zone = state.getSelectedZone();
-        if (zone != null) {
+        // Zone controls (if any zone selected)
+        if (!zones.isEmpty() && selectedZoneIndex >= 0 && selectedZoneIndex < zones.size()) {
+            ZoneState zone = zones.get(selectedZoneIndex);
+            
             // Radius
             widgets.add(LabeledSlider.builder("Radius")
-                .position(leftX, leftY).width(colW)
-                .range(0.5f, 50f).initial(zone.radius).format("%.1f")
+                .position(x, y).width(w)
+                .range(1f, 50f).initial(zone.radius).format("%.1f blocks")
                 .onChange(v -> zone.radius = v)
                 .build());
-            leftY += rowH + padding;
+            y += rowH + gap;
             
             // Strength
             widgets.add(LabeledSlider.builder("Strength")
-                .position(leftX, leftY).width(colW)
+                .position(x, y).width(w)
                 .range(0.01f, 1.0f).initial(zone.strength).format("%.3f")
                 .onChange(v -> zone.strength = v)
                 .build());
-            leftY += rowH + padding;
+            y += rowH + gap;
             
-            // Falloff dropdown - fixed label (no double prefix)
+            // Falloff dropdown
             final ZoneState finalZone = zone;
             widgets.add(CyclingButtonWidget.<String>builder(s -> Text.literal(s))
                 .values(FALLOFF_OPTIONS)
                 .initially(capitalize(zone.falloff))
-                .build(leftX, leftY, colW, rowH, Text.literal("Falloff"),
+                .build(x, y, w, rowH, Text.literal("Falloff"),
                        (btn, val) -> finalZone.falloff = val.toLowerCase()));
-            leftY += rowH + padding;
+            y += rowH + gap;
             
-            // Delete button (only if >1 zone)
-            if (state.getZones().size() > 1) {
-                widgets.add(GuiWidgets.button(leftX, leftY, colW, "🗑 Delete Zone", 
-                    "Remove this zone", () -> state.removeZone(state.getSelectedZoneIndex())));
+            // Delete button (only if multiple zones)
+            if (zones.size() > 1) {
+                widgets.add(GuiWidgets.button(x, y, w, "🗑 Delete Zone",
+                    "Remove this zone", () -> {
+                        zones.remove(selectedZoneIndex);
+                        selectedZoneIndex = Math.max(0, Math.min(selectedZoneIndex, zones.size() - 1));
+                        dialog.rebuild();
+                    }));
             }
         }
         
-        // ═══════════════════════════════════════════════════════════════════
-        // RIGHT COLUMN: PHASES
-        // ═══════════════════════════════════════════════════════════════════
-        int rightY = topY;
+        return widgets;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Phase Column
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    private List<ClickableWidget> buildPhaseColumn(int x, int y, int w, int maxH, TextRenderer tr) {
+        List<ClickableWidget> widgets = new ArrayList<>();
+        int rowH = GuiConstants.WIDGET_HEIGHT;
+        int gap = 3;
         
-        // Phase selector (CompactSelector)
+        // Header with selector
         List<String> phaseNames = new ArrayList<>();
-        for (int i = 0; i < state.getPhases().size(); i++) {
-            phaseNames.add("Phase " + (i + 1));
+        for (int i = 0; i < phases.size(); i++) {
+            PhaseState p = phases.get(i);
+            phaseNames.add("Phase " + (i + 1) + " (" + p.polarity.name().charAt(0) + ")");
         }
         if (phaseNames.isEmpty()) phaseNames.add("(none)");
         
         CompactSelector<String> phaseSelector = new CompactSelector<>("", tr, phaseNames, s -> s)
             .onSelect(name -> {
                 int idx = phaseNames.indexOf(name);
-                if (idx >= 0 && idx < state.getPhases().size()) {
-                    state.setSelectedPhaseIndex(idx);
+                if (idx >= 0 && idx < phases.size()) {
+                    selectedPhaseIndex = idx;
+                    dialog.rebuild();
                 }
             })
-            .onAdd(state::addPhase)
-            .selectIndex(state.getSelectedPhaseIndex());
-        phaseSelector.setBounds(new Bounds(rightX, rightY, colW, 20));
+            .onAdd(() -> {
+                // Add new phase starting where last one ends
+                float lastEnd = phases.isEmpty() ? 0 : phases.get(phases.size() - 1).endPercent;
+                if (lastEnd >= 100) lastEnd = 90; // Make room
+                phases.add(new PhaseState(lastEnd, 100, ForcePolarity.PUSH, 1.0f));
+                selectedPhaseIndex = phases.size() - 1;
+                dialog.rebuild();
+            })
+            .selectIndex(selectedPhaseIndex);
+        phaseSelector.setBounds(new Bounds(x, y, w, 20));
         widgets.addAll(phaseSelector.getWidgets());
-        rightY += 24;
+        y += 24;
         
-        // Phase controls (only if phase exists)
-        PhaseState phase = state.getSelectedPhase();
-        if (phase != null) {
+        // Phase controls
+        if (!phases.isEmpty() && selectedPhaseIndex >= 0 && selectedPhaseIndex < phases.size()) {
+            PhaseState phase = phases.get(selectedPhaseIndex);
+            
             // Start %
             widgets.add(LabeledSlider.builder("Start %")
-                .position(rightX, rightY).width(colW)
+                .position(x, y).width(w)
                 .range(0, 100).initial(phase.startPercent).format("%.0f%%").step(5)
                 .onChange(v -> phase.startPercent = v)
                 .build());
-            rightY += rowH + padding;
+            y += rowH + gap;
             
             // End %
             widgets.add(LabeledSlider.builder("End %")
-                .position(rightX, rightY).width(colW)
+                .position(x, y).width(w)
                 .range(0, 100).initial(phase.endPercent).format("%.0f%%").step(5)
                 .onChange(v -> phase.endPercent = v)
                 .build());
-            rightY += rowH + padding;
+            y += rowH + gap;
             
-            // Polarity - Simple cycling button with all three polarities
+            // Polarity
             final PhaseState finalPhase = phase;
-            ForcePolarity[] polarities = ForcePolarity.values();
             widgets.add(CyclingButtonWidget.<ForcePolarity>builder(p -> Text.literal("● " + p.name()))
-                .values(polarities)
+                .values(ForcePolarity.values())
                 .initially(phase.polarity)
-                .build(rightX, rightY, colW, rowH, Text.literal("Polarity"),
+                .build(x, y, w, rowH, Text.literal("Polarity"),
                        (btn, val) -> finalPhase.polarity = val));
-            rightY += rowH + padding;
+            y += rowH + gap;
             
             // Multiplier
             widgets.add(LabeledSlider.builder("Multiplier")
-                .position(rightX, rightY).width(colW)
+                .position(x, y).width(w)
                 .range(0.1f, 5.0f).initial(phase.multiplier).format("%.1fx")
                 .onChange(v -> phase.multiplier = v)
                 .build());
-            rightY += rowH + padding;
+            y += rowH + gap;
             
-            // Delete button (only if >1 phase)
-            if (state.getPhases().size() > 1) {
-                widgets.add(GuiWidgets.button(rightX, rightY, colW, "🗑 Delete Phase",
-                    "Remove this phase", () -> state.removePhase(state.getSelectedPhaseIndex())));
+            // Delete button (only if multiple phases)
+            if (phases.size() > 1) {
+                widgets.add(GuiWidgets.button(x, y, w, "🗑 Delete Phase",
+                    "Remove this phase", () -> {
+                        phases.remove(selectedPhaseIndex);
+                        selectedPhaseIndex = Math.max(0, Math.min(selectedPhaseIndex, phases.size() - 1));
+                        dialog.rebuild();
+                    }));
             }
         }
         
-        // ═══════════════════════════════════════════════════════════════════
-        // BOTTOM SECTION: CONSTRAINTS
-        // ═══════════════════════════════════════════════════════════════════
-        int bottomY = bounds.y() + bounds.height() - 50;
+        return widgets;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Bottom Controls: Mode + Constraints
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    private List<ClickableWidget> buildBottomControls(int x, int y, int w, TextRenderer tr) {
+        List<ClickableWidget> widgets = new ArrayList<>();
+        int rowH = GuiConstants.WIDGET_HEIGHT;
+        int gap = GuiConstants.PADDING;
         
-        // Constraints row
-        int thirdW = (contentW - padding * 2) / 3;
+        // First row: Mode + Max Velocity + Damping
+        int thirdW = (w - gap * 2) / 3;
+        
+        // Mode dropdown
+        List<String> modeNames = Arrays.stream(ForceMode.values())
+            .map(ForceMode::displayName).toList();
+        
+        widgets.add(CyclingButtonWidget.<String>builder(s -> Text.literal(s))
+            .values(modeNames.toArray(new String[0]))
+            .initially(mode.displayName())
+            .build(x, y, thirdW, rowH, Text.literal("Mode"),
+                   (btn, val) -> {
+                       for (ForceMode m : ForceMode.values()) {
+                           if (m.displayName().equals(val)) {
+                               mode = m;
+                               break;
+                           }
+                       }
+                   }));
         
         // Max Velocity
         widgets.add(LabeledSlider.builder("Max Vel")
-            .position(leftX, bottomY).width(thirdW)
+            .position(x + thirdW + gap, y).width(thirdW)
             .range(0.1f, 3.0f).initial(maxVelocity).format("%.2f")
             .onChange(v -> maxVelocity = v)
             .build());
         
-        // Vertical Boost
-        widgets.add(LabeledSlider.builder("V.Boost")
-            .position(leftX + thirdW + padding, bottomY).width(thirdW)
-            .range(0f, 1.0f).initial(verticalBoost).format("%.2f")
-            .onChange(v -> verticalBoost = v)
-            .build());
-        
         // Damping
         widgets.add(LabeledSlider.builder("Damping")
-            .position(leftX + thirdW * 2 + padding * 2, bottomY).width(thirdW)
+            .position(x + thirdW * 2 + gap * 2, y).width(thirdW)
             .range(0f, 0.5f).initial(damping).format("%.3f")
             .onChange(v -> damping = v)
+            .build());
+        
+        y += rowH + gap;
+        
+        // Second row: Vertical Boost (half width)
+        int halfW = (w - gap) / 2;
+        widgets.add(LabeledSlider.builder("V-Boost")
+            .position(x, y).width(halfW)
+            .range(0f, 1.0f).initial(verticalBoost).format("%.2f")
+            .onChange(v -> verticalBoost = v)
             .build());
         
         return widgets;
     }
     
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Helpers
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    private String capitalize(String s) {
+        if (s == null || s.isEmpty()) return "Linear";
+        return s.substring(0, 1).toUpperCase() + s.substring(1).toLowerCase();
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Save
+    // ═══════════════════════════════════════════════════════════════════════════
+    
     private void save() {
-        // Build config from state
         ForceFieldConfig.Builder builder = ForceFieldConfig.builder()
+            .mode(mode)
             .maxVelocity(maxVelocity)
             .verticalBoost(verticalBoost)
             .damping(damping);
         
-        for (ZoneState z : state.getZones()) {
+        // Add all zones
+        for (ZoneState z : zones) {
             builder.zone(z.radius, z.strength, z.falloff);
         }
         
-        for (PhaseState p : state.getPhases()) {
+        // Add all phases
+        for (PhaseState p : phases) {
             builder.phase(ForcePhase.builder()
                 .start(p.startPercent)
                 .end(p.endPercent)
@@ -287,17 +440,23 @@ public class ForceConfigModal {
                 .build());
         }
         
+        // Add mode-specific config if applicable
+        switch (mode) {
+            case VORTEX -> builder.vortex(vortexConfig);
+            case ORBIT -> builder.orbit(orbitConfig);
+            case TORNADO -> builder.tornado(tornadoConfig);
+            case RING -> builder.ring(ringConfig);
+            case IMPLOSION -> builder.implosion(implosionConfig);
+            case EXPLOSION -> builder.explosion(explosionConfig);
+            default -> {} // RADIAL, PULL, PUSH don't need extra config
+        }
+        
         ForceFieldConfig config = builder.build();
         onSave.accept(config);
         dialog.hide();
         
-        Logging.GUI.topic("force").info("Saved force config with {} zones, {} phases", 
-            state.getZones().size(), state.getPhases().size());
-    }
-    
-    private String capitalize(String s) {
-        if (s == null || s.isEmpty()) return "Linear";
-        return s.substring(0, 1).toUpperCase() + s.substring(1).toLowerCase();
+        Logging.GUI.topic("force").info("Saved force config: mode={}, {} zones, {} phases",
+            mode, zones.size(), phases.size());
     }
     
     public ModalDialog getDialog() {
@@ -305,117 +464,7 @@ public class ForceConfigModal {
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
-    // ForceConfigState - Centralized state management (follows LayerManager pattern)
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    /**
-     * Manages zones, phases, and selection state.
-     * Follows LayerManager pattern for selection management.
-     */
-    private class ForceConfigState {
-        private final List<ZoneState> zones = new ArrayList<>();
-        private final List<PhaseState> phases = new ArrayList<>();
-        private int selectedZoneIndex = 0;
-        private int selectedPhaseIndex = 0;
-        private Runnable onSelectionChange;
-        
-        void setOnSelectionChange(Runnable callback) {
-            this.onSelectionChange = callback;
-        }
-        
-        // Zone selection
-        ZoneState getSelectedZone() {
-            if (zones.isEmpty()) return null;
-            return zones.get(Math.min(selectedZoneIndex, zones.size() - 1));
-        }
-        
-        int getSelectedZoneIndex() { return selectedZoneIndex; }
-        
-        void setSelectedZoneIndex(int index) {
-            selectedZoneIndex = Math.max(0, Math.min(index, zones.size() - 1));
-            if (onSelectionChange != null) onSelectionChange.run();
-        }
-        
-        // Phase selection
-        PhaseState getSelectedPhase() {
-            if (phases.isEmpty()) return null;
-            return phases.get(Math.min(selectedPhaseIndex, phases.size() - 1));
-        }
-        
-        int getSelectedPhaseIndex() { return selectedPhaseIndex; }
-        
-        void setSelectedPhaseIndex(int index) {
-            selectedPhaseIndex = Math.max(0, Math.min(index, phases.size() - 1));
-            if (onSelectionChange != null) onSelectionChange.run();
-        }
-        
-        // Zone CRUD
-        List<ZoneState> getZones() { return zones; }
-        
-        void addZone() {
-            float minRadius = zones.stream().map(z -> z.radius).min(Float::compare).orElse(10f);
-            zones.add(new ZoneState(Math.max(1, minRadius * 0.5f), 0.2f, "linear"));
-            selectedZoneIndex = zones.size() - 1;
-            if (onSelectionChange != null) onSelectionChange.run();
-            Logging.GUI.topic("force").debug("Added zone, total: {}", zones.size());
-        }
-        
-        void removeZone(int index) {
-            if (zones.size() > 1 && index >= 0 && index < zones.size()) {
-                zones.remove(index);
-                selectedZoneIndex = Math.min(selectedZoneIndex, zones.size() - 1);
-                if (onSelectionChange != null) onSelectionChange.run();
-                Logging.GUI.topic("force").debug("Removed zone {}, total: {}", index, zones.size());
-            }
-        }
-        
-        // Phase CRUD
-        List<PhaseState> getPhases() { return phases; }
-        
-        void addPhase() {
-            float lastEnd = phases.isEmpty() ? 0 : phases.get(phases.size() - 1).endPercent;
-            if (lastEnd < 100) {
-                phases.add(new PhaseState(lastEnd, 100, ForcePolarity.PUSH, 1.0f));
-            } else {
-                phases.add(new PhaseState(90, 100, ForcePolarity.PUSH, 1.0f));
-            }
-            selectedPhaseIndex = phases.size() - 1;
-            if (onSelectionChange != null) onSelectionChange.run();
-            Logging.GUI.topic("force").debug("Added phase, total: {}", phases.size());
-        }
-        
-        void removePhase(int index) {
-            if (phases.size() > 1 && index >= 0 && index < phases.size()) {
-                phases.remove(index);
-                selectedPhaseIndex = Math.min(selectedPhaseIndex, phases.size() - 1);
-                if (onSelectionChange != null) onSelectionChange.run();
-                Logging.GUI.topic("force").debug("Removed phase {}, total: {}", index, phases.size());
-            }
-        }
-        
-        // Load from config
-        void loadFrom(ForceFieldConfig config) {
-            zones.clear();
-            phases.clear();
-            
-            for (ForceZone zone : config.zones()) {
-                zones.add(new ZoneState(zone.radius(), zone.strength(), zone.falloffName()));
-            }
-            if (zones.isEmpty()) zones.add(new ZoneState(10f, 0.1f, "linear"));
-            
-            for (ForcePhase phase : config.phases()) {
-                phases.add(new PhaseState(phase.startPercent(), phase.endPercent(), 
-                                          phase.polarity(), phase.strengthMultiplier()));
-            }
-            if (phases.isEmpty()) phases.add(new PhaseState(0, 100, ForcePolarity.PULL, 1.0f));
-            
-            selectedZoneIndex = 0;
-            selectedPhaseIndex = 0;
-        }
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Mutable State Classes
+    // State Classes
     // ═══════════════════════════════════════════════════════════════════════════
     
     private static class ZoneState {
@@ -426,7 +475,7 @@ public class ForceConfigModal {
         ZoneState(float radius, float strength, String falloff) {
             this.radius = radius;
             this.strength = strength;
-            this.falloff = falloff;
+            this.falloff = falloff != null ? falloff : "linear";
         }
     }
     
@@ -439,7 +488,7 @@ public class ForceConfigModal {
         PhaseState(float start, float end, ForcePolarity polarity, float multiplier) {
             this.startPercent = start;
             this.endPercent = end;
-            this.polarity = polarity;
+            this.polarity = polarity != null ? polarity : ForcePolarity.PULL;
             this.multiplier = multiplier;
         }
     }

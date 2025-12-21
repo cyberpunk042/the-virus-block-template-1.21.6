@@ -1,0 +1,37 @@
+{
+    "id": "void_singularity",
+    "name": "Void Singularity",
+    "description": "Intense vortex with strong core protection - entities spin fast and tight",
+    "mode": "vortex",
+    "vortex": {
+        "radialStrength": 0.5,
+        "tangentialStrength": 0.8,
+        "spinAxis": "Y",
+        "clockwise": true,
+        "radius": 15.0,
+        "falloff": "inverse"
+    },
+    "zones": [
+        {
+            "radius": 15,
+            "strength": 0.5,
+            "tangentialStrength": 0.8,
+            "falloff": "inverse"
+        },
+        {
+            "radius": 8,
+            "strength": 0.8,
+            "tangentialStrength": 1.2,
+            "falloff": "quadratic"
+        },
+        {
+            "radius": 3,
+            "strength": 1.5,
+            "tangentialStrength": 2.0,
+            "falloff": "constant"
+        }
+    ],
+    "maxVelocity": 3.0,
+    "damping": 0.005,
+    "verticalBoost": 0.0
+}

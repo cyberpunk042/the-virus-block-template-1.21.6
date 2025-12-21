@@ -1,0 +1,29 @@
+{
+    "id": "gentle_hold",
+    "name": "Gentle Hold",
+    "description": "Very soft spiraling pull with high damping",
+    "zones": [
+        {
+            "radius": 8,
+            "strength": 0.03,
+            "tangentialStrength": 0.015,
+            "falloff": "smooth"
+        },
+        {
+            "radius": 3,
+            "strength": 0.05,
+            "tangentialStrength": 0.03,
+            "falloff": "constant"
+        }
+    ],
+    "phases": [
+        {
+            "start": 0,
+            "end": 100,
+            "polarity": "pull",
+            "strength": 1.0
+        }
+    ],
+    "maxVelocity": 0.5,
+    "damping": 0.08
+}

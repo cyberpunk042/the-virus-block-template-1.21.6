@@ -1,7 +1,8 @@
 {
     "id": "slow_vortex",
     "name": "Slow Vortex",
-    "description": "Gentle spiral inward with soft center",
+    "description": "Gentle spiral inward with soft rotation",
+    "mode": "vortex",
     "zones": [
         {
             "radius": 15,
@@ -19,6 +20,15 @@
             "falloff": "constant"
         }
     ],
+    "vortex": {
+        "radialStrength": 0.06,
+        "tangentialStrength": 0.08,
+        "spinAxis": "Y",
+        "clockwise": true,
+        "tightness": 0.3,
+        "radius": 15.0,
+        "falloff": "cubic"
+    },
     "phases": [
         {
             "start": 0,

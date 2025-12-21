@@ -1,0 +1,16 @@
+{
+    "id": "vortex",
+    "name": "Vortex",
+    "description": "Intense spinning vortex with strong pull",
+    "mode": "vortex",
+    "vortex": {
+        "radialStrength": 0.45,
+        "tangentialStrength": 0.70,
+        "spinAxis": "Y",
+        "clockwise": true,
+        "radius": 12.0,
+        "falloff": "linear"
+    },
+    "maxVelocity": 2.5,
+    "damping": 0.01
+}

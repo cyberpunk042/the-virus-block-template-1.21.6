@@ -1,0 +1,39 @@
+{
+    "id": "tornado_lift",
+    "name": "Tornado Lift",
+    "description": "Sucks entities in and lifts them upward in a spiraling motion",
+    "mode": "tornado",
+    "zones": [
+        {
+            "radius": 12,
+            "strength": 0.08,
+            "falloff": "linear"
+        },
+        {
+            "radius": 6,
+            "strength": 0.15,
+            "falloff": "quadratic"
+        }
+    ],
+    "tornado": {
+        "liftSpeed": 0.18,
+        "spinSpeed": 0.22,
+        "spinAxis": "Y",
+        "clockwise": true,
+        "funnelFactor": 0.4,
+        "baseRadius": 4.0,
+        "height": 20.0,
+        "suckRadius": 12.0,
+        "groundPull": 0.1
+    },
+    "phases": [
+        {
+            "start": 0,
+            "end": 100,
+            "polarity": "pull",
+            "strength": 1.0
+        }
+    ],
+    "maxVelocity": 2.0,
+    "damping": 0.01
+}

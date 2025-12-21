@@ -1,26 +1,30 @@
 {
     "id": "black_hole",
     "name": "Black Hole",
-    "description": "Inescapable gravity - pure attraction with no escape",
+    "description": "Intense gravitational pull with fast accretion disk",
     "zones": [
         {
             "radius": 20,
-            "strength": 0.05,
-            "falloff": "quadratic"
+            "strength": 0.30,
+            "tangentialStrength": 0.40,
+            "falloff": "inverse"
         },
         {
             "radius": 12,
-            "strength": 0.12,
+            "strength": 0.55,
+            "tangentialStrength": 0.75,
             "falloff": "quadratic"
         },
         {
             "radius": 6,
-            "strength": 0.25,
+            "strength": 0.90,
+            "tangentialStrength": 1.20,
             "falloff": "gaussian"
         },
         {
-            "radius": 2,
-            "strength": 0.60,
+            "radius": 2.5,
+            "strength": 1.50,
+            "tangentialStrength": 2.00,
             "falloff": "constant"
         }
     ],
@@ -32,7 +36,6 @@
             "strength": 1.0
         }
     ],
-    "maxVelocity": 2.5,
-    "verticalBoost": 0.0,
-    "damping": 0.04
+    "maxVelocity": 3.5,
+    "damping": 0.005
 }

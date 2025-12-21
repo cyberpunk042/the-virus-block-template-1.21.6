@@ -1,0 +1,28 @@
+{
+    "id": "barrier_field",
+    "name": "Barrier Field",
+    "description": "Repels entities from crossing, creating an invisible barrier",
+    "zones": [
+        {
+            "radius": 10,
+            "strength": 0.30,
+            "falloff": "constant"
+        },
+        {
+            "radius": 12,
+            "strength": 0.15,
+            "falloff": "linear"
+        }
+    ],
+    "phases": [
+        {
+            "start": 0,
+            "end": 100,
+            "polarity": "push",
+            "strength": 1.0
+        }
+    ],
+    "maxVelocity": 1.5,
+    "verticalBoost": 0.2,
+    "damping": 0.02
+}

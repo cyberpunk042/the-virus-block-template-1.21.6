@@ -1,0 +1,45 @@
+{
+    "id": "shockwave",
+    "name": "Shockwave",
+    "description": "Quick implosion followed by massive explosive wave",
+    "mode": "explosion",
+    "zones": [
+        {
+            "radius": 15,
+            "strength": 0.08,
+            "falloff": "linear"
+        }
+    ],
+    "explosion": {
+        "blastStrength": 0.8,
+        "blastRadius": 15.0,
+        "verticalBoost": 0.5,
+        "falloff": "linear",
+        "burstDuration": 10,
+        "decayCurve": 1.5,
+        "knockbackResistanceIgnore": false
+    },
+    "phases": [
+        {
+            "start": 0,
+            "end": 50,
+            "polarity": "pull",
+            "strength": 0.8
+        },
+        {
+            "start": 50,
+            "end": 60,
+            "polarity": "hold",
+            "strength": 0.3
+        },
+        {
+            "start": 60,
+            "end": 100,
+            "polarity": "push",
+            "strength": 3.0
+        }
+    ],
+    "maxVelocity": 2.5,
+    "verticalBoost": 0.4,
+    "damping": 0.0
+}

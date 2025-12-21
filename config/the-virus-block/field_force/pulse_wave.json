@@ -1,0 +1,48 @@
+{
+    "id": "pulse_wave",
+    "name": "Pulse Wave",
+    "description": "Rhythmic pull/push with orbital spin",
+    "zones": [
+        {
+            "radius": 12,
+            "strength": 0.12,
+            "tangentialStrength": 0.08,
+            "falloff": "quadratic"
+        },
+        {
+            "radius": 6,
+            "strength": 0.18,
+            "tangentialStrength": 0.12,
+            "falloff": "quadratic"
+        }
+    ],
+    "phases": [
+        {
+            "start": 0,
+            "end": 25,
+            "polarity": "pull",
+            "strength": 1.2
+        },
+        {
+            "start": 25,
+            "end": 50,
+            "polarity": "push",
+            "strength": 1.5
+        },
+        {
+            "start": 50,
+            "end": 75,
+            "polarity": "pull",
+            "strength": 1.0
+        },
+        {
+            "start": 75,
+            "end": 100,
+            "polarity": "push",
+            "strength": 2.0
+        }
+    ],
+    "maxVelocity": 1.5,
+    "verticalBoost": 0.1,
+    "damping": 0.01
+}

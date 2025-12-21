@@ -1,0 +1,34 @@
+{
+    "id": "orbit_rings",
+    "name": "Orbit Rings",
+    "description": "Entities orbit at stable radii, creating planetary-like motion",
+    "mode": "orbit",
+    "zones": [
+        {
+            "radius": 15,
+            "strength": 0.08,
+            "falloff": "linear"
+        }
+    ],
+    "orbit": {
+        "ringCount": 2,
+        "baseRadius": 6.0,
+        "ringSpacing": 4.0,
+        "orbitSpeed": 0.12,
+        "orbitAxis": "Y",
+        "clockwise": true,
+        "stability": 0.85,
+        "entryForce": 0.15,
+        "alternateDirection": true
+    },
+    "phases": [
+        {
+            "start": 0,
+            "end": 100,
+            "polarity": "pull",
+            "strength": 1.0
+        }
+    ],
+    "maxVelocity": 1.2,
+    "damping": 0.01
+}
