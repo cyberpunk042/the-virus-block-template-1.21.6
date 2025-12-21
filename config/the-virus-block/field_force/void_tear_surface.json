@@ -1,0 +1,15 @@
+{
+    "id": "void_tear_surface",
+    "name": "Void Tear (Surface)",
+    "description": "Shell orbit mode - entities orbit around a shell instead of slingshotting",
+    "strength": 0.2,
+    "radius": 15.0,
+    "orbitRadius": 0.5,
+    "coreRadius": 0.0,
+    "tangentialStrength": 0.18,
+    "slingshotFactor": 0.0,
+    "maxVelocity": 1.5,
+    "damping": 0.02,
+    "groundLift": 0.06,
+    "falloff": "linear"
+}

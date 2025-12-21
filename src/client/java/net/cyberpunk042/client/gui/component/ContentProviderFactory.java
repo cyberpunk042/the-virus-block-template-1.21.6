@@ -145,16 +145,7 @@ public class ContentProviderFactory {
      * Creates the Force sub-tab content.
      */
     public SubTabPane.ContentProvider force() {
-        ForceSubPanel panel = new ForceSubPanel(parent, state, 0);
-        // Wire up the Configure button to open ForceConfigModal
-        if (parent instanceof net.cyberpunk042.client.gui.screen.FieldCustomizerScreen screen) {
-            panel.setOnConfigureRequest(config -> {
-                screen.showForceModal(config, savedConfig -> {
-                    panel.setCustomConfig(savedConfig);
-                });
-            });
-        }
-        return new PanelWrapper(panel);
+        return new PanelWrapper(new ForceSubPanel(parent, state, 0));
     }
     
     /**

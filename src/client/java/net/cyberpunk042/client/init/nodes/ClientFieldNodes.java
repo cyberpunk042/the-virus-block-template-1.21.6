@@ -1,6 +1,5 @@
 package net.cyberpunk042.client.init.nodes;
 
-import net.cyberpunk042.client.field.ClientForceApplicator;
 import net.cyberpunk042.client.field.JoinWarmupManager;
 import net.cyberpunk042.client.field.WarmupOverlay;
 import net.cyberpunk042.client.gui.render.TestFieldRenderer;

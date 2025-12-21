@@ -1,8 +1,11 @@
 {
     "id": "void_tear",
     "name": "Void Tear",
-    "description": "Entities follow infinity path - captured, dragged along, then released",
-    "mode": "path",
-    "maxVelocity": 2.5,
-    "damping": 0.01
+    "description": "Gravitational well - entities slingshot around center naturally",
+    "strength": 2.0,
+    "radius": 15.0,
+    "maxVelocity": 3.0,
+    "damping": 0.01,
+    "groundLift": 0.1,
+    "falloff": "inverse"
 }

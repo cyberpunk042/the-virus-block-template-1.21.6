@@ -1,29 +1,15 @@
 {
     "id": "gentle_pull",
     "name": "Gentle Pull",
-    "description": "Moderate spiral attraction",
-    "zones": [
-        {
-            "radius": 10,
-            "strength": 0.18,
-            "tangentialStrength": 0.25,
-            "falloff": "linear"
-        },
-        {
-            "radius": 4,
-            "strength": 0.30,
-            "tangentialStrength": 0.40,
-            "falloff": "constant"
-        }
-    ],
-    "phases": [
-        {
-            "start": 0,
-            "end": 100,
-            "polarity": "pull",
-            "strength": 1.0
-        }
-    ],
-    "maxVelocity": 1.5,
-    "damping": 0.02
+    "description": "Soft attraction with stable orbit",
+    "strength": 0.15,
+    "radius": 10.0,
+    "orbitRadius": 0.45,
+    "coreRadius": 0.08,
+    "tangentialStrength": 0.12,
+    "slingshotFactor": 0.5,
+    "maxVelocity": 1.2,
+    "damping": 0.025,
+    "groundLift": 0.04,
+    "falloff": "linear"
 }
