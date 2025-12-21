@@ -1,11 +1,15 @@
 {
     "id": "void_tear_intense",
     "name": "Void Tear (Intense)",
-    "description": "High force gravitational field - testing escape prevention",
-    "strength": 1.5,
-    "radius": 25.0,
-    "maxVelocity": 4.0,
-    "damping": 0.01,
-    "groundLift": 0.15,
-    "falloff": "inverse"
+    "description": "Intense maelstrom forces with 3D rotation - tight spiral",
+    "strength": 4.5,
+    "radius": 18.0,
+    "maxVelocity": 6.0,
+    "damping": 0.007,
+    "groundLift": 0.25,
+    "falloff": "inverse",
+    "tiltMode": "wobble",
+    "tiltRate": 0.05,
+    "orientationMode": "wobble",
+    "orientationRate": 0.06
 }
