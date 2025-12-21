@@ -1,0 +1,11 @@
+{
+    "id": "void_tear_intense",
+    "name": "Void Tear (Intense)",
+    "description": "High force gravitational field - testing escape prevention",
+    "strength": 1.5,
+    "radius": 25.0,
+    "maxVelocity": 4.0,
+    "damping": 0.01,
+    "groundLift": 0.15,
+    "falloff": "inverse"
+}

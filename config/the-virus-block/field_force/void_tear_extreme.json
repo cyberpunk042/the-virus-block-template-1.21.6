@@ -1,0 +1,11 @@
+{
+    "id": "void_tear_extreme",
+    "name": "Void Tear (Extreme)",
+    "description": "Extreme intensity - very strong gravity",
+    "strength": 0.6,
+    "radius": 50.0,
+    "maxVelocity": 3.0,
+    "damping": 0.008,
+    "groundLift": 0.15,
+    "falloff": "inverse"
+}

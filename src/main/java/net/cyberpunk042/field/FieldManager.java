@@ -248,25 +248,20 @@ public final class FieldManager {
                 force.x, force.y, force.z, normalizedTime * 100);
         }
         
-        // Apply damping
+        // Get current velocity - NO DAMPING (let gravity naturally decelerate)
         Vec3d currentVel = entity.getVelocity();
-        if (config.damping() > 0) {
-            currentVel = currentVel.multiply(1.0 - config.damping());
-        }
         
-        // Add force directly - no negation
+        // Add force directly
         Vec3d newVel = currentVel.add(force);
         
-        // Cap velocity
-        float maxVel = config.maxVelocity();
-        double hSpeed = newVel.horizontalLength();
-        if (hSpeed > maxVel) {
-            double scale = maxVel / hSpeed;
-            newVel = new Vec3d(newVel.x * scale, newVel.y, newVel.z * scale);
+        // NO HARD VELOCITY CAP - gravity will naturally limit via orbital mechanics
+        // The gravity floor in RadialForceField ensures entities can't escape
+        
+        // Only cap extreme values to prevent physics bugs
+        double maxExtreme = 10.0;  // Minecraft physics breaks above this
+        if (newVel.length() > maxExtreme) {
+            newVel = newVel.normalize().multiply(maxExtreme);
         }
-        newVel = new Vec3d(newVel.x, 
-            net.minecraft.util.math.MathHelper.clamp(newVel.y, -maxVel, maxVel), 
-            newVel.z);
         
         // Apply
         entity.setVelocity(newVel);

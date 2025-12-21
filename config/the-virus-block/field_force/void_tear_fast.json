@@ -1,0 +1,11 @@
+{
+    "id": "void_tear_fast",
+    "name": "Void Tear (Fast)",
+    "description": "Faster void tear - stronger forces",
+    "strength": 0.4,
+    "radius": 30.0,
+    "maxVelocity": 2.5,
+    "damping": 0.012,
+    "groundLift": 0.12,
+    "falloff": "inverse"
+}

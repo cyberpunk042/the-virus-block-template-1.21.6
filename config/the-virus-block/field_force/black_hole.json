@@ -1,15 +1,11 @@
 {
     "id": "black_hole",
     "name": "Black Hole",
-    "description": "Intense gravitational pull with fast spinning and strong slingshot",
+    "description": "Massive gravitational well",
     "strength": 0.5,
-    "radius": 20.0,
-    "orbitRadius": 0.3,
-    "coreRadius": 0.12,
-    "tangentialStrength": 0.25,
-    "slingshotFactor": 2.5,
-    "maxVelocity": 3.0,
+    "radius": 40.0,
+    "maxVelocity": 2.8,
     "damping": 0.01,
-    "groundLift": 0.1,
+    "groundLift": 0.12,
     "falloff": "inverse"
 }

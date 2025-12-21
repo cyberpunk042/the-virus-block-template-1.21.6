@@ -1,15 +1,11 @@
 {
     "id": "pull",
     "name": "Pull",
-    "description": "Basic gravitational pull with mild spiral",
-    "strength": 0.3,
-    "radius": 12.0,
-    "orbitRadius": 0.35,
-    "coreRadius": 0.1,
-    "tangentialStrength": 0.08,
-    "slingshotFactor": 1.0,
-    "maxVelocity": 1.5,
-    "damping": 0.015,
-    "groundLift": 0.05,
-    "falloff": "quadratic"
+    "description": "Moderate gravitational pull",
+    "strength": 0.22,
+    "radius": 15.0,
+    "maxVelocity": 1.6,
+    "damping": 0.02,
+    "groundLift": 0.06,
+    "falloff": "inverse"
 }
