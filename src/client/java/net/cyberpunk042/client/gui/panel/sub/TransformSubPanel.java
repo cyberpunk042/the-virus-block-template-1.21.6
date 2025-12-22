@@ -238,14 +238,22 @@ public class TransformSubPanel extends AbstractPanel {
     
     private int addAxisOrbitRow(int x, int y, int w, String axis, 
             net.cyberpunk042.visual.transform.AxisMotionConfig config, String basePath) {
-        int modeW = 55;
-        int sliderW = (w - modeW - GAP * 3) / 3;
+        // Layout: Full-width rows
+        // Row 1: Mode (60) + Rad (rest of width)
+        // Row 2: Spd (half) + Ph° (half)
+        // Row 3 (complex): Amp2 + Freq2 (+ Swing/Ph2)
+        // Row 4 (EPICYCLIC): TiltX + TiltY + TiltZ
+        
+        int halfW = (w - GAP) / 2;
+        int thirdW = (w - GAP * 2) / 3;
+        int modeW = 90;  // Wide enough for full mode name
+        int radW = w - modeW - GAP;  // Rad gets rest of Row 1
         
         MotionMode currentMode = config != null ? config.mode() : MotionMode.NONE;
         
-        // Mode dropdown - triggers rebuild when changed to show/hide secondary params
+        // ===================== ROW 1: Mode + Rad (full width) =====================
         var modeDropdown = CyclingButtonWidget.<MotionMode>builder(
-                m -> Text.literal(axis + ":" + (m.name().length() > 4 ? m.name().substring(0, 4) : m.name())))
+                m -> Text.literal(axis + ":" + m.name()))  // Full mode name
             .values(MotionMode.values())
             .initially(currentMode)
             .omitKeyText()
@@ -253,99 +261,115 @@ public class TransformSubPanel extends AbstractPanel {
                 (btn, val) -> {
                     state.set(basePath + ".mode", val.name());
                     Logging.GUI.topic("transform").info("[TRANSFORM-DEBUG] Mode changed to: {}", val.name());
-                    // Rebuild to show/hide secondary parameters (like FillSubPanel)
                     rebuildWidgets();
                     notifyWidgetsChanged();
                 });
         widgets.add(modeDropdown);
         
-        int sliderX = x + modeW + GAP;
-        
-        // Radius (Amplitude)
         var radSlider = LabeledSlider.builder("Rad")
-            .position(sliderX, y).width(sliderW)
+            .position(x + modeW + GAP, y).width(radW)
             .range(0f, 10f).initial(config != null ? config.amplitude() : 1.0f).format("%.1f")
             .onChange(v -> state.set(basePath + ".amplitude", v))
             .build();
         widgets.add(radSlider);
-        sliderX += sliderW + GAP;
         
-        // Speed (Frequency) - cycles per second
+        int nextY = y + COMPACT_H + GAP;
+        
+        // ===================== ROW 2: Spd + Ph° (half width each) =====================
         var spdSlider = LabeledSlider.builder("Spd")
-            .position(sliderX, y).width(sliderW)
-            .range(0.1f, 3f).initial(config != null ? config.frequency() : 0.5f).format("%.1f")
+            .position(x, nextY).width(halfW)
+            .range(-3f, 3f).initial(config != null ? config.frequency() : 0.5f).format("%.1f")
             .onChange(v -> state.set(basePath + ".frequency", v))
             .build();
         widgets.add(spdSlider);
-        sliderX += sliderW + GAP;
         
-        // Phase (0-360 degrees, converted to 0-1 internally)
         float phaseDegrees = config != null ? config.phase() * 360f : 0f;
         var phSlider = LabeledSlider.builder("Ph°")
-            .position(sliderX, y).width(sliderW)
+            .position(x + halfW + GAP, nextY).width(halfW)
             .range(0f, 360f).initial(phaseDegrees).format("%.0f")
             .onChange(v -> state.set(basePath + ".phase", v / 360f))
             .build();
         widgets.add(phSlider);
         
-        int nextY = y + COMPACT_H + GAP;
+        nextY += COMPACT_H + GAP;
         
-        // Secondary parameters row (only for complex modes)
+        // ===================== ROW 3: Secondary Params (complex modes) =====================
         if (currentMode.needsSecondaryParams()) {
-            sliderX = x + GAP;
-            int secSliderW = (w - GAP * 3) / 3;
-            
-            // Amplitude2 (secondary amplitude)
+            // halfW already defined at top of method
+            // Amplitude2 label
             String amp2Label = switch (currentMode) {
                 case HELIX -> "Wave";
                 case EPICYCLIC -> "Rad2";
                 case WOBBLE -> "Tilt";
                 case FLOWER -> "Petal";
                 case ORBIT_BOUNCE -> "Bnc";
+                case ELLIPTIC -> "Ratio";  // Ellipse ratio (1.0 = circle)
                 default -> "Amp2";
             };
+            
+            // Frequency2 label
+            String freq2Label = switch (currentMode) {
+                case FLOWER -> "Petals";
+                case WOBBLE -> "Rock";
+                case HELIX -> "Coils";
+                case ORBIT_BOUNCE -> "Bnc/s";
+                case EPICYCLIC -> "Spd2";
+                case PENDULUM -> "Wbl";  // Wobble speed
+                default -> "Freq2";
+            };
+            
+            // Frequency2 ranges - all support negative for opposite direction
+            float freq2Min = switch (currentMode) {
+                case EPICYCLIC -> -20f;
+                case HELIX -> -20f;
+                case WOBBLE -> -5f;
+                case ORBIT_BOUNCE -> -3f;
+                case PENDULUM -> -5f;      // Pendulum wobble can be negative
+                default -> 0.1f;           // FLOWER stays positive (petal count)
+            };
+            float freq2Max = switch (currentMode) {
+                case FLOWER -> 20f;
+                case HELIX -> 20f;
+                case WOBBLE -> 5f;
+                case ORBIT_BOUNCE -> 3f;
+                case PENDULUM -> 5f;
+                default -> 20f;
+            };
+            
+            // Determine if 3rd control is needed
+            boolean hasThirdControl = (currentMode == MotionMode.PENDULUM || currentMode == MotionMode.EPICYCLIC);
+            int secSliderW = hasThirdControl ? thirdW : halfW;
+            
+            // Default amp2: PENDULUM = 0 (no wobble), others = 0.5
+            // For PENDULUM, ALWAYS use 0 regardless of existing config
+            float defaultAmp2 = currentMode == MotionMode.PENDULUM ? 0f : 0.5f;
+            float initialAmp2 = (currentMode == MotionMode.PENDULUM) ? 0f 
+                : (config != null ? config.amplitude2() : defaultAmp2);
+            
+            // Amplitude2 range: ORBIT_BOUNCE allows negative (bounce direction)
+            float amp2Min = currentMode == MotionMode.ORBIT_BOUNCE ? -10f : 0f;
+            float amp2Max = 10f;
+            
             var amp2Slider = LabeledSlider.builder(amp2Label)
-                .position(sliderX, nextY).width(secSliderW)
-                .range(0f, 10f).initial(config != null ? config.amplitude2() : 0.5f).format("%.1f")
+                .position(x, nextY).width(secSliderW)
+                .range(amp2Min, amp2Max).initial(initialAmp2).format("%.1f")
                 .onChange(v -> state.set(basePath + ".amplitude2", v))
                 .build();
             widgets.add(amp2Slider);
-            sliderX += secSliderW + GAP;
             
-            // Frequency2 (secondary frequency) - for WOBBLE/HELIX it's a multiplier of main freq
-            String freq2Label = switch (currentMode) {
-                case FLOWER -> "Petals";  // How many petals per rotation
-                case WOBBLE -> "Rock×";   // Multiplier: how many rocks per orbit
-                case HELIX -> "Coils×";   // Multiplier: how many coils per orbit
-                case EPICYCLIC -> "Spd2"; // Absolute speed for secondary orbit
-                default -> "Freq2";
-            };
-            // For 3D modes (WOBBLE/HELIX), freq2 is a multiplier so smaller values make sense
-            // For EPICYCLIC, it's absolute speed so can be negative
-            // For FLOWER, it's petal count
-            float freq2Min = switch (currentMode) {
-                case EPICYCLIC -> -20f;
-                case WOBBLE, HELIX, ORBIT_BOUNCE -> 0.1f;
-                default -> 0.1f;
-            };
-            float freq2Max = switch (currentMode) {
-                case FLOWER -> 20f;  // Up to 20 petals
-                case WOBBLE, HELIX -> 10f;  // Up to 10x main frequency
-                default -> 20f;
-            };
+            // Default freq2: 1.0 for most modes (sensible starting point)
+            float defaultFreq2 = 1.0f;
             var freq2Slider = LabeledSlider.builder(freq2Label)
-                .position(sliderX, nextY).width(secSliderW)
-                .range(freq2Min, freq2Max).initial(config != null ? config.frequency2() : 2f).format("%.1f")
+                .position(x + secSliderW + GAP, nextY).width(secSliderW)
+                .range(freq2Min, freq2Max).initial(config != null ? config.frequency2() : defaultFreq2).format("%.1f")
                 .onChange(v -> state.set(basePath + ".frequency2", v))
                 .build();
             widgets.add(freq2Slider);
-            sliderX += secSliderW + GAP;
             
-            // Third slot: Swing° for PENDULUM, Ph2° for EPICYCLIC
+            // Third control: Swing° for PENDULUM, Ph2° for EPICYCLIC
             if (currentMode == MotionMode.PENDULUM) {
-                // Swing can be up to 1000 degrees for multiple revolutions
                 var swingSlider = LabeledSlider.builder("Swing°")
-                    .position(sliderX, nextY).width(secSliderW)
+                    .position(x + (secSliderW + GAP) * 2, nextY).width(secSliderW)
                     .range(1f, 1000f).initial(config != null ? config.swingAngle() : 90f).format("%.0f")
                     .onChange(v -> state.set(basePath + ".swingAngle", v))
                     .build();
@@ -353,7 +377,7 @@ public class TransformSubPanel extends AbstractPanel {
             } else if (currentMode == MotionMode.EPICYCLIC) {
                 float phase2Deg = config != null ? config.phase2() * 360f : 0f;
                 var ph2Slider = LabeledSlider.builder("Ph2°")
-                    .position(sliderX, nextY).width(secSliderW)
+                    .position(x + (secSliderW + GAP) * 2, nextY).width(secSliderW)
                     .range(0f, 360f).initial(phase2Deg).format("%.0f")
                     .onChange(v -> state.set(basePath + ".phase2", v / 360f))
                     .build();
@@ -362,28 +386,24 @@ public class TransformSubPanel extends AbstractPanel {
             
             nextY += COMPACT_H + GAP;
             
-            // EPICYCLIC: Second row for tilt controls (TiltX, TiltY, TiltZ)
+            // ===================== ROW 4: EPICYCLIC Tilts =====================
             if (currentMode == MotionMode.EPICYCLIC) {
-                sliderX = x + GAP;
-                
                 var tiltXSlider = LabeledSlider.builder("TiltX")
-                    .position(sliderX, nextY).width(secSliderW)
+                    .position(x, nextY).width(thirdW)
                     .range(-180f, 180f).initial(config != null ? config.orbit2TiltX() : 0f).format("%.0f°")
                     .onChange(v -> state.set(basePath + ".orbit2TiltX", v))
                     .build();
                 widgets.add(tiltXSlider);
-                sliderX += secSliderW + GAP;
                 
                 var tiltYSlider = LabeledSlider.builder("TiltY")
-                    .position(sliderX, nextY).width(secSliderW)
+                    .position(x + thirdW + GAP, nextY).width(thirdW)
                     .range(-180f, 180f).initial(config != null ? config.orbit2TiltY() : 0f).format("%.0f°")
                     .onChange(v -> state.set(basePath + ".orbit2TiltY", v))
                     .build();
                 widgets.add(tiltYSlider);
-                sliderX += secSliderW + GAP;
                 
                 var tiltZSlider = LabeledSlider.builder("TiltZ")
-                    .position(sliderX, nextY).width(secSliderW)
+                    .position(x + (thirdW + GAP) * 2, nextY).width(thirdW)
                     .range(-180f, 180f).initial(config != null ? config.orbit2TiltZ() : 0f).format("%.0f°")
                     .onChange(v -> state.set(basePath + ".orbit2TiltZ", v))
                     .build();

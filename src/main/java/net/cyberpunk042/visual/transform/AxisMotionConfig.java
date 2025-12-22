@@ -165,26 +165,39 @@ public record AxisMotionConfig(
         // Special handling for complex modes
         return switch (mode) {
             case PENDULUM -> {
-                // Pendulum swings in an arc from -swingAngle/2 to +swingAngle/2 degrees
-                // swing is -1 to 1, convert to angle: swing * (swingAngle/2) degrees
-                float swing = (float) Math.sin(t * Math.PI * 2); // -1 to 1
-                float halfAngleDeg = swingAngle / 2f;
-                float angleDeg = swing * halfAngleDeg;
-                float angleRad = (float) Math.toRadians(angleDeg);
-                // Y component of arc = sin(angle) * radius (for XY plane pendulum)
-                yield (float) Math.sin(angleRad) * amplitude;
+                // PENDULUM: Sweeps through swingAngle degrees of arc
+                // Frequency scaled by 0.5 for natural pendulum speed (freq=1 -> 2 sec period)
+                float pendulumT = (time / 20f) * (frequency * 0.5f) + phase;
+                float oscillation = (float) Math.sin(pendulumT * Math.PI * 2); // -1 to 1
+                float maxAngleRad = (float) Math.toRadians(swingAngle / 2f);
+                float currentAngleRad = oscillation * maxAngleRad;
+                // Primary arc position (sin component)
+                float primary = (float) Math.sin(currentAngleRad) * amplitude;
+                
+                // Secondary oscillation: perpendicular wobble during swing
+                // frequency2 = oscillations per swing cycle, amplitude2 = wobble amount
+                if (amplitude2 > 0.001f && frequency2 > 0.001f) {
+                    float secondaryT = pendulumT * frequency2;
+                    float secondary = (float) Math.sin(secondaryT * Math.PI * 2) * amplitude2;
+                    yield primary + secondary;
+                }
+                yield primary;
             }
             case FLOWER -> {
                 // Sin with radius modulation for petal pattern
                 yield (float) Math.sin(t * Math.PI * 2) * amplitude * getRadiusMultiplier(time);
             }
+            case ELLIPTIC -> {
+                // Sin component at full amplitude (minor axis)
+                yield (float) Math.sin(t * Math.PI * 2) * amplitude;
+            }
             case EPICYCLIC -> {
                 // Primary orbit: uses amplitude, frequency, phase
                 float primary = (float) Math.sin(t * Math.PI * 2) * amplitude;
                 
-                // Secondary orbit: uses amplitude2, frequency2, phase2
-                // frequency2 can be negative for opposite direction
-                float t2 = (time / 20f) * frequency2 + phase2;
+                // Secondary orbit: uses amplitude2, frequency2 (scaled), phase2
+                // frequency2 divided by 10 for manageable control
+                float t2 = (time / 20f) * (frequency2 / 10f) + phase2;
                 
                 // Calculate secondary orbit position in local space
                 float secX = (float) Math.sin(t2 * Math.PI * 2) * amplitude2;
@@ -221,27 +234,31 @@ public record AxisMotionConfig(
         
         return switch (mode) {
             case PENDULUM -> {
-                // Pendulum X component: cos(angle) gives distance from center
-                // At rest (angle=0), cos(0)=1, so we return (cos(angle)-1)*amplitude 
-                // to give displacement from rest position
-                float swing = (float) Math.sin(t * Math.PI * 2);
-                float halfAngleDeg = swingAngle / 2f;
-                float angleDeg = swing * halfAngleDeg;
-                float angleRad = (float) Math.toRadians(angleDeg);
-                // X component: deviation from rest position (cos(angle) - 1)
-                // Multiplied by amplitude to scale with pendulum length
-                yield ((float) Math.cos(angleRad) - 1f) * amplitude;
+                // PENDULUM cos component: horizontal position on the arc
+                // Same scaled frequency as sin component
+                float pendulumT = (time / 20f) * (frequency * 0.5f) + phase;
+                float oscillation = (float) Math.sin(pendulumT * Math.PI * 2);
+                float maxAngleRad = (float) Math.toRadians(swingAngle / 2f);
+                float currentAngleRad = oscillation * maxAngleRad;
+                // Cos component of arc position (horizontal movement)
+                yield (float) Math.cos(currentAngleRad) * amplitude;
             }
             case FLOWER -> {
                 // Cos with radius modulation
                 yield (float) Math.cos(t * Math.PI * 2) * amplitude * getRadiusMultiplier(time);
             }
+            case ELLIPTIC -> {
+                // Cos component scaled by amplitude2 (ellipse ratio)
+                // amplitude2 = 1.0 -> circle, amplitude2 = 0.5 -> ellipse with half-width
+                float ratio = amplitude2 > 0.01f ? amplitude2 : 0.6f;  // default 0.6 if not set
+                yield (float) Math.cos(t * Math.PI * 2) * amplitude * ratio;
+            }
             case EPICYCLIC -> {
                 // Primary orbit cosine component
                 float primary = (float) Math.cos(t * Math.PI * 2) * amplitude;
                 
-                // Secondary orbit with phase2 and Y-tilt
-                float t2 = (time / 20f) * frequency2 + phase2;
+                // Secondary orbit with phase2 and Y-tilt (frequency2 scaled)
+                float t2 = (time / 20f) * (frequency2 / 10f) + phase2;
                 float secX = (float) Math.sin(t2 * Math.PI * 2) * amplitude2;
                 float secY = (float) Math.cos(t2 * Math.PI * 2) * amplitude2;
                 
@@ -265,42 +282,67 @@ public record AxisMotionConfig(
     public float getDisplacementPerp(float time) {
         if (!isActive()) return 0f;
         
-        float t = (time / 20f) * frequency + phase;
-        // For 3D modes, frequency2 is a multiplier of the primary frequency
-        // This makes the secondary motion relative to the orbit speed
-        float effectiveFreq2 = frequency * frequency2;
-        float t2 = (time / 20f) * effectiveFreq2 + phase2;
+        // Base orbit position (without phase, for HELIX coil calculation)
+        float baseOrbitT = (time / 20f) * frequency;
+        // Full orbit time (with phase, for position-dependent effects)
+        float orbitT = baseOrbitT + phase;
+        
+        // Secondary time - frequency2 scaled down for manageable control
+        // Divide by 10 so frequency2=1 means 0.1 cycles/second (slow)
+        float secondaryT = (time / 20f) * (frequency2 / 10f) + phase2;
         
         return switch (mode) {
             case WOBBLE -> {
-                // WOBBLE: Orbit plane tilts back and forth over time
-                // The tilt angle varies with t2, creating a rocking motion
-                // amplitude2 = maximum tilt angle (in units)
-                float tiltFactor = (float) Math.sin(t2 * Math.PI * 2);
-                // Position on orbit determines how much the tilt affects this axis
-                float orbitPos = (float) Math.sin(t * Math.PI * 2);
-                yield orbitPos * tiltFactor * amplitude2;
+                // WOBBLE: The orbit plane tilts back and forth
+                // frequency2 = rock speed (scaled), amplitude2 = tilt amount
+                float tiltOscillation = (float) Math.sin(secondaryT * Math.PI * 2);
+                // Your position on orbit determines how much tilt affects you
+                float orbitPosition = (float) Math.sin(orbitT * Math.PI * 2);
+                yield orbitPosition * tiltOscillation * amplitude2;
             }
             case HELIX -> {
-                // HELIX: Wave that progresses along the orbit path (like DNA)
-                // The wave position is tied to orbit position, creating a spiral
-                // This gives a spring/corkscrew effect rather than rocking
-                yield (float) Math.sin(t * frequency2 * Math.PI * 2) * amplitude2;
+                // HELIX: True corkscrew/spring - Y progresses LINEARLY while orbiting
+                // Like walking up a spiral staircase - you go around AND up
+                // frequency2 = orbits per full up-down cycle
+                // amplitude2 = height of the helix (how far up/down it goes)
+                
+                // Linear sawtooth: goes 0 to 1 repeatedly per orbit
+                // Then we scale to -amplitude2 to +amplitude2
+                float helixProgress = orbitT / Math.max(frequency2, 0.1f);  // How far through the helix
+                float withinCycle = helixProgress - (float) Math.floor(helixProgress);  // 0 to 1
+                
+                // Triangle wave: 0->1->0 per cycle for smooth up-then-down motion
+                float triangleWave = withinCycle < 0.5f 
+                    ? withinCycle * 4f - 1f      // -1 to 1 ascending
+                    : 3f - withinCycle * 4f;     // 1 to -1 descending
+                
+                yield triangleWave * amplitude2;
             }
             case ORBIT_BOUNCE -> {
-                // Bounce on perpendicular axis - frequency2 controls bounce speed
-                float cycle = t2 - (float) Math.floor(t2);
-                float x = cycle * 2f - 1f;
-                yield (1f - x * x) * amplitude2;
+                // ORBIT_BOUNCE: Bouncing on perpendicular axis
+                // frequency2 = bounces per second (scaled by /10)
+                // Handle negative frequency by taking absolute value of the cycle
+                float absSecT = Math.abs(secondaryT);
+                float cycle = absSecT - (float) Math.floor(absSecT);  // 0 to 1
+                float bx = cycle * 2f - 1f;  // -1 to 1
+                yield (1f - bx * bx) * amplitude2;  // parabola: 0 -> 1 -> 0
             }
             case EPICYCLIC -> {
-                // Z-tilt lifts the secondary orbit out of the primary orbit plane
-                float t2e = (time / 20f) * frequency2 + phase2;
-                float secX = (float) Math.sin(t2e * Math.PI * 2) * amplitude2;
+                // Secondary orbit with Z-tilt (scaled frequency)
+                float secAngle = (float) (secondaryT * Math.PI * 2);
+                float secPos = (float) Math.sin(secAngle) * amplitude2;
                 
                 // Apply Z-tilt to get perpendicular component
                 float tiltRad = (float) Math.toRadians(orbit2TiltZ);
-                yield secX * (float) Math.sin(tiltRad);
+                yield secPos * (float) Math.sin(tiltRad);
+            }
+            case PENDULUM -> {
+                // PENDULUM perpendicular: wobble perpendicular to swing plane
+                if (amplitude2 > 0.001f && frequency2 > 0.001f) {
+                    float pendulumT = baseOrbitT * frequency2;
+                    yield (float) Math.sin(pendulumT * Math.PI * 2) * amplitude2;
+                }
+                yield 0f;
             }
             default -> 0f;
         };
@@ -315,10 +357,10 @@ public record AxisMotionConfig(
     public float getRadiusMultiplier(float time) {
         if (mode != MotionMode.FLOWER) return 1f;
         
-        float t = (time / 20f) * frequency + phase;
-        // frequency2 determines petal count
-        float petalPhase = t * frequency2 * (float)(Math.PI * 2);
-        return 1f + (float) Math.sin(petalPhase) * (amplitude2 / amplitude);
+        // frequency2 = petal frequency (independent of main orbit)
+        // Use time-based calculation to avoid speed multiplication
+        float petalT = (time / 20f) * frequency2 + phase2;
+        return 1f + (float) Math.sin(petalT * Math.PI * 2) * (amplitude2 / Math.max(amplitude, 0.1f));
     }
     
     // =========================================================================

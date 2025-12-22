@@ -1379,6 +1379,8 @@ config.zAxisSpeed = 0.4f;
 
 ---
 
+Another idea would be to inject into the seed generation and pregenerate around the seed center certain structure hidden and stuff, like reminant of past virus of whatnot or added treasures and such. increasing the side of ore vein and such...
+
 ## 📋 IDEAS TO EXPLORE
 
 *(Add more here as we find them)*

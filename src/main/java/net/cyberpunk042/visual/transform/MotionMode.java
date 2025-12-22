@@ -219,7 +219,8 @@ public enum MotionMode {
      */
     public boolean needsSecondaryParams() {
         return this == WOBBLE || this == HELIX || this == ORBIT_BOUNCE 
-            || this == FLOWER || this == EPICYCLIC || this == PENDULUM;
+            || this == FLOWER || this == EPICYCLIC || this == PENDULUM
+            || this == ELLIPTIC;
     }
     
     /**

@@ -234,7 +234,8 @@ public record OrbitConfig3D(
      *   <li>2D Orbit modes (CIRCULAR, ELLIPTIC, FIGURE_8): X→XZ plane, Y→YX plane, Z→ZY plane</li>
      *   <li>Single-axis modes (WAVE, OSCILLATION, BOUNCE): Only affect that axis</li>
      * </ul>
-     * Multiple axes ADD together for compound motion (tilted orbits, 3D spirals).</p>
+     * <p>When 2 axes are orbit modes: combined diagonal orbit (additive).</p>
+     * <p>When 3 axes are orbit modes: PRECESSING ORBIT - base circle is ROTATED by 3rd axis.</p>
      * 
      * @param time Time in ticks
      * @return Offset vector from center
@@ -244,61 +245,74 @@ public record OrbitConfig3D(
             return new Vector3f(0, 0, 0);
         }
         
+        // Check which axes are in orbit mode
+        boolean xIsOrbit = x != null && x.isActive() && (x.is2DOrbit() || x.is3DOrbit());
+        boolean yIsOrbit = y != null && y.isActive() && (y.is2DOrbit() || y.is3DOrbit());
+        boolean zIsOrbit = z != null && z.isActive() && (z.is2DOrbit() || z.is3DOrbit());
+        int orbitCount = (xIsOrbit ? 1 : 0) + (yIsOrbit ? 1 : 0) + (zIsOrbit ? 1 : 0);
+        
+        // NESTED ROTATION: When 2+ axes are orbit modes
+        // Each axis adds a rotation, like an electron with multiple degrees of freedom
+        if (orbitCount >= 2) {
+            Vector3f result = getNestedRotationOffset(time, xIsOrbit, yIsOrbit, zIsOrbit);
+            
+            // Also add contributions from NON-orbit axes (e.g., LINEAR mode)
+            if (x != null && x.isActive() && !xIsOrbit) {
+                result.x += x.getDisplacement(time);
+            }
+            if (y != null && y.isActive() && !yIsOrbit) {
+                result.y += y.getDisplacement(time);
+            }
+            if (z != null && z.isActive() && !zIsOrbit) {
+                result.z += z.getDisplacement(time);
+            }
+            
+            return result;
+        }
+        
+        // Standard behavior for 0 or 1 orbit axes
         float offsetX = 0f;
         float offsetY = 0f;
         float offsetZ = 0f;
         
         // X axis motion - orbits in XZ plane (horizontal circle)
         if (x != null && x.isActive()) {
-            if (x.is2DOrbit() || x.is3DOrbit()) {
-                // 2D/3D orbit: X uses cos, Z uses sin
+            if (xIsOrbit) {
                 float radiusMult = x.getRadiusMultiplier(time);
                 offsetX += x.getDisplacementCos(time);
                 offsetZ += x.getDisplacement(time) * radiusMult;
-                
-                // 3D modes add perpendicular (Y) motion
                 if (x.is3DOrbit()) {
                     offsetY += x.getDisplacementPerp(time);
                 }
             } else {
-                // Single-axis: only affects X
                 offsetX += x.getDisplacement(time);
             }
         }
         
         // Y axis motion - orbits in YX plane (vertical circle facing Z)
-        // This pairs with Z for diagonal orbits when combined with X
         if (y != null && y.isActive()) {
-            if (y.is2DOrbit() || y.is3DOrbit()) {
-                // 2D/3D orbit: Y uses cos, X uses sin
+            if (yIsOrbit) {
                 float radiusMult = y.getRadiusMultiplier(time);
                 offsetY += y.getDisplacementCos(time);
                 offsetX += y.getDisplacement(time) * radiusMult;
-                
-                // 3D modes add perpendicular (Z) motion
                 if (y.is3DOrbit()) {
                     offsetZ += y.getDisplacementPerp(time);
                 }
             } else {
-                // Single-axis: only affects Y
                 offsetY += y.getDisplacement(time);
             }
         }
         
         // Z axis motion - orbits in ZY plane (vertical circle facing X)
         if (z != null && z.isActive()) {
-            if (z.is2DOrbit() || z.is3DOrbit()) {
-                // 2D/3D orbit: Z uses cos, Y uses sin
+            if (zIsOrbit) {
                 float radiusMult = z.getRadiusMultiplier(time);
                 offsetZ += z.getDisplacementCos(time);
                 offsetY += z.getDisplacement(time) * radiusMult;
-                
-                // 3D modes add perpendicular (X) motion
                 if (z.is3DOrbit()) {
                     offsetX += z.getDisplacementPerp(time);
                 }
             } else {
-                // Single-axis: only affects Z
                 offsetZ += z.getDisplacement(time);
             }
         }
@@ -307,6 +321,242 @@ public record OrbitConfig3D(
             "3D offset: ({}, {}, {}) at t={}", offsetX, offsetY, offsetZ, time);
         
         return new Vector3f(offsetX, offsetY, offsetZ);
+    }
+    
+    /**
+     * Computes nested rotation orbit when 2+ axes are in orbit mode.
+     * 
+     * <p>Like an electron with multiple degrees of freedom:
+     * <ul>
+     *   <li>1st orbit axis: creates base circle</li>
+     *   <li>2nd orbit axis: rotates that circle around its axis</li>
+     *   <li>3rd orbit axis: rotates the result around another axis</li>
+     * </ul>
+     * Combined = 360° freedom (can reach any point on a sphere over time)
+     * </p>
+     */
+    private Vector3f getNestedRotationOffset(float time, boolean xIsOrbit, boolean yIsOrbit, boolean zIsOrbit) {
+        // TILTED PRECESSING ORBIT - Standard orbital mechanics formula
+        // 
+        // Parameters:
+        //   θ (theta) = orbital angle: position along the circle (X controls)
+        //   i = inclination: tilt of orbital plane from horizontal (Y controls)
+        //   Ω (Omega) = precession: rotation of the tilted plane around Z axis (Z controls)
+        //   R = radius: constant distance from center
+        //
+        // Formula:
+        //   x = R * (cos(θ) * cos(Ω) - sin(θ) * cos(i) * sin(Ω))
+        //   y = R * (cos(θ) * sin(Ω) + sin(θ) * cos(i) * cos(Ω))
+        //   z = R * sin(θ) * sin(i)
+        
+        // Determine radius from first active orbit axis
+        float radius = 0f;
+        if (xIsOrbit) radius = x.amplitude();
+        else if (yIsOrbit) radius = y.amplitude();
+        else if (zIsOrbit) radius = z.amplitude();
+        
+        if (radius < 0.001f) {
+            return new Vector3f(0, 0, 0);
+        }
+        
+        // θ (theta) = orbital angle - controlled by X
+        // This is where we are on the orbit circle (0 to 2π)
+        float theta = 0f;
+        if (xIsOrbit) {
+            float t = (time / 20f) * x.frequency() + x.phase();
+            theta = (float) (t * Math.PI * 2);
+        }
+        
+        // i = inclination - controlled by Y
+        // This is the tilt of the orbital plane
+        // Y amplitude = max tilt in radians (scaled: amp=1 → 45°, amp=2 → 90°)
+        // Y frequency = oscillation rate of the tilt
+        float inclination = 0f;
+        if (yIsOrbit) {
+            float t = (time / 20f) * y.frequency() + y.phase();
+            float maxTilt = (float) (y.amplitude() * Math.PI / 4);  // amp=2 → 90°
+            inclination = (float) Math.sin(t * Math.PI * 2) * maxTilt;
+        }
+        
+        // Ω (Omega) = precession - controlled by Z
+        // This rotates the tilted orbital plane around the vertical axis
+        float omega = 0f;
+        if (zIsOrbit) {
+            float t = (time / 20f) * z.frequency() + z.phase();
+            omega = (float) (t * Math.PI * 2);
+        }
+        
+        // Precompute trig values
+        float cosTheta = (float) Math.cos(theta);
+        float sinTheta = (float) Math.sin(theta);
+        float cosI = (float) Math.cos(inclination);
+        float sinI = (float) Math.sin(inclination);
+        float cosOmega = (float) Math.cos(omega);
+        float sinOmega = (float) Math.sin(omega);
+        
+        // Apply the tilted precessing orbit formula
+        float posX = radius * (cosTheta * cosOmega - sinTheta * cosI * sinOmega);
+        float posY = radius * sinTheta * sinI;  // Z in formula = Y in Minecraft (vertical)
+        float posZ = radius * (cosTheta * sinOmega + sinTheta * cosI * cosOmega);
+        
+        // Add 3D perpendicular effects (HELIX, etc.)
+        if (xIsOrbit && x.is3DOrbit()) {
+            posY += x.getDisplacementPerp(time);
+        }
+        if (yIsOrbit && y.is3DOrbit()) {
+            posX += y.getDisplacementPerp(time);
+        }
+        if (zIsOrbit && z.is3DOrbit()) {
+            posY += z.getDisplacementPerp(time);
+        }
+        
+        Logging.ANIMATION.topic("orbit3d").trace(
+            "Tilted precessing orbit: R={}, θ={:.2f}, i={:.2f}, Ω={:.2f} → ({:.2f}, {:.2f}, {:.2f})", 
+            radius, theta, inclination, omega, posX, posY, posZ);
+        
+        return new Vector3f(posX, posY, posZ);
+    }
+    
+    /**
+     * Computes a TILTED orbit when exactly 2 axes are in orbit mode.
+     * 
+     * <p>First orbit axis creates the base circle, second tilts it.</p>
+     */
+    @Deprecated // Now handled by getNestedRotationOffset
+    private Vector3f getTiltedOffset(float time, boolean xIsOrbit, boolean yIsOrbit, boolean zIsOrbit) {
+        AxisMotionConfig primary;
+        AxisMotionConfig tiltAxis;
+        int tiltDimension; // 0=X, 1=Y, 2=Z
+        
+        // Determine which axis is primary (circle) and which is tilt
+        if (xIsOrbit && yIsOrbit) {
+            primary = x;
+            tiltAxis = y;
+            tiltDimension = 1; // Tilt around Y axis
+        } else if (xIsOrbit && zIsOrbit) {
+            primary = x;
+            tiltAxis = z;
+            tiltDimension = 2; // Tilt around Z axis
+        } else { // yIsOrbit && zIsOrbit
+            primary = y;
+            tiltAxis = z;
+            tiltDimension = 0; // Tilt around X axis
+        }
+        
+        // Step 1: Get base circle from primary axis
+        float baseX = primary.getDisplacementCos(time);
+        float baseY = primary.is3DOrbit() ? primary.getDisplacementPerp(time) : 0f;
+        float baseZ = primary.getDisplacement(time) * primary.getRadiusMultiplier(time);
+        
+        // Step 2: Get tilt angle from secondary axis
+        float tiltT = (time / 20f) * tiltAxis.frequency() + tiltAxis.phase();
+        float tiltAngle = (float) (tiltT * Math.PI * 2) * tiltAxis.amplitude();
+        float cosT = (float) Math.cos(tiltAngle);
+        float sinT = (float) Math.sin(tiltAngle);
+        
+        // Step 3: Apply tilt rotation
+        float finalX, finalY, finalZ;
+        if (tiltDimension == 0) {
+            // Tilt around X axis (Y-Z rotation)
+            finalX = baseX;
+            finalY = baseY * cosT - baseZ * sinT;
+            finalZ = baseY * sinT + baseZ * cosT;
+        } else if (tiltDimension == 1) {
+            // Tilt around Y axis (X-Z rotation)
+            finalX = baseX * cosT + baseZ * sinT;
+            finalY = baseY;
+            finalZ = -baseX * sinT + baseZ * cosT;
+        } else {
+            // Tilt around Z axis (X-Y rotation)
+            finalX = baseX * cosT - baseY * sinT;
+            finalY = baseX * sinT + baseY * cosT;
+            finalZ = baseZ;
+        }
+        
+        // Add tilt axis's perpendicular contribution if it's a 3D mode
+        if (tiltAxis.is3DOrbit()) {
+            float perpContrib = tiltAxis.getDisplacementPerp(time);
+            if (tiltDimension == 0) finalX += perpContrib;
+            else if (tiltDimension == 1) finalY += perpContrib;
+            else finalZ += perpContrib;
+        }
+        
+        Logging.ANIMATION.topic("orbit3d").trace(
+            "Tilted offset: ({}, {}, {}) at t={}", finalX, finalY, finalZ, time);
+        
+        return new Vector3f(finalX, finalY, finalZ);
+    }
+    
+    /**
+     * Computes a PRECESSING orbit when all 3 axes are in orbit mode.
+     * 
+     * <p>Full combo support - each axis contributes its special behavior:
+     * <ul>
+     *   <li>X config: base circle/shape (uses full getDisplacement/Cos/Perp)</li>
+     *   <li>Y config: precession around Y + Y's own perpendicular motion</li>
+     *   <li>Z config: nutation around X + Z's own perpendicular motion</li>
+     * </ul>
+     * </p>
+     * 
+     * <p>Examples:
+     * <ul>
+     *   <li>X=WOBBLE, Y=CIRCULAR, Z=CIRCULAR: rocking orbit that precesses</li>
+     *   <li>X=HELIX, Y=WOBBLE, Z=CIRCULAR: helix + Y's rock + Z's precession</li>
+     *   <li>X=PENDULUM, Y=CIRCULAR, Z=CIRCULAR: swinging arc that precesses</li>
+     * </ul>
+     * </p>
+     */
+    private Vector3f getPrecessingOffset(float time) {
+        // ========== STEP 1: Get base shape from X config ==========
+        // X creates the primary shape in XZ plane (with Y perp if 3D mode)
+        float baseX = x.getDisplacementCos(time);
+        float baseY = x.is3DOrbit() ? x.getDisplacementPerp(time) : 0f;
+        float baseZ = x.getDisplacement(time) * x.getRadiusMultiplier(time);
+        
+        // ========== STEP 2: Apply Y's precession + Y's perpendicular ==========
+        // Y config rotates around Y axis (precession)
+        float tY = (time / 20f) * y.frequency() + y.phase();
+        float rotY = (float) (tY * Math.PI * 2);
+        
+        // Scale rotation by amplitude (0 = no rotation, 1 = full rotation)
+        float cosY = (float) Math.cos(rotY * y.amplitude());
+        float sinY = (float) Math.sin(rotY * y.amplitude());
+        
+        // Rotate (X, Z) around Y axis
+        float afterYx = baseX * cosY + baseZ * sinY;
+        float afterYy = baseY;
+        float afterYz = -baseX * sinY + baseZ * cosY;
+        
+        // ADD Y's perpendicular contribution (from WOBBLE/HELIX/etc on Y axis)
+        if (y.is3DOrbit()) {
+            // Y's perp affects Z (since Y orbits in YX plane, perp is Z)
+            afterYz += y.getDisplacementPerp(time);
+        }
+        
+        // ========== STEP 3: Apply Z's nutation + Z's perpendicular ==========
+        // Z config rotates around X axis (nutation)
+        float tZ = (time / 20f) * z.frequency() + z.phase();
+        float rotX = (float) (tZ * Math.PI * 2);
+        
+        // Scale rotation by amplitude
+        float cosX = (float) Math.cos(rotX * z.amplitude());
+        float sinX = (float) Math.sin(rotX * z.amplitude());
+        
+        // Rotate (Y, Z) around X axis
+        float finalX = afterYx;
+        float finalY = afterYy * cosX - afterYz * sinX;
+        float finalZ = afterYy * sinX + afterYz * cosX;
+        
+        // ADD Z's perpendicular contribution (from WOBBLE/HELIX/etc on Z axis)
+        if (z.is3DOrbit()) {
+            // Z's perp affects X (since Z orbits in ZY plane, perp is X)
+            finalX += z.getDisplacementPerp(time);
+        }
+        
+        Logging.ANIMATION.topic("orbit3d").trace(
+            "Precessing offset: ({}, {}, {}) at t={}", finalX, finalY, finalZ, time);
+        
+        return new Vector3f(finalX, finalY, finalZ);
     }
     
     // =========================================================================
