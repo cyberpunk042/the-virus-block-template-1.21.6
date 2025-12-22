@@ -43,7 +43,8 @@ import net.cyberpunk042.util.json.JsonSerializer;
  * 
  * <h2>Dynamic Positioning</h2>
  * <ul>
- *   <li><b>orbit</b>: Orbital motion around anchor</li>
+ *   <li><b>orbit</b>: Legacy single-axis orbital motion</li>
+ *   <li><b>orbit3d</b>: Multi-axis orbital motion (atom-like orbits)</li>
  * </ul>
  * 
  * <h2>JSON Format</h2>
@@ -64,6 +65,7 @@ import net.cyberpunk042.util.json.JsonSerializer;
  * @see Billboard
  * @see UpVector
  * @see OrbitConfig
+ * @see OrbitConfig3D
  */
 public record Transform(
     @JsonField(skipIfEqualsConstant = "Anchor.CENTER") // Position
@@ -81,7 +83,8 @@ public record Transform(
     @JsonField(skipIfEqualsConstant = "UpVector.WORLD_UP") UpVector up,
     @JsonField(skipIfEqualsConstant = "Billboard.NONE") Billboard billboard,
     // Dynamic
-    @Nullable @JsonField(skipIfNull = true) OrbitConfig orbit
+    @Nullable @JsonField(skipIfNull = true) OrbitConfig orbit,
+    @Nullable @JsonField(skipIfNull = true) OrbitConfig3D orbit3d
 ){
     // =========================================================================
     // Static Constants
@@ -90,22 +93,22 @@ public record Transform(
     /** Identity transform (CENTER anchor, no offset, no rotation, scale=1). */
     public static final Transform IDENTITY = new Transform(
         Anchor.CENTER, null, null, true, 1.0f, null, false,
-        Facing.FIXED, UpVector.WORLD_UP, Billboard.NONE, null);
+        Facing.FIXED, UpVector.WORLD_UP, Billboard.NONE, null, null);
     
     /** Feet-anchored transform. */
     public static final Transform AT_FEET = new Transform(
         Anchor.FEET, null, null, true, 1.0f, null, false,
-        Facing.FIXED, UpVector.WORLD_UP, Billboard.NONE, null);
+        Facing.FIXED, UpVector.WORLD_UP, Billboard.NONE, null, null);
     
     /** Head-anchored transform. */
     public static final Transform AT_HEAD = new Transform(
         Anchor.HEAD, null, null, true, 1.0f, null, false,
-        Facing.FIXED, UpVector.WORLD_UP, Billboard.NONE, null);
+        Facing.FIXED, UpVector.WORLD_UP, Billboard.NONE, null, null);
     
     /** Billboard transform (always faces camera). */
     public static final Transform BILLBOARD = new Transform(
         Anchor.CENTER, null, null, true, 1.0f, null, false,
-        Facing.FIXED, UpVector.WORLD_UP, Billboard.FULL, null);
+        Facing.FIXED, UpVector.WORLD_UP, Billboard.FULL, null, null);
     
     // =========================================================================
     // Factory Methods
@@ -124,7 +127,7 @@ public record Transform(
      */
     public static Transform at(Anchor anchor) {
         return new Transform(anchor, null, null, true, 1.0f, null, false,
-            Facing.FIXED, UpVector.WORLD_UP, Billboard.NONE, null);
+            Facing.FIXED, UpVector.WORLD_UP, Billboard.NONE, null, null);
     }
     
     /**
@@ -135,7 +138,7 @@ public record Transform(
      */
     public static Transform offset(float x, float y, float z) {
         return new Transform(Anchor.CENTER, new Vector3f(x, y, z), null, true, 1.0f, null, false,
-            Facing.FIXED, UpVector.WORLD_UP, Billboard.NONE, null);
+            Facing.FIXED, UpVector.WORLD_UP, Billboard.NONE, null, null);
     }
     
     /**
@@ -144,7 +147,7 @@ public record Transform(
      */
     public static Transform scaled(@Range(ValueRange.SCALE) float scale) {
         return new Transform(Anchor.CENTER, null, null, true, scale, null, false,
-            Facing.FIXED, UpVector.WORLD_UP, Billboard.NONE, null);
+            Facing.FIXED, UpVector.WORLD_UP, Billboard.NONE, null, null);
     }
     
     /**
@@ -155,7 +158,7 @@ public record Transform(
      */
     public static Transform rotated(float pitch, float yaw, float roll) {
         return new Transform(Anchor.CENTER, null, new Vector3f(pitch, yaw, roll), true, 1.0f, null, false,
-            Facing.FIXED, UpVector.WORLD_UP, Billboard.NONE, null);
+            Facing.FIXED, UpVector.WORLD_UP, Billboard.NONE, null, null);
     }
     
     // =========================================================================
@@ -184,9 +187,19 @@ public record Transform(
         return new Vector3f(scale, scale, scale);
     }
     
-    /** Whether this transform has orbit enabled. */
+    /** Whether this transform has legacy orbit enabled. */
     public boolean hasOrbit() {
         return orbit != null && orbit.isActive();
+    }
+    
+    /** Whether this transform has 3D orbit enabled. */
+    public boolean hasOrbit3D() {
+        return orbit3d != null && orbit3d.isActive();
+    }
+    
+    /** Whether this transform has any orbit (legacy or 3D). */
+    public boolean hasAnyOrbit() {
+        return hasOrbit() || hasOrbit3D();
     }
     
     /** Whether this transform uses billboard. */
@@ -208,7 +221,7 @@ public record Transform(
      */
     public Transform withOffset(Vector3f newOffset) {
         return new Transform(anchor, newOffset, rotation, inheritRotation, scale,
-            scaleXYZ, scaleWithRadius, facing, up, billboard, orbit);
+            scaleXYZ, scaleWithRadius, facing, up, billboard, orbit, orbit3d);
     }
     
     /**
@@ -216,7 +229,7 @@ public record Transform(
      */
     public Transform withScale(float newScale) {
         return new Transform(anchor, offset, rotation, inheritRotation, newScale,
-            scaleXYZ, scaleWithRadius, facing, up, billboard, orbit);
+            scaleXYZ, scaleWithRadius, facing, up, billboard, orbit, orbit3d);
     }
     
     /**
@@ -224,7 +237,7 @@ public record Transform(
      */
     public Transform withRotation(Vector3f newRotation) {
         return new Transform(anchor, offset, newRotation, inheritRotation, scale,
-            scaleXYZ, scaleWithRadius, facing, up, billboard, orbit);
+            scaleXYZ, scaleWithRadius, facing, up, billboard, orbit, orbit3d);
     }
     
     /**
@@ -232,7 +245,15 @@ public record Transform(
      */
     public Transform withAnchor(Anchor newAnchor) {
         return new Transform(newAnchor, offset, rotation, inheritRotation, scale,
-            scaleXYZ, scaleWithRadius, facing, up, billboard, orbit);
+            scaleXYZ, scaleWithRadius, facing, up, billboard, orbit, orbit3d);
+    }
+    
+    /**
+     * Returns a new Transform with the specified 3D orbit config.
+     */
+    public Transform withOrbit3D(OrbitConfig3D newOrbit3d) {
+        return new Transform(anchor, offset, rotation, inheritRotation, scale,
+            scaleXYZ, scaleWithRadius, facing, up, billboard, orbit, newOrbit3d);
     }
     
     /**
@@ -304,10 +325,15 @@ public record Transform(
             orbit = OrbitConfig.fromJson(json.getAsJsonObject("orbit"));
         }
         
+        OrbitConfig3D orbit3d = null;
+        if (json.has("orbit3d")) {
+            orbit3d = OrbitConfig3D.fromJson(json.getAsJsonObject("orbit3d"));
+        }
+        
         Transform result = new Transform(anchor, offset, rotation, inheritRotation, scale, 
-            scaleXYZ, scaleWithRadius, facing, up, billboard, orbit);
-        Logging.FIELD.topic("parse").trace("Parsed Transform: anchor={}, scale={}, facing={}, billboard={}", 
-            anchor, scale, facing, billboard);
+            scaleXYZ, scaleWithRadius, facing, up, billboard, orbit, orbit3d);
+        Logging.FIELD.topic("parse").trace("Parsed Transform: anchor={}, scale={}, facing={}, billboard={}, orbit3d={}", 
+            anchor, scale, facing, billboard, orbit3d != null && orbit3d.isActive());
         return result;
     }
     
@@ -344,7 +370,8 @@ public record Transform(
             .facing(facing)
             .up(up)
             .billboard(billboard)
-            .orbit(orbit);
+            .orbit(orbit)
+            .orbit3d(orbit3d);
     }
     
     public static class Builder {
@@ -359,6 +386,7 @@ public record Transform(
         private UpVector up = UpVector.WORLD_UP;
         private Billboard billboard = Billboard.NONE;
         private OrbitConfig orbit = null;
+        private OrbitConfig3D orbit3d = null;
         
         public Builder anchor(Anchor a) { this.anchor = a; return this; }
         public Builder offset(Vector3f o) { this.offset = o; return this; }
@@ -376,10 +404,23 @@ public record Transform(
         public Builder up(UpVector u) { this.up = u; return this; }
         public Builder billboard(Billboard b) { this.billboard = b; return this; }
         public Builder orbit(OrbitConfig o) { this.orbit = o; return this; }
+        public Builder orbit3d(OrbitConfig3D o) { this.orbit3d = o; return this; }
+        
+        /** Convenience: create a horizontal orbit. */
+        public Builder horizontalOrbit(float radius, float frequency) {
+            this.orbit3d = OrbitConfig3D.horizontalOrbit(radius, frequency);
+            return this;
+        }
+        
+        /** Convenience: create a tilted orbit with wobble. */
+        public Builder tiltedOrbit(float radius, float frequency, float wobbleAmp) {
+            this.orbit3d = OrbitConfig3D.tiltedOrbit(radius, frequency, wobbleAmp);
+            return this;
+        }
         
         public Transform build() {
             return new Transform(anchor, offset, rotation, inheritRotation, scale, scaleXYZ,
-                scaleWithRadius, facing, up, billboard, orbit);
+                scaleWithRadius, facing, up, billboard, orbit, orbit3d);
         }
     }
 }

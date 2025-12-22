@@ -25,6 +25,9 @@ import net.cyberpunk042.visual.fill.FillConfig;
 import net.cyberpunk042.visual.fill.FillMode;
 import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Quaternionf;
+import org.joml.Vector3f;
+
+import java.util.Map;
 
 /**
  * Renders a single layer of a field definition.
@@ -111,6 +114,9 @@ public final class LayerRenderer {
             int light = 0xF000F0; // Full bright for fields
             float effectiveAlpha = alpha * layer.alpha();
             
+            // Build primitive index for link resolution
+            Map<String, Primitive> primitiveIndex = LinkResolver.buildIndex(layer.primitives());
+            
             int primCount = 0;
             // Separate primitives by depth write setting
             java.util.List<Primitive> normalPrimitives = new java.util.ArrayList<>();
@@ -142,7 +148,7 @@ public final class LayerRenderer {
                 }
                 
                 VertexConsumer consumer = getConsumerForPrimitive(consumers, primitive);
-                renderPrimitive(matrices, consumer, primitive, resolver, light, time, effectiveAlpha, overrides);
+                renderPrimitive(matrices, consumer, primitive, resolver, light, time, effectiveAlpha, overrides, primitiveIndex);
                 primCount++;
             }
             
@@ -168,7 +174,7 @@ public final class LayerRenderer {
                         }
                         
                         VertexConsumer consumer = getConsumerForPrimitive(consumers, primitive);
-                        renderPrimitive(matrices, consumer, primitive, resolver, light, time, effectiveAlpha, overrides);
+                        renderPrimitive(matrices, consumer, primitive, resolver, light, time, effectiveAlpha, overrides, primitiveIndex);
                         primCount++;
                     }
                     
@@ -285,6 +291,8 @@ public final class LayerRenderer {
     
     /**
      * Renders a single primitive with its own transform and animation.
+     * 
+     * @param primitiveIndex Index of all primitives in the layer for link resolution
      */
     private static void renderPrimitive(
             MatrixStack matrices,
@@ -294,12 +302,72 @@ public final class LayerRenderer {
             int light,
             float time,
             float alpha,
-            RenderOverrides overrides) {
+            RenderOverrides overrides,
+            Map<String, Primitive> primitiveIndex) {
         
         matrices.push();
         try {
         
-        // Apply primitive transform
+        // === LINK RESOLUTION ===
+        // Resolve links first - may provide orbit config, color, alpha, etc.
+        LinkResolver.ResolvedValues resolvedLinks = LinkResolver.resolveLinks(primitive, primitiveIndex);
+        
+        // Calculate effective time with orbit phase offset from links
+        float orbitTime = time;
+        if (resolvedLinks.hasOrbitPhaseOffset()) {
+            // Add orbit phase offset (in cycles, so multiply by 2*PI for radians)
+            orbitTime = time + resolvedLinks.orbitPhaseOffset();
+        }
+        
+        // Apply follow offset (translate to linked primitive's position)
+        if (resolvedLinks.hasOffset()) {
+            Vector3f followOffset = resolvedLinks.offset();
+            matrices.translate(followOffset.x, followOffset.y, followOffset.z);
+        }
+        
+        // Apply scale from linked primitive
+        if (resolvedLinks.hasScale()) {
+            float linkedScale = resolvedLinks.scale();
+            matrices.scale(linkedScale, linkedScale, linkedScale);
+        }
+        
+        // Apply color/alpha overrides from links to the renderer overrides
+        RenderOverrides effectiveOverrides = overrides;
+        if (resolvedLinks.hasColor() || resolvedLinks.hasAlpha()) {
+            // Build new overrides, copying existing values if present
+            RenderOverrides.Builder ovBuilder = RenderOverrides.builder();
+            
+            // Copy existing pattern if present
+            if (overrides != null && overrides.vertexPattern() != null) {
+                ovBuilder.vertexPattern(overrides.vertexPattern());
+            }
+            
+            // Color from link or existing
+            if (resolvedLinks.hasColor()) {
+                // Parse color string to int (e.g., "#FF0000" or "0xFF0000")
+                String colorStr = resolvedLinks.color();
+                int colorInt = parseColorString(colorStr);
+                ovBuilder.colorOverride(colorInt);
+            } else if (overrides != null && overrides.colorOverride() != null) {
+                ovBuilder.colorOverride(overrides.colorOverride());
+            }
+            
+            // Alpha from link or existing
+            if (resolvedLinks.hasAlpha()) {
+                ovBuilder.alphaMultiplier(resolvedLinks.alpha());
+            } else if (overrides != null) {
+                ovBuilder.alphaMultiplier(overrides.alphaMultiplier());
+            }
+            
+            // Scale from existing
+            if (overrides != null) {
+                ovBuilder.scaleMultiplier(overrides.scaleMultiplier());
+            }
+            
+            effectiveOverrides = ovBuilder.build();
+        }
+        
+        // Apply primitive transform (with resolved orbit if linked)
         Transform transform = primitive.transform();
         if (transform != null && transform != Transform.IDENTITY) {
             // CP5: ALL transform segments applied
@@ -311,7 +379,13 @@ public final class LayerRenderer {
             PipelineTracer.trace(PipelineTracer.T6_BILLBOARD, 5, "render", transform.billboard() != null ? transform.billboard().name() : "null");
             PipelineTracer.trace(PipelineTracer.T7_ORBIT, 5, "render", transform.orbit() != null ? "active" : "null");
             
-            applyPrimitiveTransform(matrices, transform, time);
+            // If we have a resolved orbit from link, apply it with the phase-adjusted time
+            if (resolvedLinks.hasOrbit()) {
+                // Use linked orbit config instead of primitive's own
+                applyPrimitiveTransformWithLinkedOrbit(matrices, transform, resolvedLinks.orbitConfig(), orbitTime);
+            } else {
+                applyPrimitiveTransform(matrices, transform, orbitTime);
+            }
             
             // CP6: ALL transform segments in matrix
             PipelineTracer.trace(PipelineTracer.T1_OFFSET, 6, "matrix", "applied");
@@ -479,8 +553,8 @@ public final class LayerRenderer {
         // Get renderer and render
         PrimitiveRenderer renderer = PrimitiveRenderers.get(primitive);
         if (renderer != null) {
-            // Pass through existing overrides (contains field/layer alpha)
-            renderer.render(primitive, matrices, consumer, light, time, resolver, overrides);
+            // Pass through effective overrides (includes link color/alpha)
+            renderer.render(primitive, matrices, consumer, light, time, resolver, effectiveOverrides);
         } else {
             Logging.FIELD.topic("render")
                 .reason("Missing renderer")
@@ -511,7 +585,14 @@ public final class LayerRenderer {
         }
         
         // 2. Orbit (apply before offset, so primitive orbits around anchor position)
-        if (transform.orbit() != null && transform.orbit().isActive()) {
+        // Priority: orbit3d (new) > orbit (legacy)
+        if (transform.hasOrbit3D()) {
+            // New 3D orbit system
+            var orbit3d = transform.orbit3d();
+            var offset = orbit3d.getOffset(time);
+            matrices.translate(offset.x, offset.y, offset.z);
+        } else if (transform.orbit() != null && transform.orbit().isActive()) {
+            // Legacy single-axis orbit
             var orbit = transform.orbit();
             float angle = time * orbit.speed();
             float orbitX, orbitY, orbitZ;
@@ -537,6 +618,73 @@ public final class LayerRenderer {
                 }
             }
             matrices.translate(orbitX, orbitY, orbitZ);
+        }
+
+        
+        // 3. Translation (offset from anchor/orbit position)
+        if (transform.offset() != null) {
+            matrices.translate(
+                transform.offset().x,
+                transform.offset().y,
+                transform.offset().z
+            );
+        }
+        
+        // 4. Facing - rotate based on player direction/camera
+        if (transform.facing() != null && transform.facing() != Facing.FIXED) {
+            applyFacing(matrices, transform.facing(), client);
+        }
+        
+        // 5. Rotation (explicit rotation, applied after facing)
+        if (transform.rotation() != null) {
+            Quaternionf rotation = new Quaternionf()
+                .rotateX((float) Math.toRadians(transform.rotation().x))
+                .rotateY((float) Math.toRadians(transform.rotation().y))
+                .rotateZ((float) Math.toRadians(transform.rotation().z));
+            matrices.multiply(rotation);
+        }
+        
+        // 6. Scale
+        if (transform.scaleXYZ() != null) {
+            matrices.scale(transform.scaleXYZ().x, transform.scaleXYZ().y, transform.scaleXYZ().z);
+        } else {
+            matrices.scale(transform.scale(), transform.scale(), transform.scale());
+        }
+        
+        // 7. Billboard - rotate to face camera (applied last for correct orientation)
+        if (transform.billboard() != null && transform.billboard() != Billboard.NONE) {
+            applyBillboard(matrices, transform.billboard(), client);
+        }
+    }
+    
+    /**
+     * Applies primitive-level transform using a LINKED orbit config from another primitive.
+     * This is used for orbitSync linking where multiple primitives share the same orbit pattern
+     * but with different phase offsets (like electrons around an atom).
+     * 
+     * @param matrices Matrix stack to apply transforms to
+     * @param transform The primitive's own transform (for non-orbit properties)
+     * @param linkedOrbit The orbit config from the linked primitive
+     * @param time Time value (already adjusted for orbit phase offset)
+     */
+    private static void applyPrimitiveTransformWithLinkedOrbit(
+            MatrixStack matrices, 
+            Transform transform, 
+            net.cyberpunk042.visual.transform.OrbitConfig3D linkedOrbit, 
+            float time) {
+        var client = net.minecraft.client.MinecraftClient.getInstance();
+        
+        // 1. Anchor offset (applied first - positions relative to player center)
+        if (transform.anchor() != null) {
+            var anchor = transform.anchor();
+            matrices.translate(anchor.getX(), anchor.getY(), anchor.getZ());
+        }
+        
+        // 2. Apply LINKED orbit (from orbitSync target)
+        if (linkedOrbit != null && linkedOrbit.isActive()) {
+            var offset = linkedOrbit.getOffset(time);
+            matrices.translate(offset.x, offset.y, offset.z);
+            Logging.FIELD.topic("link").trace("Applied linked orbit: offset={}", offset);
         }
         
         // 3. Translation (offset from anchor/orbit position)
@@ -644,6 +792,33 @@ public final class LayerRenderer {
             return 0;
         }
         return LinkResolver.resolvePhaseOffset(link);
+    }
+    
+    /**
+     * Parses a color string to an integer.
+     * Supports formats: "#RRGGBB", "#AARRGGBB", "0xRRGGBB", "0xAARRGGBB", or plain hex.
+     */
+    private static int parseColorString(String colorStr) {
+        if (colorStr == null || colorStr.isEmpty()) {
+            return 0xFFFFFFFF; // Default white
+        }
+        
+        String hex = colorStr.trim();
+        if (hex.startsWith("#")) {
+            hex = hex.substring(1);
+        } else if (hex.startsWith("0x") || hex.startsWith("0X")) {
+            hex = hex.substring(2);
+        }
+        
+        try {
+            // If 6 chars, assume RGB and add FF alpha
+            if (hex.length() == 6) {
+                return (int) Long.parseLong("FF" + hex, 16);
+            }
+            return (int) Long.parseLong(hex, 16);
+        } catch (NumberFormatException e) {
+            return 0xFFFFFFFF;
+        }
     }
 }
 

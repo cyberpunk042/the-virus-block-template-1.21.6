@@ -79,6 +79,7 @@ public class TransformStack {
             .up(current.up())
             .billboard(current.billboard())
             .orbit(current.orbit())
+            .orbit3d(current.orbit3d())
             .build());
     }
     
@@ -101,6 +102,7 @@ public class TransformStack {
             .up(current.up())
             .billboard(current.billboard())
             .orbit(current.orbit())
+            .orbit3d(current.orbit3d())
             .build());
     }
     
@@ -127,6 +129,7 @@ public class TransformStack {
             .up(current.up())
             .billboard(current.billboard())
             .orbit(current.orbit())
+            .orbit3d(current.orbit3d())
             .build());
     }
     
@@ -191,7 +194,8 @@ public class TransformStack {
             applied.facing() != Facing.FIXED ? applied.facing() : base.facing(),
             applied.up() != UpVector.WORLD_UP ? applied.up() : base.up(),
             applied.billboard() != Billboard.NONE ? applied.billboard() : base.billboard(),
-            applied.orbit() != null ? applied.orbit() : base.orbit()
+            applied.orbit() != null ? applied.orbit() : base.orbit(),
+            applied.orbit3d() != null ? applied.orbit3d() : base.orbit3d()
         );
     }
 }

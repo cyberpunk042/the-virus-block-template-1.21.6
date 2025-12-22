@@ -312,6 +312,7 @@ public class FieldEditState {
     public net.cyberpunk042.visual.visibility.VisibilityMask mask() { return visibilityAdapter.mask(); }
     public net.cyberpunk042.visual.pattern.ArrangementConfig arrangement() { return arrangementAdapter.arrangement(); }
     public AppearanceState appearance() { return appearanceAdapter.appearance(); }
+    public net.cyberpunk042.field.primitive.PrimitiveLink link() { return linkAdapter.currentLink(); }
     
     // ═══════════════════════════════════════════════════════════════════════════
     // PRIMITIVE SYNC (via adapters)

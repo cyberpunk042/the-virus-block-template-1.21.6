@@ -10,6 +10,7 @@ import net.cyberpunk042.field.influence.TriggerConfig;
 import net.cyberpunk042.field.instance.FollowConfig;
 import net.cyberpunk042.field.loader.SimplePrimitive;
 import net.cyberpunk042.field.primitive.Primitive;
+import net.cyberpunk042.field.primitive.PrimitiveLink;
 import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.visual.animation.Animation;
 import net.cyberpunk042.visual.appearance.AlphaRange;
@@ -287,6 +288,9 @@ public final class DefinitionBuilder {
             .kv("type", shapeType)
             .kv("shapeClass", shape != null ? shape.getClass().getSimpleName() : "null");
         
+        // Get link from adapter
+        PrimitiveLink link = state.link();
+        
         return new SimplePrimitive(
             primitiveId,
             shapeType,
@@ -297,7 +301,7 @@ public final class DefinitionBuilder {
             arrangement != null ? arrangement : ArrangementConfig.DEFAULT,
             appearance != null ? appearance : Appearance.DEFAULT,
             animation != null ? animation : Animation.NONE,
-            null  // link
+            link
         );
     }
     

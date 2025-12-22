@@ -72,7 +72,9 @@ public class ContentProviderFactory {
      * Creates the Transform sub-tab content (unified with orbit).
      */
     public SubTabPane.ContentProvider transform() {
-        return new PanelWrapper(new TransformQuickSubPanel(parent, state, 0));
+        TransformSubPanel panel = new TransformSubPanel(parent, state, 0);
+        panel.setWidgetChangedCallback(onWidgetsChanged);
+        return new PanelWrapper(panel);
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -107,12 +109,6 @@ public class ContentProviderFactory {
         return new PanelWrapper(new ModifiersSubPanel(parent, state));
     }
     
-    /**
-     * Creates the Orbit sub-tab content (separate, for advanced tab).
-     */
-    public SubTabPane.ContentProvider orbit() {
-        return new PanelWrapper(new OrbitSubPanel(parent, state));
-    }
     
     /**
      * Creates the Arrange sub-tab content.

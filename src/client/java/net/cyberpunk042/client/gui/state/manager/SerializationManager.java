@@ -61,6 +61,9 @@ public class SerializationManager extends AbstractManager {
             }
         }
         
+        // IMPORTANT: Save current adapter state to primitive before serializing layers
+        layerManager.saveSelectedPrimitive();
+        
         // Add layers
         JsonArray layersArray = new JsonArray();
         for (FieldLayer layer : fieldLayers) {

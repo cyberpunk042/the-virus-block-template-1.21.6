@@ -30,7 +30,6 @@ public class AdvancedPanel extends AbstractPanel {
     private AnimationSubPanel animationSubPanel;
     private ModifiersSubPanel modifiersSubPanel;
     private TransformSubPanel transformSubPanel;
-    private OrbitSubPanel orbitSubPanel;
     private VisibilitySubPanel visibilitySubPanel;
     private FillSubPanel fillSubPanel;
     private LinkingSubPanel linkingSubPanel;
@@ -73,15 +72,10 @@ public class AdvancedPanel extends AbstractPanel {
         modifiersSubPanel.init(width, height);
         contentY += modifiersSubPanel.getContentHeight() + GuiConstants.SECTION_SPACING;
         
-        // Transform (anchor, offset, rotation, scale)
+        // Transform (anchor, offset, rotation, scale, orbit)
         transformSubPanel = new TransformSubPanel(parent, state, contentY);
         transformSubPanel.init(width, height);
         contentY += transformSubPanel.getHeight() + GuiConstants.SECTION_SPACING;
-        
-        // Orbit (orbital motion around anchor)
-        orbitSubPanel = new OrbitSubPanel(parent, state);
-        orbitSubPanel.init(width, height);
-        contentY += orbitSubPanel.getContentHeight() + GuiConstants.SECTION_SPACING;
         
         // Visibility (masks)
         visibilitySubPanel = new VisibilitySubPanel(parent, state, contentY);
@@ -104,7 +98,7 @@ public class AdvancedPanel extends AbstractPanel {
         
         contentHeight = contentY;
         
-        Logging.GUI.topic("panel").debug("AdvancedPanel initialized with 11 sub-panels, height: {}", contentHeight);
+        Logging.GUI.topic("panel").debug("AdvancedPanel initialized with 10 sub-panels, height: {}", contentHeight);
     }
     
     @Override
@@ -132,7 +126,6 @@ public class AdvancedPanel extends AbstractPanel {
         renderSubPanel(animationSubPanel, context, mouseX, mouseY, delta);
         renderSubPanel(modifiersSubPanel, context, mouseX, mouseY, delta);
         renderSubPanel(transformSubPanel, context, mouseX, mouseY, delta);
-        renderSubPanel(orbitSubPanel, context, mouseX, mouseY, delta);
         renderSubPanel(visibilitySubPanel, context, mouseX, mouseY, delta);
         renderSubPanel(fillSubPanel, context, mouseX, mouseY, delta);
         

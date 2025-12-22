@@ -342,17 +342,6 @@ public final class SuperProfiler {
                         wormsCount++;
                         if (worm.age > 600) {
                             wormsOldAge++;
-                            // Sample first 3 old worms for detailed analysis
-                            if (wormsOldAge <= 3) {
-                                net.minecraft.util.math.BlockPos pos = worm.getBlockPos();
-                                net.cyberpunk042.log.Logging.PROFILER.warn(
-                                    "[WormDiag] age={} pos=({},{},{}) health={} persistent={} inLoadedChunk={}",
-                                    worm.age, pos.getX(), pos.getY(), pos.getZ(),
-                                    worm.getHealth(),
-                                    worm.isPersistent(),
-                                    world.isChunkLoaded(entityChunk.toLong())
-                                );
-                            }
                         }
                     }
                     

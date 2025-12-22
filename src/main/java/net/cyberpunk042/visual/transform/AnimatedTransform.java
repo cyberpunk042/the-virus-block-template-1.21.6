@@ -112,7 +112,8 @@ public class AnimatedTransform {
             t < 0.5f ? a.facing() : b.facing(),
             t < 0.5f ? a.up() : b.up(),
             t < 0.5f ? a.billboard() : b.billboard(),
-            t < 0.5f ? a.orbit() : b.orbit()
+            t < 0.5f ? a.orbit() : b.orbit(),
+            t < 0.5f ? a.orbit3d() : b.orbit3d()
         );
     }
 }

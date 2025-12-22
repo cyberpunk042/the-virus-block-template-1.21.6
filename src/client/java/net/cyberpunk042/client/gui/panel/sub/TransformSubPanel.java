@@ -4,45 +4,52 @@ import net.cyberpunk042.client.gui.panel.AbstractPanel;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.GuiWidgets;
-import net.cyberpunk042.client.gui.widget.ExpandableSection;
 import net.cyberpunk042.client.gui.widget.LabeledSlider;
-import net.cyberpunk042.client.gui.widget.Vec3Editor;
 import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.visual.transform.Anchor;
 import net.cyberpunk042.visual.transform.Billboard;
 import net.cyberpunk042.visual.transform.Facing;
+import net.cyberpunk042.visual.transform.MotionMode;
+import net.cyberpunk042.visual.transform.OrbitConfig3D;
+import net.cyberpunk042.visual.transform.UpVector;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
+import net.minecraft.text.Text;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * TransformSubPanel - Position, rotation, scale, and orientation controls.
+ * Unified Transform + Orbit sub-panel for Quick tab.
  * 
- * <p>From 03_PARAMETERS.md §5 Transform Level:</p>
+ * <p>Compact layout with all transform controls:
  * <ul>
- *   <li>anchor: CENTER, FEET, HEAD, ABOVE, BELOW, etc.</li>
- *   <li>offset: Vec3 (x, y, z)</li>
- *   <li>rotation: Vec3 (degrees)</li>
- *   <li>scale: uniform or per-axis</li>
- *   <li>facing: FIXED, PLAYER_LOOK, VELOCITY, CAMERA</li>
- *   <li>billboard: NONE, FULL, Y_AXIS</li>
+ *   <li>Anchor, Offset (X/Y/Z)</li>
+ *   <li>Rotation (X/Y/Z)</li>
+ *   <li>Scale (uniform or per-axis)</li>
+ *   <li>Facing, Billboard</li>
+ *   <li>Orbit (enable, radius, speed)</li>
  * </ul>
  */
 public class TransformSubPanel extends AbstractPanel {
     
-    private int startY;    
+    private static final int COMPACT_H = 16;  // Compact widget height
+    private static final int GAP = 2;
+    
+    private int startY;
+    
+    // Transform controls
     private CyclingButtonWidget<Anchor> anchorDropdown;
-    private Vec3Editor offsetEditor;
-    private Vec3Editor rotationEditor;
+    private LabeledSlider offsetX, offsetY, offsetZ;
+    private LabeledSlider rotX, rotY, rotZ;
     private LabeledSlider scaleSlider;
     private CyclingButtonWidget<Boolean> uniformScaleToggle;
-    private Vec3Editor scaleXYZEditor;
+    private LabeledSlider scaleX, scaleY, scaleZ;  // For non-uniform mode
+    private boolean useUniformScale = true;
     private CyclingButtonWidget<Facing> facingDropdown;
     private CyclingButtonWidget<Billboard> billboardDropdown;
     
@@ -56,101 +63,387 @@ public class TransformSubPanel extends AbstractPanel {
     public void init(int width, int height) {
         this.panelWidth = width;
         this.panelHeight = height;
-        widgets.clear();
-        
-        
-        int x = GuiConstants.PADDING;
-        int y = startY + GuiConstants.PADDING;
-        int w = width - GuiConstants.PADDING * 2;
-        int halfW = (w - GuiConstants.PADDING) / 2;
-        
-        // Anchor
-        anchorDropdown = GuiWidgets.enumDropdown(x, y, w, "Anchor", Anchor.class, Anchor.CENTER,
-            "Field attachment point", v -> {
-                state.set("transform.anchor", v.name());
-                Logging.GUI.topic("transform").debug("Anchor: {}", v);
-            });
-        widgets.add(anchorDropdown);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
-        
-        // Offset (nullable Vector3f - default to 0,0,0)
-        TextRenderer tr = MinecraftClient.getInstance().textRenderer;
-        Vector3f offset = state.transform() != null ? state.transform().offset() : null;
-        Vector3f offsetInit = offset != null ? new Vector3f(offset) : new Vector3f(0, 0, 0);
-        offsetEditor = new Vec3Editor(tr, x, y, "Offset", offsetInit, v -> {
-            state.set("transform.offset", v);
-            Logging.GUI.topic("transform").trace("Offset: ({}, {}, {})", v.x, v.y, v.z);
-        });
-        // Vec3Editor renders itself, not added to widgets
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
-        
-        // Rotation (nullable Vector3f - default to 0,0,0)
-        Vector3f rotation = state.transform() != null ? state.transform().rotation() : null;
-        Vector3f rotInit = rotation != null ? new Vector3f(rotation) : new Vector3f(0, 0, 0);
-        rotationEditor = new Vec3Editor(tr, x, y, "Rotation", rotInit, v -> {
-            state.set("transform.rotation", v);
-            Logging.GUI.topic("transform").trace("Rotation: ({}, {}, {})", v.x, v.y, v.z);
-        });
-        // Vec3Editor renders itself, not added to widgets
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
-        
-        // Scale
-        scaleSlider = LabeledSlider.builder("Scale")
-            .position(x, y).width(halfW)
-            .range(0.1f, 5f).initial(state.getFloat("transform.scale")).format("%.2f")
-            .onChange(v -> {
-                state.set("transform.scale", v);
-                Logging.GUI.topic("transform").trace("Scale: {}", v);
-            }).build();
-        widgets.add(scaleSlider);
-        
-        uniformScaleToggle = GuiWidgets.toggle(x + halfW + GuiConstants.PADDING, y, halfW,
-            "Uniform", true, "Use uniform scale", v -> {
-                // Toggle between uniform and per-axis scale
-            });
-        widgets.add(uniformScaleToggle);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
-        
-        // Facing
-        facingDropdown = GuiWidgets.enumDropdown(x, y, halfW, "Facing", Facing.class, Facing.FIXED,
-            "How field orients", v -> {
-                state.set("transform.facing", v.name());
-                Logging.GUI.topic("transform").debug("Facing: {}", v);
-            });
-        widgets.add(facingDropdown);
-        
-        // Billboard
-        billboardDropdown = GuiWidgets.enumDropdown(x + halfW + GuiConstants.PADDING, y, halfW,
-            "Billboard", Billboard.class, Billboard.NONE,
-            "Camera-facing mode", v -> {
-                state.set("transform.billboard", v.name());
-                Logging.GUI.topic("transform").debug("Billboard: {}", v);
-            });
-        widgets.add(billboardDropdown);
-        y += GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING;
-        
-        contentHeight = y - startY + GuiConstants.PADDING;
-        Logging.GUI.topic("panel").debug("TransformSubPanel initialized");
+        rebuildWidgets();
+        Logging.GUI.topic("panel").debug("TransformSubPanel initialized, height={}", contentHeight);
     }
     
-    @Override public void tick() {}
+    /**
+     * Rebuilds widgets based on current state.
+     * Called when mode changes to show/hide secondary parameters.
+     */
+    private void rebuildWidgets() {
+        boolean needsOffset = bounds != null && !bounds.isEmpty();
+        widgets.clear();
+        
+        TextRenderer tr = MinecraftClient.getInstance().textRenderer;
+        
+        int x = GuiConstants.PADDING;
+        int y = startY + GAP;
+        int w = panelWidth - GuiConstants.PADDING * 2;
+        int thirdW = (w - GAP * 2) / 3;
+        int halfW = (w - GAP) / 2;
+        
+        // Get current transform values
+        var transform = state.transform();
+        Anchor currentAnchor = transform != null ? transform.anchor() : Anchor.CENTER;
+        Vector3f offset = transform != null && transform.offset() != null ? transform.offset() : new Vector3f();
+        Vector3f rotation = transform != null && transform.rotation() != null ? transform.rotation() : new Vector3f();
+        float scale = transform != null ? transform.scale() : 1.0f;
+        Vector3f scaleXYZ = transform != null ? transform.scaleXYZ() : null;
+        Facing currentFacing = transform != null ? transform.facing() : Facing.FIXED;
+        Billboard currentBillboard = transform != null ? transform.billboard() : Billboard.NONE;
+        
+        // === ANCHOR ===
+        anchorDropdown = CyclingButtonWidget.<Anchor>builder(a -> Text.literal(a.label()))
+            .values(Anchor.values())
+            .initially(currentAnchor)
+            .build(x, y, w, COMPACT_H, Text.literal("Anchor"),
+                (btn, val) -> {
+                    state.set("transform.anchor", val.name());
+                    Logging.GUI.topic("transform").debug("Anchor: {}", val);
+                });
+        widgets.add(anchorDropdown);
+        y += COMPACT_H + GAP;
+        
+        // === OFFSET X/Y/Z (3 compact sliders) ===
+        offsetX = LabeledSlider.builder("X")
+            .position(x, y).width(thirdW)
+            .range(-10f, 10f).initial(offset.x).format("%.1f")
+            .onChange(v -> updateOffset(v, null, null))
+            .build();
+        widgets.add(offsetX);
+        
+        offsetY = LabeledSlider.builder("Y")
+            .position(x + thirdW + GAP, y).width(thirdW)
+            .range(-10f, 10f).initial(offset.y).format("%.1f")
+            .onChange(v -> updateOffset(null, v, null))
+            .build();
+        widgets.add(offsetY);
+        
+        offsetZ = LabeledSlider.builder("Z")
+            .position(x + (thirdW + GAP) * 2, y).width(thirdW)
+            .range(-10f, 10f).initial(offset.z).format("%.1f")
+            .onChange(v -> updateOffset(null, null, v))
+            .build();
+        widgets.add(offsetZ);
+        y += COMPACT_H + GAP;
+        
+        // === ROTATION X/Y/Z (3 compact sliders) ===
+        rotX = LabeledSlider.builder("Rx")
+            .position(x, y).width(thirdW)
+            .range(-180f, 180f).initial(rotation.x).format("%.0f°")
+            .onChange(v -> updateRotation(v, null, null))
+            .build();
+        widgets.add(rotX);
+        
+        rotY = LabeledSlider.builder("Ry")
+            .position(x + thirdW + GAP, y).width(thirdW)
+            .range(-180f, 180f).initial(rotation.y).format("%.0f°")
+            .onChange(v -> updateRotation(null, v, null))
+            .build();
+        widgets.add(rotY);
+        
+        rotZ = LabeledSlider.builder("Rz")
+            .position(x + (thirdW + GAP) * 2, y).width(thirdW)
+            .range(-180f, 180f).initial(rotation.z).format("%.0f°")
+            .onChange(v -> updateRotation(null, null, v))
+            .build();
+        widgets.add(rotZ);
+        y += COMPACT_H + GAP;
+        
+        // === SCALE (with uniform toggle) ===
+        useUniformScale = scaleXYZ == null;  // If no per-axis scale, use uniform
+        
+        scaleSlider = LabeledSlider.builder("Scale")
+            .position(x, y).width(halfW - 30)
+            .range(0.1f, 5f).initial(scale).format("%.2f")
+            .onChange(v -> {
+                state.set("transform.scale", v);
+                Logging.GUI.topic("transform").debug("Scale: {}", v);
+            })
+            .build();
+        widgets.add(scaleSlider);
+        
+        // Use GuiWidgets.toggle for proper label formatting
+        uniformScaleToggle = CyclingButtonWidget.<Boolean>builder(b -> Text.literal(b ? "Uni" : "XYZ"))
+            .values(true, false)
+            .initially(useUniformScale)
+            .omitKeyText()
+            .build(x + halfW - 28, y, 30, COMPACT_H, Text.literal(""),
+                (btn, val) -> {
+                    useUniformScale = val;
+                    rebuildScaleControls();
+                });
+        widgets.add(uniformScaleToggle);
+        
+        // ScaleWithRadius toggle (small button) - Show R text always but colored
+        boolean scaleWithR = transform != null && transform.scaleWithRadius();
+        var scaleWithRadiusToggle = CyclingButtonWidget.<Boolean>builder(b -> Text.literal(b ? "§aR" : "§7R"))
+            .values(true, false)
+            .initially(scaleWithR)
+            .omitKeyText()
+            .build(x + halfW + GAP, y, 20, COMPACT_H, Text.literal(""),
+                (btn, val) -> state.set("transform.scaleWithRadius", val));
+        widgets.add(scaleWithRadiusToggle);
+        
+        // InheritRotation toggle (small button) - Show ↻ always but colored
+        boolean inheritRot = transform == null || transform.inheritRotation();
+        var inheritRotToggle = CyclingButtonWidget.<Boolean>builder(b -> Text.literal(b ? "§a↻" : "§7↻"))
+            .values(true, false)
+            .initially(inheritRot)
+            .omitKeyText()
+            .build(x + halfW + GAP + 22, y, 20, COMPACT_H, Text.literal(""),
+                (btn, val) -> state.set("transform.inheritRotation", val));
+        widgets.add(inheritRotToggle);
+        y += COMPACT_H + GAP;
+        
+        // === FACING + BILLBOARD (side by side) ===
+        // Include label in value formatter to avoid ': ' prefix from label param
+        facingDropdown = CyclingButtonWidget.<Facing>builder(f -> Text.literal("Face: " + f.name()))
+            .values(Facing.values())
+            .initially(currentFacing)
+            .omitKeyText()
+            .build(x, y, halfW, COMPACT_H, Text.literal(""),
+                (btn, val) -> {
+                    state.set("transform.facing", val.name());
+                    Logging.GUI.topic("transform").debug("Facing: {}", val);
+                });
+        widgets.add(facingDropdown);
+        
+        billboardDropdown = CyclingButtonWidget.<Billboard>builder(b -> Text.literal("Bill: " + b.name()))
+            .values(Billboard.values())
+            .initially(currentBillboard)
+            .omitKeyText()
+            .build(x + halfW + GAP, y, halfW, COMPACT_H, Text.literal(""),
+                (btn, val) -> {
+                    state.set("transform.billboard", val.name());
+                    Logging.GUI.topic("transform").debug("Billboard: {}", val);
+                });
+        widgets.add(billboardDropdown);
+        y += COMPACT_H + GAP + 4;  // Extra gap before orbit section
+        
+        // === 3D ORBIT - PER-AXIS CONTROLS ===
+        // Each axis has: Mode | Radius (amplitude) | Speed (frequency) | Phase
+        var orbit3d = transform != null ? transform.orbit3d() : null;
+        y = addAxisOrbitRow(x, y, w, "X", orbit3d != null ? orbit3d.x() : null, "transform.orbit3d.x");
+        y = addAxisOrbitRow(x, y, w, "Y", orbit3d != null ? orbit3d.y() : null, "transform.orbit3d.y");
+        y = addAxisOrbitRow(x, y, w, "Z", orbit3d != null ? orbit3d.z() : null, "transform.orbit3d.z");
+        
+        contentHeight = y - startY + GuiConstants.PADDING;
+        
+        if (needsOffset) {
+            applyBoundsOffset();
+        }
+    }
+    
+    private int addAxisOrbitRow(int x, int y, int w, String axis, 
+            net.cyberpunk042.visual.transform.AxisMotionConfig config, String basePath) {
+        int modeW = 55;
+        int sliderW = (w - modeW - GAP * 3) / 3;
+        
+        MotionMode currentMode = config != null ? config.mode() : MotionMode.NONE;
+        
+        // Mode dropdown - triggers rebuild when changed to show/hide secondary params
+        var modeDropdown = CyclingButtonWidget.<MotionMode>builder(
+                m -> Text.literal(axis + ":" + (m.name().length() > 4 ? m.name().substring(0, 4) : m.name())))
+            .values(MotionMode.values())
+            .initially(currentMode)
+            .omitKeyText()
+            .build(x, y, modeW, COMPACT_H, Text.literal(""),
+                (btn, val) -> {
+                    state.set(basePath + ".mode", val.name());
+                    Logging.GUI.topic("transform").info("[TRANSFORM-DEBUG] Mode changed to: {}", val.name());
+                    // Rebuild to show/hide secondary parameters (like FillSubPanel)
+                    rebuildWidgets();
+                    notifyWidgetsChanged();
+                });
+        widgets.add(modeDropdown);
+        
+        int sliderX = x + modeW + GAP;
+        
+        // Radius (Amplitude)
+        var radSlider = LabeledSlider.builder("Rad")
+            .position(sliderX, y).width(sliderW)
+            .range(0f, 10f).initial(config != null ? config.amplitude() : 1.0f).format("%.1f")
+            .onChange(v -> state.set(basePath + ".amplitude", v))
+            .build();
+        widgets.add(radSlider);
+        sliderX += sliderW + GAP;
+        
+        // Speed (Frequency) - cycles per second
+        var spdSlider = LabeledSlider.builder("Spd")
+            .position(sliderX, y).width(sliderW)
+            .range(0.1f, 3f).initial(config != null ? config.frequency() : 0.5f).format("%.1f")
+            .onChange(v -> state.set(basePath + ".frequency", v))
+            .build();
+        widgets.add(spdSlider);
+        sliderX += sliderW + GAP;
+        
+        // Phase (0-360 degrees, converted to 0-1 internally)
+        float phaseDegrees = config != null ? config.phase() * 360f : 0f;
+        var phSlider = LabeledSlider.builder("Ph°")
+            .position(sliderX, y).width(sliderW)
+            .range(0f, 360f).initial(phaseDegrees).format("%.0f")
+            .onChange(v -> state.set(basePath + ".phase", v / 360f))
+            .build();
+        widgets.add(phSlider);
+        
+        int nextY = y + COMPACT_H + GAP;
+        
+        // Secondary parameters row (only for complex modes)
+        if (currentMode.needsSecondaryParams()) {
+            sliderX = x + GAP;
+            int secSliderW = (w - GAP * 3) / 3;
+            
+            // Amplitude2 (secondary amplitude)
+            String amp2Label = switch (currentMode) {
+                case HELIX -> "Wave";
+                case EPICYCLIC -> "Rad2";
+                case WOBBLE -> "Tilt";
+                case FLOWER -> "Petal";
+                case ORBIT_BOUNCE -> "Bnc";
+                default -> "Amp2";
+            };
+            var amp2Slider = LabeledSlider.builder(amp2Label)
+                .position(sliderX, nextY).width(secSliderW)
+                .range(0f, 10f).initial(config != null ? config.amplitude2() : 0.5f).format("%.1f")
+                .onChange(v -> state.set(basePath + ".amplitude2", v))
+                .build();
+            widgets.add(amp2Slider);
+            sliderX += secSliderW + GAP;
+            
+            // Frequency2 (secondary frequency) - for WOBBLE/HELIX it's a multiplier of main freq
+            String freq2Label = switch (currentMode) {
+                case FLOWER -> "Petals";  // How many petals per rotation
+                case WOBBLE -> "Rock×";   // Multiplier: how many rocks per orbit
+                case HELIX -> "Coils×";   // Multiplier: how many coils per orbit
+                case EPICYCLIC -> "Spd2"; // Absolute speed for secondary orbit
+                default -> "Freq2";
+            };
+            // For 3D modes (WOBBLE/HELIX), freq2 is a multiplier so smaller values make sense
+            // For EPICYCLIC, it's absolute speed so can be negative
+            // For FLOWER, it's petal count
+            float freq2Min = switch (currentMode) {
+                case EPICYCLIC -> -20f;
+                case WOBBLE, HELIX, ORBIT_BOUNCE -> 0.1f;
+                default -> 0.1f;
+            };
+            float freq2Max = switch (currentMode) {
+                case FLOWER -> 20f;  // Up to 20 petals
+                case WOBBLE, HELIX -> 10f;  // Up to 10x main frequency
+                default -> 20f;
+            };
+            var freq2Slider = LabeledSlider.builder(freq2Label)
+                .position(sliderX, nextY).width(secSliderW)
+                .range(freq2Min, freq2Max).initial(config != null ? config.frequency2() : 2f).format("%.1f")
+                .onChange(v -> state.set(basePath + ".frequency2", v))
+                .build();
+            widgets.add(freq2Slider);
+            sliderX += secSliderW + GAP;
+            
+            // Third slot: Swing° for PENDULUM, Ph2° for EPICYCLIC
+            if (currentMode == MotionMode.PENDULUM) {
+                // Swing can be up to 1000 degrees for multiple revolutions
+                var swingSlider = LabeledSlider.builder("Swing°")
+                    .position(sliderX, nextY).width(secSliderW)
+                    .range(1f, 1000f).initial(config != null ? config.swingAngle() : 90f).format("%.0f")
+                    .onChange(v -> state.set(basePath + ".swingAngle", v))
+                    .build();
+                widgets.add(swingSlider);
+            } else if (currentMode == MotionMode.EPICYCLIC) {
+                float phase2Deg = config != null ? config.phase2() * 360f : 0f;
+                var ph2Slider = LabeledSlider.builder("Ph2°")
+                    .position(sliderX, nextY).width(secSliderW)
+                    .range(0f, 360f).initial(phase2Deg).format("%.0f")
+                    .onChange(v -> state.set(basePath + ".phase2", v / 360f))
+                    .build();
+                widgets.add(ph2Slider);
+            }
+            
+            nextY += COMPACT_H + GAP;
+            
+            // EPICYCLIC: Second row for tilt controls (TiltX, TiltY, TiltZ)
+            if (currentMode == MotionMode.EPICYCLIC) {
+                sliderX = x + GAP;
+                
+                var tiltXSlider = LabeledSlider.builder("TiltX")
+                    .position(sliderX, nextY).width(secSliderW)
+                    .range(-180f, 180f).initial(config != null ? config.orbit2TiltX() : 0f).format("%.0f°")
+                    .onChange(v -> state.set(basePath + ".orbit2TiltX", v))
+                    .build();
+                widgets.add(tiltXSlider);
+                sliderX += secSliderW + GAP;
+                
+                var tiltYSlider = LabeledSlider.builder("TiltY")
+                    .position(sliderX, nextY).width(secSliderW)
+                    .range(-180f, 180f).initial(config != null ? config.orbit2TiltY() : 0f).format("%.0f°")
+                    .onChange(v -> state.set(basePath + ".orbit2TiltY", v))
+                    .build();
+                widgets.add(tiltYSlider);
+                sliderX += secSliderW + GAP;
+                
+                var tiltZSlider = LabeledSlider.builder("TiltZ")
+                    .position(sliderX, nextY).width(secSliderW)
+                    .range(-180f, 180f).initial(config != null ? config.orbit2TiltZ() : 0f).format("%.0f°")
+                    .onChange(v -> state.set(basePath + ".orbit2TiltZ", v))
+                    .build();
+                widgets.add(tiltZSlider);
+                
+                nextY += COMPACT_H + GAP;
+            }
+        }
+        
+        return nextY;
+    }
+    
+    private void updateOffset(Float x, Float y, Float z) {
+        var transform = state.transform();
+        Vector3f current = transform != null && transform.offset() != null 
+            ? new Vector3f(transform.offset()) 
+            : new Vector3f();
+        if (x != null) current.x = x;
+        if (y != null) current.y = y;
+        if (z != null) current.z = z;
+        state.set("transform.offset", current);
+    }
+    
+    private void updateRotation(Float x, Float y, Float z) {
+        var transform = state.transform();
+        Vector3f current = transform != null && transform.rotation() != null 
+            ? new Vector3f(transform.rotation()) 
+            : new Vector3f();
+        if (x != null) current.x = x;
+        if (y != null) current.y = y;
+        if (z != null) current.z = z;
+        state.set("transform.rotation", current);
+    }
+    
+    private void rebuildScaleControls() {
+        // TODO: Rebuild to show either uniform slider or XYZ sliders
+        // For now, just log the toggle
+        Logging.GUI.topic("transform").debug("Uniform scale: {}", useUniformScale);
+    }
+    
+    @Override
+    public void tick() {}
     
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        TextRenderer tr = MinecraftClient.getInstance().textRenderer;
-        // Render all widgets directly (no expandable section)
-        for (var widget : widgets) widget.render(context, mouseX, mouseY, delta);
-        // Vec3Editors render separately (need TextRenderer)
-        if (offsetEditor != null) offsetEditor.render(context, tr, mouseX, mouseY, delta);
-        if (rotationEditor != null) rotationEditor.render(context, tr, mouseX, mouseY, delta);
+        // Background
+        int bgY = startY + scrollOffset;
+        context.fill(bounds.x(), bgY, bounds.x() + panelWidth, bgY + contentHeight, GuiConstants.BG_PANEL);
+        
+        // Render all widgets
+        for (var widget : widgets) {
+            widget.render(context, mouseX, mouseY, delta);
+        }
     }
     
-    public int getHeight() { return contentHeight; }
+    public int getHeight() {
+        return contentHeight;
+    }
     
     public List<net.minecraft.client.gui.widget.ClickableWidget> getWidgets() {
-        List<net.minecraft.client.gui.widget.ClickableWidget> all = new ArrayList<>();
-        // No header button (direct content)
-        all.addAll(widgets);
-        return all;
+        return new ArrayList<>(widgets);
     }
 }

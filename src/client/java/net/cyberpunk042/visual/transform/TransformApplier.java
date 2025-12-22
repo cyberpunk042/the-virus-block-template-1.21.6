@@ -70,8 +70,11 @@ public final class TransformApplier {
             matrices.translate(offset.x, offset.y, offset.z);
         }
         
-        // 3. Orbit offset
-        if (transform.hasOrbit()) {
+        // 3. Orbit offset (priority: orbit3d > orbit)
+        if (transform.hasOrbit3D()) {
+            org.joml.Vector3f orbitOffset = transform.orbit3d().getOffset(time);
+            matrices.translate(orbitOffset.x, orbitOffset.y, orbitOffset.z);
+        } else if (transform.hasOrbit()) {
             Vector3f orbitOffset = OrbitAnimator.getOffset(transform.orbit(), time);
             matrices.translate(orbitOffset.x, orbitOffset.y, orbitOffset.z);
         }

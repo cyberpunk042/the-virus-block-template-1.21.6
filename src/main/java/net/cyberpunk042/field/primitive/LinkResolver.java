@@ -7,7 +7,9 @@ import net.cyberpunk042.visual.shape.SphereShape;
 import net.cyberpunk042.visual.shape.RingShape;
 import net.cyberpunk042.visual.shape.CylinderShape;
 import net.cyberpunk042.visual.shape.PrismShape;
+import net.cyberpunk042.visual.transform.OrbitConfig3D;
 import net.cyberpunk042.visual.transform.Transform;
+import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3f;
 
 import java.util.*;
@@ -73,28 +75,24 @@ public final class LinkResolver {
             
             // Validate links
             PrimitiveLink link = prim.link();
-            if (link != null && link.hasLinks()) {
-                for (String refId : link.getReferencedIds()) {
-                    // Self reference
-                    if (refId.equals(id)) {
-                        errors.add("Primitive '" + id + "' references itself");
-                        continue;
-                    }
-                    
+            if (link != null && link.isValid() && link.hasAnyLinkType()) {
+                String refId = link.target();
+                
+                // Self reference
+                if (refId.equals(id)) {
+                    errors.add("Primitive '" + id + "' references itself");
+                } else if (!seenIds.contains(refId)) {
                     // Forward reference (not yet seen)
-                    if (!seenIds.contains(refId)) {
-                        // Check if it exists later in the list
-                        boolean existsLater = primitives.stream()
-                            .skip(i + 1)
-                            .anyMatch(p -> refId.equals(p.id()));
-                        
-                        if (existsLater) {
-                            errors.add("Forward reference: '" + id + "' links to '" + refId + 
-                                "' which is declared later (must be before)");
-                        } else {
-                            errors.add("Unknown reference: '" + id + "' links to '" + refId + 
-                                "' which does not exist");
-                        }
+                    boolean existsLater = primitives.stream()
+                        .skip(i + 1)
+                        .anyMatch(p -> refId.equals(p.id()));
+                    
+                    if (existsLater) {
+                        errors.add("Forward reference: '" + id + "' links to '" + refId + 
+                            "' which is declared later (must be before)");
+                    } else {
+                        errors.add("Unknown reference: '" + id + "' links to '" + refId + 
+                            "' which does not exist");
                     }
                 }
             }
@@ -129,14 +127,14 @@ public final class LinkResolver {
      * @return Resolved radius, or -1 if link is invalid
      */
     public static float resolveRadius(PrimitiveLink link, Map<String, Primitive> primitiveIndex) {
-        if (link == null || link.radiusMatch() == null) {
+        if (link == null || !link.radiusMatch() || link.target() == null) {
             return -1;
         }
         
-        Primitive target = primitiveIndex.get(link.radiusMatch());
+        Primitive target = primitiveIndex.get(link.target());
         if (target == null) {
             Logging.FIELD.topic("link").warn(
-                "Cannot resolve radius: target '{}' not found", link.radiusMatch());
+                "Cannot resolve radius: target '{}' not found", link.target());
             return -1;
         }
         
@@ -144,7 +142,7 @@ public final class LinkResolver {
         float targetRadius = getShapeRadius(target.shape());
         if (targetRadius < 0) {
             Logging.FIELD.topic("link").warn(
-                "Cannot resolve radius: target '{}' has no radius", link.radiusMatch());
+                "Cannot resolve radius: target '{}' has no radius", link.target());
             return -1;
         }
         
@@ -211,20 +209,20 @@ public final class LinkResolver {
      * @return Target's offset, or null if link invalid
      */
     public static Vector3f resolveFollow(PrimitiveLink link, Map<String, Primitive> primitiveIndex) {
-        if (link == null || link.follow() == null) {
+        if (link == null || !link.follow() || link.target() == null) {
             return null;
         }
         
-        Primitive target = primitiveIndex.get(link.follow());
+        Primitive target = primitiveIndex.get(link.target());
         if (target == null) {
             Logging.FIELD.topic("link").warn(
-                "Cannot resolve follow: target '{}' not found", link.follow());
+                "Cannot resolve follow: target '{}' not found", link.target());
             return null;
         }
         
         Vector3f result = new Vector3f(target.transform().offset());
         Logging.FIELD.topic("link").trace(
-            "Resolved follow to '{}': {}", link.follow(), result);
+            "Resolved follow to '{}': {}", link.target(), result);
         return result;
     }
     
@@ -236,20 +234,20 @@ public final class LinkResolver {
      * @return Target's scale, or -1 if link invalid
      */
     public static float resolveScale(PrimitiveLink link, Map<String, Primitive> primitiveIndex) {
-        if (link == null || link.scaleWith() == null) {
+        if (link == null || !link.scaleWith() || link.target() == null) {
             return -1;
         }
         
-        Primitive target = primitiveIndex.get(link.scaleWith());
+        Primitive target = primitiveIndex.get(link.target());
         if (target == null) {
             Logging.FIELD.topic("link").warn(
-                "Cannot resolve scaleWith: target '{}' not found", link.scaleWith());
+                "Cannot resolve scaleWith: target '{}' not found", link.target());
             return -1;
         }
         
         float result = target.transform().scale();
         Logging.FIELD.topic("link").trace(
-            "Resolved scale from '{}': {}", link.scaleWith(), result);
+            "Resolved scale from '{}': {}", link.target(), result);
         return result;
     }
     
@@ -267,6 +265,91 @@ public final class LinkResolver {
         return link.phaseOffset();
     }
     
+    /**
+     * Resolves orbit phase offset from a link.
+     * 
+     * @param link The link configuration
+     * @return Orbit phase offset, or 0 if none
+     */
+    public static float resolveOrbitPhaseOffset(PrimitiveLink link) {
+        if (link == null) {
+            return 0;
+        }
+        return link.orbitPhaseOffset();
+    }
+    
+    /**
+     * Resolves orbit configuration from a link.
+     * Returns the target primitive's orbit3d config if orbitSync is specified.
+     * 
+     * @param link The link configuration
+     * @param primitiveIndex Index of primitives
+     * @return Resolved OrbitConfig3D, or null if not linked
+     */
+    @Nullable
+    public static OrbitConfig3D resolveOrbit(PrimitiveLink link, Map<String, Primitive> primitiveIndex) {
+        if (link == null || !link.orbitSync() || link.target() == null) {
+            return null;
+        }
+        
+        Primitive target = primitiveIndex.get(link.target());
+        if (target == null) {
+            Logging.FIELD.topic("link").warn(
+                "OrbitSync target '{}' not found", link.target());
+            return null;
+        }
+        
+        Transform targetTransform = target.transform();
+        if (targetTransform == null || !targetTransform.hasOrbit3D()) {
+            Logging.FIELD.topic("link").debug(
+                "OrbitSync target '{}' has no orbit3d", link.target());
+            return null;
+        }
+        
+        return targetTransform.orbit3d();
+    }
+    
+    /**
+     * Resolves color from a linked primitive.
+     * 
+     * @param link The link configuration
+     * @param primitiveIndex Index of primitives
+     * @return Resolved color string, or null if not linked
+     */
+    @Nullable
+    public static String resolveColor(PrimitiveLink link, Map<String, Primitive> primitiveIndex) {
+        if (link == null || !link.colorMatch() || link.target() == null) {
+            return null;
+        }
+        
+        Primitive target = primitiveIndex.get(link.target());
+        if (target == null || target.appearance() == null) {
+            return null;
+        }
+        
+        return target.appearance().color();
+    }
+    
+    /**
+     * Resolves alpha from a linked primitive.
+     * 
+     * @param link The link configuration
+     * @param primitiveIndex Index of primitives
+     * @return Resolved alpha value (-1 if not linked)
+     */
+    public static float resolveAlpha(PrimitiveLink link, Map<String, Primitive> primitiveIndex) {
+        if (link == null || !link.alphaMatch() || link.target() == null) {
+            return -1;
+        }
+        
+        Primitive target = primitiveIndex.get(link.target());
+        if (target == null || target.appearance() == null || target.appearance().alpha() == null) {
+            return -1;
+        }
+        
+        return target.appearance().alpha().max();
+    }
+    
     // =========================================================================
     // Full Resolution (returns resolved VALUES)
     // =========================================================================
@@ -279,20 +362,36 @@ public final class LinkResolver {
      * @param offset Resolved offset (null if not linked)
      * @param scale Resolved scale (-1 if not linked)
      * @param phaseOffset Animation phase offset (0 if not linked)
+     * @param orbitConfig Resolved orbit config (null if not linked)
+     * @param orbitPhaseOffset Orbit phase offset (0 if not linked)
+     * @param color Resolved color (null if not linked)
+     * @param alpha Resolved alpha (-1 if not linked)
      */
     public record ResolvedValues(
         float radius,
         Vector3f offset,
         float scale,
-        float phaseOffset
+        float phaseOffset,
+        @Nullable OrbitConfig3D orbitConfig,
+        float orbitPhaseOffset,
+        @Nullable String color,
+        float alpha
     ) {
-        public static final ResolvedValues NONE = new ResolvedValues(-1, null, -1, 0);
+        public static final ResolvedValues NONE = new ResolvedValues(
+            -1, null, -1, 0, null, 0, null, -1);
         
         public boolean hasRadius() { return radius >= 0; }
         public boolean hasOffset() { return offset != null; }
         public boolean hasScale() { return scale >= 0; }
         public boolean hasPhaseOffset() { return phaseOffset != 0; }
-        public boolean hasAny() { return hasRadius() || hasOffset() || hasScale() || hasPhaseOffset(); }
+        public boolean hasOrbit() { return orbitConfig != null; }
+        public boolean hasOrbitPhaseOffset() { return orbitPhaseOffset != 0; }
+        public boolean hasColor() { return color != null; }
+        public boolean hasAlpha() { return alpha >= 0; }
+        public boolean hasAny() { 
+            return hasRadius() || hasOffset() || hasScale() || hasPhaseOffset() 
+                || hasOrbit() || hasOrbitPhaseOffset() || hasColor() || hasAlpha(); 
+        }
     }
     
     /**
@@ -307,6 +406,8 @@ public final class LinkResolver {
      *   <li>Position follow + mirror</li>
      *   <li>Scale synchronization</li>
      *   <li>Phase offset</li>
+     *   <li>Orbit synchronization + orbit phase offset</li>
+     *   <li>Color/alpha matching</li>
      * </ol>
      * 
      * @param primitive The primitive to resolve links for
@@ -315,7 +416,7 @@ public final class LinkResolver {
      */
     public static ResolvedValues resolveLinks(Primitive primitive, Map<String, Primitive> primitiveIndex) {
         PrimitiveLink link = primitive.link();
-        if (link == null || !link.hasLinks()) {
+        if (link == null || !link.isValid() || !link.hasAnyLinkType()) {
             return ResolvedValues.NONE;
         }
         
@@ -338,12 +439,23 @@ public final class LinkResolver {
         // 5. Phase offset
         float phaseOffset = resolvePhaseOffset(link);
         
-        ResolvedValues result = new ResolvedValues(resolvedRadius, resolvedOffset, resolvedScale, phaseOffset);
+        // 6. Orbit synchronization
+        OrbitConfig3D orbitConfig = resolveOrbit(link, primitiveIndex);
+        float orbitPhaseOffset = resolveOrbitPhaseOffset(link);
+        
+        // 7. Color/alpha matching
+        String color = resolveColor(link, primitiveIndex);
+        float alpha = resolveAlpha(link, primitiveIndex);
+        
+        ResolvedValues result = new ResolvedValues(
+            resolvedRadius, resolvedOffset, resolvedScale, phaseOffset,
+            orbitConfig, orbitPhaseOffset, color, alpha);
         
         if (result.hasAny()) {
             Logging.FIELD.topic("link").debug(
-                "Resolved links for '{}': radius={}, offset={}, scale={}, phase={}",
-                primitive.id(), resolvedRadius, resolvedOffset, resolvedScale, phaseOffset);
+                "Resolved links for '{}': radius={}, offset={}, scale={}, phase={}, orbit={}, orbitPhase={}",
+                primitive.id(), resolvedRadius, resolvedOffset, resolvedScale, phaseOffset, 
+                orbitConfig != null, orbitPhaseOffset);
         }
         
         return result;
