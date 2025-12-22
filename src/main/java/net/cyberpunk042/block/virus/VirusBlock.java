@@ -8,6 +8,7 @@ import com.mojang.serialization.MapCodec;
 
 import net.cyberpunk042.TheVirusBlock;
 import net.cyberpunk042.block.entity.VirusBlockEntity;
+import net.cyberpunk042.infection.VirusDamageClassifier;
 import net.cyberpunk042.infection.VirusWorldState;
 import net.cyberpunk042.item.PurificationOption;
 import net.cyberpunk042.registry.ModBlockEntities;
@@ -81,6 +82,11 @@ public class VirusBlock extends BlockWithEntity {
 		if (!world.getBlockState(pos).isOf(state.getBlock())) {
 			VirusWorldState infection = VirusWorldState.get(world);
 			infection.sources().unregisterSource(infection.sourceState(), pos);
+			
+			// If that was the last source, end the infection
+			if (infection.sources().isEmpty(infection.sourceState()) && infection.infectionState().infected()) {
+				infection.infectionLifecycle().endInfection(); // This triggers cleanse
+			}
 		}
 
 		super.onStateReplaced(state, world, pos, moved);
@@ -139,9 +145,15 @@ public class VirusBlock extends BlockWithEntity {
 			return;
 		}
 
+		// Classify based on the explosion's entity
+		String damageKey = VirusDamageClassifier.classifyExplosion(source);
+		System.out.println("[Explosion DEBUG] Entity=" + (source != null ? source.getType().toString() : "null") + " -> damageKey=" + damageKey);
+
 		if (infection.tiers().isApocalypseMode()) {
-			infection.tierProgression().bleedHealth(VULNERABLE_EXPLOSION_FRACTION);
+			System.out.println("[Explosion DEBUG] Apocalypse mode - applying damage with key: " + damageKey);
+			infection.tierProgression().bleedHealth(VULNERABLE_EXPLOSION_FRACTION, damageKey);
 		} else {
+			System.out.println("[Explosion DEBUG] Not apocalypse - just disturbing");
 			infection.disturbance().disturbByPlayer();
 		}
 	}
@@ -157,8 +169,11 @@ public class VirusBlock extends BlockWithEntity {
 			return;
 		}
 
+		// Classify as projectile damage for viral adaptation
+		String damageKey = VirusDamageClassifier.KEY_PROJECTILE;
+
 		if (infection.tiers().isApocalypseMode()) {
-			infection.tierProgression().bleedHealth(VULNERABLE_CONTACT_FRACTION);
+			infection.tierProgression().bleedHealth(VULNERABLE_CONTACT_FRACTION, damageKey);
 		} else {
 			infection.disturbance().disturbByPlayer();
 		}
@@ -176,9 +191,12 @@ public class VirusBlock extends BlockWithEntity {
 			VirusWorldState infection = VirusWorldState.get(serverWorld);
 			boolean vulnerable = infection.tiers().isApocalypseMode();
 
-			if (vulnerable) {
+		if (vulnerable) {
 				if (!player.isCreative()) {
-					infection.tierProgression().bleedHealth(VULNERABLE_CONTACT_FRACTION);
+					// Classify melee damage by tool type for viral adaptation
+					String damageKey = classifyMeleeDamage(player);
+					System.out.println("[Melee DEBUG] Player attacking with damageKey=" + damageKey);
+					infection.tierProgression().bleedHealth(VULNERABLE_CONTACT_FRACTION, damageKey);
 				}
 			} else if (!player.isCreative()) {
 				infection.disturbance().disturbByPlayer();
@@ -193,6 +211,18 @@ public class VirusBlock extends BlockWithEntity {
 		}
 
 		return super.calcBlockBreakingDelta(state, player, world, pos);
+	}
+
+	/**
+	 * Classifies melee damage from the player's held item.
+	 */
+	private static String classifyMeleeDamage(PlayerEntity player) {
+		ItemStack held = player.getMainHandStack();
+		if (held.isEmpty()) {
+			return VirusDamageClassifier.KEY_MELEE_FIST;
+		}
+		String itemId = net.minecraft.registry.Registries.ITEM.getId(held.getItem()).toString();
+		return VirusDamageClassifier.KEY_MELEE_PREFIX + itemId;
 	}
 }
 

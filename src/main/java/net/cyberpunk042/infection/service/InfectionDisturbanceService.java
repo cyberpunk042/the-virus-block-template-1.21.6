@@ -64,7 +64,9 @@ public final class InfectionDisturbanceService {
 		bonus = MathHelper.clamp(bonus, 40L, 400L);
 		if (host.tiers().isApocalypseMode()) {
 			double damageScale = MathHelper.clamp(radius / 4.0D, 0.5D, 3.5D);
-			host.infection().applyHealthDamage(world, host.tiers().maxHealth(host.tiers().currentTier()) * (damageScale * 0.02D));
+			// Classify the explosion for viral adaptation
+			String damageKey = net.cyberpunk042.infection.VirusDamageClassifier.classifyExplosion(source);
+			host.infection().applyHealthDamage(world, host.tiers().maxHealth(host.tiers().currentTier()) * (damageScale * 0.02D), damageKey);
 			return;
 		}
 		applyDisturbance(world, bonus);

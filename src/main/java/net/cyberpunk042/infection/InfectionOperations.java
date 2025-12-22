@@ -64,13 +64,59 @@ public final class InfectionOperations {
 	}
 
 	public boolean applyHealthDamage(ServerWorld world, double amount) {
+		return applyHealthDamage(world, amount, null);
+	}
+
+	/**
+	 * Applies damage to the infection health pool, with viral adaptation.
+	 * 
+	 * <p>The virus develops resistance to damage types it has experienced:
+	 * <ul>
+	 *   <li>1st hit: 25% resistance</li>
+	 *   <li>2nd hit: 50% resistance</li>
+	 *   <li>3rd hit: 75% resistance</li>
+	 *   <li>4th+ hit: 100% resistance (immune)</li>
+	 * </ul>
+	 * 
+	 * @param world The server world
+	 * @param amount The base damage amount
+	 * @param damageKey The damage category key from {@link VirusDamageClassifier}, or null for no adaptation
+	 * @return true if damage was applied
+	 */
+	public boolean applyHealthDamage(ServerWorld world, double amount, String damageKey) {
 		if (!state.infectionState().infected() || amount <= 0.0D) {
 			return false;
 		}
 
-		InfectionTierService.HealthChange change = state.tiers().applyHealthDamage(state.tiers().currentTier(), amount);
+		// Apply viral adaptation resistance
+		double finalAmount = amount;
+		float resistance = 0.0F;
+		if (damageKey != null && !damageKey.isEmpty()) {
+			resistance = state.infectionState().getDamageResistance(damageKey);
+			finalAmount = amount * (1.0 - resistance);
+			System.out.println("[Adaptation DEBUG] damageKey=" + damageKey + " resistance=" + resistance + " amount=" + amount + " finalAmount=" + finalAmount);
+		} else {
+			System.out.println("[Adaptation DEBUG] No damageKey provided, applying full damage: " + amount);
+		}
+
+		// Check if immune
+		if (finalAmount <= 0.0D) {
+			// Virus is immune - notify nearby players
+			notifyImmunity(world, damageKey);
+			return false;
+		}
+
+		InfectionTierService.HealthChange change = state.tiers().applyHealthDamage(state.tiers().currentTier(), finalAmount);
 		if (!change.changed()) {
 			return false;
+		}
+
+		// Record this damage exposure (develops resistance for next time)
+		int newExposure = 0;
+		if (damageKey != null && !damageKey.isEmpty()) {
+			newExposure = state.infectionState().recordDamageExposure(damageKey);
+			System.out.println("[Adaptation DEBUG] Recorded exposure for " + damageKey + " -> newExposure=" + newExposure);
+			notifyAdaptation(world, damageKey, newExposure, resistance);
 		}
 
 		if (change.crossedHalfThreshold() && !state.shell().isCollapsed()) {
@@ -83,6 +129,47 @@ public final class InfectionOperations {
 			state.sourceControl().forceContainmentReset();
 		}
 		return true;
+	}
+
+	/**
+	 * Notifies nearby players that the virus has adapted to a damage type.
+	 */
+	private void notifyAdaptation(ServerWorld world, String damageKey, int exposure, float previousResistance) {
+		if (exposure <= 0 || exposure > 4) {
+			return; // No notification for first hit or after max
+		}
+		
+		String displayName = VirusDamageClassifier.getDisplayName(damageKey);
+		if (displayName == null) {
+			displayName = "Unknown";
+		}
+		int resistPercent = exposure * 25;
+		
+		// Use literal text to avoid any serialization issues
+		Text message = Text.literal("The virus adapts! " + displayName + " now deals " + resistPercent + "% less damage.")
+				.formatted(net.minecraft.util.Formatting.DARK_PURPLE);
+		
+		// Broadcast to all players in this world
+		for (ServerPlayerEntity player : world.getPlayers()) {
+			player.sendMessage(message, true); // Action bar message
+		}
+	}
+
+	/**
+	 * Notifies nearby players that the virus is immune to a damage type.
+	 */
+	private void notifyImmunity(ServerWorld world, String damageKey) {
+		String displayName = VirusDamageClassifier.getDisplayName(damageKey);
+		if (displayName == null) {
+			displayName = "Unknown";
+		}
+		// Use literal text to avoid any serialization issues
+		Text message = Text.literal("The virus is immune to " + displayName + "!")
+				.formatted(net.minecraft.util.Formatting.DARK_RED);
+		
+		for (ServerPlayerEntity player : world.getPlayers()) {
+			player.sendMessage(message, true);
+		}
 	}
 
 	public int claimSurfaceMutations(ServerWorld world, InfectionTier tier, int requested) {

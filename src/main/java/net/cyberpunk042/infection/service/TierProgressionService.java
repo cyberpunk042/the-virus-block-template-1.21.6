@@ -115,13 +115,24 @@ public final class TierProgressionService {
 	}
 
 	public boolean bleedHealth(double fraction) {
+		return bleedHealth(fraction, null);
+	}
+
+	/**
+	 * Bleeds health from the infection, with viral adaptation tracking.
+	 * 
+	 * @param fraction Fraction of max health to damage (0.0 - 1.0)
+	 * @param damageKey The damage category key for adaptation, or null for no tracking
+	 * @return true if damage was applied
+	 */
+	public boolean bleedHealth(double fraction, String damageKey) {
 		ServerWorld world = host.world();
 		if (!host.infectionState().infected() || fraction <= 0.0D) {
 			return false;
 		}
 
 		double amount = Math.max(1.0D, host.tiers().maxHealth(host.tiers().currentTier()) * MathHelper.clamp(fraction, 0.0D, 1.0D));
-		return host.infection().applyHealthDamage(world, amount);
+		return host.infection().applyHealthDamage(world, amount, damageKey);
 	}
 
 	public void reinforceCores(InfectionTier tier) {

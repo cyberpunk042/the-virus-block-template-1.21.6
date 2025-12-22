@@ -33,6 +33,14 @@ public final class AmbientPressureService {
 	private static final Identifier EXTREME_HEALTH_MODIFIER_ID =
 			Identifier.of(TheVirusBlock.MOD_ID, "extreme_health_penalty");
 
+	// Mob caps for ambient pressure spawning (to prevent lag)
+	private static final int CAP_ZOMBIE = 50;
+	private static final int CAP_SKELETON = 50;
+	private static final int CAP_SPIDER = 50;
+	private static final int CAP_HUSK = 30;
+	private static final int CAP_DROWNED = 30;
+	private static final int CAP_ENDERMAN = 20;
+
 	private final VirusWorldState host;
 
 	public AmbientPressureService(VirusWorldState host) {
@@ -57,6 +65,12 @@ public final class AmbientPressureService {
 		if (!world.getGameRules().getBoolean(GameRules.DO_MOB_SPAWNING)) {
 			return;
 		}
+		
+		// Only spawn every 100 ticks (5 seconds) instead of every tick
+		if (host.infectionState().totalTicks() % 100 != 0) {
+			return;
+		}
+		
 		VirusDifficulty difficulty = host.tiers().difficulty();
 		int difficultyScale = switch (difficulty) {
 			case EASY -> 0;
@@ -72,12 +86,15 @@ public final class AmbientPressureService {
 		if (tierIndex < 1) {
 			return;
 		}
+		// Use tier multiplier with a very low base to keep numbers reasonable
 		float tierMultiplier = tier.getMobSpawnMultiplier();
-		float scaledAttempts = difficultyScale * tierMultiplier;
+		float baseAttempts = 0.5F * difficultyScale; // Much lower base than before
+		float scaledAttempts = baseAttempts * tierMultiplier;
 		if (host.tiers().isApocalypseMode()) {
-			scaledAttempts += 2.0F;
+			scaledAttempts += 1.0F;
 		}
-		int attempts = Math.max(1, Math.round(scaledAttempts));
+		int attempts = Math.max(1, Math.min(4, Math.round(scaledAttempts))); // Cap at 4
+		
 		Random random = world.getRandom();
 		List<ServerPlayerEntity> anchors = world.getPlayers(player -> player.isAlive()
 				&& !player.isSpectator()
@@ -95,6 +112,10 @@ public final class AmbientPressureService {
 			if (type == null) {
 				continue;
 			}
+			// Check mob cap before spawning
+			if (isAtMobCap(world, type)) {
+				continue;
+			}
 			MobEntity spawned = type.spawn(world,
 					entity -> entity.refreshPositionAndAngles(spawnPos, random.nextFloat() * 360.0F, 0.0F),
 					spawnPos,
@@ -103,6 +124,29 @@ public final class AmbientPressureService {
 					false);
 			VirusMobAllyHelper.mark(spawned);
 		}
+	}
+
+	/**
+	 * Checks if the world has reached the ambient cap for this mob type.
+	 */
+	private boolean isAtMobCap(ServerWorld world, EntityType<? extends MobEntity> type) {
+		int cap = getMobCap(type);
+		if (cap <= 0) {
+			return false; // No cap
+		}
+		// Count entities of this type in the world
+		int count = world.getEntitiesByType(type, entity -> entity.isAlive()).size();
+		return count >= cap;
+	}
+
+	private int getMobCap(EntityType<?> type) {
+		if (type == EntityType.ZOMBIE) return CAP_ZOMBIE;
+		if (type == EntityType.SKELETON) return CAP_SKELETON;
+		if (type == EntityType.SPIDER) return CAP_SPIDER;
+		if (type == EntityType.HUSK) return CAP_HUSK;
+		if (type == EntityType.DROWNED) return CAP_DROWNED;
+		if (type == EntityType.ENDERMAN) return CAP_ENDERMAN;
+		return 100; // Default cap for unlisted types
 	}
 
 	private BlockPos findBoostSpawnPos(ServerWorld world, BlockPos origin, int radius, Random random) {

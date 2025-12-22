@@ -34,6 +34,13 @@ public final class InfectionState {
 	private final Object2IntMap<UUID> infectiousContactTicks = new Object2IntOpenHashMap<>();
 	private final Object2IntMap<UUID> helmetPingTimers = new Object2IntOpenHashMap<>();
 	private final Object2DoubleMap<UUID> heavyPantsVoidWear = new Object2DoubleOpenHashMap<>();
+	
+	/**
+	 * Tracks how many times the virus has been hurt by each damage type.
+	 * Keys are damage category strings (e.g., "BED", "TNT", "MELEE:minecraft:diamond_pickaxe").
+	 * Values are hit counts (0-4+). Each hit increases resistance by 25%.
+	 */
+	private final Object2IntMap<String> damageAdaptation = new Object2IntOpenHashMap<>();
 
 	public boolean infected() {
 		return infected;
@@ -145,6 +152,61 @@ public final class InfectionState {
 
 	public void setLastMatrixCubeTick(long tick) {
 		this.lastMatrixCubeTick = tick;
+	}
+
+	// ========== Damage Adaptation ("Viral Evolution") ==========
+
+	/**
+	 * Returns the raw adaptation map for persistence.
+	 */
+	public Object2IntMap<String> damageAdaptation() {
+		return damageAdaptation;
+	}
+
+	/**
+	 * Records a successful damage hit against the virus.
+	 * Each hit of the same type increases resistance by 25%.
+	 * 
+	 * @param damageKey The damage category key (e.g., "BED", "MELEE:minecraft:diamond_sword")
+	 * @return The new exposure count (1-4+)
+	 */
+	public int recordDamageExposure(String damageKey) {
+		if (damageKey == null || damageKey.isEmpty()) {
+			return 0;
+		}
+		int current = damageAdaptation.getOrDefault(damageKey, 0);
+		int newCount = Math.min(current + 1, 4); // Cap at 4 (100% resistance)
+		damageAdaptation.put(damageKey, newCount);
+		return newCount;
+	}
+
+	/**
+	 * Gets the resistance multiplier for a damage type.
+	 * 
+	 * @param damageKey The damage category key
+	 * @return Resistance from 0.0 (no resistance) to 1.0 (immune)
+	 */
+	public float getDamageResistance(String damageKey) {
+		if (damageKey == null || damageKey.isEmpty()) {
+			return 0.0F;
+		}
+		int exposure = damageAdaptation.getOrDefault(damageKey, 0);
+		// 0 hits = 0%, 1 hit = 25%, 2 = 50%, 3 = 75%, 4+ = 100%
+		return Math.min(1.0F, exposure * 0.25F);
+	}
+
+	/**
+	 * Gets the current exposure count for a damage type.
+	 */
+	public int getExposureCount(String damageKey) {
+		return damageAdaptation.getOrDefault(damageKey, 0);
+	}
+
+	/**
+	 * Resets all damage adaptations (e.g., on infection reset).
+	 */
+	public void resetDamageAdaptation() {
+		damageAdaptation.clear();
 	}
 }
 

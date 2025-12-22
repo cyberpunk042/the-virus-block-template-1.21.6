@@ -18,6 +18,8 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.random.Random;
@@ -25,6 +27,7 @@ import net.minecraft.world.World;
 
 public class VirusBlockEntity extends BlockEntity {
 	private int auraTick;
+	private int heartbeatCooldown;
 	private boolean registered = false; // Track if already registered
 	private final Object2LongMap<UUID> auraCooldowns = new Object2LongOpenHashMap<>();
 
@@ -54,6 +57,53 @@ public class VirusBlockEntity extends BlockEntity {
 		if (entity.auraTick % 20 == 0) {
 			serverWorld.spawnParticles(ParticleTypes.PORTAL, pos.getX() + 0.5D, pos.getY() + 1.1D, pos.getZ() + 0.5D, 4, 0.4D, 0.2D, 0.4D, 0.0D);
 		}
+
+		// Heartbeat sound - "The Infection Sings"
+		entity.tickHeartbeat(serverWorld, pos);
+	}
+
+	/**
+	 * Emits a rhythmic heartbeat sound that intensifies with infection tier.
+	 * <ul>
+	 *   <li>Tier 1: every 60 ticks (3 sec) - slow, ominous</li>
+	 *   <li>Tier 5: every 20 ticks (1 sec) - rapid, threatening</li>
+	 *   <li>Apocalypse: every 10 ticks (0.5 sec) - frantic</li>
+	 * </ul>
+	 */
+	private void tickHeartbeat(ServerWorld world, BlockPos pos) {
+		// Always decrement cooldown
+		if (heartbeatCooldown > 0) {
+			heartbeatCooldown--;
+			return;
+		}
+
+		// Get infection state
+		VirusWorldState infection = VirusWorldState.get(world);
+		boolean isInfected = infection.infectionState().infected();
+		
+		// Debug every 3 seconds
+		if (auraTick % 60 == 0) {
+			System.out.println("[Heartbeat DEBUG] pos=" + pos + " infected=" + isInfected);
+		}
+		
+		// Must be infected for heartbeat
+		if (!isInfected) {
+			return;
+		}
+
+		InfectionTier tier = infection.tiers().currentTier();
+		boolean apocalypse = infection.tiers().isApocalypseMode();
+
+		// Set next heartbeat interval
+		int interval = apocalypse ? 10 : Math.max(20, 60 - tier.getIndex() * 10);
+		heartbeatCooldown = interval;
+
+		// Volume and pitch - HIGH volume for long range
+		float volume = 5.0F; // Very loud for long range
+		float pitch = 0.8F;
+
+		// Play the sound
+		world.playSound(null, pos, SoundEvents.ENTITY_WARDEN_HEARTBEAT, SoundCategory.HOSTILE, volume, pitch);
 	}
 
 	private void applyAura(ServerWorld world, BlockPos pos, VirusWorldState infection) {

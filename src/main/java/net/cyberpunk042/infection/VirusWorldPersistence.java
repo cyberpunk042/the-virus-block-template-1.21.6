@@ -85,7 +85,8 @@ public final class VirusWorldPersistence {
 						state.shieldFieldService().snapshot(),
 						state.infection().getSingularitySnapshot(),
 						state.singularity().chunkPreparationState().preGenComplete,
-						state.singularity().chunkPreparationState().preGenMissingChunks));
+						state.singularity().chunkPreparationState().preGenMissingChunks,
+						captureDamageAdaptation(state)));
 	}
 
 	private static Optional<BoobytrapDefaults> createBoobytrapSnapshot(VirusWorldState state) {
@@ -107,6 +108,19 @@ public final class VirusWorldPersistence {
 			return Optional.empty();
 		}
 		return Optional.of(new SpreadSnapshot(pillars, sources));
+	}
+
+	/**
+	 * Captures damage adaptation data for persistence.
+	 */
+	private static Map<String, Integer> captureDamageAdaptation(VirusWorldState state) {
+		it.unimi.dsi.fastutil.objects.Object2IntMap<String> raw = state.infectionState().damageAdaptation();
+		if (raw.isEmpty()) {
+			return Map.of();
+		}
+		java.util.HashMap<String, Integer> result = new java.util.HashMap<>();
+		raw.object2IntEntrySet().forEach(e -> result.put(e.getKey(), e.getIntValue()));
+		return result;
 	}
 
 	private static VirusWorldState fromSnapshot(VirusWorldSnapshot snapshot) {
@@ -160,7 +174,8 @@ public final class VirusWorldPersistence {
 			List<ShieldFieldService.ShieldField> shields,
 			Optional<SingularitySnapshot> snapshot,
 			boolean preGenComplete,
-			int preGenMissing) {
+			int preGenMissing,
+			Map<String, Integer> damageAdaptation) {
 	}
 
 	record ProfilesAndScheduler(
@@ -206,7 +221,8 @@ public final class VirusWorldPersistence {
 					SHIELD_FIELD_CODEC.listOf().optionalFieldOf("shieldFields", List.of()).forGetter((VirusWorldSnapshot snapshot) -> snapshot.persistenceTail().shields()),
 					SingularitySnapshot.CODEC.optionalFieldOf("singularity").forGetter((VirusWorldSnapshot snapshot) -> snapshot.persistenceTail().snapshot()),
 					Codec.BOOL.optionalFieldOf("singularityPreGenComplete", false).forGetter((VirusWorldSnapshot snapshot) -> snapshot.persistenceTail().preGenComplete()),
-					Codec.INT.optionalFieldOf("singularityPreGenMissing", 0).forGetter((VirusWorldSnapshot snapshot) -> snapshot.persistenceTail().preGenMissing())
+					Codec.INT.optionalFieldOf("singularityPreGenMissing", 0).forGetter((VirusWorldSnapshot snapshot) -> snapshot.persistenceTail().preGenMissing()),
+					Codec.unboundedMap(Codec.STRING, Codec.INT).optionalFieldOf("damageAdaptation", Map.of()).forGetter((VirusWorldSnapshot snapshot) -> snapshot.persistenceTail().damageAdaptation())
 			).apply(instance, SingularityPersistenceTail::new)
 		).apply(instance, VirusWorldSnapshot::new));
 
@@ -237,6 +253,12 @@ public final class VirusWorldPersistence {
 			});
 			state.infectionState().eventHistory().putAll(eventHistory);
 			state.infectionState().setLastMatrixCubeTick(lastMatrixCubeTick);
+			// Restore damage adaptation from persistence tail
+			persistenceTail.damageAdaptation().forEach((key, value) -> {
+				for (int i = 0; i < value; i++) {
+					state.infectionState().recordDamageExposure(key);
+				}
+			});
 			state.presentationCoord().applyProfileSnapshot(profilesAndScheduler.profiles());
 			state.orchestrator().services().schedulerService().loadSnapshot(profilesAndScheduler.schedulerTasks());
 			state.shieldFieldService().restoreSnapshot(persistenceTail.shields());

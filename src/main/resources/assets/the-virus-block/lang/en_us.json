@@ -49,7 +49,6 @@
   "item.the-virus-block.augmented_helmet": "Augmented Helmet",
   "item.the-virus-block.bacteria": "Corrupted Bacteria",
   "item.the-virus-block.infected_grass": "Infected Grass",
-
   "item.the-virus-block.purification_totem": "Purification Totem",
   "item.the-virus-block.purification_totem.used": "Purification surge activated.",
   "screen.the-virus-block.purification_totem.title": "Purification Protocol",
@@ -65,9 +64,7 @@
   "screen.the-virus-block.difficulty.heading": "Virus Difficulty Level",
   "screen.the-virus-block.difficulty.warning.line1": "Be aware that placing the virus block may lead",
   "screen.the-virus-block.difficulty.warning.line2": "to the entire destruction of your world.",
-
   "itemGroup.the-virus-block": "The Virus Block",
-
   "message.the-virus-block.tier_up": "Infection Tier %s reached!",
   "message.the-virus-block.block_locked": "The infection is too resilient right now.",
   "message.the-virus-block.cleansed": "The infection has been cleansed.",
@@ -78,7 +75,7 @@
   "message.the-virus-block.singularity_collapse": "[Virus Alert] Total Collapse has begun!",
   "message.the-virus-block.singularity_core": "[Virus Alert] Singularity core is igniting!",
   "message.the-virus-block.singularity_dissipated": "[Virus Alert] Singularity has dissipated. World resetting...",
-	"message.the-virus-block.singularity_detonated": "[Virus Alert] Singularity detonated; collapse disabled by operators.",
+  "message.the-virus-block.singularity_detonated": "[Virus Alert] Singularity detonated; collapse disabled by operators.",
   "message.the-virus-block.singularity_forced": "[Debug] Singularity sequence forced by operator.",
   "message.the-virus-block.singularity_aborted": "[Debug] Singularity sequence aborted by operator.",
   "message.the-virus-block.purification.no_boobytraps": "Trap placements disabled. Worm activity will plummet.",
@@ -116,6 +113,8 @@
   "message.the-virus-block.shield_field.offline": "Anti-virus field has dissipated.",
   "message.the-virus-block.shield_field.rejected": "The virus rejects the cocoon! Feedback surge!",
   "message.the-virus-block.barrier_offline": "[Virus Alert] Core defenses have gone offline!",
+  "message.the-virus-block.adaptation": "The virus adapts! %s now deals %s%% less damage.",
+  "message.the-virus-block.immunity": "The virus is immune to %s!",
   "message.the-virus-block.purification_totem.inactive": "The infection is dormant. The totem has no effect.",
   "message.the-virus-block.infection.warning": "This world is in danger of annihilation...",
   "commands.the-virus-block.difficulty.player_only": "Only players can use this command.",
@@ -136,7 +135,6 @@
   "bossbar.the-virus-block.singularity.fuse": "Singularity Fuse",
   "bossbar.the-virus-block.singularity.collapse": "Singularity Collapse",
   "bossbar.the-virus-block.singularity.collapse_priming": "Singularity Collapse (Priming)",
-
   "difficulty.the-virus-block.easy.name": "Easy",
   "difficulty.the-virus-block.easy.desc": "The infection crawls. Shells stay gentle and the Bleed option is available.",
   "difficulty.the-virus-block.medium.name": "Medium",
@@ -145,9 +143,7 @@
   "difficulty.the-virus-block.hard.desc": "Canonical experience: standard spread and defenses.",
   "difficulty.the-virus-block.extreme.name": "Extreme",
   "difficulty.the-virus-block.extreme.desc": "Aggressive spread and max-health drained each tier.",
-
   "entity.the-virus-block.corrupted_passive": "Corrupted Husk",
   "entity.the-virus-block.corrupted_worm": "Bitey Worm",
   "effect.the-virus-block.personal_shield": "Personal Shield"
 }
-
