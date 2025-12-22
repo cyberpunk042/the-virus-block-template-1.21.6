@@ -1,6 +1,6 @@
 # 🏗️ System Architecture
 
-> Auto-generated from 701 classes across 105 packages.
+> Auto-generated from 757 classes across 117 packages.
 
 ## Complete System Overview
 
@@ -111,13 +111,16 @@ graph TB
 
 | Package | Classes | Key Types |
 |---------|---------|------------|
-| `net.cyberpunk042.client.field` | 1 | FieldClientInit |
+| `net.cyberpunk042.client.field` | 2 | JoinWarmupManager, WarmupOverlay |
 | `net.cyberpunk042.client.field.render` | 16 | AbstractPrimitiveRenderer, BeamRenderer, CapsuleRenderer, ... |
 | `net.cyberpunk042.client.render.field` | 1 | GrowthRingFieldRenderer |
 | `net.cyberpunk042.command.field` | 7 | FieldCommand, FieldEditSubcommand, FieldTestCommand, ... |
-| `net.cyberpunk042.field` | 10 | BeamConfig, ClientFieldState, FieldDefinition, ... |
+| `net.cyberpunk042.field` | 9 | BeamConfig, ClientFieldState, FieldDefinition, ... |
 | `net.cyberpunk042.field.category` | 3 | PresetCategory, ProfileCategory, ProfileSource |
 | `net.cyberpunk042.field.effect` | 5 | ActiveEffect, EffectConfig, EffectProcessor, ... |
+| `net.cyberpunk042.field.force` | 1 | ForceFieldConfig |
+| `net.cyberpunk042.field.force.core` | 1 | ForceContext |
+| `net.cyberpunk042.field.force.field` | 2 | ForceField, RadialForceField |
 | `net.cyberpunk042.field.influence` | 15 | ActiveTrigger, BindingConfig, BindingResolver, ... |
 | `net.cyberpunk042.field.instance` | 7 | AnchoredFieldInstance, FieldEffect, FieldInstance, ... |
 | `net.cyberpunk042.field.loader` | 6 | DefaultsProvider, FieldLoader, JsonParseUtils, ... |
@@ -129,21 +132,25 @@ graph TB
 
 | Package | Classes | Key Types |
 |---------|---------|------------|
+| `net.cyberpunk042.client.gui.annotation` | 2 | ShowWhen, ShowWhenConditions |
 | `net.cyberpunk042.client.gui.component` | 7 | ContentArea, ContentProviderFactory, HeaderBar, ... |
 | `net.cyberpunk042.client.gui.config` | 1 | GuiConfig |
 | `net.cyberpunk042.client.gui.layout` | 10 | Bounds, FullscreenLayout, GuiMode, ... |
 | `net.cyberpunk042.client.gui.panel` | 8 | AbstractPanel, ActionPanel, AdvancedPanel, ... |
-| `net.cyberpunk042.client.gui.panel.sub` | 17 | AnimationSubPanel, AppearanceSubPanel, ArrangeSubPanel, ... |
-| `net.cyberpunk042.client.gui.preview` | 9 | FieldPreviewRenderer, FramebufferFboAccess, PreviewConfig, ... |
-| `net.cyberpunk042.client.gui.preview.tessellator` | 1 | PreviewSphereTessellator |
+| `net.cyberpunk042.client.gui.panel.layout` | 3 | DualColumnLayout, ProfilesPanelLayout, SingleColumnLayout |
+| `net.cyberpunk042.client.gui.panel.service` | 1 | ProfileActionService |
+| `net.cyberpunk042.client.gui.panel.sub` | 18 | AnimationSubPanel, AppearanceSubPanel, ArrangeSubPanel, ... |
+| `net.cyberpunk042.client.gui.preview` | 6 | FieldPreviewRenderer, FramebufferFboAccess, PreviewConfig, ... |
 | `net.cyberpunk042.client.gui.render` | 1 | TestFieldRenderer |
 | `net.cyberpunk042.client.gui.screen` | 3 | FieldCustomizerScreen, LogViewerScreen, TabType |
-| `net.cyberpunk042.client.gui.state` | 14 | AppearanceState, DefinitionBuilder, DefinitionField, ... |
+| `net.cyberpunk042.client.gui.shape` | 3 | ShapeControlBuilder, ShapePerformanceHint, ShapeWidgetSpec |
+| `net.cyberpunk042.client.gui.state` | 13 | AppearanceState, DefinitionBuilder, DefinitionField, ... |
 | `net.cyberpunk042.client.gui.state.adapter` | 14 | AbstractAdapter, AnimationAdapter, AppearanceAdapter, ... |
 | `net.cyberpunk042.client.gui.state.manager` | 7 | AbstractManager, BindingsManager, LayerManager, ... |
 | `net.cyberpunk042.client.gui.util` | 11 | FragmentRegistry, GuiAnimations, GuiConfigPersistence, ... |
+| `net.cyberpunk042.client.gui.visibility` | 1 | WidgetVisibilityResolver |
 | `net.cyberpunk042.client.gui.widget` | 17 | BidirectionalCyclingButton, BottomActionBar, ColorButton, ... |
-| `net.cyberpunk042.network.gui` | 13 | DebugFieldC2SPayload, DebugFieldS2CPayload, DebugFieldTracker, ... |
+| `net.cyberpunk042.network.gui` | 14 | DebugFieldC2SPayload, DebugFieldS2CPayload, DebugFieldTracker, ... |
 
 ### Infection
 
@@ -176,14 +183,13 @@ graph TB
 | `net.cyberpunk042.command.util` | 16 | CommandFeedback, CommandFormatters, CommandKnob, ... |
 | `net.cyberpunk042.infection.command` | 1 | CommandFacade |
 | `net.cyberpunk042.network` | 20 | DifficultySyncPayload, FieldDefinitionSyncPayload, FieldNetworking, ... |
-| `net.cyberpunk042.network.gui` | 13 | DebugFieldC2SPayload, DebugFieldS2CPayload, DebugFieldTracker, ... |
+| `net.cyberpunk042.network.gui` | 14 | DebugFieldC2SPayload, DebugFieldS2CPayload, DebugFieldTracker, ... |
 
 ### Rendering
 
 | Package | Classes | Key Types |
 |---------|---------|------------|
 | `net.cyberpunk042.client.field.render` | 16 | AbstractPrimitiveRenderer, BeamRenderer, CapsuleRenderer, ... |
-| `net.cyberpunk042.client.gui.preview.tessellator` | 1 | PreviewSphereTessellator |
 | `net.cyberpunk042.client.gui.render` | 1 | TestFieldRenderer |
 | `net.cyberpunk042.client.render` | 8 | CorruptedFireTextures, SingularityBorderClientState, SingularityFieldController, ... |
 | `net.cyberpunk042.client.render.beam` | 1 | GrowthBeamRenderer |
@@ -208,7 +214,7 @@ graph TB
 | `net.cyberpunk042.visual.animation` | 14 | AlphaPulseConfig, Animation, Axis, ... |
 | `net.cyberpunk042.visual.appearance` | 5 | Alpha, AlphaRange, Appearance, ... |
 | `net.cyberpunk042.visual.color` | 4 | ColorMath, ColorResolver, ColorTheme, ... |
-| `net.cyberpunk042.visual.fill` | 8 | CageOptions, CageOptionsAdapter, CylinderCageOptions, ... |
+| `net.cyberpunk042.visual.fill` | 12 | CageOptions, CageOptionsAdapter, ConeCageOptions, ... |
 | `net.cyberpunk042.visual.layer` | 1 | BlendMode |
 | `net.cyberpunk042.visual.pattern` | 15 | ArrangementConfig, CellType, DynamicEdgePattern, ... |
 | `net.cyberpunk042.visual.shape` | 14 | CapsuleShape, ConeShape, CylinderShape, ... |

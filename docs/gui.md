@@ -2,7 +2,7 @@
 
 > Complete graphical user interface architecture.
 
-**102 classes** across 10 packages.
+**99 classes** across 10 packages.
 
 ## Architecture
 
@@ -270,10 +270,10 @@ classDiagram
     PrimitiveAdapter <|.. TransformAdapter
     PrimitiveAdapter <|.. TriggerAdapter
     PrimitiveAdapter <|.. VisibilityAdapter
-    ProfilesPanel --> Bounds : leftBounds
-    ProfilesPanel --> Bounds : rightBounds
+    ProfilesPanel --> ProfileActionService : actionService
     ProfilesPanel --> ProfileEntry : allProfiles
     ProfilesPanel --> ProfileEntry : filteredProfiles
+    ProfilesPanel --> ProfilesPanelLayout : layout
     Screen <|-- FieldCustomizerScreen
     ShapeAdapter --> DiscShape : disc
     ShapeAdapter --> PrismShape : prism
@@ -282,7 +282,7 @@ classDiagram
     ShapeSubPanel --> BiConsumer : warningCallback
     ShapeSubPanel --> CyclingButtonWidget : fragmentDropdown
     ShapeSubPanel --> CyclingButtonWidget : patternFaces
-    ShapeSubPanel --> CyclingButtonWidget : sphereAlgorithm
+    ShapeSubPanel --> CyclingButtonWidget : shapeTypeDropdown
     SliderWidget <|-- LabeledSlider
     StatusBar --> Bounds : bounds
     StatusBar --> Boundsbounds : uses
@@ -306,9 +306,9 @@ classDiagram
 
 | Module | Classes | Description |
 |--------|---------|-------------|
-| [Panels](./gui/panels.md) | 25 | client.gui.panel, client.gui.panel.sub |
+| [Panels](./gui/panels.md) | 26 | client.gui.panel, client.gui.panel.sub |
 | [Widgets](./gui/widgets.md) | 28 | client.gui.widget, client.gui.util |
-| [State & Adapters](./gui/state.md) | 49 | client.gui.state, client.gui.state.adapter, client.gui.layout, client.gui.screen, client.gui.preview, client.gui |
+| [State & Adapters](./gui/state.md) | 45 | client.gui.state, client.gui.state.adapter, client.gui.layout, client.gui.screen, client.gui.preview, client.gui |
 
 ---
 [Back to README](./README.md)

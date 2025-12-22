@@ -2,7 +2,7 @@
 
 > Packages: client.gui.state, client.gui.state.adapter, client.gui.layout, client.gui.screen, client.gui.preview, client.gui
 
-**49 classes**
+**45 classes**
 
 ## Class Diagram
 
@@ -32,7 +32,6 @@ classDiagram
         +livePreviewEnabled: boolean
         +autoSaveEnabled: boolean
         +debugUnlocked: boolean
-        +shapeType: String
         +layers() LayerManager
         +profiles() ProfileManager
         +bindings() BindingsManager
@@ -45,17 +44,6 @@ classDiagram
         +set(...) void
         +clear() void
         +reset() void
-    }
-    class FieldEditStateOld {
-        +shapeType: String
-        +radius: float
-        +pointSize: float
-        +followEnabled: boolean
-        +currentShape() Shape
-        +fireTestTrigger(...) void
-        +getActiveTestTrigger()
-        +getTestTriggerProgress() float
-        +setSelectionChangeListener(...) void
     }
     class PipelineTracer {
         +A1_PRIMARY_COLOR: String
@@ -215,6 +203,13 @@ classDiagram
         +setOnClose(...) void
         +tick() void
     }
+    class StatusBar {
+        +setBounds(...) void
+        +showMessage(...) void
+        +setWarning(...) void
+        +clearWarning() void
+        +render(...) void
+    }
     class AbstractPanel
     class Builder
     class Objectvalue
@@ -228,6 +223,7 @@ classDiagram
     class Shape
     class Screen
     class Side
+    class Boundsbounds
     AbstractAdapter --> Objectvalue : uses
     AbstractAdapter --> T : returns
     AbstractAdapter --> TdefaultValue : uses
@@ -268,10 +264,6 @@ classDiagram
     FieldEditStateHolder --> FieldEditState : current
     FieldEditStateHolder --> FieldEditState : returns
     FieldEditStateHolder --> FieldEditStatestate : uses
-    FieldEditStateOld --> DiscShape : disc
-    FieldEditStateOld --> PrismShape : prism
-    FieldEditStateOld --> RingShape : ring
-    FieldEditStateOld --> SphereShape : sphere
     FillAdapter --> FillConfig : fill
     FillAdapter --> Objectvalue : uses
     FillAdapter --> PrimitiveBuilderbuilder : uses
@@ -328,6 +320,10 @@ classDiagram
     StateAccessor --> Objectvalue : uses
     StateAccessor --> T : returns
     StateAccessor --> T : uses
+    StatusBar --> Bounds : bounds
+    StatusBar --> Boundsbounds : uses
+    StatusBar --> FieldEditState : state
+    StatusBar --> TextRenderer : textRenderer
     TransformAdapter --> PrimitiveBuilderbuilder : uses
     TransformAdapter --> Primitivesource : uses
     TransformAdapter --> Transform : returns

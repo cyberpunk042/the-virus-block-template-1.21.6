@@ -2,7 +2,7 @@
 
 > Packages: client.gui.panel, client.gui.panel.sub
 
-**25 classes**
+**26 classes**
 
 ## Class Diagram
 
@@ -79,11 +79,11 @@ classDiagram
         +getWidgets() List
     }
     class ArrangeSubPanel {
-        +setWidgetChangedCallback(...) void
         +getHeight() int
         +init(...) void
         +tick() void
         +render(...) void
+        +getWidgets() List
     }
     class BeamSubPanel {
         +init(...) void
@@ -102,8 +102,14 @@ classDiagram
         +init(...) void
         +tick() void
         +render(...) void
-        +getHeight() int
         +onShapeChanged() void
+    }
+    class ForceSubPanel {
+        +setOnConfigureRequest(...) void
+        +init(...) void
+        +getSelectedConfig() ForceFieldConfig
+        +setCustomConfig(...) void
+        +tick() void
     }
     class LifecycleSubPanel {
         +init(...) void
@@ -175,11 +181,11 @@ classDiagram
         +getWidgets() List
     }
     class VisibilitySubPanel {
+        +setWidgetChangedCallback(...) void
         +init(...) void
         +tick() void
         +render(...) void
         +getHeight() int
-        +getWidgets() List
     }
     class Screen
     class Bounds
@@ -196,6 +202,7 @@ classDiagram
     AbstractPanel <|-- BindingsSubPanel
     AbstractPanel <|-- DebugPanel
     AbstractPanel <|-- FillSubPanel
+    AbstractPanel <|-- ForceSubPanel
     AbstractPanel <|-- LayerPanel
     AbstractPanel <|-- LifecycleSubPanel
     AbstractPanel <|-- LinkingSubPanel
@@ -226,8 +233,8 @@ classDiagram
     AppearanceSubPanel --> ColorButton : secondaryColorBtn
     AppearanceSubPanel --> DrawContextcontext : uses
     ArrangeSubPanel --> CellType : currentCellType
-    ArrangeSubPanel --> Runnablecallback : uses
     ArrangeSubPanel --> Tab : currentTab
+    ArrangeSubPanel --> Tabtab : uses
     ArrangeSubPanel --> TextRenderer : textRenderer
     BeamSubPanel --> CyclingButtonWidget : enableToggle
     BeamSubPanel --> CyclingButtonWidget : fragmentDropdown
@@ -241,10 +248,14 @@ classDiagram
     DebugPanel --> BindingsSubPanel : bindingsPanel
     DebugPanel --> LifecycleSubPanel : lifecyclePanel
     DebugPanel --> TriggerSubPanel : triggerPanel
-    FillSubPanel --> CyclingButtonWidget : depthTestToggle
-    FillSubPanel --> CyclingButtonWidget : doubleSidedToggle
+    FillSubPanel --> CageOptionsAdapter : cageAdapter
+    FillSubPanel --> CyclingButtonWidget : depthWriteToggle
     FillSubPanel --> CyclingButtonWidget : fillModeDropdown
     FillSubPanel --> CyclingButtonWidget : fragmentDropdown
+    ForceSubPanel --> CyclingButtonWidget : locationDropdown
+    ForceSubPanel --> CyclingButtonWidget : presetDropdown
+    ForceSubPanel --> ForceFieldConfig : customConfig
+    ForceSubPanel --> SpawnLocation : spawnLocation
     LayerPanel --> CyclingButtonWidget : blendModeDropdown
     LayerPanel --> DrawContextcontext : uses
     LayerPanel --> RunnableonLayerChanged : uses
@@ -269,10 +280,10 @@ classDiagram
     PredictionSubPanel --> GuiLayout : layout
     PrimitivePanel --> DrawContextcontext : uses
     PrimitivePanel --> Runnablecallback : uses
-    ProfilesPanel --> Bounds : leftBounds
-    ProfilesPanel --> Bounds : rightBounds
+    ProfilesPanel --> ProfileActionService : actionService
     ProfilesPanel --> ProfileEntry : allProfiles
     ProfilesPanel --> ProfileEntry : filteredProfiles
+    ProfilesPanel --> ProfilesPanelLayout : layout
     QuickPanel --> ColorButton : colorButton
     QuickPanel --> CyclingButtonWidget : shapeDropdown
     QuickPanel --> LayerPanel : layerPanel
@@ -280,7 +291,7 @@ classDiagram
     ShapeSubPanel --> BiConsumer : warningCallback
     ShapeSubPanel --> CyclingButtonWidget : fragmentDropdown
     ShapeSubPanel --> CyclingButtonWidget : patternFaces
-    ShapeSubPanel --> CyclingButtonWidget : sphereAlgorithm
+    ShapeSubPanel --> CyclingButtonWidget : shapeTypeDropdown
     TraceSubPanel --> DrawContextcontext : uses
     TransformQuickSubPanel --> CyclingButtonWidget : anchorDropdown
     TransformQuickSubPanel --> CyclingButtonWidget : billboardDropdown

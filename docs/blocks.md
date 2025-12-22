@@ -62,10 +62,11 @@ classDiagram
         <<enumeration>>
     }
     class GrowthCollisionTracker {
+        +hasAny() boolean
+        +hasAnyInWorld(...) boolean
         +register(...) void
         +unregister(...) void
         +active(...) Collection
-        +forEachActive(...) void
     }
     class GrowthEventPublisher {
         +postForceEvent(...) void

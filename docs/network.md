@@ -22,8 +22,8 @@ classDiagram
         <<record>>
         +definitionId: String
         +definitionJson: String
-        +PACKET_ID: Identifier
         +ID: Id
+        +CODEC: PacketCodec
         +read(...) FieldDefinitionSyncPayload
         +getId() Id
         +definitionIdentifier() Identifier
@@ -50,7 +50,6 @@ classDiagram
         +definitionId: String
         +x: double
         +y: double
-        +read(...) FieldSpawnPayload
         +getId() Id
         +definitionIdentifier() Identifier
     }

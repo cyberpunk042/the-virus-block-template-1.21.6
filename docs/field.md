@@ -2,7 +2,7 @@
 
 > Complete field system architecture.
 
-**43 classes** across 5 packages.
+**42 classes** across 5 packages.
 
 ## Architecture
 
@@ -185,7 +185,7 @@ classDiagram
 
 | Module | Classes | Description |
 |--------|---------|-------------|
-| [Core Classes](./field/core.md) | 16 | field, field.loader |
+| [Core Classes](./field/core.md) | 15 | field, field.loader |
 | [Effects & Triggers](./field/effects.md) | 27 | field.effect, field.influence, field.instance |
 
 ---

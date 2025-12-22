@@ -2,7 +2,7 @@
 
 > Shapes, patterns, colors, animations, and fill modes.
 
-**74 classes**
+**78 classes**
 
 ## Key Classes
 

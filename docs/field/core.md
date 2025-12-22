@@ -2,7 +2,7 @@
 
 > Packages: field, field.loader
 
-**16 classes**
+**15 classes**
 
 ## Class Diagram
 
@@ -71,10 +71,6 @@ classDiagram
         +get(...) FieldDefinition
         +get(...) FieldDefinition
         +clear() void
-    }
-    class FieldSystemInit {
-        +init() void
-        +isInitialized() boolean
     }
     class FieldType {
         <<enumeration>>

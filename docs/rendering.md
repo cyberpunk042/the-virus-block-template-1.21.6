@@ -2,7 +2,7 @@
 
 > Mesh building, tessellators, and renderers.
 
-**40 classes**
+**41 classes**
 
 ## Key Classes
 
@@ -77,10 +77,6 @@ classDiagram
         +vertex(...) int
     }
     class PolyhedronTessellator {
-        +PHI: float
-        +INV_PHI: float
-        +SQRT_3: float
-        +ICOSA_NORM: float
         +builder() Builder
         +fromShape(...) PolyhedronTessellator
         +tessellate(...) Mesh
@@ -232,6 +228,7 @@ classDiagram
     BeamRenderer --> ColorResolverresolver : uses
     BeamRenderer --> MatrixStackmatrices : uses
     BeamRenderer --> VertexConsumerProviderconsumers : uses
+    CapsuleRenderer --> MatrixStackmatrices : uses
     CapsuleRenderer --> Mesh : returns
     CapsuleRenderer --> Primitiveprimitive : uses
     CapsuleRenderer --> WaveConfigwave : uses
@@ -243,6 +240,7 @@ classDiagram
     ClientFieldManager --> ClientFieldState : states
     ClientFieldManager --> ClientFieldStatestate : uses
     ClientFieldManager --> PersonalFieldTracker : personalTracker
+    ConeRenderer --> MatrixStackmatrices : uses
     ConeRenderer --> Mesh : returns
     ConeRenderer --> Primitiveprimitive : uses
     ConeRenderer --> WaveConfigwave : uses
@@ -250,6 +248,7 @@ classDiagram
     ConeTessellator --> Mesh : returns
     ConeTessellator --> VertexPatternpattern : uses
     ConeTessellator --> VisibilityMaskvisibility : uses
+    CylinderRenderer --> MatrixStackmatrices : uses
     CylinderRenderer --> Mesh : returns
     CylinderRenderer --> Primitiveprimitive : uses
     CylinderRenderer --> WaveConfigwave : uses
@@ -257,6 +256,7 @@ classDiagram
     CylinderTessellator --> Mesh : returns
     CylinderTessellator --> VertexPatterncapPattern : uses
     CylinderTessellator --> VertexPatternsidesPattern : uses
+    DiscRenderer --> MatrixStackmatrices : uses
     DiscRenderer --> Mesh : returns
     DiscRenderer --> Primitiveprimitive : uses
     DiscRenderer --> WaveConfigwave : uses
@@ -294,6 +294,7 @@ classDiagram
     MeshBuilder --> Vertexvertex : uses
     PersonalFieldTracker --> FieldDefinition : returns
     PersonalFieldTracker --> PlayerEntityplayer : uses
+    PolyhedronRenderer --> MatrixStackmatrices : uses
     PolyhedronRenderer --> Mesh : returns
     PolyhedronRenderer --> Primitiveprimitive : uses
     PolyhedronRenderer --> WaveConfigwave : uses
@@ -310,6 +311,7 @@ classDiagram
     PrimitiveRenderers --> PrimitiveRenderer : returns
     PrimitiveRenderers --> PrimitiveRendererrenderer : uses
     PrimitiveRenderers --> Primitiveprimitive : uses
+    PrismRenderer --> MatrixStackmatrices : uses
     PrismRenderer --> Mesh : returns
     PrismRenderer --> Primitiveprimitive : uses
     PrismRenderer --> WaveConfigwave : uses

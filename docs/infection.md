@@ -51,8 +51,14 @@ classDiagram
         +activeFeatures(...) EnumSet
         +defaultPlan() EnumMap
     }
-    class VirusInfectionSystem {
-        +init() void
+    class VirusDamageClassifier {
+        +KEY_BED: String
+        +KEY_TNT: String
+        +KEY_EXPLOSION: String
+        +KEY_MELEE_PREFIX: String
+        +classify(...) String
+        +classifyExplosion(...) String
+        +getDisplayName(...) String
     }
     class VirusInventoryAnnouncements {
         +init() void
@@ -174,11 +180,11 @@ classDiagram
     class Deque
     class T
     class Objectvalue
-    AmbientPressureService --> EntityType : returns
+    AmbientPressureService --> EntityType : uses
     AmbientPressureService --> InfectionTiertier : uses
     AmbientPressureService --> Randomrandom : uses
     AmbientPressureService --> VirusWorldState : host
-    BoobytrapHelper --> Randomrandom : uses
+    BoobytrapHelper --> BlockStatestate : uses
     BoobytrapHelper --> ServerPlayerEntityplayer : uses
     BoobytrapHelper --> TrapSelection : returns
     BoobytrapHelper --> Typetype : uses
@@ -248,6 +254,10 @@ classDiagram
     TierCookbook --> InfectionTiertier : uses
     TierCookbook --> TierFeatureGroupgroup : uses
     TierCookbook --> TierFeaturefeature : uses
+    VirusDamageClassifier --> NullableDamageSourcesource : uses
+    VirusDamageClassifier --> NullableEntityattacker : uses
+    VirusDamageClassifier --> NullableEntitysource : uses
+    VirusDamageClassifier --> PlayerEntityplayer : uses
     VirusInventoryAnnouncements --> MinecraftServerserver : uses
     VirusItemAlerts --> ServerPlayerEntitydropper : uses
     VirusItemAlerts --> ServerPlayerEntityplayer : uses

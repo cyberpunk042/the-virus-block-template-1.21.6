@@ -131,10 +131,10 @@ classDiagram
     }
     class FragmentRegistry {
         +reload() void
+        +ensureLoaded() void
         +listShapeFragments(...) List
         +applyShapeFragment(...) void
         +listFillFragments() List
-        +applyFillFragment(...) void
     }
     class GuiAnimations {
         +easeInOut(...) float
