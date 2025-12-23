@@ -187,6 +187,13 @@ public final class LayerRenderer {
                         }
                     }
                     
+                    // Flush buffer before POINTS mode to prevent orphaned vertices
+                    FillConfig fill = primitive.fill();
+                    FillMode mode = fill != null ? fill.mode() : FillMode.SOLID;
+                    if (mode == FillMode.POINTS && consumers instanceof VertexConsumerProvider.Immediate immediate) {
+                        immediate.draw();
+                    }
+                    
                     VertexConsumer consumer = getConsumerForPrimitive(consumers, primitive);
                     renderPrimitive(matrices, consumer, primitive, resolver, light, time, effectiveAlpha, overrides, primitiveIndex);
                     primCount++;
