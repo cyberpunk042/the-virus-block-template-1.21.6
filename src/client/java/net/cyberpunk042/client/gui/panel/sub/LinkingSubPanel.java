@@ -117,27 +117,38 @@ public class LinkingSubPanel extends AbstractPanel {
         y += COMPACT_H + GAP + 4;
         
         // ═══════════════════════════════════════════════════════════════════════
-        // LINK TYPE TOGGLES (2 rows of 3)
+        // POSITION TOGGLES (Row 1)
         // ═══════════════════════════════════════════════════════════════════════
         
-        // Row 1: Follow, RadiusMatch, ScaleWith
+        int fourthW = (w - GAP * 3) / 4;
+        
+        // Row 1: Follow, FollowDyn, RadMatch, ScaleWith
         boolean hasFollow = link != null && link.follow();
-        followToggle = createLinkToggle(x, y, thirdW, "Follow", hasFollow, 
+        followToggle = createLinkToggle(x, y, fourthW, "Follow", hasFollow, 
             v -> state.set("link.follow", v));
         widgets.add(followToggle);
         
+        boolean hasFollowDyn = link != null && link.followDynamic();
+        var followDynToggle = createLinkToggle(x + fourthW + GAP, y, fourthW, "FollwDyn", hasFollowDyn,
+            v -> state.set("link.followDynamic", v));
+        widgets.add(followDynToggle);
+        
         boolean hasRadMatch = link != null && link.radiusMatch();
-        radiusMatchToggle = createLinkToggle(x + thirdW + GAP, y, thirdW, "RadMatch", hasRadMatch,
+        radiusMatchToggle = createLinkToggle(x + (fourthW + GAP) * 2, y, fourthW, "RadMtch", hasRadMatch,
             v -> state.set("link.radiusMatch", v));
         widgets.add(radiusMatchToggle);
         
         boolean hasScaleWith = link != null && link.scaleWith();
-        scaleWithToggle = createLinkToggle(x + (thirdW + GAP) * 2, y, thirdW, "ScaleWith", hasScaleWith,
+        scaleWithToggle = createLinkToggle(x + (fourthW + GAP) * 3, y, fourthW, "ScaleW", hasScaleWith,
             v -> state.set("link.scaleWith", v));
         widgets.add(scaleWithToggle);
         y += COMPACT_H + GAP;
         
-        // Row 2: OrbitSync, ColorMatch, AlphaMatch
+        // ═══════════════════════════════════════════════════════════════════════
+        // ORBIT + APPEARANCE TOGGLES (Row 2)
+        // ═══════════════════════════════════════════════════════════════════════
+        
+        // Row 2: OrbitSync, Color, Alpha
         boolean hasOrbitSync = link != null && link.orbitSync();
         orbitSyncToggle = createLinkToggle(x, y, thirdW, "OrbitSync", hasOrbitSync,
             v -> state.set("link.orbitSync", v));
@@ -155,7 +166,7 @@ public class LinkingSubPanel extends AbstractPanel {
         y += COMPACT_H + GAP + 4;
         
         // ═══════════════════════════════════════════════════════════════════════
-        // PARAMETERS
+        // PHASE PARAMETERS
         // ═══════════════════════════════════════════════════════════════════════
         
         // Phase offset (0-360 degrees, converted to 0-1 internally)
@@ -177,7 +188,48 @@ public class LinkingSubPanel extends AbstractPanel {
         widgets.add(orbitPhaseSlider);
         y += COMPACT_H + GAP;
         
-        radiusOffsetSlider = LabeledSlider.builder("RadiusOff")
+        // ═══════════════════════════════════════════════════════════════════════
+        // ORBIT PARAMETERS (NEW!)
+        // ═══════════════════════════════════════════════════════════════════════
+        
+        // Orbit radius offset + speed multiplier
+        float orbRadOff = link != null ? link.orbitRadiusOffset() : 0f;
+        var orbRadOffSlider = LabeledSlider.builder("OrbRad")
+            .position(x, y).width(halfW)
+            .range(-10f, 10f).initial(orbRadOff).format("%.1f")
+            .onChange(v -> state.set("link.orbitRadiusOffset", v))
+            .build();
+        widgets.add(orbRadOffSlider);
+        
+        float spdMult = link != null ? link.orbitSpeedMult() : 1f;
+        var spdMultSlider = LabeledSlider.builder("SpdMul")
+            .position(x + halfW + GAP, y).width(halfW)
+            .range(0.1f, 10f).initial(spdMult).format("%.1f")
+            .onChange(v -> state.set("link.orbitSpeedMult", v))
+            .build();
+        widgets.add(spdMultSlider);
+        y += COMPACT_H + GAP;
+        
+        // Inclination offset + precession offset (in degrees)
+        float incOff = link != null ? link.orbitInclinationOffset() * 360f : 0f;
+        var incOffSlider = LabeledSlider.builder("Inc°")
+            .position(x, y).width(halfW)
+            .range(-180f, 180f).initial(incOff).format("%.0f")
+            .onChange(v -> state.set("link.orbitInclinationOffset", v / 360f))
+            .build();
+        widgets.add(incOffSlider);
+        
+        float precOff = link != null ? link.orbitPrecessionOffset() * 360f : 0f;
+        var precOffSlider = LabeledSlider.builder("Prec°")
+            .position(x + halfW + GAP, y).width(halfW)
+            .range(-180f, 180f).initial(precOff).format("%.0f")
+            .onChange(v -> state.set("link.orbitPrecessionOffset", v / 360f))
+            .build();
+        widgets.add(precOffSlider);
+        y += COMPACT_H + GAP;
+        
+        // Shape radius offset
+        radiusOffsetSlider = LabeledSlider.builder("ShapeRadOff")
             .position(x, y).width(w)
             .range(-10f, 10f).initial(link != null ? link.radiusOffset() : 0f).format("%.1f")
             .onChange(v -> state.set("link.radiusOffset", v))

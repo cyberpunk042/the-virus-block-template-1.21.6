@@ -65,11 +65,16 @@ public class LinkAdapter extends AbstractAdapter implements PrimitiveAdapter {
             case "radiusMatch" -> link.radiusMatch();
             case "radiusOffset" -> link.radiusOffset();
             case "follow" -> link.follow();
+            case "followDynamic" -> link.followDynamic();
             case "mirror" -> link.mirror() != null ? link.mirror().name() : "NONE";
             case "phaseOffset" -> link.phaseOffset();
             case "scaleWith" -> link.scaleWith();
             case "orbitSync" -> link.orbitSync();
             case "orbitPhaseOffset" -> link.orbitPhaseOffset();
+            case "orbitRadiusOffset" -> link.orbitRadiusOffset();
+            case "orbitSpeedMult" -> link.orbitSpeedMult();
+            case "orbitInclinationOffset" -> link.orbitInclinationOffset();
+            case "orbitPrecessionOffset" -> link.orbitPrecessionOffset();
             case "colorMatch" -> link.colorMatch();
             case "alphaMatch" -> link.alphaMatch();
             default -> super.get(path);
@@ -88,11 +93,16 @@ public class LinkAdapter extends AbstractAdapter implements PrimitiveAdapter {
             case "radiusMatch" -> b.radiusMatch(toBool(value));
             case "radiusOffset" -> b.radiusOffset(toFloat(value));
             case "follow" -> b.follow(toBool(value));
+            case "followDynamic" -> b.followDynamic(toBool(value));
             case "mirror" -> b.mirror(parseMirror(value));
             case "phaseOffset" -> b.phaseOffset(toFloat(value));
             case "scaleWith" -> b.scaleWith(toBool(value));
             case "orbitSync" -> b.orbitSync(toBool(value));
             case "orbitPhaseOffset" -> b.orbitPhaseOffset(toFloat(value));
+            case "orbitRadiusOffset" -> b.orbitRadiusOffset(toFloat(value));
+            case "orbitSpeedMult" -> b.orbitSpeedMult(toFloat(value));
+            case "orbitInclinationOffset" -> b.orbitInclinationOffset(toFloat(value));
+            case "orbitPrecessionOffset" -> b.orbitPrecessionOffset(toFloat(value));
             case "colorMatch" -> b.colorMatch(toBool(value));
             case "alphaMatch" -> b.alphaMatch(toBool(value));
             default -> { super.set(path, value); return; }

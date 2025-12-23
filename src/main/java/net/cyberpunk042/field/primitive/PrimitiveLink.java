@@ -60,6 +60,7 @@ public record PrimitiveLink(
     @JsonField(skipIfDefault = true) boolean radiusMatch,
     @JsonField(skipIfDefault = true) float radiusOffset,
     @JsonField(skipIfDefault = true) boolean follow,
+    @JsonField(skipIfDefault = true) boolean followDynamic,  // NEW: Follow animated position
     @Nullable @JsonField(skipIfNull = true) Axis mirror,
     @JsonField(skipIfDefault = true) float phaseOffset,
     @JsonField(skipIfDefault = true) boolean scaleWith,
@@ -67,6 +68,10 @@ public record PrimitiveLink(
     // Orbit linking
     @JsonField(skipIfDefault = true) boolean orbitSync,
     @JsonField(skipIfDefault = true) float orbitPhaseOffset,
+    @JsonField(skipIfDefault = true) float orbitRadiusOffset,      // NEW: Offset from target's orbit radius
+    @JsonField(skipIfDefault = true) float orbitSpeedMult,         // NEW: Multiply target's orbit speed (default 1.0)
+    @JsonField(skipIfDefault = true) float orbitInclinationOffset, // NEW: Add to target's inclination
+    @JsonField(skipIfDefault = true) float orbitPrecessionOffset,  // NEW: Add to target's precession
     
     // Appearance linking
     @JsonField(skipIfDefault = true) boolean colorMatch,
@@ -75,7 +80,7 @@ public record PrimitiveLink(
     
     /** No linking (null target). */
     public static final PrimitiveLink NONE = new PrimitiveLink(
-        null, false, 0, false, null, 0, false, false, 0, false, false);
+        null, false, 0, false, false, null, 0, false, false, 0, 0, 1f, 0, 0, false, false);
     
     // =========================================================================
     // Factory Methods
@@ -83,32 +88,37 @@ public record PrimitiveLink(
     
     /** Creates a link to a target with default settings. */
     public static PrimitiveLink to(String targetId) {
-        return new PrimitiveLink(targetId, false, 0, false, null, 0, false, false, 0, false, false);
+        return new PrimitiveLink(targetId, false, 0, false, false, null, 0, false, false, 0, 0, 1f, 0, 0, false, false);
     }
     
     /** Creates a radius match link. */
     public static PrimitiveLink radiusMatch(String targetId, float offset) {
-        return new PrimitiveLink(targetId, true, offset, false, null, 0, false, false, 0, false, false);
+        return new PrimitiveLink(targetId, true, offset, false, false, null, 0, false, false, 0, 0, 1f, 0, 0, false, false);
     }
     
-    /** Creates a follow link. */
+    /** Creates a follow link (static). */
     public static PrimitiveLink follow(String targetId) {
-        return new PrimitiveLink(targetId, false, 0, true, null, 0, false, false, 0, false, false);
+        return new PrimitiveLink(targetId, false, 0, true, false, null, 0, false, false, 0, 0, 1f, 0, 0, false, false);
+    }
+    
+    /** Creates a dynamic follow link (follows animated position). */
+    public static PrimitiveLink followDynamic(String targetId) {
+        return new PrimitiveLink(targetId, false, 0, false, true, null, 0, false, false, 0, 0, 1f, 0, 0, false, false);
     }
     
     /** Creates a mirror link. */
     public static PrimitiveLink mirror(String targetId, Axis axis) {
-        return new PrimitiveLink(targetId, false, 0, false, axis, 0, false, false, 0, false, false);
+        return new PrimitiveLink(targetId, false, 0, false, false, axis, 0, false, false, 0, 0, 1f, 0, 0, false, false);
     }
     
     /** Creates an orbit sync link with phase offset. */
     public static PrimitiveLink orbitSync(String targetId, float orbitPhaseOffset) {
-        return new PrimitiveLink(targetId, false, 0, false, null, 0, false, true, orbitPhaseOffset, false, false);
+        return new PrimitiveLink(targetId, false, 0, false, false, null, 0, false, true, orbitPhaseOffset, 0, 1f, 0, 0, false, false);
     }
     
     /** Creates a color/alpha match link. */
     public static PrimitiveLink appearance(String targetId, boolean color, boolean alpha) {
-        return new PrimitiveLink(targetId, false, 0, false, null, 0, false, false, 0, color, alpha);
+        return new PrimitiveLink(targetId, false, 0, false, false, null, 0, false, false, 0, 0, 1f, 0, 0, color, alpha);
     }
     
     // =========================================================================
@@ -122,14 +132,22 @@ public record PrimitiveLink(
     
     /** Checks if this link has any active link types. */
     public boolean hasAnyLinkType() {
-        return radiusMatch || follow || mirror != null || scaleWith 
+        return radiusMatch || follow || followDynamic || mirror != null || scaleWith 
             || orbitSync || colorMatch || alphaMatch
-            || phaseOffset != 0 || orbitPhaseOffset != 0 || radiusOffset != 0;
+            || phaseOffset != 0 || orbitPhaseOffset != 0 || radiusOffset != 0
+            || orbitRadiusOffset != 0 || orbitSpeedMult != 1f 
+            || orbitInclinationOffset != 0 || orbitPrecessionOffset != 0;
     }
     
     /** Checks if this link has orbit synchronization. */
     public boolean hasOrbitLink() {
-        return orbitSync || orbitPhaseOffset != 0;
+        return orbitSync || orbitPhaseOffset != 0 || orbitRadiusOffset != 0 
+            || orbitSpeedMult != 1f || orbitInclinationOffset != 0 || orbitPrecessionOffset != 0;
+    }
+    
+    /** Checks if this link has position following. */
+    public boolean hasFollow() {
+        return follow || followDynamic;
     }
     
     /** Checks if this link has appearance linking. */
@@ -147,11 +165,16 @@ public record PrimitiveLink(
             .radiusMatch(radiusMatch)
             .radiusOffset(radiusOffset)
             .follow(follow)
+            .followDynamic(followDynamic)
             .mirror(mirror)
             .phaseOffset(phaseOffset)
             .scaleWith(scaleWith)
             .orbitSync(orbitSync)
             .orbitPhaseOffset(orbitPhaseOffset)
+            .orbitRadiusOffset(orbitRadiusOffset)
+            .orbitSpeedMult(orbitSpeedMult)
+            .orbitInclinationOffset(orbitInclinationOffset)
+            .orbitPrecessionOffset(orbitPrecessionOffset)
             .colorMatch(colorMatch)
             .alphaMatch(alphaMatch);
     }
@@ -161,11 +184,16 @@ public record PrimitiveLink(
         private boolean radiusMatch;
         private float radiusOffset;
         private boolean follow;
+        private boolean followDynamic;
         private Axis mirror;
         private float phaseOffset;
         private boolean scaleWith;
         private boolean orbitSync;
         private float orbitPhaseOffset;
+        private float orbitRadiusOffset;
+        private float orbitSpeedMult = 1f;  // Default to 1 (no change)
+        private float orbitInclinationOffset;
+        private float orbitPrecessionOffset;
         private boolean colorMatch;
         private boolean alphaMatch;
         
@@ -173,17 +201,23 @@ public record PrimitiveLink(
         public Builder radiusMatch(boolean v) { this.radiusMatch = v; return this; }
         public Builder radiusOffset(float v) { this.radiusOffset = v; return this; }
         public Builder follow(boolean v) { this.follow = v; return this; }
+        public Builder followDynamic(boolean v) { this.followDynamic = v; return this; }
         public Builder mirror(Axis v) { this.mirror = v; return this; }
         public Builder phaseOffset(float v) { this.phaseOffset = v; return this; }
         public Builder scaleWith(boolean v) { this.scaleWith = v; return this; }
         public Builder orbitSync(boolean v) { this.orbitSync = v; return this; }
         public Builder orbitPhaseOffset(float v) { this.orbitPhaseOffset = v; return this; }
+        public Builder orbitRadiusOffset(float v) { this.orbitRadiusOffset = v; return this; }
+        public Builder orbitSpeedMult(float v) { this.orbitSpeedMult = v; return this; }
+        public Builder orbitInclinationOffset(float v) { this.orbitInclinationOffset = v; return this; }
+        public Builder orbitPrecessionOffset(float v) { this.orbitPrecessionOffset = v; return this; }
         public Builder colorMatch(boolean v) { this.colorMatch = v; return this; }
         public Builder alphaMatch(boolean v) { this.alphaMatch = v; return this; }
         
         public PrimitiveLink build() {
-            return new PrimitiveLink(target, radiusMatch, radiusOffset, follow, mirror,
-                phaseOffset, scaleWith, orbitSync, orbitPhaseOffset, colorMatch, alphaMatch);
+            return new PrimitiveLink(target, radiusMatch, radiusOffset, follow, followDynamic, mirror,
+                phaseOffset, scaleWith, orbitSync, orbitPhaseOffset, orbitRadiusOffset, orbitSpeedMult,
+                orbitInclinationOffset, orbitPrecessionOffset, colorMatch, alphaMatch);
         }
     }
     
@@ -201,16 +235,22 @@ public record PrimitiveLink(
             boolean radiusMatch = json.has("radiusMatch") && json.get("radiusMatch").getAsBoolean();
             float radiusOffset = json.has("radiusOffset") ? json.get("radiusOffset").getAsFloat() : 0;
             boolean follow = json.has("follow") && json.get("follow").getAsBoolean();
+            boolean followDynamic = json.has("followDynamic") && json.get("followDynamic").getAsBoolean();
             Axis mirror = json.has("mirror") ? Axis.valueOf(json.get("mirror").getAsString()) : null;
             float phaseOffset = json.has("phaseOffset") ? json.get("phaseOffset").getAsFloat() : 0;
             boolean scaleWith = json.has("scaleWith") && json.get("scaleWith").getAsBoolean();
             boolean orbitSync = json.has("orbitSync") && json.get("orbitSync").getAsBoolean();
             float orbitPhaseOffset = json.has("orbitPhaseOffset") ? json.get("orbitPhaseOffset").getAsFloat() : 0;
+            float orbitRadiusOffset = json.has("orbitRadiusOffset") ? json.get("orbitRadiusOffset").getAsFloat() : 0;
+            float orbitSpeedMult = json.has("orbitSpeedMult") ? json.get("orbitSpeedMult").getAsFloat() : 1f;
+            float orbitInclinationOffset = json.has("orbitInclinationOffset") ? json.get("orbitInclinationOffset").getAsFloat() : 0;
+            float orbitPrecessionOffset = json.has("orbitPrecessionOffset") ? json.get("orbitPrecessionOffset").getAsFloat() : 0;
             boolean colorMatch = json.has("colorMatch") && json.get("colorMatch").getAsBoolean();
             boolean alphaMatch = json.has("alphaMatch") && json.get("alphaMatch").getAsBoolean();
             
-            return new PrimitiveLink(target, radiusMatch, radiusOffset, follow, mirror,
-                phaseOffset, scaleWith, orbitSync, orbitPhaseOffset, colorMatch, alphaMatch);
+            return new PrimitiveLink(target, radiusMatch, radiusOffset, follow, followDynamic, mirror,
+                phaseOffset, scaleWith, orbitSync, orbitPhaseOffset, orbitRadiusOffset, orbitSpeedMult,
+                orbitInclinationOffset, orbitPrecessionOffset, colorMatch, alphaMatch);
         } catch (Exception e) {
             Logging.FIELD.topic("link").warn("Failed to parse PrimitiveLink: {}", e.getMessage());
             return NONE;

@@ -277,7 +277,24 @@ public class ProfilesPanel extends AbstractPanel {
     }
     
     private void onFactoryReset() {
-        actionService.factoryReset(getSelectedProfile()).handle(ToastNotification::success, ToastNotification::error);
+        // Reset reloads the CURRENTLY LOADED profile, not the selected list item
+        String currentName = state.getCurrentProfileName();
+        if (currentName == null || currentName.isEmpty()) {
+            currentName = "default";
+        }
+        // Find or create the profile entry for the current profile
+        ProfileEntry currentEntry = null;
+        for (ProfileEntry p : allProfiles) {
+            if (p.name().equalsIgnoreCase(currentName)) {
+                currentEntry = p;
+                break;
+            }
+        }
+        if (currentEntry == null) {
+            // Fallback: create a default entry
+            currentEntry = new ProfileEntry(currentName, false, "");
+        }
+        actionService.factoryReset(currentEntry).handle(ToastNotification::success, ToastNotification::error);
     }
     
     private void onSaveToServer() {

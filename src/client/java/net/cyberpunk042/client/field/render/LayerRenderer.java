@@ -59,6 +59,38 @@ public final class LayerRenderer {
     private LayerRenderer() {}
     
     /**
+     * Cache for primitive positions during rendering.
+     * Maps primitive ID -> computed world offset (including orbit displacement).
+     * Used for followDynamic linking where a primitive follows another's animated position.
+     * 
+     * <p>Thread-local to avoid concurrency issues with multiple render threads.</p>
+     */
+    private static final ThreadLocal<java.util.Map<String, Vector3f>> positionCache = 
+        ThreadLocal.withInitial(java.util.HashMap::new);
+    
+    /**
+     * Clears the position cache. Should be called at the start of each layer render.
+     */
+    private static void clearPositionCache() {
+        positionCache.get().clear();
+    }
+    
+    /**
+     * Stores a primitive's computed position in the cache.
+     */
+    private static void cachePosition(String primitiveId, Vector3f position) {
+        positionCache.get().put(primitiveId, new Vector3f(position));
+    }
+    
+    /**
+     * Gets a cached primitive position.
+     * @return cached position or null if not found
+     */
+    private static Vector3f getCachedPosition(String primitiveId) {
+        return positionCache.get().get(primitiveId);
+    }
+    
+    /**
      * Renders all primitives in a layer.
      * 
      * @param matrices Matrix stack (positioned at field origin)
@@ -116,6 +148,9 @@ public final class LayerRenderer {
             
             // Build primitive index for link resolution
             Map<String, Primitive> primitiveIndex = LinkResolver.buildIndex(layer.primitives());
+            
+            // Clear position cache for dynamic follow
+            clearPositionCache();
             
             int primCount = 0;
             // Separate primitives by depth write setting
@@ -315,14 +350,37 @@ public final class LayerRenderer {
         // Calculate effective time with orbit phase offset from links
         float orbitTime = time;
         if (resolvedLinks.hasOrbitPhaseOffset()) {
-            // Add orbit phase offset (in cycles, so multiply by 2*PI for radians)
-            orbitTime = time + resolvedLinks.orbitPhaseOffset();
+            // orbitPhaseOffset is 0-1 (representing 0-360°)
+            // At frequency=1, one cycle = 20 ticks
+            // So orbitPhaseOffset * 20 gives us the tick offset for freq=1
+            // Example: 0.5 (180°) = 10 ticks, 0.983 (354°) = 19.67 ticks
+            orbitTime = time + resolvedLinks.orbitPhaseOffset() * 20f;
         }
         
-        // Apply follow offset (translate to linked primitive's position)
+        // Track this primitive's computed position for caching
+        Vector3f computedPosition = new Vector3f(0, 0, 0);
+        
+        // === DYNAMIC FOLLOW (follows target's animated position) ===
+        if (resolvedLinks.hasFollowDynamic()) {
+            // Get the target primitive's ID from the link
+            PrimitiveLink link = primitive.link();
+            if (link != null && link.target() != null) {
+                Vector3f targetPos = getCachedPosition(link.target());
+                if (targetPos != null) {
+                    matrices.translate(targetPos.x, targetPos.y, targetPos.z);
+                    computedPosition.add(targetPos);
+                    Logging.ANIMATION.topic("link").trace(
+                        "'{}' dynamic follow '{}' -> ({}, {}, {})", 
+                        primitive.id(), link.target(), targetPos.x, targetPos.y, targetPos.z);
+                }
+            }
+        }
+        
+        // === STATIC FOLLOW (follows target's base offset) ===
         if (resolvedLinks.hasOffset()) {
             Vector3f followOffset = resolvedLinks.offset();
             matrices.translate(followOffset.x, followOffset.y, followOffset.z);
+            computedPosition.add(followOffset);
         }
         
         // Apply scale from linked primitive
@@ -379,6 +437,33 @@ public final class LayerRenderer {
             PipelineTracer.trace(PipelineTracer.T6_BILLBOARD, 5, "render", transform.billboard() != null ? transform.billboard().name() : "null");
             PipelineTracer.trace(PipelineTracer.T7_ORBIT, 5, "render", transform.orbit() != null ? "active" : "null");
             
+            // Calculate orbit offset for position caching
+            if (resolvedLinks.hasOrbit()) {
+                // Linked orbit
+                var orbitOffset = resolvedLinks.orbitConfig().getOffset(orbitTime);
+                computedPosition.add(orbitOffset);
+            } else if (transform.hasOrbit3D()) {
+                // Own 3D orbit
+                var orbitOffset = transform.orbit3d().getOffset(orbitTime);
+                computedPosition.add(orbitOffset);
+            } else if (transform.orbit() != null && transform.orbit().isActive()) {
+                // Legacy orbit
+                var orbit = transform.orbit();
+                float angle = orbitTime * orbit.speed();
+                float orbitX = 0, orbitY = 0, orbitZ = 0;
+                switch (orbit.axis()) {
+                    case X -> { orbitY = orbit.radius() * (float) Math.cos(angle + orbit.phase()); orbitZ = orbit.radius() * (float) Math.sin(angle + orbit.phase()); }
+                    case Z -> { orbitX = orbit.radius() * (float) Math.cos(angle + orbit.phase()); orbitY = orbit.radius() * (float) Math.sin(angle + orbit.phase()); }
+                    default -> { orbitX = orbit.radius() * (float) Math.cos(angle + orbit.phase()); orbitZ = orbit.radius() * (float) Math.sin(angle + orbit.phase()); }
+                }
+                computedPosition.add(orbitX, orbitY, orbitZ);
+            }
+            
+            // Add static offset
+            if (transform.offset() != null) {
+                computedPosition.add(transform.offset());
+            }
+            
             // If we have a resolved orbit from link, apply it with the phase-adjusted time
             if (resolvedLinks.hasOrbit()) {
                 // Use linked orbit config instead of primitive's own
@@ -397,6 +482,11 @@ public final class LayerRenderer {
             PipelineTracer.trace(PipelineTracer.T7_ORBIT, 6, "matrix", transform.orbit() != null && transform.orbit().isActive() ? "applied" : "n/a");
             PipelineTracer.trace(PipelineTracer.T10_FACING, 5, "render", transform.facing() != null ? transform.facing().name() : "null");
             PipelineTracer.trace(PipelineTracer.T10_FACING, 6, "matrix", transform.facing() != Facing.FIXED ? "applied" : "fixed");
+        }
+        
+        // Cache this primitive's computed position for dynamic follow by other primitives
+        if (primitive.id() != null) {
+            cachePosition(primitive.id(), computedPosition);
         }
         
         // F184: Apply primitive animation with link phase offset

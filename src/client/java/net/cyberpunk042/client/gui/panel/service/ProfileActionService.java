@@ -47,6 +47,15 @@ public class ProfileActionService {
         }
         
         try {
+            // Special handling for 'default' profile - it's a virtual profile that resets to factory
+            if ("default".equalsIgnoreCase(entry.name())) {
+                state.reset();
+                state.setCurrentProfile("default", false);
+                state.clearDirty();
+                Logging.GUI.info("Loaded default profile (factory settings)");
+                return Result.success("Loaded: default (factory settings)");
+            }
+            
             var profileOpt = profileManager.getProfileByName(entry.name());
             
             if (profileOpt.isPresent()) {
@@ -315,31 +324,27 @@ public class ProfileActionService {
         }
         
         boolean isDefault = "default".equalsIgnoreCase(entry.name());
-        boolean isBundled = entry.isBundled();
         
-        if (!isDefault && !isBundled) {
-            return Result.failure("Factory reset only for default/bundled profiles");
-        }
-        
-        state.setCurrentProfile(entry.name(), entry.isServer());
-        
+        // Default profile: reset to factory settings
         if (isDefault) {
             state.reset();
+            state.setCurrentProfile("default", false);
             state.clearDirty();
-            Logging.GUI.info("Factory reset applied to default profile");
-            return Result.success("Default profile reset to factory settings");
+            Logging.GUI.info("Reset to factory default");
+            return Result.success("Reset to factory default");
         }
         
-        // Bundled profile: reload from ProfileManager
+        // Any other profile: reload from disk
         var profileOpt = profileManager.getProfileByName(entry.name());
         if (profileOpt.isPresent() && profileOpt.get().definition() != null) {
             state.loadFromDefinition(profileOpt.get().definition());
+            state.setCurrentProfile(entry.name(), entry.isServer());
             state.clearDirty();
-            Logging.GUI.info("Factory reset applied to bundled profile: {}", entry.name());
-            return Result.success("Reset to original: " + entry.name());
+            Logging.GUI.info("Reset profile: {} (reloaded from disk)", entry.name());
+            return Result.success("Reset: " + entry.name());
         } else {
-            Logging.GUI.error("Factory reset failed - no definition for: {}", entry.name());
-            return Result.failure("Could not find original definition for: " + entry.name());
+            Logging.GUI.error("Reset failed - no definition for: {}", entry.name());
+            return Result.failure("Could not reload: " + entry.name());
         }
     }
     

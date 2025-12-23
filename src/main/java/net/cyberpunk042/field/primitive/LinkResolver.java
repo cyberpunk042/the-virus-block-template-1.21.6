@@ -357,13 +357,17 @@ public final class LinkResolver {
     /**
      * Container for resolved link values.
      * Used by builders/parsers to construct primitives with linked properties.
-     * 
      * @param radius Resolved radius (-1 if not linked)
      * @param offset Resolved offset (null if not linked)
      * @param scale Resolved scale (-1 if not linked)
      * @param phaseOffset Animation phase offset (0 if not linked)
      * @param orbitConfig Resolved orbit config (null if not linked)
      * @param orbitPhaseOffset Orbit phase offset (0 if not linked)
+     * @param orbitRadiusOffset Orbit radius offset (0 if not linked)
+     * @param orbitSpeedMult Orbit speed multiplier (1 if not linked)
+     * @param orbitInclinationOffset Inclination offset (0 if not linked)
+     * @param orbitPrecessionOffset Precession offset (0 if not linked)
+     * @param followDynamic Whether to follow target's animated position
      * @param color Resolved color (null if not linked)
      * @param alpha Resolved alpha (-1 if not linked)
      */
@@ -374,11 +378,16 @@ public final class LinkResolver {
         float phaseOffset,
         @Nullable OrbitConfig3D orbitConfig,
         float orbitPhaseOffset,
+        float orbitRadiusOffset,
+        float orbitSpeedMult,
+        float orbitInclinationOffset,
+        float orbitPrecessionOffset,
+        boolean followDynamic,
         @Nullable String color,
         float alpha
     ) {
         public static final ResolvedValues NONE = new ResolvedValues(
-            -1, null, -1, 0, null, 0, null, -1);
+            -1, null, -1, 0, null, 0, 0, 1f, 0, 0, false, null, -1);
         
         public boolean hasRadius() { return radius >= 0; }
         public boolean hasOffset() { return offset != null; }
@@ -386,11 +395,18 @@ public final class LinkResolver {
         public boolean hasPhaseOffset() { return phaseOffset != 0; }
         public boolean hasOrbit() { return orbitConfig != null; }
         public boolean hasOrbitPhaseOffset() { return orbitPhaseOffset != 0; }
+        public boolean hasOrbitRadiusOffset() { return orbitRadiusOffset != 0; }
+        public boolean hasOrbitSpeedMult() { return orbitSpeedMult != 1f; }
+        public boolean hasOrbitInclinationOffset() { return orbitInclinationOffset != 0; }
+        public boolean hasOrbitPrecessionOffset() { return orbitPrecessionOffset != 0; }
+        public boolean hasFollowDynamic() { return followDynamic; }
         public boolean hasColor() { return color != null; }
         public boolean hasAlpha() { return alpha >= 0; }
         public boolean hasAny() { 
             return hasRadius() || hasOffset() || hasScale() || hasPhaseOffset() 
-                || hasOrbit() || hasOrbitPhaseOffset() || hasColor() || hasAlpha(); 
+                || hasOrbit() || hasOrbitPhaseOffset() || hasColor() || hasAlpha()
+                || hasOrbitRadiusOffset() || hasOrbitSpeedMult() 
+                || hasOrbitInclinationOffset() || hasOrbitPrecessionOffset() || hasFollowDynamic(); 
         }
     }
     
@@ -423,7 +439,7 @@ public final class LinkResolver {
         // 1. Radius matching
         float resolvedRadius = resolveRadius(link, primitiveIndex);
         
-        // 2. Follow position
+        // 2. Follow position (static only - dynamic follow is handled in renderer)
         Vector3f resolvedOffset = resolveFollow(link, primitiveIndex);
         
         // 3. Mirror (applied to resolved offset, or original if no follow)
@@ -443,19 +459,27 @@ public final class LinkResolver {
         OrbitConfig3D orbitConfig = resolveOrbit(link, primitiveIndex);
         float orbitPhaseOffset = resolveOrbitPhaseOffset(link);
         
-        // 7. Color/alpha matching
+        // 7. NEW: Orbit parameter offsets
+        float orbitRadiusOffset = link.orbitRadiusOffset();
+        float orbitSpeedMult = link.orbitSpeedMult();
+        float orbitInclinationOffset = link.orbitInclinationOffset();
+        float orbitPrecessionOffset = link.orbitPrecessionOffset();
+        boolean followDynamic = link.followDynamic();
+        
+        // 8. Color/alpha matching
         String color = resolveColor(link, primitiveIndex);
         float alpha = resolveAlpha(link, primitiveIndex);
         
         ResolvedValues result = new ResolvedValues(
             resolvedRadius, resolvedOffset, resolvedScale, phaseOffset,
-            orbitConfig, orbitPhaseOffset, color, alpha);
+            orbitConfig, orbitPhaseOffset, orbitRadiusOffset, orbitSpeedMult,
+            orbitInclinationOffset, orbitPrecessionOffset, followDynamic, color, alpha);
         
         if (result.hasAny()) {
             Logging.FIELD.topic("link").debug(
-                "Resolved links for '{}': radius={}, offset={}, scale={}, phase={}, orbit={}, orbitPhase={}",
+                "Resolved links for '{}': radius={}, offset={}, scale={}, phase={}, orbit={}, orbitPhase={}, followDyn={}",
                 primitive.id(), resolvedRadius, resolvedOffset, resolvedScale, phaseOffset, 
-                orbitConfig != null, orbitPhaseOffset);
+                orbitConfig != null, orbitPhaseOffset, followDynamic);
         }
         
         return result;
