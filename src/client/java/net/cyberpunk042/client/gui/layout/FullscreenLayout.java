@@ -117,9 +117,9 @@ public class FullscreenLayout implements LayoutManager {
     
     @Override
     public Bounds getContentBounds() {
-        // ContentArea only goes in right column below selectors
+        // ContentArea spans FULL right column (both cells) below selectors
         int padding = GuiConstants.padding();
-        return grid.topRight().withoutTop(selectorHeight * 2 + padding);
+        return grid.rightColumn().withoutTop(selectorHeight * 2 + padding);
     }
     
     @Override
@@ -143,7 +143,7 @@ public class FullscreenLayout implements LayoutManager {
     /** Returns the sub-tab content bounds (right column below selectors) */
     public Bounds getSubTabBounds() {
         int padding = GuiConstants.padding();
-        return grid.topRight().withoutTop(selectorHeight * 2 + padding);
+        return grid.rightColumn().withoutTop(selectorHeight * 2 + padding);
     }
     
     @Override
