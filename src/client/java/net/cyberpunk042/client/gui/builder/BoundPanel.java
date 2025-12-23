@@ -70,6 +70,7 @@ public abstract class BoundPanel extends AbstractPanel implements StateChangeLis
         bindings.clear();
         vec3Bindings.clear();
         widgets.clear();
+        scrollOffset = 0;  // Reset scroll when rebuilding
         
         // Build content using fluent API (subclass implements this)
         buildContent();
