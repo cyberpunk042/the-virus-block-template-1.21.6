@@ -1,5 +1,6 @@
 package net.cyberpunk042.client.gui.state.manager;
 
+import net.cyberpunk042.client.gui.state.ChangeType;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.state.adapter.PrimitiveAdapter;
 import net.cyberpunk042.client.gui.state.adapter.PrimitiveBuilder;
@@ -117,6 +118,7 @@ public class LayerManager extends AbstractManager {
         ensurePrimitiveSelection(selectedLayerIndex);
         loadSelectedPrimitive();
         notifySelectionChanged();
+        state.notifyStateChanged(ChangeType.LAYER_SWITCHED);
     }
     
     public int getSelectedPrimitiveIndex() {
@@ -132,6 +134,7 @@ public class LayerManager extends AbstractManager {
         selectedPrimitivePerLayer.set(selectedLayerIndex, clamped);
         loadSelectedPrimitive();
         notifySelectionChanged();
+        state.notifyStateChanged(ChangeType.PRIMITIVE_SWITCHED);
     }
     
     public FieldLayer getSelectedLayer() {

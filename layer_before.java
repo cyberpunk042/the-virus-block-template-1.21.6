@@ -16,7 +16,6 @@ import net.cyberpunk042.visual.transform.Billboard;
 import net.cyberpunk042.visual.transform.Facing;
 import net.cyberpunk042.visual.transform.Transform;
 
-import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.VertexConsumerProvider;
 
@@ -25,9 +24,6 @@ import net.cyberpunk042.visual.fill.FillConfig;
 import net.cyberpunk042.visual.fill.FillMode;
 import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Quaternionf;
-import org.joml.Vector3f;
-
-import java.util.Map;
 
 /**
  * Renders a single layer of a field definition.
@@ -57,38 +53,6 @@ import java.util.Map;
 public final class LayerRenderer {
     
     private LayerRenderer() {}
-    
-    /**
-     * Cache for primitive positions during rendering.
-     * Maps primitive ID -> computed world offset (including orbit displacement).
-     * Used for followDynamic linking where a primitive follows another's animated position.
-     * 
-     * <p>Thread-local to avoid concurrency issues with multiple render threads.</p>
-     */
-    private static final ThreadLocal<java.util.Map<String, Vector3f>> positionCache = 
-        ThreadLocal.withInitial(java.util.HashMap::new);
-    
-    /**
-     * Clears the position cache. Should be called at the start of each layer render.
-     */
-    private static void clearPositionCache() {
-        positionCache.get().clear();
-    }
-    
-    /**
-     * Stores a primitive's computed position in the cache.
-     */
-    private static void cachePosition(String primitiveId, Vector3f position) {
-        positionCache.get().put(primitiveId, new Vector3f(position));
-    }
-    
-    /**
-     * Gets a cached primitive position.
-     * @return cached position or null if not found
-     */
-    private static Vector3f getCachedPosition(String primitiveId) {
-        return positionCache.get().get(primitiveId);
-    }
     
     /**
      * Renders all primitives in a layer.
@@ -146,64 +110,30 @@ public final class LayerRenderer {
             int light = 0xF000F0; // Full bright for fields
             float effectiveAlpha = alpha * layer.alpha();
             
-            // Build primitive index for link resolution
-            Map<String, Primitive> primitiveIndex = LinkResolver.buildIndex(layer.primitives());
-            
-            // Clear position cache for dynamic follow
-            clearPositionCache();
-            
-            // Check if ANY primitive in this layer needs see-through mode
-            boolean anySeeThroughPrimitive = false;
-            for (Primitive p : layer.primitives()) {
-                FillConfig fill = p.fill();
-                if (fill != null && !fill.depthWrite()) {
-                    anySeeThroughPrimitive = true;
-                    break;
+            int primCount = 0;
+            for (Primitive primitive : layer.primitives()) {
+                // Build primitive info into scope tree
+                ScopeNode primNode = scope.branch("prim:" + primCount);
+                primNode.kv("type", primitive.type());
+                
+                if (primitive.shape() != null) {
+                    primNode.kv("shape", primitive.shape().getClass().getSimpleName());
                 }
-            }
-            
-            // If any primitive wants see-through, enable it for the whole layer
-            if (anySeeThroughPrimitive) {
-                // Flush any pending geometry first
-                if (consumers instanceof VertexConsumerProvider.Immediate immediate) {
-                    immediate.draw();
-                }
-                FieldRenderLayers.disableDepthWrite();
-            }
-            
-            try {
-                int primCount = 0;
-                for (Primitive primitive : layer.primitives()) {
-                    ScopeNode primNode = scope.branch("prim:" + primCount);
-                    primNode.kv("type", primitive.type());
-                    
-                    if (primitive.shape() != null) {
-                        primNode.kv("shape", primitive.shape().getClass().getSimpleName());
+                if (primitive.appearance() != null) {
+                    primNode.kv("color", primitive.appearance().color());
+                    if (primitive.appearance().alpha() != null) {
+                        primNode.kv("alpha", primitive.appearance().alpha().max());
                     }
-                    if (primitive.appearance() != null) {
-                        primNode.kv("color", primitive.appearance().color());
-                        if (primitive.appearance().alpha() != null) {
-                            primNode.kv("alpha", primitive.appearance().alpha().max());
-                        }
-                    }
-                    
-                    VertexConsumer consumer = getConsumerForPrimitive(consumers, primitive);
-                    renderPrimitive(matrices, consumer, primitive, resolver, light, time, effectiveAlpha, overrides, primitiveIndex);
-                    primCount++;
                 }
                 
-                // Flush the layer's geometry
-                if (anySeeThroughPrimitive && consumers instanceof VertexConsumerProvider.Immediate immediate) {
-                    immediate.draw();
-                }
+                // Get appropriate consumer based on fill mode (line width handled by render layer)
+                VertexConsumer consumer = getConsumerForPrimitive(consumers, primitive);
                 
-                scope.count("rendered", primCount);
-            } finally {
-                // Restore depth write if we changed it
-                if (anySeeThroughPrimitive) {
-                    FieldRenderLayers.enableDepthWrite();
-                }
+                renderPrimitive(matrices, consumer, primitive, resolver, light, time, effectiveAlpha, overrides);
+                primCount++;
             }
+            
+            scope.count("rendered", primCount);
             } finally {
                 matrices.pop();
             }
@@ -227,7 +157,7 @@ public final class LayerRenderer {
     /**
      * Gets the appropriate VertexConsumer for a primitive based on its fill mode.
      * 
-     * - SOLID → solidTranslucent, solidTranslucentNoDepth (if depthWrite=false), or NoCull (if doubleSided)
+     * - SOLID → solidTranslucent or solidTranslucentNoCull (if doubleSided)
      * - WIREFRAME, CAGE → lines with custom thickness via RenderPhase.LineWidth
      * - POINTS → solidTranslucent (uses tiny quads)
      */
@@ -235,24 +165,13 @@ public final class LayerRenderer {
         FillConfig fill = primitive.fill();
         FillMode mode = fill != null ? fill.mode() : FillMode.SOLID;
         boolean doubleSided = fill != null && fill.doubleSided();
-        boolean depthWrite = fill == null || fill.depthWrite();
         float wireThickness = fill != null ? fill.wireThickness() : 1.0f;
         
         return switch (mode) {
             case WIREFRAME, CAGE -> consumers.getBuffer(FieldRenderLayers.lines(wireThickness));
-            case SOLID, POINTS -> {
-                // Select layer based on depth write setting
-                RenderLayer layer;
-                if (!depthWrite) {
-                    // No depth write = true transparency (see-through)
-                    layer = FieldRenderLayers.solidTranslucentNoDepth();
-                } else if (doubleSided) {
-                    layer = FieldRenderLayers.solidTranslucentNoCull();
-                } else {
-                    layer = FieldRenderLayers.solidTranslucent();
-                }
-                yield consumers.getBuffer(layer);
-            }
+            case SOLID, POINTS -> consumers.getBuffer(
+                doubleSided ? FieldRenderLayers.solidTranslucentNoCull() : FieldRenderLayers.solidTranslucent()
+            );
         };
     }
     
@@ -306,8 +225,6 @@ public final class LayerRenderer {
     
     /**
      * Renders a single primitive with its own transform and animation.
-     * 
-     * @param primitiveIndex Index of all primitives in the layer for link resolution
      */
     private static void renderPrimitive(
             MatrixStack matrices,
@@ -317,95 +234,12 @@ public final class LayerRenderer {
             int light,
             float time,
             float alpha,
-            RenderOverrides overrides,
-            Map<String, Primitive> primitiveIndex) {
+            RenderOverrides overrides) {
         
         matrices.push();
         try {
         
-        // === LINK RESOLUTION ===
-        // Resolve links first - may provide orbit config, color, alpha, etc.
-        LinkResolver.ResolvedValues resolvedLinks = LinkResolver.resolveLinks(primitive, primitiveIndex);
-        
-        // Calculate effective time with orbit phase offset from links
-        float orbitTime = time;
-        if (resolvedLinks.hasOrbitPhaseOffset()) {
-            // orbitPhaseOffset is 0-1 (representing 0-360°)
-            // At frequency=1, one cycle = 20 ticks
-            // So orbitPhaseOffset * 20 gives us the tick offset for freq=1
-            // Example: 0.5 (180°) = 10 ticks, 0.983 (354°) = 19.67 ticks
-            orbitTime = time + resolvedLinks.orbitPhaseOffset() * 20f;
-        }
-        
-        // Track this primitive's computed position for caching
-        Vector3f computedPosition = new Vector3f(0, 0, 0);
-        
-        // === DYNAMIC FOLLOW (follows target's animated position) ===
-        if (resolvedLinks.hasFollowDynamic()) {
-            // Get the target primitive's ID from the link
-            PrimitiveLink link = primitive.link();
-            if (link != null && link.target() != null) {
-                Vector3f targetPos = getCachedPosition(link.target());
-                if (targetPos != null) {
-                    matrices.translate(targetPos.x, targetPos.y, targetPos.z);
-                    computedPosition.add(targetPos);
-                    Logging.ANIMATION.topic("link").trace(
-                        "'{}' dynamic follow '{}' -> ({}, {}, {})", 
-                        primitive.id(), link.target(), targetPos.x, targetPos.y, targetPos.z);
-                }
-            }
-        }
-        
-        // === STATIC FOLLOW (follows target's base offset) ===
-        if (resolvedLinks.hasOffset()) {
-            Vector3f followOffset = resolvedLinks.offset();
-            matrices.translate(followOffset.x, followOffset.y, followOffset.z);
-            computedPosition.add(followOffset);
-        }
-        
-        // Apply scale from linked primitive
-        if (resolvedLinks.hasScale()) {
-            float linkedScale = resolvedLinks.scale();
-            matrices.scale(linkedScale, linkedScale, linkedScale);
-        }
-        
-        // Apply color/alpha overrides from links to the renderer overrides
-        RenderOverrides effectiveOverrides = overrides;
-        if (resolvedLinks.hasColor() || resolvedLinks.hasAlpha()) {
-            // Build new overrides, copying existing values if present
-            RenderOverrides.Builder ovBuilder = RenderOverrides.builder();
-            
-            // Copy existing pattern if present
-            if (overrides != null && overrides.vertexPattern() != null) {
-                ovBuilder.vertexPattern(overrides.vertexPattern());
-            }
-            
-            // Color from link or existing
-            if (resolvedLinks.hasColor()) {
-                // Parse color string to int (e.g., "#FF0000" or "0xFF0000")
-                String colorStr = resolvedLinks.color();
-                int colorInt = parseColorString(colorStr);
-                ovBuilder.colorOverride(colorInt);
-            } else if (overrides != null && overrides.colorOverride() != null) {
-                ovBuilder.colorOverride(overrides.colorOverride());
-            }
-            
-            // Alpha from link or existing
-            if (resolvedLinks.hasAlpha()) {
-                ovBuilder.alphaMultiplier(resolvedLinks.alpha());
-            } else if (overrides != null) {
-                ovBuilder.alphaMultiplier(overrides.alphaMultiplier());
-            }
-            
-            // Scale from existing
-            if (overrides != null) {
-                ovBuilder.scaleMultiplier(overrides.scaleMultiplier());
-            }
-            
-            effectiveOverrides = ovBuilder.build();
-        }
-        
-        // Apply primitive transform (with resolved orbit if linked)
+        // Apply primitive transform
         Transform transform = primitive.transform();
         if (transform != null && transform != Transform.IDENTITY) {
             // CP5: ALL transform segments applied
@@ -417,40 +251,7 @@ public final class LayerRenderer {
             PipelineTracer.trace(PipelineTracer.T6_BILLBOARD, 5, "render", transform.billboard() != null ? transform.billboard().name() : "null");
             PipelineTracer.trace(PipelineTracer.T7_ORBIT, 5, "render", transform.orbit() != null ? "active" : "null");
             
-            // Calculate orbit offset for position caching
-            if (resolvedLinks.hasOrbit()) {
-                // Linked orbit
-                var orbitOffset = resolvedLinks.orbitConfig().getOffset(orbitTime);
-                computedPosition.add(orbitOffset);
-            } else if (transform.hasOrbit3D()) {
-                // Own 3D orbit
-                var orbitOffset = transform.orbit3d().getOffset(orbitTime);
-                computedPosition.add(orbitOffset);
-            } else if (transform.orbit() != null && transform.orbit().isActive()) {
-                // Legacy orbit
-                var orbit = transform.orbit();
-                float angle = orbitTime * orbit.speed();
-                float orbitX = 0, orbitY = 0, orbitZ = 0;
-                switch (orbit.axis()) {
-                    case X -> { orbitY = orbit.radius() * (float) Math.cos(angle + orbit.phase()); orbitZ = orbit.radius() * (float) Math.sin(angle + orbit.phase()); }
-                    case Z -> { orbitX = orbit.radius() * (float) Math.cos(angle + orbit.phase()); orbitY = orbit.radius() * (float) Math.sin(angle + orbit.phase()); }
-                    default -> { orbitX = orbit.radius() * (float) Math.cos(angle + orbit.phase()); orbitZ = orbit.radius() * (float) Math.sin(angle + orbit.phase()); }
-                }
-                computedPosition.add(orbitX, orbitY, orbitZ);
-            }
-            
-            // Add static offset
-            if (transform.offset() != null) {
-                computedPosition.add(transform.offset());
-            }
-            
-            // If we have a resolved orbit from link, apply it with the phase-adjusted time
-            if (resolvedLinks.hasOrbit()) {
-                // Use linked orbit config instead of primitive's own
-                applyPrimitiveTransformWithLinkedOrbit(matrices, transform, resolvedLinks.orbitConfig(), orbitTime);
-            } else {
-                applyPrimitiveTransform(matrices, transform, orbitTime);
-            }
+            applyPrimitiveTransform(matrices, transform, time);
             
             // CP6: ALL transform segments in matrix
             PipelineTracer.trace(PipelineTracer.T1_OFFSET, 6, "matrix", "applied");
@@ -462,11 +263,6 @@ public final class LayerRenderer {
             PipelineTracer.trace(PipelineTracer.T7_ORBIT, 6, "matrix", transform.orbit() != null && transform.orbit().isActive() ? "applied" : "n/a");
             PipelineTracer.trace(PipelineTracer.T10_FACING, 5, "render", transform.facing() != null ? transform.facing().name() : "null");
             PipelineTracer.trace(PipelineTracer.T10_FACING, 6, "matrix", transform.facing() != Facing.FIXED ? "applied" : "fixed");
-        }
-        
-        // Cache this primitive's computed position for dynamic follow by other primitives
-        if (primitive.id() != null) {
-            cachePosition(primitive.id(), computedPosition);
         }
         
         // F184: Apply primitive animation with link phase offset
@@ -623,8 +419,8 @@ public final class LayerRenderer {
         // Get renderer and render
         PrimitiveRenderer renderer = PrimitiveRenderers.get(primitive);
         if (renderer != null) {
-            // Pass through effective overrides (includes link color/alpha)
-            renderer.render(primitive, matrices, consumer, light, time, resolver, effectiveOverrides);
+            // Pass through existing overrides (contains field/layer alpha)
+            renderer.render(primitive, matrices, consumer, light, time, resolver, overrides);
         } else {
             Logging.FIELD.topic("render")
                 .reason("Missing renderer")
@@ -655,14 +451,7 @@ public final class LayerRenderer {
         }
         
         // 2. Orbit (apply before offset, so primitive orbits around anchor position)
-        // Priority: orbit3d (new) > orbit (legacy)
-        if (transform.hasOrbit3D()) {
-            // New 3D orbit system
-            var orbit3d = transform.orbit3d();
-            var offset = orbit3d.getOffset(time);
-            matrices.translate(offset.x, offset.y, offset.z);
-        } else if (transform.orbit() != null && transform.orbit().isActive()) {
-            // Legacy single-axis orbit
+        if (transform.orbit() != null && transform.orbit().isActive()) {
             var orbit = transform.orbit();
             float angle = time * orbit.speed();
             float orbitX, orbitY, orbitZ;
@@ -688,73 +477,6 @@ public final class LayerRenderer {
                 }
             }
             matrices.translate(orbitX, orbitY, orbitZ);
-        }
-
-        
-        // 3. Translation (offset from anchor/orbit position)
-        if (transform.offset() != null) {
-            matrices.translate(
-                transform.offset().x,
-                transform.offset().y,
-                transform.offset().z
-            );
-        }
-        
-        // 4. Facing - rotate based on player direction/camera
-        if (transform.facing() != null && transform.facing() != Facing.FIXED) {
-            applyFacing(matrices, transform.facing(), client);
-        }
-        
-        // 5. Rotation (explicit rotation, applied after facing)
-        if (transform.rotation() != null) {
-            Quaternionf rotation = new Quaternionf()
-                .rotateX((float) Math.toRadians(transform.rotation().x))
-                .rotateY((float) Math.toRadians(transform.rotation().y))
-                .rotateZ((float) Math.toRadians(transform.rotation().z));
-            matrices.multiply(rotation);
-        }
-        
-        // 6. Scale
-        if (transform.scaleXYZ() != null) {
-            matrices.scale(transform.scaleXYZ().x, transform.scaleXYZ().y, transform.scaleXYZ().z);
-        } else {
-            matrices.scale(transform.scale(), transform.scale(), transform.scale());
-        }
-        
-        // 7. Billboard - rotate to face camera (applied last for correct orientation)
-        if (transform.billboard() != null && transform.billboard() != Billboard.NONE) {
-            applyBillboard(matrices, transform.billboard(), client);
-        }
-    }
-    
-    /**
-     * Applies primitive-level transform using a LINKED orbit config from another primitive.
-     * This is used for orbitSync linking where multiple primitives share the same orbit pattern
-     * but with different phase offsets (like electrons around an atom).
-     * 
-     * @param matrices Matrix stack to apply transforms to
-     * @param transform The primitive's own transform (for non-orbit properties)
-     * @param linkedOrbit The orbit config from the linked primitive
-     * @param time Time value (already adjusted for orbit phase offset)
-     */
-    private static void applyPrimitiveTransformWithLinkedOrbit(
-            MatrixStack matrices, 
-            Transform transform, 
-            net.cyberpunk042.visual.transform.OrbitConfig3D linkedOrbit, 
-            float time) {
-        var client = net.minecraft.client.MinecraftClient.getInstance();
-        
-        // 1. Anchor offset (applied first - positions relative to player center)
-        if (transform.anchor() != null) {
-            var anchor = transform.anchor();
-            matrices.translate(anchor.getX(), anchor.getY(), anchor.getZ());
-        }
-        
-        // 2. Apply LINKED orbit (from orbitSync target)
-        if (linkedOrbit != null && linkedOrbit.isActive()) {
-            var offset = linkedOrbit.getOffset(time);
-            matrices.translate(offset.x, offset.y, offset.z);
-            Logging.FIELD.topic("link").trace("Applied linked orbit: offset={}", offset);
         }
         
         // 3. Translation (offset from anchor/orbit position)
@@ -862,33 +584,6 @@ public final class LayerRenderer {
             return 0;
         }
         return LinkResolver.resolvePhaseOffset(link);
-    }
-    
-    /**
-     * Parses a color string to an integer.
-     * Supports formats: "#RRGGBB", "#AARRGGBB", "0xRRGGBB", "0xAARRGGBB", or plain hex.
-     */
-    private static int parseColorString(String colorStr) {
-        if (colorStr == null || colorStr.isEmpty()) {
-            return 0xFFFFFFFF; // Default white
-        }
-        
-        String hex = colorStr.trim();
-        if (hex.startsWith("#")) {
-            hex = hex.substring(1);
-        } else if (hex.startsWith("0x") || hex.startsWith("0X")) {
-            hex = hex.substring(2);
-        }
-        
-        try {
-            // If 6 chars, assume RGB and add FF alpha
-            if (hex.length() == 6) {
-                return (int) Long.parseLong("FF" + hex, 16);
-            }
-            return (int) Long.parseLong(hex, 16);
-        } catch (NumberFormatException e) {
-            return 0xFFFFFFFF;
-        }
     }
 }
 

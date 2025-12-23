@@ -4,6 +4,7 @@ import net.cyberpunk042.visual.animation.PulseConfig;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import net.cyberpunk042.client.gui.state.ChangeType;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.field.instance.FollowConfig;
 import net.fabricmc.loader.api.FabricLoader;
@@ -318,6 +319,9 @@ public final class FragmentRegistry {
             case "cylinder", "beam" -> applyCylinderPreset(state, json);
             case "cube", "octahedron", "icosahedron" -> applyPolyPreset(state, json);
         }
+        
+        // Notify listeners that a fragment was applied
+        state.notifyStateChanged(ChangeType.FRAGMENT_APPLIED);
     }
 
     private static void applySpherePreset(FieldEditState state, JsonObject json) {
@@ -430,6 +434,9 @@ public final class FragmentRegistry {
             var newFill = state.fill().toBuilder().cage(adapter.build()).build();
             state.set("fill", newFill);
         }
+        
+        // Notify listeners that a fragment was applied
+        state.notifyStateChanged(ChangeType.FRAGMENT_APPLIED);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -456,6 +463,9 @@ public final class FragmentRegistry {
         if (json.has("feather")) state.set("mask.feather", json.get("feather").getAsFloat());
         if (json.has("animate")) state.set("mask.animate", json.get("animate").getAsBoolean());
         if (json.has("animateSpeed")) state.set("mask.animSpeed", json.get("animateSpeed").getAsFloat());
+        
+        // Notify listeners that a fragment was applied
+        state.notifyStateChanged(ChangeType.FRAGMENT_APPLIED);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -479,6 +489,9 @@ public final class FragmentRegistry {
         if (json.has("sector")) state.set("arrangement.sectorPattern", json.get("sector").getAsString());
         // multiPart is UI-only, not stored in config
         if (json.has("defaultPattern")) state.set("arrangement.defaultPattern", json.get("defaultPattern").getAsString());
+        
+        // Notify listeners that a fragment was applied
+        state.notifyStateChanged(ChangeType.FRAGMENT_APPLIED);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -521,6 +534,9 @@ public final class FragmentRegistry {
             if (alpha.has("max")) state.set("alphaPulse.max", alpha.get("max").getAsFloat());
             if (alpha.has("speed")) state.set("alphaPulse.speed", alpha.get("speed").getAsFloat());
         }
+        
+        // Notify listeners that a fragment was applied
+        state.notifyStateChanged(ChangeType.FRAGMENT_APPLIED);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -566,6 +582,9 @@ public final class FragmentRegistry {
                 if (pulse.has("max")) state.set("beam.pulse.max", pulse.get("max").getAsFloat());
             }
         }
+        
+        // Notify listeners that a fragment was applied
+        state.notifyStateChanged(ChangeType.FRAGMENT_APPLIED);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -589,6 +608,9 @@ public final class FragmentRegistry {
         if (json.has("leadOffset")) state.set("follow.leadOffset", json.get("leadOffset").getAsFloat());
         if (json.has("responsiveness")) state.set("follow.responsiveness", json.get("responsiveness").getAsFloat());
         if (json.has("lookAhead")) state.set("follow.lookAhead", json.get("lookAhead").getAsFloat());
+        
+        // Notify listeners that a fragment was applied
+        state.notifyStateChanged(ChangeType.FRAGMENT_APPLIED);
     }
 
     // ═══════════════════════════════════════════════════════════════════════

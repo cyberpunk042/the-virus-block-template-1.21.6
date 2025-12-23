@@ -2,6 +2,7 @@ package net.cyberpunk042.client.gui.state.manager;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import net.cyberpunk042.client.gui.state.ChangeType;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 
 import java.util.ArrayList;
@@ -225,6 +226,9 @@ public class ProfileManager extends AbstractManager {
         }
         
         net.cyberpunk042.log.Logging.GUI.topic("state").info("Loaded definition: {}", definition.id());
+        
+        // Notify listeners that profile was loaded (widgets should sync)
+        state.notifyStateChanged(ChangeType.PROFILE_LOADED);
     }
     
     // ═══════════════════════════════════════════════════════════════════════════

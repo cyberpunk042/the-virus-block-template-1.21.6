@@ -210,6 +210,71 @@ public class FieldEditState {
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
+    // STATE CHANGE LISTENERS (for GUI panel binding system)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    private final List<StateChangeListener> stateListeners = new ArrayList<>();
+    
+    /**
+     * Registers a listener for state changes.
+     * 
+     * <p>Listeners are notified when:
+     * <ul>
+     *   <li>Profile is loaded</li>
+     *   <li>Layer/primitive selection changes</li>
+     *   <li>Fragment/preset is applied</li>
+     *   <li>Properties change from external source</li>
+     * </ul>
+     * 
+     * @param listener The listener to add
+     * @see StateChangeListener
+     * @see ChangeType
+     */
+    public void addStateListener(StateChangeListener listener) {
+        if (listener != null && !stateListeners.contains(listener)) {
+            stateListeners.add(listener);
+            Logging.GUI.topic("state").trace("Added state listener: {}", listener.getClass().getSimpleName());
+        }
+    }
+    
+    /**
+     * Removes a previously registered state listener.
+     * 
+     * @param listener The listener to remove
+     */
+    public void removeStateListener(StateChangeListener listener) {
+        if (stateListeners.remove(listener)) {
+            Logging.GUI.topic("state").trace("Removed state listener: {}", listener.getClass().getSimpleName());
+        }
+    }
+    
+    /**
+     * Notifies all registered listeners of a state change.
+     * 
+     * <p>Called by managers and external systems when state changes
+     * in a way that widgets need to know about.</p>
+     * 
+     * @param type The type of change that occurred
+     * @see ChangeType
+     */
+    public void notifyStateChanged(ChangeType type) {
+        if (stateListeners.isEmpty()) return;
+        
+        Logging.GUI.topic("state").debug("Notifying {} listeners of {}", stateListeners.size(), type);
+        
+        // Copy to avoid ConcurrentModificationException if listener modifies list
+        List<StateChangeListener> listeners = new ArrayList<>(stateListeners);
+        for (StateChangeListener listener : listeners) {
+            try {
+                listener.onStateChanged(type);
+            } catch (Exception e) {
+                Logging.GUI.topic("state").error("Error in state listener {}: {}", 
+                    listener.getClass().getSimpleName(), e.getMessage());
+            }
+        }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
     // PATH-BASED ACCESS (routes to adapters)
     // ═══════════════════════════════════════════════════════════════════════════
     
@@ -268,6 +333,12 @@ public class FieldEditState {
         if (v == null) return null;
         if (v instanceof Enum<?>) return ((Enum<?>) v).name();
         return v.toString();
+    }
+    
+    public org.joml.Vector3f getVec3f(String path) {
+        Object v = get(path);
+        if (v instanceof org.joml.Vector3f) return (org.joml.Vector3f) v;
+        return null;
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -371,6 +442,9 @@ public class FieldEditState {
         
         markDirty();
         Logging.GUI.topic("state").info("FieldEditState reset to defaults");
+        
+        // Notify listeners of full reset (widgets should reinitialize)
+        notifyStateChanged(ChangeType.FULL_RESET);
     }
     
     // JSON SERIALIZATION (delegates to SerializationManager)

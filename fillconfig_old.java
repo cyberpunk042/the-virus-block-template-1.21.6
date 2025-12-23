@@ -47,37 +47,37 @@ import net.cyberpunk042.util.json.JsonSerializer;
  * @see CageOptions
  */
 public record FillConfig(
-    FillMode mode,
+    @JsonField(skipIfEqualsConstant = "SOLID") FillMode mode,
     @Range(ValueRange.POSITIVE_NONZERO) @JsonField(skipIfDefault = true, defaultValue = "1.0") float wireThickness,
     @Range(ValueRange.POSITIVE_NONZERO) @JsonField(skipIfDefault = true, defaultValue = "2.0") float pointSize,
     @JsonField(skipIfDefault = true) boolean doubleSided,
-    boolean depthTest,
-    boolean depthWrite,
+    @JsonField(skipIfDefault = true, defaultValue = "true") boolean depthTest,
+    @JsonField(skipIfDefault = true) boolean depthWrite,
     @Nullable @JsonField(skipIfNull = true) CageOptions cage
 ){
     /** Default solid fill. */
     public static final FillConfig SOLID = new FillConfig(
-        FillMode.SOLID, 1.0f, 2.0f, false, true, true, null);
+        FillMode.SOLID, 1.0f, 2.0f, false, true, false, null);
     
     /** Default wireframe fill. */
     public static final FillConfig WIREFRAME = new FillConfig(
-        FillMode.WIREFRAME, 1.0f, 2.0f, true, true, true, null);
+        FillMode.WIREFRAME, 1.0f, 2.0f, true, true, false, null);
     
     /** Sphere cage fill. */
     public static final FillConfig SPHERE_CAGE = new FillConfig(
-        FillMode.CAGE, 1.0f, 2.0f, true, true, true, SphereCageOptions.DEFAULT);
+        FillMode.CAGE, 1.0f, 2.0f, true, true, false, SphereCageOptions.DEFAULT);
     
     /** Prism cage fill. */
     public static final FillConfig PRISM_CAGE = new FillConfig(
-        FillMode.CAGE, 1.0f, 2.0f, true, true, true, PrismCageOptions.DEFAULT);
+        FillMode.CAGE, 1.0f, 2.0f, true, true, false, PrismCageOptions.DEFAULT);
     
     /** Cylinder cage fill. */
     public static final FillConfig CYLINDER_CAGE = new FillConfig(
-        FillMode.CAGE, 1.0f, 2.0f, true, true, true, CylinderCageOptions.DEFAULT);
+        FillMode.CAGE, 1.0f, 2.0f, true, true, false, CylinderCageOptions.DEFAULT);
     
     /** Polyhedron cage fill. */
     public static final FillConfig POLYHEDRON_CAGE = new FillConfig(
-        FillMode.CAGE, 1.0f, 2.0f, true, true, true, PolyhedronCageOptions.DEFAULT);
+        FillMode.CAGE, 1.0f, 2.0f, true, true, false, PolyhedronCageOptions.DEFAULT);
     
     // =========================================================================
     // Convenience Checks
@@ -112,26 +112,6 @@ public record FillConfig(
     /** Gets cage as PolyhedronCageOptions, or null if not polyhedron cage. */
     public @Nullable PolyhedronCageOptions polyhedronCage() {
         return cage instanceof PolyhedronCageOptions p ? p : null;
-    }
-    
-    /** Gets cage as DiscCageOptions, or null if not disc cage. */
-    public @Nullable DiscCageOptions discCage() {
-        return cage instanceof DiscCageOptions d ? d : null;
-    }
-    
-    /** Gets cage as RingCageOptions, or null if not ring cage. */
-    public @Nullable RingCageOptions ringCage() {
-        return cage instanceof RingCageOptions r ? r : null;
-    }
-    
-    /** Gets cage as ConeCageOptions, or null if not cone cage. */
-    public @Nullable ConeCageOptions coneCage() {
-        return cage instanceof ConeCageOptions c ? c : null;
-    }
-    
-    /** Gets cage as TorusCageOptions, or null if not torus cage. */
-    public @Nullable TorusCageOptions torusCage() {
-        return cage instanceof TorusCageOptions t ? t : null;
     }
     
     // =========================================================================
@@ -211,7 +191,7 @@ public record FillConfig(
         private @Range(ValueRange.POSITIVE_NONZERO) float pointSize = 2.0f;
         private boolean doubleSided = false;
         private boolean depthTest = true;
-        private boolean depthWrite = true;
+        private boolean depthWrite = false;
         private @Nullable CageOptions cage = null;
         
         public Builder mode(FillMode m) { this.mode = m; return this; }
@@ -239,26 +219,6 @@ public record FillConfig(
             return this; 
         }
         public Builder polyhedronCage(PolyhedronCageOptions c) { 
-            this.mode = FillMode.CAGE;
-            this.cage = c; 
-            return this; 
-        }
-        public Builder discCage(DiscCageOptions c) { 
-            this.mode = FillMode.CAGE;
-            this.cage = c; 
-            return this; 
-        }
-        public Builder ringCage(RingCageOptions c) { 
-            this.mode = FillMode.CAGE;
-            this.cage = c; 
-            return this; 
-        }
-        public Builder coneCage(ConeCageOptions c) { 
-            this.mode = FillMode.CAGE;
-            this.cage = c; 
-            return this; 
-        }
-        public Builder torusCage(TorusCageOptions c) { 
             this.mode = FillMode.CAGE;
             this.cage = c; 
             return this; 
