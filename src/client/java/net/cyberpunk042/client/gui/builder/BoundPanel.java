@@ -261,26 +261,20 @@ public abstract class BoundPanel extends AbstractPanel implements StateChangeLis
     }
     
     /**
-     * Legacy renderWithScroll - applies scroll, renders widgets, restores.
-     * Use applyScrollPositions/restoreScrollPositions instead for proper integration.
-     * 
-     * @deprecated Use applyScrollPositions() + super.render() + restoreScrollPositions()
+     * Renders widgets with scissor clipping.
+     * Widgets are already at visual positions (via setScrollOffset).
      */
-    @Deprecated
+    @Override
     protected void renderWithScroll(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {
         if (bounds == null || bounds.isEmpty()) return;
         
         // Clip to panel bounds
         context.enableScissor(bounds.x(), bounds.y(), bounds.right(), bounds.bottom());
         
-        applyScrollPositions();
-        
-        // Render all widgets
+        // Render all widgets (already at visual positions)
         for (var widget : widgets) {
             widget.render(context, mouseX, mouseY, delta);
         }
-        
-        restoreScrollPositions();
         
         context.disableScissor();
         

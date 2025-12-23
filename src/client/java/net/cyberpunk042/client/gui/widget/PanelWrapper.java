@@ -96,10 +96,7 @@ public class PanelWrapper implements SubTabPane.ContentProvider {
     
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        // Widgets are permanently at their scroll-adjusted positions,
-        // so Screen's normal input handling works correctly.
-        // This method is kept for ContentProvider interface but returns false
-        // to let the Screen handle clicks through its registered widgets.
+        // Widgets are at visual positions - Screen handles input via registered children
         return false;
     }
     

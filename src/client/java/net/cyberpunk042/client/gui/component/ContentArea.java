@@ -189,14 +189,9 @@ public class ContentArea implements ScreenComponent {
     }
     
     /**
-     * Handles mouse click for the active sub-tab content.
-     * 
-     * <p>Since widgets are permanently at their scroll-adjusted positions,
-     * Screen's normal input handling works correctly. This method returns
-     * false to let Screen handle clicks through its registered widgets.</p>
+     * Mouse clicks are handled by Screen since widgets are at visual positions.
      */
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        // Widgets are at their visual positions - Screen handles input
         return false;
     }
     

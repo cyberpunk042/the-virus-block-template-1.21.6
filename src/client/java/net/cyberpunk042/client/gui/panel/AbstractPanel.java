@@ -375,17 +375,17 @@ public abstract class AbstractPanel {
      * mouseClicked(), and mouseDragged() all work without coordinate adjustments.</p>
      */
     public void setScrollOffset(int offset) {
+        if (bounds == null || bounds.isEmpty()) return;
+        
         int maxScroll = Math.max(0, contentHeight - bounds.height());
         int newOffset = Math.max(0, Math.min(offset, maxScroll));
         
-        // Calculate how much scroll changed
         int delta = newOffset - this.scrollOffset;
         if (delta == 0) return;
         
         this.scrollOffset = newOffset;
         
-        // Move all widgets by the scroll delta
-        // Widgets are kept permanently at their visual positions
+        // Permanently move widgets to visual positions
         for (var widget : widgets) {
             widget.setY(widget.getY() - delta);
         }
@@ -413,6 +413,13 @@ public abstract class AbstractPanel {
     }
     
     /**
+     * @return The parent screen.
+     */
+    public Screen getParent() {
+        return parent;
+    }
+    
+    /**
      * Handles mouse scroll input.
      * @return true if scroll was consumed.
      */
@@ -426,16 +433,16 @@ public abstract class AbstractPanel {
     }
     
     /**
+     * Mouse clicks are handled by Screen since widgets are at visual positions.
+     * @return false - let Screen handle input
+     */
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        return false;
+    }
+    
+    /**
      * Renders widgets with scissor clipping.
-     * 
-     * <p>Since widgets are permanently kept at their scroll-adjusted positions
-     * (via setScrollOffset), this method only needs to:</p>
-     * <ol>
-     *   <li>Enable scissor clipping to panel bounds</li>
-     *   <li>Render all widgets (already at correct positions)</li>
-     *   <li>Disable scissor</li>
-     *   <li>Render scroll indicator if scrollable</li>
-     * </ol>
+     * Widgets are already at visual positions (via setScrollOffset).
      */
     protected void renderWithScroll(DrawContext context, int mouseX, int mouseY, float delta) {
         if (bounds == null || bounds.isEmpty()) return;
@@ -443,7 +450,7 @@ public abstract class AbstractPanel {
         // Clip to panel bounds
         context.enableScissor(bounds.x(), bounds.y(), bounds.right(), bounds.bottom());
         
-        // Render all widgets - they're already at scroll-adjusted positions
+        // Render all widgets (already at visual positions)
         for (var widget : widgets) {
             widget.render(context, mouseX, mouseY, delta);
         }
@@ -457,7 +464,7 @@ public abstract class AbstractPanel {
     }
     
     /**
-     * @deprecated No longer needed - widgets are permanently at scroll-adjusted positions.
+     * @deprecated Use renderWithScroll() instead.
      */
     @Deprecated
     protected void applyScrollPositions() {
@@ -465,7 +472,7 @@ public abstract class AbstractPanel {
     }
     
     /**
-     * @deprecated No longer needed - widgets are permanently at scroll-adjusted positions.
+     * @deprecated Use renderWithScroll() instead.
      */
     @Deprecated
     protected void restoreScrollPositions() {

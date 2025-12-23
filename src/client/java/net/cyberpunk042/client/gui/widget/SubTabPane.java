@@ -267,17 +267,15 @@ public class SubTabPane {
     }
     
     /**
-     * Handles mouse click by forwarding to active content panel.
-     * 
-     * <p>Since widgets are permanently at their scroll-adjusted positions,
-     * Screen's normal input handling works correctly. This method returns
-     * false to let Screen handle clicks through its registered widgets.</p>
-     */
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        // Widgets are at their visual positions - Screen handles input
-        return false;
+ * Handles mouse click by forwarding to active content panel.
+ * Content panels handle scroll-adjusted input.
+ */
+public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    if (activeIndex < tabs.size()) {
+        return tabs.get(activeIndex).content.mouseClicked(mouseX, mouseY, button);
     }
-    
+    return false;
+}    
     // ═══════════════════════════════════════════════════════════════════════════
     // INNER TYPES
     // ═══════════════════════════════════════════════════════════════════════════

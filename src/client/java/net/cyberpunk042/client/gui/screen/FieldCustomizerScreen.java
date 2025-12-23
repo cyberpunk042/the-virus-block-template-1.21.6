@@ -502,7 +502,7 @@ public class FieldCustomizerScreen extends Screen {
         }
         
         // Let super.mouseClicked handle all registered widgets
-        // This ensures proper focus tracking for slider dragging
+        // Widgets are at visual positions, so this works correctly
         return super.mouseClicked(mouseX, mouseY, button);
     }
     
