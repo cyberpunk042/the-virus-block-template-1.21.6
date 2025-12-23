@@ -55,9 +55,9 @@ public record FillConfig(
     boolean depthWrite,
     @Nullable @JsonField(skipIfNull = true) CageOptions cage
 ){
-    /** Default solid fill. */
+    /** Default solid fill (see-through enabled by default). */
     public static final FillConfig SOLID = new FillConfig(
-        FillMode.SOLID, 1.0f, 2.0f, false, true, true, null);
+        FillMode.SOLID, 1.0f, 2.0f, false, true, false, null);
     
     /** Default wireframe fill. */
     public static final FillConfig WIREFRAME = new FillConfig(

@@ -151,8 +151,18 @@ public class FieldCustomizerScreen extends Screen {
         addWidgetsFrom(tabBar);
         if (currentTab != TabType.PROFILES) {
             addWidgetsFrom(selectorBar);
-            addWidgetsFrom(contentArea);
-            // ShapePanel handles its own rendering with scroll - don't register as drawables
+            // ContentArea: tab buttons are drawable (Screen renders)
+            // Content panel widgets are selectable only (panel renders, Screen handles input)
+            if (contentArea != null) {
+                SubTabPane active = contentArea.getActiveSubTabPane();
+                if (active != null) {
+                    // Tab buttons - Screen renders these
+                    for (var w : active.getWidgets()) addDrawableChild(w);
+                    // Content widgets - Panel renders, Screen handles input
+                    for (var w : active.getContentWidgets()) addSelectableChild(w);
+                }
+            }
+            // ShapePanel: selectable only (panel renders with scroll)
             addWidgetsAsSelectableOnly(shapePanel);
         } else {
             addWidgetsFrom(profilesPanel);
@@ -491,30 +501,8 @@ public class FieldCustomizerScreen extends Screen {
             presetDropdown.close();
         }
         
-        // Forward to contentArea for scroll-aware input handling
-        // ContentArea panel widgets are rendered with scroll offset but not registered 
-        // with Screen, so they need custom input handling with adjusted coordinates
-        if (currentTab != TabType.PROFILES && contentArea != null) {
-            if (contentArea.mouseClicked(mouseX, mouseY, button)) {
-                return true;
-            }
-        }
-        
-        // Forward to shapePanel for scroll-aware input handling
-        if (currentTab != TabType.PROFILES && shapePanel != null && shapePanelBounds != null) {
-            if (shapePanelBounds.contains(mouseX, mouseY)) {
-                // Adjust mouseY for scroll offset before checking widgets
-                int scrollOffset = shapePanel.getScrollOffset();
-                double adjustedMouseY = mouseY + scrollOffset;
-                for (var widget : shapePanel.getWidgets()) {
-                    if (widget.isMouseOver(mouseX, adjustedMouseY)) {
-                        if (widget.mouseClicked(mouseX, adjustedMouseY, button)) {
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
+        // Let super.mouseClicked handle all registered widgets
+        // This ensures proper focus tracking for slider dragging
         return super.mouseClicked(mouseX, mouseY, button);
     }
     

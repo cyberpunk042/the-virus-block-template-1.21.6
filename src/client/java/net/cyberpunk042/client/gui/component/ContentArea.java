@@ -144,11 +144,15 @@ public class ContentArea implements ScreenComponent {
     
     @Override
     public List<ClickableWidget> getWidgets() {
+        List<ClickableWidget> all = new ArrayList<>();
         SubTabPane active = getActiveSubTabPane();
         if (active != null) {
-            return active.getWidgets();
+            // Tab buttons (for tab switching)
+            all.addAll(active.getWidgets());
+            // Content panel widgets (sliders, toggles, etc.)
+            all.addAll(active.getContentWidgets());
         }
-        return List.of();
+        return all;
     }
     
     @Override
@@ -186,13 +190,13 @@ public class ContentArea implements ScreenComponent {
     
     /**
      * Handles mouse click for the active sub-tab content.
-     * Forwarded to the panel which handles scroll-adjusted coordinates.
+     * 
+     * <p>Since widgets are permanently at their scroll-adjusted positions,
+     * Screen's normal input handling works correctly. This method returns
+     * false to let Screen handle clicks through its registered widgets.</p>
      */
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        SubTabPane active = getActiveSubTabPane();
-        if (active != null) {
-            return active.mouseClicked(mouseX, mouseY, button);
-        }
+        // Widgets are at their visual positions - Screen handles input
         return false;
     }
     

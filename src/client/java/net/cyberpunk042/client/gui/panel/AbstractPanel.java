@@ -368,10 +368,27 @@ public abstract class AbstractPanel {
     
     /**
      * Sets the scroll offset for this panel.
+     * 
+     * <p>When scroll offset changes, all widget Y positions are permanently updated
+     * to match their visual positions. This ensures Screen's input handling works
+     * correctly - widgets are always at their rendered positions, so isMouseOver(),
+     * mouseClicked(), and mouseDragged() all work without coordinate adjustments.</p>
      */
     public void setScrollOffset(int offset) {
         int maxScroll = Math.max(0, contentHeight - bounds.height());
-        this.scrollOffset = Math.max(0, Math.min(offset, maxScroll));
+        int newOffset = Math.max(0, Math.min(offset, maxScroll));
+        
+        // Calculate how much scroll changed
+        int delta = newOffset - this.scrollOffset;
+        if (delta == 0) return;
+        
+        this.scrollOffset = newOffset;
+        
+        // Move all widgets by the scroll delta
+        // Widgets are kept permanently at their visual positions
+        for (var widget : widgets) {
+            widget.setY(widget.getY() - delta);
+        }
     }
     
     /**
@@ -409,16 +426,15 @@ public abstract class AbstractPanel {
     }
     
     /**
-     * Renders widgets with scroll offset applied.
+     * Renders widgets with scissor clipping.
      * 
-     * <p>This method:
+     * <p>Since widgets are permanently kept at their scroll-adjusted positions
+     * (via setScrollOffset), this method only needs to:</p>
      * <ol>
-     *   <li>Enables scissor clipping to panel bounds</li>
-     *   <li>Temporarily repositions widgets by scroll offset</li>
-     *   <li>Renders all widgets</li>
-     *   <li>Restores widget positions</li>
-     *   <li>Disables scissor</li>
-     *   <li>Renders scroll indicator if scrollable</li>
+     *   <li>Enable scissor clipping to panel bounds</li>
+     *   <li>Render all widgets (already at correct positions)</li>
+     *   <li>Disable scissor</li>
+     *   <li>Render scroll indicator if scrollable</li>
      * </ol>
      */
     protected void renderWithScroll(DrawContext context, int mouseX, int mouseY, float delta) {
@@ -427,14 +443,10 @@ public abstract class AbstractPanel {
         // Clip to panel bounds
         context.enableScissor(bounds.x(), bounds.y(), bounds.right(), bounds.bottom());
         
-        applyScrollPositions();
-        
-        // Render all widgets
+        // Render all widgets - they're already at scroll-adjusted positions
         for (var widget : widgets) {
             widget.render(context, mouseX, mouseY, delta);
         }
-        
-        restoreScrollPositions();
         
         context.disableScissor();
         
@@ -445,22 +457,19 @@ public abstract class AbstractPanel {
     }
     
     /**
-     * Temporarily applies scroll offset to all widget Y positions.
-     * Call restoreScrollPositions() after rendering.
+     * @deprecated No longer needed - widgets are permanently at scroll-adjusted positions.
      */
+    @Deprecated
     protected void applyScrollPositions() {
-        for (var widget : widgets) {
-            widget.setY(widget.getY() - scrollOffset);
-        }
+        // No-op: kept for backward compatibility
     }
     
     /**
-     * Restores widget Y positions after scroll rendering.
+     * @deprecated No longer needed - widgets are permanently at scroll-adjusted positions.
      */
+    @Deprecated
     protected void restoreScrollPositions() {
-        for (var widget : widgets) {
-            widget.setY(widget.getY() + scrollOffset);
-        }
+        // No-op: kept for backward compatibility
     }
     
     /**

@@ -89,6 +89,12 @@ public class ContentBuilder {
         return this;
     }
     
+    /** Advances Y by a custom amount. Use for manual widgets with non-standard heights. */
+    public ContentBuilder advanceBy(int amount) {
+        currentY += amount;
+        return this;
+    }
+    
     /** Gets current Y position for manual widget placement. */
     public int getCurrentY() {
         return currentY;

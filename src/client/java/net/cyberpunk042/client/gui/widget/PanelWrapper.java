@@ -96,21 +96,10 @@ public class PanelWrapper implements SubTabPane.ContentProvider {
     
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (!initialized || currentBounds == null) return false;
-        if (!currentBounds.contains(mouseX, mouseY)) return false;
-        
-        // Get scroll offset from panel and adjust mouseY to account for scroll
-        int scrollOffset = panel.getScrollOffset();
-        double adjustedMouseY = mouseY + scrollOffset;
-        
-        // Check each widget with scroll-adjusted coordinates
-        for (ClickableWidget widget : panel.getWidgets()) {
-            if (widget.isMouseOver(mouseX, adjustedMouseY)) {
-                if (widget.mouseClicked(mouseX, adjustedMouseY, button)) {
-                    return true;
-                }
-            }
-        }
+        // Widgets are permanently at their scroll-adjusted positions,
+        // so Screen's normal input handling works correctly.
+        // This method is kept for ContentProvider interface but returns false
+        // to let the Screen handle clicks through its registered widgets.
         return false;
     }
     
