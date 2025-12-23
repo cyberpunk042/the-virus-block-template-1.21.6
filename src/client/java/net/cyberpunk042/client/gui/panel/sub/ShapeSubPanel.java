@@ -356,15 +356,13 @@ public class ShapeSubPanel extends AbstractPanel {
         int bx = bounds.x();
         int by = bounds.y();
         
-        // Title bar
+        // Title bar (rendered above scroll area)
         int titleX = bx + GuiConstants.PADDING;
         int titleY = by + (TITLE_HEIGHT - 8) / 2;
         context.drawTextWithShadow(tr, "Shape", titleX, titleY, 0xFF88AACC);
         
-        // Render all widgets
-        for (var widget : widgets) {
-            widget.render(context, mouseX, mouseY, delta);
-        }
+        // Render widgets with scroll support (handles scissor + offset + restore)
+        renderWithScroll(context, mouseX, mouseY, delta);
     }
     
     public int getHeight() {

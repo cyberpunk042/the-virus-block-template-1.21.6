@@ -149,7 +149,8 @@ public class AdvancedPanel extends AbstractPanel {
         }
     }
     
-    private void renderScrollIndicator(DrawContext context) {
+    @Override
+    protected void renderScrollIndicator(DrawContext context) {
         int barHeight = 4;
         int barY = GuiConstants.TAB_HEIGHT + 2;
         float scrollPercent = (float) scrollOffset / Math.max(1, contentHeight - panelHeight);

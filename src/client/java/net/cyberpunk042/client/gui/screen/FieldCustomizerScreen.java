@@ -152,7 +152,8 @@ public class FieldCustomizerScreen extends Screen {
         if (currentTab != TabType.PROFILES) {
             addWidgetsFrom(selectorBar);
             addWidgetsFrom(contentArea);
-            addWidgetsFrom(shapePanel);
+            // ShapePanel handles its own rendering with scroll - don't register as drawables
+            addWidgetsAsSelectableOnly(shapePanel);
         } else {
             addWidgetsFrom(profilesPanel);
         }
@@ -442,6 +443,10 @@ public class FieldCustomizerScreen extends Screen {
         if (presetDropdown != null && presetDropdown.isExpanded() && presetDropdown.handleScroll(mouseX, mouseY, vAmt)) return true;
         if (currentTab != TabType.PROFILES) {
             if (contentArea != null && contentArea.mouseScrolled(mouseX, mouseY, hAmt, vAmt)) return true;
+            // Forward to shapePanel for scroll handling
+            if (shapePanel != null && shapePanelBounds != null && shapePanelBounds.contains(mouseX, mouseY)) {
+                if (shapePanel.mouseScrolled(mouseX, mouseY, hAmt, vAmt)) return true;
+            }
         } else {
             if (profilesPanel != null && profilesPanel.mouseScrolled(mouseX, mouseY, hAmt, vAmt)) return true;
         }
@@ -495,6 +500,21 @@ public class FieldCustomizerScreen extends Screen {
             }
         }
         
+        // Forward to shapePanel for scroll-aware input handling
+        if (currentTab != TabType.PROFILES && shapePanel != null && shapePanelBounds != null) {
+            if (shapePanelBounds.contains(mouseX, mouseY)) {
+                // Adjust mouseY for scroll offset before checking widgets
+                int scrollOffset = shapePanel.getScrollOffset();
+                double adjustedMouseY = mouseY + scrollOffset;
+                for (var widget : shapePanel.getWidgets()) {
+                    if (widget.isMouseOver(mouseX, adjustedMouseY)) {
+                        if (widget.mouseClicked(mouseX, adjustedMouseY, button)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
         return super.mouseClicked(mouseX, mouseY, button);
     }
     

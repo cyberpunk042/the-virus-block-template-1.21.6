@@ -144,7 +144,7 @@ public class TabBar implements ScreenComponent {
         
         // Preset dropdown and renderer toggle (FULLSCREEN only - in windowed these go to right panel)
         if (!useShortLabels) {
-            int dropdownW = 160;
+            int dropdownW = 120;  // Reduced from 160 to avoid overlapping tabs
             int toggleW = 70;
             int presetX = rightEdge - dropdownW;
             int toggleX = presetX - toggleW - 8;

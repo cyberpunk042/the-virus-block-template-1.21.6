@@ -408,6 +408,82 @@ public abstract class AbstractPanel {
         return true;
     }
     
+    /**
+     * Renders widgets with scroll offset applied.
+     * 
+     * <p>This method:
+     * <ol>
+     *   <li>Enables scissor clipping to panel bounds</li>
+     *   <li>Temporarily repositions widgets by scroll offset</li>
+     *   <li>Renders all widgets</li>
+     *   <li>Restores widget positions</li>
+     *   <li>Disables scissor</li>
+     *   <li>Renders scroll indicator if scrollable</li>
+     * </ol>
+     */
+    protected void renderWithScroll(DrawContext context, int mouseX, int mouseY, float delta) {
+        if (bounds == null || bounds.isEmpty()) return;
+        
+        // Clip to panel bounds
+        context.enableScissor(bounds.x(), bounds.y(), bounds.right(), bounds.bottom());
+        
+        applyScrollPositions();
+        
+        // Render all widgets
+        for (var widget : widgets) {
+            widget.render(context, mouseX, mouseY, delta);
+        }
+        
+        restoreScrollPositions();
+        
+        context.disableScissor();
+        
+        // Render scroll indicator if scrollable
+        if (isScrollable()) {
+            renderScrollIndicator(context);
+        }
+    }
+    
+    /**
+     * Temporarily applies scroll offset to all widget Y positions.
+     * Call restoreScrollPositions() after rendering.
+     */
+    protected void applyScrollPositions() {
+        for (var widget : widgets) {
+            widget.setY(widget.getY() - scrollOffset);
+        }
+    }
+    
+    /**
+     * Restores widget Y positions after scroll rendering.
+     */
+    protected void restoreScrollPositions() {
+        for (var widget : widgets) {
+            widget.setY(widget.getY() + scrollOffset);
+        }
+    }
+    
+    /**
+     * Renders a scroll indicator bar on the right edge.
+     */
+    protected void renderScrollIndicator(DrawContext context) {
+        int maxScroll = getMaxScroll();
+        if (maxScroll <= 0) return;
+        
+        // Scroll track
+        int trackX = bounds.right() - 4;
+        int trackY = bounds.y() + 2;
+        int trackH = bounds.height() - 4;
+        
+        // Scroll thumb
+        float scrollRatio = (float) scrollOffset / maxScroll;
+        int thumbH = Math.max(10, trackH * bounds.height() / contentHeight);
+        int thumbY = trackY + (int)((trackH - thumbH) * scrollRatio);
+        
+        context.fill(trackX, trackY, trackX + 3, trackY + trackH, 0x40FFFFFF);
+        context.fill(trackX, thumbY, trackX + 3, thumbY + thumbH, 0xA0FFFFFF);
+    }
+    
     // ═══════════════════════════════════════════════════════════════════════════
     // LIFECYCLE (Template Method Pattern)
     // ═══════════════════════════════════════════════════════════════════════════
