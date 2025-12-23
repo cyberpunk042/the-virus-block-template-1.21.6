@@ -185,6 +185,18 @@ public class ContentArea implements ScreenComponent {
     }
     
     /**
+     * Handles mouse click for the active sub-tab content.
+     * Forwarded to the panel which handles scroll-adjusted coordinates.
+     */
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        SubTabPane active = getActiveSubTabPane();
+        if (active != null) {
+            return active.mouseClicked(mouseX, mouseY, button);
+        }
+        return false;
+    }
+    
+    /**
      * Refreshes for renderer mode changes.
      * Rebuilds sub-tabs to update visibility of mode-dependent panels.
      */

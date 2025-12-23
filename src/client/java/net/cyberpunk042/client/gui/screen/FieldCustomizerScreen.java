@@ -172,6 +172,25 @@ public class FieldCustomizerScreen extends Screen {
         if (widgets != null) for (ClickableWidget w : widgets) addDrawableChild(w);
     }
     
+    /**
+     * Adds widgets as selectable only (for input handling) but NOT as drawables.
+     * Use this for components that handle their own rendering (e.g., with scroll).
+     * 
+     * <p>This prevents double-rendering: widgets receive input via Screen,
+     * but are rendered by their parent panel with proper scroll handling.</p>
+     */
+    private void addWidgetsAsSelectableOnly(Object component) {
+        if (component == null) return;
+        List<ClickableWidget> widgets = null;
+        if (component instanceof ScreenComponent sc) widgets = sc.getWidgets();
+        else if (component instanceof AbstractPanel ap) widgets = ap.getWidgets();
+        if (widgets != null) {
+            for (ClickableWidget w : widgets) {
+                addSelectableChild(w);  // Input only, NOT rendered by super.render()
+            }
+        }
+    }
+    
     // ═══════════════════════════════════════════════════════════════════════════
     // MODE & TAB SWITCHING (~30 lines)
     // ═══════════════════════════════════════════════════════════════════════════
@@ -466,6 +485,16 @@ public class FieldCustomizerScreen extends Screen {
             if (presetDropdown.handleClick(mouseX, mouseY, button)) return true;
             presetDropdown.close();
         }
+        
+        // Forward to contentArea for scroll-aware input handling
+        // ContentArea panel widgets are rendered with scroll offset but not registered 
+        // with Screen, so they need custom input handling with adjusted coordinates
+        if (currentTab != TabType.PROFILES && contentArea != null) {
+            if (contentArea.mouseClicked(mouseX, mouseY, button)) {
+                return true;
+            }
+        }
+        
         return super.mouseClicked(mouseX, mouseY, button);
     }
     

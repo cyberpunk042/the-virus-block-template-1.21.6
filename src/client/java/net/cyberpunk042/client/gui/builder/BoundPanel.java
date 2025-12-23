@@ -233,31 +233,54 @@ public abstract class BoundPanel extends AbstractPanel implements StateChangeLis
      * @param mouseY Mouse Y
      * @param delta Frame delta
      */
+    /**
+     * Applies scroll offset to widget positions for rendering.
+     * Call this BEFORE super.render() and call restoreScrollPositions() AFTER.
+     * 
+     * <p>This method does NOT render widgets - that's done by Screen.render().
+     * It only repositions widgets so they appear scrolled when rendered.</p>
+     */
+    protected void applyScrollPositions() {
+        if (scrollOffset != 0) {
+            for (var widget : widgets) {
+                widget.setY(widget.getY() - scrollOffset);
+            }
+        }
+    }
+    
+    /**
+     * Restores widget positions after scrolled rendering.
+     * Call this AFTER super.render() to undo the scroll offset.
+     */
+    protected void restoreScrollPositions() {
+        if (scrollOffset != 0) {
+            for (var widget : widgets) {
+                widget.setY(widget.getY() + scrollOffset);
+            }
+        }
+    }
+    
+    /**
+     * Legacy renderWithScroll - applies scroll, renders widgets, restores.
+     * Use applyScrollPositions/restoreScrollPositions instead for proper integration.
+     * 
+     * @deprecated Use applyScrollPositions() + super.render() + restoreScrollPositions()
+     */
+    @Deprecated
     protected void renderWithScroll(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {
         if (bounds == null || bounds.isEmpty()) return;
         
         // Clip to panel bounds
         context.enableScissor(bounds.x(), bounds.y(), bounds.right(), bounds.bottom());
         
-        // Apply scroll offset to widgets by temporarily repositioning
-        // This is needed because widgets have absolute positions
-        if (scrollOffset != 0) {
-            for (var widget : widgets) {
-                widget.setY(widget.getY() - scrollOffset);
-            }
-        }
+        applyScrollPositions();
         
         // Render all widgets
         for (var widget : widgets) {
             widget.render(context, mouseX, mouseY, delta);
         }
         
-        // Restore widget positions
-        if (scrollOffset != 0) {
-            for (var widget : widgets) {
-                widget.setY(widget.getY() + scrollOffset);
-            }
-        }
+        restoreScrollPositions();
         
         context.disableScissor();
         

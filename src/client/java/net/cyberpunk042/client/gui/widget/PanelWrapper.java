@@ -79,7 +79,8 @@ public class PanelWrapper implements SubTabPane.ContentProvider {
             currentBounds.bottom()
         );
         
-        // Render directly - widgets are at correct screen positions now
+        // Render panel with scroll handling - this is the ONLY render path for widgets
+        // Widgets are registered with Screen as selectables (for input) but NOT drawables
         panel.render(context, mouseX, mouseY, delta);
         
         context.disableScissor();
@@ -89,6 +90,26 @@ public class PanelWrapper implements SubTabPane.ContentProvider {
     public boolean mouseScrolled(double mouseX, double mouseY, double h, double v) {
         if (currentBounds != null && currentBounds.contains(mouseX, mouseY)) {
             return panel.mouseScrolled(mouseX, mouseY, h, v);
+        }
+        return false;
+    }
+    
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (!initialized || currentBounds == null) return false;
+        if (!currentBounds.contains(mouseX, mouseY)) return false;
+        
+        // Get scroll offset from panel and adjust mouseY to account for scroll
+        int scrollOffset = panel.getScrollOffset();
+        double adjustedMouseY = mouseY + scrollOffset;
+        
+        // Check each widget with scroll-adjusted coordinates
+        for (ClickableWidget widget : panel.getWidgets()) {
+            if (widget.isMouseOver(mouseX, adjustedMouseY)) {
+                if (widget.mouseClicked(mouseX, adjustedMouseY, button)) {
+                    return true;
+                }
+            }
         }
         return false;
     }

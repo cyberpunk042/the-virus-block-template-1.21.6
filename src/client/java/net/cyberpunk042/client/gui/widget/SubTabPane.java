@@ -198,16 +198,27 @@ public class SubTabPane {
     // WIDGETS
     // ═══════════════════════════════════════════════════════════════════════════
     
+    /**
+     * Returns ONLY tab button widgets (for Screen registration).
+     * These are rendered by Screen and don't need scroll handling.
+     */
     public List<ClickableWidget> getWidgets() {
-        List<ClickableWidget> all = new ArrayList<>();
-        // Only add non-null buttons (hidden tabs have null placeholders)
+        List<ClickableWidget> tabWidgets = new ArrayList<>();
         for (ButtonWidget btn : tabButtons) {
-            if (btn != null) all.add(btn);
+            if (btn != null) tabWidgets.add(btn);
         }
+        return tabWidgets;
+    }
+    
+    /**
+     * Returns the active content panel's widgets.
+     * These are NOT registered with Screen - the panel handles rendering and input.
+     */
+    public List<ClickableWidget> getContentWidgets() {
         if (activeIndex < tabs.size() && tabs.get(activeIndex).content.isFeatureSupported()) {
-            all.addAll(tabs.get(activeIndex).content.getWidgets());
+            return tabs.get(activeIndex).content.getWidgets();
         }
-        return all;
+        return List.of();
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -255,6 +266,18 @@ public class SubTabPane {
         return false;
     }
     
+    /**
+     * Handles mouse click by forwarding to active content panel.
+     * The content panel handles scroll-adjusted coordinate mapping.
+     */
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (!contentBounds.contains(mouseX, mouseY)) return false;
+        if (activeIndex < tabs.size() && tabs.get(activeIndex).content.isFeatureSupported()) {
+            return tabs.get(activeIndex).content.mouseClicked(mouseX, mouseY, button);
+        }
+        return false;
+    }
+    
     // ═══════════════════════════════════════════════════════════════════════════
     // INNER TYPES
     // ═══════════════════════════════════════════════════════════════════════════
@@ -270,6 +293,9 @@ public class SubTabPane {
         void tick();
         void render(DrawContext context, int mouseX, int mouseY, float delta);
         default boolean mouseScrolled(double mouseX, double mouseY, double h, double v) { return false; }
+        
+        /** Handle mouse click with scroll-aware coordinate mapping. */
+        default boolean mouseClicked(double mouseX, double mouseY, int button) { return false; }
         
         /** Check if this content's features are supported by current renderer. */
         default boolean isFeatureSupported() { return true; }

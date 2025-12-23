@@ -144,7 +144,8 @@ public class AdvancedPanel extends AbstractPanel {
     private void renderSubPanel(AbstractPanel panel, DrawContext context, int mouseX, int mouseY, float delta) {
         if (panel != null) {
             panel.setScrollOffset(scrollOffset);
-            panel.render(context, mouseX, mouseY + scrollOffset, delta);
+            // Don't add scrollOffset to mouseY - subpanel handles widget repositioning via renderWithScroll
+            panel.render(context, mouseX, mouseY, delta);
         }
     }
     
