@@ -50,6 +50,12 @@ public final class TestFieldRenderer {
             return;
         }
         
+        // Skip if personal field is visible - it now uses the live definition 
+        // with follow mode, so we don't need to render separately
+        if (net.cyberpunk042.client.visual.ClientFieldManager.get().personalTracker().isVisible()) {
+            return;
+        }
+        
         FieldEditState state = FieldEditStateHolder.get();
         if (state == null) {
             return;

@@ -454,7 +454,17 @@ public final class ClientFieldManager {
             float worldTime,
             float tickDelta) {
         
-        FieldDefinition def = personalTracker.definition();
+        // Use LIVE definition from current edit state if GUI is active,
+        // otherwise fall back to saved definition from registry
+        FieldDefinition def;
+        if (net.cyberpunk042.client.gui.state.FieldEditStateHolder.isTestFieldActive()) {
+            var state = net.cyberpunk042.client.gui.state.FieldEditStateHolder.get();
+            def = state != null 
+                ? net.cyberpunk042.client.gui.state.DefinitionBuilder.fromState(state) 
+                : personalTracker.definition();
+        } else {
+            def = personalTracker.definition();
+        }
         if (def == null) {
             return;
         }
