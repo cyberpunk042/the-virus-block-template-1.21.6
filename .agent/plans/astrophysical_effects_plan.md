@@ -71,13 +71,19 @@ record JetPrecession(
 - Consistent with existing multi-primitive architecture
 - Can share or differ in appearance from parent
 
-### 1.4 Tessellation
+### 1.4 Implementation Notes
+
+**Inspiration: RingShape + RingTessellator**
+- Jets with `hollow=true` are structurally similar to Ring with `height > 0`
+- Use Ring's approach for inner/outer walls and wall thickness
+- This ensures consistent handling of hollow geometry across shapes
 
 **JetTessellator**:
 - Generate cone/cylinder geometry for each jet
 - If `dualJets=true`, generate both +Y and -Y directions
-- Apply precession by rotating the entire mesh
+- Apply precession by rotating the entire mesh around time
 - Support patterns for visual effects (e.g., striped jets)
+- Reference `RingTessellator` for hollow tube approach
 
 ### 1.5 Files to Create/Modify
 
@@ -134,15 +140,19 @@ record AbsorptionRaysShape(
     float randomness,           // 0 = perfect grid, 1 = fully random positions (default: 0)
     
     // === Animation ===
-    boolean animated,           // Do rays move inward? (default: true)
-    float animSpeed,            // Speed of inward motion (default: 1.0)
+    boolean animated,           // Do rays move? (default: true)
+    float animSpeed,            // Speed of motion (default: 1.0)
+    boolean reverseDirection,   // false = inward (absorption), true = outward (emission)
     float spawnRate,            // Rays per second (0 = static rays, default: 0)
     float rayLifetime,          // How long each ray lives before respawning (default: 2.0)
-    boolean fadeIn,             // Rays fade in at outer edge (default: true)
-    boolean fadeOut,            // Rays fade out at inner edge (default: true)
+    boolean fadeIn,             // Rays fade in at spawn edge (default: true)
+    boolean fadeOut,            // Rays fade out at destination (default: true)
     
-    // === Appearance (shape-level, Appearance record handles color/glow) ===
-    boolean convergeTocenter,   // true = to center, false = from center (emission rays)
+    // === Color ===
+    RayColorMode colorMode,     // SOLID, GRADIENT, RAINBOW
+    int rayColor,               // Base color (if SOLID or GRADIENT start)
+    int rayColorEnd,            // End color (if GRADIENT)
+    float rainbowSpeed,         // Rainbow cycle speed (if RAINBOW, default: 1.0)
     float density               // Ray density multiplier (default: 1.0)
 ) implements Shape
 ```
@@ -150,10 +160,19 @@ record AbsorptionRaysShape(
 **Distribution Modes**:
 ```java
 enum RayDistribution {
-    RADIAL_UNIFORM,     // Even spacing in 2D ring pattern (like Disc)
+    RADIAL_UNIFORM,     // Even spacing in 2D ring pattern
     RADIAL_RANDOM,      // Random angles in 2D ring pattern
     SPHERICAL_UNIFORM,  // Even lat/lon grid over sphere surface
     SPHERICAL_RANDOM    // Random positions on sphere surface
+}
+```
+
+**Color Modes**:
+```java
+enum RayColorMode {
+    SOLID,      // Single color for all rays
+    GRADIENT,   // Color transitions from start to end along ray
+    RAINBOW     // Cycling through hue over time
 }
 ```
 
@@ -201,62 +220,33 @@ enum RayDistribution {
 
 ---
 
-## Phase 3: Presets and Compositions
+## Phase 3: Presets and Compositions (Future Work)
 
-### 3.1 Black Hole Preset
+**Note**: This phase requires more sophisticated planning and will be addressed in a future conversation.
 
-Once all components exist, create a preset that combines them:
+### Direction
 
-```json
-{
-  "id": "black_hole",
-  "layers": [{
-    "primitives": [
-      { 
-        "id": "event_horizon",
-        "shape": { "type": "sphere", "radius": 0.5 },
-        "appearance": { "color": "#000000", "glow": 0.8 }
-      },
-      {
-        "id": "accretion_disk", 
-        "shape": { "type": "ring", "innerRadius": 0.6, "outerRadius": 2.0, "height": 0.1 },
-        "animation": { "spin": { "speedY": 0.5 } }
-      },
-      {
-        "id": "jets",
-        "shape": { "type": "jet", "length": 5.0, "precession": { "angle": 10 } },
-        "link": { "parentId": "event_horizon" }
-      },
-      {
-        "id": "rays",
-        "shape": { "type": "absorptionRays", "outerRadius": 4.0, "rayCount": 24 }
-      }
-    ]
-  }]
-}
-```
+Once JetShape and AbsorptionRaysShape are implemented and tested:
 
-### 3.2 Pulsar Preset
+1. **Study composition patterns** - How do multi-primitive presets work today?
+2. **Define preset structure** - What makes a good cosmic preset?
+3. **Plan target presets**:
+   - Black Hole (event horizon + accretion disk + jets + absorption rays)
+   - Pulsar (neutron star + rotating beams)
+   - Quasar (active galactic nucleus variant)
+   - Supernova (expanding shockwave)
+   - Magnetar (extreme magnetic field visualization)
 
-```json
-{
-  "id": "pulsar",
-  "layers": [{
-    "primitives": [
-      {
-        "id": "star",
-        "shape": { "type": "sphere", "radius": 0.3 },
-        "appearance": { "color": "#FFFFFF", "glow": 1.0 }
-      },
-      {
-        "id": "beams",
-        "shape": { "type": "jet", "length": 8.0, "baseRadius": 0.1 },
-        "animation": { "spin": { "speedY": 2.0 } }
-      }
-    ]
-  }]
-}
-```
+4. **Consider inter-primitive relationships**:
+   - How do jets stay aligned with parent sphere?
+   - How does PrimitiveLink inheritance work for transforms?
+   - Do we need new linking modes?
+
+5. **Animation synchronization**:
+   - Can jet precession sync with parent spin?
+   - Should accretion disk rotation affect ray behavior?
+
+**This phase should NOT start until Phase 1 and 2 are complete and stable.**
 
 ---
 
