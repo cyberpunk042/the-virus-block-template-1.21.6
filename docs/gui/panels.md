@@ -2,7 +2,7 @@
 
 > Packages: client.gui.panel, client.gui.panel.sub
 
-**26 classes**
+**23 classes**
 
 ## Class Diagram
 
@@ -64,19 +64,10 @@ classDiagram
         +render(...) void
         +getWidgets() List
     }
-    class AnimationSubPanel {
-        +init(...) void
-        +tick() void
-        +render(...) void
-        +getHeight() int
-        +getWidgets() List
-    }
     class AppearanceSubPanel {
-        +init(...) void
         +tick() void
         +render(...) void
         +getHeight() int
-        +getWidgets() List
     }
     class ArrangeSubPanel {
         +getHeight() int
@@ -86,10 +77,10 @@ classDiagram
         +getWidgets() List
     }
     class BeamSubPanel {
-        +init(...) void
+        +onStateChanged(...) void
         +render(...) void
-        +getHeight() int
         +tick() void
+        +getHeight() int
     }
     class BindingsSubPanel {
         +init(...) void
@@ -99,10 +90,11 @@ classDiagram
         +getHeight() int
     }
     class FillSubPanel {
-        +init(...) void
         +tick() void
         +render(...) void
         +onShapeChanged() void
+        +getHeight() int
+        +getWidgets() List
     }
     class ForceSubPanel {
         +setOnConfigureRequest(...) void
@@ -112,18 +104,15 @@ classDiagram
         +tick() void
     }
     class LifecycleSubPanel {
-        +init(...) void
         +tick() void
         +render(...) void
         +getHeight() int
-        +getWidgets() List
     }
     class LinkingSubPanel {
-        +init(...) void
-        +getWidgets() List
+        +tick() void
         +render(...) void
         +getHeight() int
-        +tick() void
+        +getWidgets() List
     }
     class ModifiersSubPanel {
         +init(...) void
@@ -132,19 +121,10 @@ classDiagram
         +getWidgets() List
         +getContentHeight() int
     }
-    class OrbitSubPanel {
-        +init(...) void
-        +tick() void
-        +render(...) void
-        +getWidgets() List
-        +getContentHeight() int
-    }
     class PredictionSubPanel {
-        +init(...) void
-        +getWidgets() List
         +render(...) void
-        +getHeight() int
         +tick() void
+        +getHeight() int
     }
     class ShapeSubPanel {
         +setWarningCallback(...) void
@@ -159,15 +139,7 @@ classDiagram
         +tick() void
         +getHeight() int
     }
-    class TransformQuickSubPanel {
-        +init(...) void
-        +tick() void
-        +render(...) void
-        +getHeight() int
-        +getWidgets() List
-    }
     class TransformSubPanel {
-        +init(...) void
         +tick() void
         +render(...) void
         +getHeight() int
@@ -181,54 +153,39 @@ classDiagram
         +getWidgets() List
     }
     class VisibilitySubPanel {
-        +setWidgetChangedCallback(...) void
-        +init(...) void
         +tick() void
         +render(...) void
         +getHeight() int
     }
+    class BoundPanel
     class Screen
     class Bounds
+    class Presetpreset
     AbstractPanel --> Bounds : bounds
     AbstractPanel --> ExpandableSection : sections
     AbstractPanel --> FieldEditState : state
     AbstractPanel --> Screen : parent
     AbstractPanel <|-- ActionPanel
     AbstractPanel <|-- AdvancedPanel
-    AbstractPanel <|-- AnimationSubPanel
-    AbstractPanel <|-- AppearanceSubPanel
     AbstractPanel <|-- ArrangeSubPanel
-    AbstractPanel <|-- BeamSubPanel
     AbstractPanel <|-- BindingsSubPanel
     AbstractPanel <|-- DebugPanel
-    AbstractPanel <|-- FillSubPanel
     AbstractPanel <|-- ForceSubPanel
     AbstractPanel <|-- LayerPanel
-    AbstractPanel <|-- LifecycleSubPanel
-    AbstractPanel <|-- LinkingSubPanel
     AbstractPanel <|-- ModifiersSubPanel
-    AbstractPanel <|-- OrbitSubPanel
-    AbstractPanel <|-- PredictionSubPanel
     AbstractPanel <|-- PrimitivePanel
     AbstractPanel <|-- ProfilesPanel
     AbstractPanel <|-- QuickPanel
     AbstractPanel <|-- ShapeSubPanel
     AbstractPanel <|-- TraceSubPanel
-    AbstractPanel <|-- TransformQuickSubPanel
-    AbstractPanel <|-- TransformSubPanel
     AbstractPanel <|-- TriggerSubPanel
-    AbstractPanel <|-- VisibilitySubPanel
     ActionPanel --> CyclingButtonWidget : autoSaveToggle
     ActionPanel --> CyclingButtonWidget : livePreviewToggle
     ActionPanel --> DrawContextcontext : uses
-    AdvancedPanel --> AnimationSubPanel : animationSubPanel
     AdvancedPanel --> AppearanceSubPanel : appearanceSubPanel
     AdvancedPanel --> ModifiersSubPanel : modifiersSubPanel
     AdvancedPanel --> ShapeSubPanel : shapeSubPanel
-    AnimationSubPanel --> CyclingButtonWidget : fragmentDropdown
-    AnimationSubPanel --> CyclingButtonWidget : pulseToggle
-    AnimationSubPanel --> CyclingButtonWidget : spinAxis
-    AnimationSubPanel --> CyclingButtonWidget : spinToggle
+    AdvancedPanel --> TransformSubPanel : transformSubPanel
     AppearanceSubPanel --> ColorButton : primaryColorBtn
     AppearanceSubPanel --> ColorButton : secondaryColorBtn
     AppearanceSubPanel --> DrawContextcontext : uses
@@ -236,22 +193,30 @@ classDiagram
     ArrangeSubPanel --> Tab : currentTab
     ArrangeSubPanel --> Tabtab : uses
     ArrangeSubPanel --> TextRenderer : textRenderer
-    BeamSubPanel --> CyclingButtonWidget : enableToggle
-    BeamSubPanel --> CyclingButtonWidget : fragmentDropdown
+    BeamSubPanel --> CyclingButtonWidget : enabledToggle
     BeamSubPanel --> CyclingButtonWidget : pulseToggle
-    BeamSubPanel --> GuiLayout : layout
+    BeamSubPanel --> CyclingButtonWidget : variantDropdown
+    BeamSubPanel --> CyclingButtonWidget : waveformDropdown
     BindingsSubPanel --> BindableProperty : selectedProperty
     BindingsSubPanel --> CyclingButtonWidget : propertyButton
     BindingsSubPanel --> GuiLayout : layout
     BindingsSubPanel --> InterpolationCurve : selectedCurve
+    BoundPanel <|-- AppearanceSubPanel
+    BoundPanel <|-- BeamSubPanel
+    BoundPanel <|-- FillSubPanel
+    BoundPanel <|-- LifecycleSubPanel
+    BoundPanel <|-- LinkingSubPanel
+    BoundPanel <|-- PredictionSubPanel
+    BoundPanel <|-- TransformSubPanel
+    BoundPanel <|-- VisibilitySubPanel
     DebugPanel --> BeamSubPanel : beamPanel
     DebugPanel --> BindingsSubPanel : bindingsPanel
     DebugPanel --> LifecycleSubPanel : lifecyclePanel
     DebugPanel --> TriggerSubPanel : triggerPanel
     FillSubPanel --> CageOptionsAdapter : cageAdapter
-    FillSubPanel --> CyclingButtonWidget : depthWriteToggle
-    FillSubPanel --> CyclingButtonWidget : fillModeDropdown
+    FillSubPanel --> ContentBuildercontent : uses
     FillSubPanel --> CyclingButtonWidget : fragmentDropdown
+    FillSubPanel --> DrawContextcontext : uses
     ForceSubPanel --> CyclingButtonWidget : locationDropdown
     ForceSubPanel --> CyclingButtonWidget : presetDropdown
     ForceSubPanel --> ForceFieldConfig : customConfig
@@ -259,25 +224,18 @@ classDiagram
     LayerPanel --> CyclingButtonWidget : blendModeDropdown
     LayerPanel --> DrawContextcontext : uses
     LayerPanel --> RunnableonLayerChanged : uses
-    LifecycleSubPanel --> DecayConfig : uses
-    LifecycleSubPanel --> LifecycleConfig : returns
-    LifecycleSubPanel --> LifecycleConfig : uses
+    LifecycleSubPanel --> DrawContextcontext : uses
     LifecycleSubPanel --> LifecycleConfigpreset : uses
-    LinkingSubPanel --> CyclingButtonWidget : followButton
-    LinkingSubPanel --> CyclingButtonWidget : mirrorButton
-    LinkingSubPanel --> CyclingButtonWidget : scaleWithButton
-    LinkingSubPanel --> GuiLayout : layout
+    LinkingSubPanel --> CyclingButtonWidget : targetDropdown
+    LinkingSubPanel --> DrawContextcontext : uses
     ModifiersSubPanel --> CheckboxWidget : colorCycleBlend
     ModifiersSubPanel --> CheckboxWidget : colorCycleEnabled
     ModifiersSubPanel --> CheckboxWidget : waveEnabled
     ModifiersSubPanel --> CheckboxWidget : wobbleEnabled
-    OrbitSubPanel --> CheckboxWidget : enabledCheckbox
-    OrbitSubPanel --> CyclingButtonWidget : axisDropdown
-    OrbitSubPanel --> DrawContextcontext : uses
     PredictionSubPanel --> CyclingButtonWidget : enabledButton
     PredictionSubPanel --> CyclingButtonWidget : presetButton
     PredictionSubPanel --> DrawContextcontext : uses
-    PredictionSubPanel --> GuiLayout : layout
+    PredictionSubPanel --> Presetpreset : uses
     PrimitivePanel --> DrawContextcontext : uses
     PrimitivePanel --> Runnablecallback : uses
     ProfilesPanel --> ProfileActionService : actionService
@@ -293,21 +251,15 @@ classDiagram
     ShapeSubPanel --> CyclingButtonWidget : patternFaces
     ShapeSubPanel --> CyclingButtonWidget : shapeTypeDropdown
     TraceSubPanel --> DrawContextcontext : uses
-    TransformQuickSubPanel --> CyclingButtonWidget : anchorDropdown
-    TransformQuickSubPanel --> CyclingButtonWidget : billboardDropdown
-    TransformQuickSubPanel --> CyclingButtonWidget : facingDropdown
-    TransformQuickSubPanel --> CyclingButtonWidget : uniformScaleToggle
-    TransformSubPanel --> CyclingButtonWidget : anchorDropdown
-    TransformSubPanel --> CyclingButtonWidget : uniformScaleToggle
-    TransformSubPanel --> Vec3Editor : offsetEditor
-    TransformSubPanel --> Vec3Editor : rotationEditor
+    TransformSubPanel --> AxisMotionConfigconfig : uses
+    TransformSubPanel --> ContentBuildercontent : uses
+    TransformSubPanel --> DrawContextcontext : uses
+    TransformSubPanel --> MotionModecurrentMode : uses
     TriggerSubPanel --> CyclingButtonWidget : triggerEffect
     TriggerSubPanel --> CyclingButtonWidget : triggerType
     TriggerSubPanel --> DrawContextcontext : uses
-    VisibilitySubPanel --> CyclingButtonWidget : animateToggle
-    VisibilitySubPanel --> CyclingButtonWidget : fragmentDropdown
-    VisibilitySubPanel --> CyclingButtonWidget : invertToggle
-    VisibilitySubPanel --> CyclingButtonWidget : maskTypeDropdown
+    VisibilitySubPanel --> CyclingButtonWidget : variantDropdown
+    VisibilitySubPanel --> DrawContextcontext : uses
 ```
 
 ---

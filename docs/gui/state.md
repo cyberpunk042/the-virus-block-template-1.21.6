@@ -2,7 +2,7 @@
 
 > Packages: client.gui.state, client.gui.state.adapter, client.gui.layout, client.gui.screen, client.gui.preview, client.gui
 
-**45 classes**
+**47 classes**
 
 ## Class Diagram
 
@@ -196,21 +196,6 @@ classDiagram
         +getBounds() Bounds
         +tick() void
     }
-    class SidePanel {
-        +addTab(...) SidePanel
-        +setActiveTab(...) void
-        +setOnModeToggle(...) void
-        +setOnClose(...) void
-        +tick() void
-    }
-    class StatusBar {
-        +setBounds(...) void
-        +showMessage(...) void
-        +setWarning(...) void
-        +clearWarning() void
-        +render(...) void
-    }
-    class AbstractPanel
     class Builder
     class Objectvalue
     class Feature
@@ -219,11 +204,9 @@ classDiagram
     class Deque
     class Primitivesource
     class Builderbuilder
-    class Objectv
     class Shape
+    class Objectv
     class Screen
-    class Side
-    class Boundsbounds
     AbstractAdapter --> Objectvalue : uses
     AbstractAdapter --> T : returns
     AbstractAdapter --> TdefaultValue : uses
@@ -237,7 +220,6 @@ classDiagram
     AbstractAdapter <|-- TransformAdapter
     AbstractAdapter <|-- TriggerAdapter
     AbstractAdapter <|-- VisibilityAdapter
-    AbstractPanel <|-- SidePanel
     AnimationAdapter --> AlphaPulseConfig : alphaPulse
     AnimationAdapter --> PulseConfig : pulse
     AnimationAdapter --> SpinConfig : spin
@@ -284,9 +266,9 @@ classDiagram
     LayoutPanel --> FieldEditState : state
     LayoutPanel --> Screen : parent
     LayoutPanel --> TextRenderer : textRenderer
-    LinkAdapter --> Objectv : uses
     LinkAdapter --> Objectvalue : uses
     LinkAdapter --> PrimitiveBuilderbuilder : uses
+    LinkAdapter --> PrimitiveLink : link
     LinkAdapter --> Primitivesource : uses
     PipelineTracer --> Objectvalue : uses
     PrimitiveAdapter --> Objectvalue : uses
@@ -308,22 +290,15 @@ classDiagram
     RendererCapabilities --> Feature : FULL_FEATURES
     RendererCapabilities --> Feature : SIMPLIFIED_FEATURES
     RendererCapabilities --> Feature : returns
-    ShapeAdapter --> DiscShape : disc
+    ShapeAdapter --> CylinderShape : cylinder
     ShapeAdapter --> PrismShape : prism
     ShapeAdapter --> RingShape : ring
     ShapeAdapter --> SphereShape : sphere
-    SidePanel --> Bounds : titleBarBounds
-    SidePanel --> Side : side
-    SidePanel --> TabEntry : tabs
-    SidePanel --> TextRenderer : textRenderer
     StateAccessor --> Objectstate : uses
     StateAccessor --> Objectvalue : uses
     StateAccessor --> T : returns
     StateAccessor --> T : uses
-    StatusBar --> Bounds : bounds
-    StatusBar --> Boundsbounds : uses
-    StatusBar --> FieldEditState : state
-    StatusBar --> TextRenderer : textRenderer
+    StateChangeListener --> ChangeTypechangeType : uses
     TransformAdapter --> PrimitiveBuilderbuilder : uses
     TransformAdapter --> Primitivesource : uses
     TransformAdapter --> Transform : returns

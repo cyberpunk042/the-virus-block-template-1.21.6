@@ -2,7 +2,7 @@
 
 > Complete graphical user interface architecture.
 
-**99 classes** across 10 packages.
+**98 classes** across 10 packages.
 
 ## Architecture
 
@@ -249,9 +249,9 @@ classDiagram
     LayoutManager --> Bounds : returns
     LayoutManager --> DrawContextcontext : uses
     LayoutManager --> GuiMode : returns
-    LinkAdapter --> Objectv : uses
     LinkAdapter --> Objectvalue : uses
     LinkAdapter --> PrimitiveBuilderbuilder : uses
+    LinkAdapter --> PrimitiveLink : link
     LinkAdapter --> Primitivesource : uses
     ModalDialog --> ActionButton : actions
     ModalDialog --> Bounds : contentBounds
@@ -275,7 +275,7 @@ classDiagram
     ProfilesPanel --> ProfileEntry : filteredProfiles
     ProfilesPanel --> ProfilesPanelLayout : layout
     Screen <|-- FieldCustomizerScreen
-    ShapeAdapter --> DiscShape : disc
+    ShapeAdapter --> CylinderShape : cylinder
     ShapeAdapter --> PrismShape : prism
     ShapeAdapter --> RingShape : ring
     ShapeAdapter --> SphereShape : sphere
@@ -284,6 +284,7 @@ classDiagram
     ShapeSubPanel --> CyclingButtonWidget : patternFaces
     ShapeSubPanel --> CyclingButtonWidget : shapeTypeDropdown
     SliderWidget <|-- LabeledSlider
+    StateChangeListener --> ChangeTypechangeType : uses
     StatusBar --> Bounds : bounds
     StatusBar --> Boundsbounds : uses
     StatusBar --> FieldEditState : state
@@ -306,9 +307,9 @@ classDiagram
 
 | Module | Classes | Description |
 |--------|---------|-------------|
-| [Panels](./gui/panels.md) | 26 | client.gui.panel, client.gui.panel.sub |
+| [Panels](./gui/panels.md) | 23 | client.gui.panel, client.gui.panel.sub |
 | [Widgets](./gui/widgets.md) | 28 | client.gui.widget, client.gui.util |
-| [State & Adapters](./gui/state.md) | 45 | client.gui.state, client.gui.state.adapter, client.gui.layout, client.gui.screen, client.gui.preview, client.gui |
+| [State & Adapters](./gui/state.md) | 47 | client.gui.state, client.gui.state.adapter, client.gui.layout, client.gui.screen, client.gui.preview, client.gui |
 
 ---
 [Back to README](./README.md)

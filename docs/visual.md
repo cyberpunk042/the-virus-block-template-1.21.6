@@ -2,7 +2,7 @@
 
 > Shapes, patterns, colors, animations, and fill modes.
 
-**78 classes**
+**79 classes**
 
 ## Key Classes
 
@@ -52,18 +52,6 @@ classDiagram
         +of(...) CylinderShape
         +tapered(...) CylinderShape
         +tube(...) CylinderShape
-    }
-    class DiscShape {
-        <<record>>
-        +radius: float
-        +segments: int
-        +y: float
-        +arcStart: float
-        +of(...) DiscShape
-        +at(...) DiscShape
-        +defaults() DiscShape
-        +ofRadius(...) DiscShape
-        +pie(...) DiscShape
     }
     class PolyhedronShape {
         <<record>>
@@ -308,6 +296,18 @@ classDiagram
         +apply(...) float
         +add(...) Phase
     }
+    class Pulse {
+        <<record>>
+        +amplitude: float
+        +frequency: float
+        +phase: float
+        +NONE: Pulse
+        +gentle() Pulse
+        +withAmplitude(...) Pulse
+        +scaleAt(...) float
+        +isActive() boolean
+        +withPhase(...) Pulse
+    }
     class Builder
     class RADIUSfloatradius
     class POSITIVE_NONZEROfloatheight
@@ -344,10 +344,6 @@ classDiagram
     CylinderShape --> POSITIVEfloattopRadius : uses
     CylinderShape --> RADIUSfloatradius : uses
     CylinderShape --> Vector3f : returns
-    DiscShape --> CellType : returns
-    DiscShape --> DEGREESfloatarcEnd : uses
-    DiscShape --> RADIUSfloatradius : uses
-    DiscShape --> Vector3f : returns
     DynamicEdgePattern --> CellType : returns
     DynamicEdgePattern --> EdgeArrangementarr : uses
     DynamicQuadPattern --> CellType : returns
@@ -379,7 +375,6 @@ classDiagram
     Shape <|.. CapsuleShape
     Shape <|.. ConeShape
     Shape <|.. CylinderShape
-    Shape <|.. DiscShape
     Shape <|.. PolyhedronShape
     Shape <|.. PrismShape
     Shape <|.. RingShape

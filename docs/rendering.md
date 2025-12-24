@@ -2,7 +2,7 @@
 
 > Mesh building, tessellators, and renderers.
 
-**41 classes**
+**39 classes**
 
 ## Key Classes
 
@@ -43,11 +43,6 @@ classDiagram
     }
     class CylinderTessellator {
         +tessellate(...) Mesh
-        +tessellate(...) Mesh
-        +tessellate(...) Mesh
-        +tessellate(...) Mesh
-    }
-    class DiscTessellator {
         +tessellate(...) Mesh
         +tessellate(...) Mesh
         +tessellate(...) Mesh
@@ -125,10 +120,10 @@ classDiagram
     }
     class FieldRenderLayers {
         +solidTranslucent() RenderLayer
+        +solidTranslucentCull() RenderLayer
         +solidTranslucentNoDepth() RenderLayer
         +solidTranslucentNoCull() RenderLayer
         +solidTranslucent(...) RenderLayer
-        +lines() RenderLayer
     }
     class GlowRenderer {
         +DEFAULT_INTENSITY: float
@@ -177,9 +172,6 @@ classDiagram
     class CylinderRenderer {
         +shapeType() String
     }
-    class DiscRenderer {
-        +shapeType() String
-    }
     class FieldRenderer {
         +render(...) void
         +renderWithFollow(...) void
@@ -207,6 +199,20 @@ classDiagram
     class PrismRenderer {
         +shapeType() String
     }
+    class RenderOverrides {
+        <<record>>
+        +vertexPattern: VertexPattern
+        +colorOverride: Integer
+        +alphaMultiplier: float
+        +scaleMultiplier: float
+        +withPattern(...) RenderOverrides
+        +withAlpha(...) RenderOverrides
+        +hasOverrides() boolean
+        +builder() Builder
+    }
+    class RingRenderer {
+        +shapeType() String
+    }
     class RenderPhase
     class Builder
     class Shapeshape
@@ -221,9 +227,9 @@ classDiagram
     AbstractPrimitiveRenderer <|-- CapsuleRenderer
     AbstractPrimitiveRenderer <|-- ConeRenderer
     AbstractPrimitiveRenderer <|-- CylinderRenderer
-    AbstractPrimitiveRenderer <|-- DiscRenderer
     AbstractPrimitiveRenderer <|-- PolyhedronRenderer
     AbstractPrimitiveRenderer <|-- PrismRenderer
+    AbstractPrimitiveRenderer <|-- RingRenderer
     BeamRenderer --> BeamConfigbeam : uses
     BeamRenderer --> ColorResolverresolver : uses
     BeamRenderer --> MatrixStackmatrices : uses
@@ -256,16 +262,8 @@ classDiagram
     CylinderTessellator --> Mesh : returns
     CylinderTessellator --> VertexPatterncapPattern : uses
     CylinderTessellator --> VertexPatternsidesPattern : uses
-    DiscRenderer --> MatrixStackmatrices : uses
-    DiscRenderer --> Mesh : returns
-    DiscRenderer --> Primitiveprimitive : uses
-    DiscRenderer --> WaveConfigwave : uses
-    DiscTessellator --> DiscShapeshape : uses
-    DiscTessellator --> Mesh : returns
-    DiscTessellator --> VertexPatternpattern : uses
-    DiscTessellator --> VisibilityMaskvisibility : uses
-    FieldRenderLayers --> RenderLayer : LINES_LAYER
     FieldRenderLayers --> RenderLayer : SOLID_TRANSLUCENT
+    FieldRenderLayers --> RenderLayer : SOLID_TRANSLUCENT_CULL
     FieldRenderLayers --> RenderLayer : SOLID_TRANSLUCENT_NO_CULL
     FieldRenderLayers --> RenderLayer : SOLID_TRANSLUCENT_NO_DEPTH
     FieldRenderer --> FollowConfigfollow : uses
@@ -280,10 +278,10 @@ classDiagram
     GlowRenderer --> Meshmesh : uses
     GlowRenderer --> VertexConsumerProviderconsumers : uses
     GlowRenderer --> VertexConsumerconsumer : uses
-    LayerRenderer --> ColorResolverresolver : uses
-    LayerRenderer --> FieldLayerlayer : uses
     LayerRenderer --> MatrixStackmatrices : uses
-    LayerRenderer --> VertexConsumerProviderconsumers : uses
+    LayerRenderer --> ThreadLocal : positionCache
+    LayerRenderer --> Vector3f : returns
+    LayerRenderer --> Vector3fposition : uses
     Mesh --> PrimitiveType : primitiveType
     Mesh --> PrimitiveType : returns
     Mesh --> Vertex : returns
@@ -320,7 +318,14 @@ classDiagram
     PrismTessellator --> VertexPatterncapPattern : uses
     PrismTessellator --> VertexPatternsidesPattern : uses
     RenderLayerFactory --> RenderLayer : returns
+    RenderOverrides --> Builder : returns
+    RenderOverrides --> VertexPattern : vertexPattern
+    RenderOverrides --> VertexPatternpattern : uses
     RenderPhase <|-- FieldRenderLayers
+    RingRenderer --> MatrixStackmatrices : uses
+    RingRenderer --> Mesh : returns
+    RingRenderer --> Primitiveprimitive : uses
+    RingRenderer --> WaveConfigwave : uses
     RingTessellator --> Mesh : returns
     RingTessellator --> RingShapeshape : uses
     RingTessellator --> VertexPatternpattern : uses
