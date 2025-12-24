@@ -26,7 +26,7 @@ import java.util.function.BiConsumer;
  * 
  * <h3>Supported Shapes</h3>
  * <ul>
- *   <li>Sphere, Ring, Disc, Prism, Cylinder</li>
+ *   <li>Sphere, Ring, Prism, Cylinder</li>
  *   <li>Cube, Tetrahedron, Octahedron, Dodecahedron, Icosahedron</li>
  *   <li>Torus, Capsule, Cone</li>
  * </ul>
@@ -72,7 +72,6 @@ public class ShapeSubPanel extends AbstractPanel {
     public enum ShapeKind {
         SPHERE("sphere", "Sphere"),
         RING("ring", "Ring"),
-        DISC("disc", "Disc"),
         PRISM("prism", "Prism"),
         CYLINDER("cylinder", "Cylinder"),
         CUBE("cube", "Cube"),

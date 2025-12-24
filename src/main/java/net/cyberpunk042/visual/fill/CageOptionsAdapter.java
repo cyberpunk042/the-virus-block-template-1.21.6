@@ -121,8 +121,6 @@ public interface CageOptionsAdapter {
                 current instanceof PrismCageOptions p ? p : PrismCageOptions.DEFAULT);
             case "polyhedron", "poly" -> new PolyhedronCageAdapter(
                 current instanceof PolyhedronCageOptions p ? p : PolyhedronCageOptions.DEFAULT);
-            case "disc" -> new DiscCageAdapter(
-                current instanceof DiscCageOptions d ? d : DiscCageOptions.DEFAULT);
             case "ring" -> new RingCageAdapter(
                 current instanceof RingCageOptions r ? r : RingCageOptions.DEFAULT);
             case "cone" -> new ConeCageAdapter(
@@ -264,30 +262,6 @@ public interface CageOptionsAdapter {
         }
         @Override public CageOptionsAdapter withFaceOutlines(boolean v) {
             return new PolyhedronCageAdapter(options.toBuilder().faceOutlines(v).build());
-        }
-        @Override public CageOptions build() { return options; }
-    }
-    
-    record DiscCageAdapter(DiscCageOptions options) implements CageOptionsAdapter {
-        @Override public String shapeType() { return "disc"; }
-        @Override public float lineWidth() { return options.lineWidth(); }
-        @Override public boolean showEdges() { return options.showEdges(); }
-        @Override public int primaryCount() { return options.radialLines(); }
-        @Override public int secondaryCount() { return options.concentricRings(); }
-        @Override public String primaryLabel() { return "Radial Lines"; }
-        @Override public String secondaryLabel() { return "Concentric Rings"; }
-        
-        @Override public CageOptionsAdapter withLineWidth(float w) {
-            return new DiscCageAdapter(options.toBuilder().lineWidth(w).build());
-        }
-        @Override public CageOptionsAdapter withShowEdges(boolean v) {
-            return new DiscCageAdapter(options.toBuilder().showEdges(v).build());
-        }
-        @Override public CageOptionsAdapter withPrimaryCount(int c) {
-            return new DiscCageAdapter(options.toBuilder().radialLines(c).build());
-        }
-        @Override public CageOptionsAdapter withSecondaryCount(int c) {
-            return new DiscCageAdapter(options.toBuilder().concentricRings(c).build());
         }
         @Override public CageOptions build() { return options; }
     }

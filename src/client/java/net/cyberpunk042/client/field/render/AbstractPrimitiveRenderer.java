@@ -230,10 +230,6 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
             PipelineTracer.trace(PipelineTracer.S7_OUTER_RADIUS, 4, "ring.outer", String.valueOf(r.outerRadius()));
             PipelineTracer.trace(PipelineTracer.S8_HEIGHT, 4, "ring.h", String.valueOf(r.height()));
             PipelineTracer.trace(PipelineTracer.S9_SEGMENTS, 4, "ring.seg", String.valueOf(r.segments()));
-        } else if (shape instanceof net.cyberpunk042.visual.shape.DiscShape d) {
-            PipelineTracer.trace(PipelineTracer.S2_RADIUS, 4, "disc.r", String.valueOf(d.radius()));
-            PipelineTracer.trace(PipelineTracer.S6_INNER_RADIUS, 4, "disc.inner", String.valueOf(d.innerRadius()));
-            PipelineTracer.trace(PipelineTracer.S9_SEGMENTS, 4, "disc.seg", String.valueOf(d.segments()));
         } else if (shape instanceof net.cyberpunk042.visual.shape.CylinderShape c) {
             PipelineTracer.trace(PipelineTracer.S2_RADIUS, 4, "cyl.r", String.valueOf(c.radius()));
             PipelineTracer.trace(PipelineTracer.S8_HEIGHT, 4, "cyl.h", String.valueOf(c.height()));

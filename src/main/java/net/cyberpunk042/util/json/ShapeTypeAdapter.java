@@ -17,7 +17,6 @@ import java.io.IOException;
  * <ul>
  *   <li>sphere → SphereShape</li>
  *   <li>ring → RingShape</li>
- *   <li>disc → DiscShape</li>
  *   <li>prism → PrismShape</li>
  *   <li>cylinder → CylinderShape</li>
  *   <li>polyhedron → PolyhedronShape</li>
@@ -53,7 +52,6 @@ public class ShapeTypeAdapter extends TypeAdapter<Shape> {
         return switch (type) {
             case "sphere" -> SphereShape.fromJson(json);
             case "ring" -> parseRing(json);
-            case "disc" -> parseDisc(json);
             case "prism" -> parsePrism(json);
             case "cylinder" -> parseCylinder(json);
             case "polyhedron" -> parsePolyhedron(json);
@@ -65,13 +63,6 @@ public class ShapeTypeAdapter extends TypeAdapter<Shape> {
         return RingShape.builder()
             .innerRadius(json.has("innerRadius") ? json.get("innerRadius").getAsFloat() : 0.8f)
             .outerRadius(json.has("outerRadius") ? json.get("outerRadius").getAsFloat() : 1.0f)
-            .segments(json.has("segments") ? json.get("segments").getAsInt() : 32)
-            .build();
-    }
-    
-    private static DiscShape parseDisc(JsonObject json) {
-        return DiscShape.builder()
-            .radius(json.has("radius") ? json.get("radius").getAsFloat() : 1.0f)
             .segments(json.has("segments") ? json.get("segments").getAsInt() : 32)
             .build();
     }

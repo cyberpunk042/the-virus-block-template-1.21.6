@@ -334,16 +334,6 @@ public final class DefinitionBuilder {
                     PipelineTracer.trace(PipelineTracer.S8_HEIGHT, 3, "shape", r.height());
                 }
             }
-            case "disc" -> {
-                if (shape instanceof net.cyberpunk042.visual.shape.DiscShape d) {
-                    PipelineTracer.trace(PipelineTracer.S2_RADIUS, 2, "state", d.radius());
-                    PipelineTracer.trace(PipelineTracer.S2_RADIUS, 3, "shape", d.radius());
-                    PipelineTracer.trace(PipelineTracer.S9_SEGMENTS, 2, "state", d.segments());
-                    PipelineTracer.trace(PipelineTracer.S9_SEGMENTS, 3, "shape", d.segments());
-                    PipelineTracer.trace(PipelineTracer.S6_INNER_RADIUS, 2, "state", d.innerRadius());
-                    PipelineTracer.trace(PipelineTracer.S6_INNER_RADIUS, 3, "shape", d.innerRadius());
-                }
-            }
             case "cylinder" -> {
                 if (shape instanceof net.cyberpunk042.visual.shape.CylinderShape c) {
                     PipelineTracer.trace(PipelineTracer.S2_RADIUS, 2, "state", c.radius());

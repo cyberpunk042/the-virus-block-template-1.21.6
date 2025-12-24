@@ -57,12 +57,6 @@ public class DefaultsProvider {
         ring.addProperty("y", 0f);
         SHAPE_DEFAULTS_JSON.put("ring", ring);
         
-        JsonObject disc = new JsonObject();
-        disc.addProperty("radius", 1.0f);
-        disc.addProperty("segments", 64);
-        disc.addProperty("y", 0f);
-        SHAPE_DEFAULTS_JSON.put("disc", disc);
-        
         JsonObject prism = new JsonObject();
         prism.addProperty("sides", 6);
         prism.addProperty("radius", 1.0f);
@@ -113,7 +107,7 @@ public class DefaultsProvider {
      */
     public static JsonObject getDefaults(String type) {
         return switch (type.toLowerCase()) {
-            case "sphere", "ring", "disc", "prism", "polyhedron", "cylinder" 
+            case "sphere", "ring", "prism", "polyhedron", "cylinder" 
                 -> SHAPE_DEFAULTS_JSON.getOrDefault(type.toLowerCase(), new JsonObject());
             case "transform" -> TRANSFORM_DEFAULTS_JSON.deepCopy();
             case "fill" -> FILL_DEFAULTS_JSON.deepCopy();
@@ -157,7 +151,6 @@ public class DefaultsProvider {
             case "sphere" -> SphereShape.defaults();
             case "ring" -> RingShape.builder()
                 .innerRadius(0.8f).outerRadius(1.0f).segments(64).build();
-            case "disc" -> DiscShape.builder().radius(1.0f).segments(64).build();
             case "prism" -> PrismShape.builder()
                 .sides(6).radius(1.0f).height(1.0f).build();
             case "polyhedron" -> PolyhedronShape.builder()

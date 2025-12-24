@@ -146,10 +146,6 @@ public record SimplePrimitive(
                 .outerRadius(json.has("outerRadius") ? json.get("outerRadius").getAsFloat() : 1.0f)
                 .segments(json.has("segments") ? json.get("segments").getAsInt() : 32)
                 .build();
-            case "disc" -> net.cyberpunk042.visual.shape.DiscShape.builder()
-                .radius(json.has("radius") ? json.get("radius").getAsFloat() : 1.0f)
-                .segments(json.has("segments") ? json.get("segments").getAsInt() : 32)
-                .build();
             case "prism" -> net.cyberpunk042.visual.shape.PrismShape.builder()
                 .sides(json.has("sides") ? json.get("sides").getAsInt() : 6)
                 .radius(json.has("radius") ? json.get("radius").getAsFloat() : 1.0f)

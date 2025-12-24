@@ -16,7 +16,6 @@ import java.util.Map;
  * <ul>
  *   <li>{@link SphereShape} - Lat/lon sphere, icosphere, UV sphere</li>
  *   <li>{@link RingShape} - Torus-like ring</li>
- *   <li>{@link DiscShape} - Flat disc/circle</li>
  *   <li>{@link PrismShape} - N-sided prism/cylinder</li>
  *   <li>{@link PolyhedronShape} - Platonic solids</li>
  *   <li>{@link CylinderShape} - Cylinder/tube/beam</li>
@@ -36,7 +35,7 @@ public interface Shape {
     
     /**
      * Gets the shape type identifier.
-     * @return Type name (e.g., "sphere", "ring", "disc")
+     * @return Type name (e.g., "sphere", "ring")
      */
     String getType();
     

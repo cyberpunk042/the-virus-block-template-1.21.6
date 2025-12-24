@@ -10,7 +10,7 @@ import java.util.Set;
 /**
  * Adapter for shape-related state.
  * 
- * <p>Handles all shape types (sphere, ring, disc, prism, cylinder, 
+ * <p>Handles all shape types (sphere, ring, prism, cylinder, 
  * polyhedron, torus, capsule, cone) plus the current shape type selector.</p>
  * 
  * <h3>Path Access</h3>
@@ -30,7 +30,6 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
     
     @StateField private SphereShape sphere = SphereShape.DEFAULT;
     @StateField private RingShape ring = RingShape.DEFAULT;
-    @StateField private DiscShape disc = DiscShape.DEFAULT;
     @StateField private PrismShape prism = PrismShape.builder().build();
     @StateField private CylinderShape cylinder = CylinderShape.builder().build();
     @StateField private PolyhedronShape polyhedron = PolyhedronShape.DEFAULT;
@@ -73,7 +72,6 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
         switch (shape) {
             case SphereShape s -> this.sphere = s;
             case RingShape r -> this.ring = r;
-            case DiscShape d -> this.disc = d;
             case PrismShape p -> this.prism = p;
             case CylinderShape c -> this.cylinder = c;
             case PolyhedronShape p -> this.polyhedron = p;
@@ -101,7 +99,6 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
         return switch (shapeType.toLowerCase()) {
             case "sphere" -> sphere;
             case "ring" -> ring;
-            case "disc" -> disc;
             case "prism" -> prism;
             case "cylinder" -> cylinder;
             case "polyhedron" -> polyhedron;
@@ -133,9 +130,6 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
     public RingShape ring() { return ring; }
     public void setRing(RingShape ring) { this.ring = ring; }
     
-    public DiscShape disc() { return disc; }
-    public void setDisc(DiscShape disc) { this.disc = disc; }
-    
     public PrismShape prism() { return prism; }
     public void setPrism(PrismShape prism) { this.prism = prism; }
     
@@ -162,7 +156,6 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
     public void reset() {
         this.sphere = SphereShape.DEFAULT;
         this.ring = RingShape.DEFAULT;
-        this.disc = DiscShape.DEFAULT;
         this.prism = PrismShape.builder().build();
         this.cylinder = CylinderShape.builder().build();
         this.polyhedron = PolyhedronShape.DEFAULT;

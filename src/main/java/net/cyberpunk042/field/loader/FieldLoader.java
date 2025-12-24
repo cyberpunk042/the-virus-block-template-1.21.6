@@ -464,10 +464,6 @@ public final class FieldLoader {
                 .outerRadius(json.get("outerRadius").getAsFloat())
                 .segments(json.get("segments").getAsInt())
                 .build();
-            case "disc" -> DiscShape.builder()
-                .radius(json.get("radius").getAsFloat())
-                .segments(json.get("segments").getAsInt())
-                .build();
             case "prism" -> PrismShape.builder()
                 .sides(json.get("sides").getAsInt())
                 .radius(json.get("radius").getAsFloat())

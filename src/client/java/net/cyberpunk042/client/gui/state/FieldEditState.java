@@ -85,7 +85,6 @@ public class FieldEditState {
         map.put("shapeType", shapeAdapter);
         map.put("sphere", shapeAdapter);
         map.put("ring", shapeAdapter);
-        map.put("disc", shapeAdapter);
         map.put("prism", shapeAdapter);
         map.put("cylinder", shapeAdapter);
         map.put("polyhedron", shapeAdapter);
@@ -360,7 +359,6 @@ public class FieldEditState {
     // Shape delegates
     public net.cyberpunk042.visual.shape.SphereShape sphere() { return shapeAdapter.sphere(); }
     public net.cyberpunk042.visual.shape.RingShape ring() { return shapeAdapter.ring(); }
-    public net.cyberpunk042.visual.shape.DiscShape disc() { return shapeAdapter.disc(); }
     public net.cyberpunk042.visual.shape.PrismShape prism() { return shapeAdapter.prism(); }
     public net.cyberpunk042.visual.shape.CylinderShape cylinder() { return shapeAdapter.cylinder(); }
     public net.cyberpunk042.visual.shape.PolyhedronShape polyhedron() { return shapeAdapter.polyhedron(); }

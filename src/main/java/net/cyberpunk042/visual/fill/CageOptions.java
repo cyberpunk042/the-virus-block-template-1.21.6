@@ -15,7 +15,6 @@ import net.cyberpunk042.visual.validation.ValueRange;
  *   <li>{@link CylinderCageOptions} - Vertical lines and horizontal rings</li>
  *   <li>{@link PrismCageOptions} - Vertical edges and horizontal rings</li>
  *   <li>{@link ConeCageOptions} - Radial lines to apex and base ring</li>
- *   <li>{@link DiscCageOptions} - Radial lines and concentric rings</li>
  *   <li>{@link RingCageOptions} - Radial lines with inner/outer rings</li>
  *   <li>{@link TorusCageOptions} - Major and minor rings</li>
  * </ul>
@@ -30,7 +29,7 @@ import net.cyberpunk042.visual.validation.ValueRange;
  */
 public sealed interface CageOptions 
     permits SphereCageOptions, PrismCageOptions, CylinderCageOptions, PolyhedronCageOptions,
-            DiscCageOptions, RingCageOptions, ConeCageOptions, TorusCageOptions {
+            RingCageOptions, ConeCageOptions, TorusCageOptions {
     
     /** Line width for cage rendering. */
     @Range(ValueRange.POSITIVE_NONZERO) 

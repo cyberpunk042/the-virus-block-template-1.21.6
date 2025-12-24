@@ -161,15 +161,6 @@ public final class ShapeRegistry {
             return new RingShape(radius - thickness/2, radius + thickness/2, segments, y, 0f, 360f, thickness, 0f);
         });
         
-        // Disc (filled circle)
-        register("disc", params -> {
-            float y = getFloat(params, "y", 0);
-            float radius = getFloat(params, "radius", 1.0f);
-            int segments = getInt(params, "segments", 48);
-            // Constructor: (radius, segments, y, arcStart, arcEnd, innerRadius, rings)
-            return new DiscShape(radius, segments, y, 0f, 360f, 0f, 1);
-        });
-        
         // Prism
         register("prism", params -> {
             int sides = getInt(params, "sides", 6);

@@ -366,11 +366,6 @@ public final class FieldEditCommands {
         CommandScanner.scanRecord(RingShape.class, "ring", ring);
         edit.then(ring);
         
-        // Disc
-        var disc = ClientCommandManager.literal("disc");
-        CommandScanner.scanRecord(DiscShape.class, "disc", disc);
-        edit.then(disc);
-        
         // Prism
         var prism = ClientCommandManager.literal("prism");
         CommandScanner.scanRecord(PrismShape.class, "prism", prism);

@@ -598,13 +598,6 @@ public final class LayerRenderer {
                 PipelineTracer.trace(PipelineTracer.S7_OUTER_RADIUS, 6, "toRenderer", String.valueOf(r.outerRadius()));
                 PipelineTracer.trace(PipelineTracer.S8_HEIGHT, 6, "toRenderer", String.valueOf(r.height()));
                 PipelineTracer.trace(PipelineTracer.S9_SEGMENTS, 6, "toRenderer", String.valueOf(r.segments()));
-            } else if (shape instanceof net.cyberpunk042.visual.shape.DiscShape d) {
-                PipelineTracer.trace(PipelineTracer.S2_RADIUS, 5, "render", String.valueOf(d.radius()));
-                PipelineTracer.trace(PipelineTracer.S6_INNER_RADIUS, 5, "render", String.valueOf(d.innerRadius()));
-                PipelineTracer.trace(PipelineTracer.S9_SEGMENTS, 5, "render", String.valueOf(d.segments()));
-                PipelineTracer.trace(PipelineTracer.S2_RADIUS, 6, "toRenderer", String.valueOf(d.radius()));
-                PipelineTracer.trace(PipelineTracer.S6_INNER_RADIUS, 6, "toRenderer", String.valueOf(d.innerRadius()));
-                PipelineTracer.trace(PipelineTracer.S9_SEGMENTS, 6, "toRenderer", String.valueOf(d.segments()));
             } else if (shape instanceof net.cyberpunk042.visual.shape.CylinderShape c) {
                 PipelineTracer.trace(PipelineTracer.S2_RADIUS, 5, "render", String.valueOf(c.radius()));
                 PipelineTracer.trace(PipelineTracer.S8_HEIGHT, 5, "render", String.valueOf(c.height()));

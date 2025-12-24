@@ -24,7 +24,6 @@ import net.cyberpunk042.visual.shape.*;
  *   <tr><th>Shape</th><th>Primary CellType</th><th>Status</th></tr>
  *   <tr><td>SphereShape</td><td>QUAD</td><td>TODO: Implement SphereTessellator</td></tr>
  *   <tr><td>RingShape</td><td>SEGMENT</td><td>TODO: Implement RingTessellator</td></tr>
- *   <tr><td>DiscShape</td><td>SECTOR</td><td>TODO: Implement DiscTessellator</td></tr>
  *   <tr><td>PrismShape</td><td>QUAD</td><td>TODO: Implement PrismTessellator</td></tr>
  *   <tr><td>CylinderShape</td><td>QUAD</td><td>TODO: Implement CylinderTessellator</td></tr>
  *   <tr><td>PolyhedronShape</td><td>TRIANGLE</td><td>PolyhedronTessellator (implemented)</td></tr>
@@ -152,9 +151,6 @@ public interface Tessellator {
             
             // === RING ===
             case RingShape ring -> RingTessellator.tessellate(ring);
-            
-            // === DISC ===
-            case DiscShape disc -> DiscTessellator.tessellate(disc);
             
             // === PRISM ===
             case PrismShape prism -> PrismTessellator.tessellate(prism);

@@ -17,7 +17,6 @@ import java.util.Map;
  * <ul>
  *   <li>{@code sphere} → {@link SphereRenderer}</li>
  *   <li>{@code ring} → {@link RingRenderer}</li>
- *   <li>{@code disc} → {@link DiscRenderer}</li>
  *   <li>{@code prism} → {@link PrismRenderer}</li>
  *   <li>{@code cylinder} → {@link CylinderRenderer}</li>
  *   <li>{@code polyhedron} → {@link PolyhedronRenderer}</li>
@@ -41,7 +40,6 @@ public final class PrimitiveRenderers {
     static {
         register(new SphereRenderer());
         register(new RingRenderer());
-        register(new DiscRenderer());
         register(new PrismRenderer());
         register(new CylinderRenderer());
         
@@ -123,7 +121,6 @@ public final class PrimitiveRenderers {
         String type = switch (shape) {
             case SphereShape s -> "sphere";
             case RingShape r -> "ring";
-            case DiscShape d -> "disc";
             case PrismShape p -> "prism";
             case CylinderShape c -> "cylinder";
             case PolyhedronShape p -> "polyhedron";
