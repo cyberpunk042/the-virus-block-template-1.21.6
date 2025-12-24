@@ -1,8 +1,0 @@
-{
-  "name": "Disc Detailed",
-  "description": "Disc with concentric rings",
-  "type": "disc",
-  "radius": 1.0,
-  "segments": 64,
-  "rings": 4
-}

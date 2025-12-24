@@ -248,9 +248,9 @@ public final class RingTessellator {
             // TL=tI[i], TR=tI[i+1], BR=tO[i+1], BL=tO[i]
             builder.quadAsTrianglesFromPattern(topInner[i], topInner[i + 1], topOuter[i + 1], topOuter[i], pattern);
             
-            // Bottom face - same structure but for below view
-            // TL=bI[i], TR=bI[i+1], BR=bO[i+1], BL=bO[i]
-            builder.quadAsTrianglesFromPattern(bottomInner[i], bottomInner[i + 1], bottomOuter[i + 1], bottomOuter[i], pattern);
+            // Bottom face - REVERSED winding for below view (swap i and i+1)
+            // TL=bI[i+1], TR=bI[i], BR=bO[i], BL=bO[i+1]
+            builder.quadAsTrianglesFromPattern(bottomInner[i + 1], bottomInner[i], bottomOuter[i], bottomOuter[i + 1], pattern);
         }
         
         // =====================================================================

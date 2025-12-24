@@ -1,9 +1,0 @@
-{
-  "name": "Disc Quarter",
-  "description": "Quarter disc",
-  "type": "disc",
-  "radius": 1.0,
-  "segments": 16,
-  "arcStart": 0,
-  "arcEnd": 90
-}

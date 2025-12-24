@@ -86,13 +86,13 @@ public record RingShape(
     
     @Override
     public CellType primaryCellType() {
-        return CellType.SEGMENT;
+        return CellType.QUAD;
     }
     
     @Override
     public Map<String, CellType> getParts() {
         return Map.of(
-            "surface", CellType.SEGMENT,
+            "surface", CellType.QUAD,
             "innerEdge", CellType.EDGE,
             "outerEdge", CellType.EDGE
         );
