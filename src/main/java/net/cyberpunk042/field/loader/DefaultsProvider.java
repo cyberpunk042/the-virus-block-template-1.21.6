@@ -3,7 +3,6 @@ package net.cyberpunk042.field.loader;
 import com.google.gson.JsonObject;
 import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.visual.animation.Animation;
-import net.cyberpunk042.visual.animation.Axis;
 import net.cyberpunk042.visual.animation.SpinConfig;
 import net.cyberpunk042.visual.animation.PulseConfig;
 import net.cyberpunk042.visual.appearance.AlphaRange;
@@ -216,10 +215,10 @@ public class DefaultsProvider {
     }
     
     /**
-     * Expands spin shorthand: 0.02 → SpinConfig(Y, 0.02)
+     * Expands spin shorthand: 0.02 → SpinConfig around Y axis
      */
     public static SpinConfig expandSpin(float speed) {
-        return SpinConfig.builder().axis(Axis.Y).speed(speed).build();
+        return SpinConfig.aroundY(speed);
     }
     
     /**

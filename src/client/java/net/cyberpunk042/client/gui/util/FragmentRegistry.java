@@ -510,11 +510,45 @@ public final class FragmentRegistry {
         JsonObject json = animationPresets.get(presetName);
         if (json == null) return;
 
-        // Spin (enabled = has non-zero speed)
+        // Spin (per-axis or legacy format)
         if (json.has("spin")) {
             JsonObject spin = json.getAsJsonObject("spin");
-            if (spin.has("axis")) state.set("spin.axis", spin.get("axis").getAsString());
-            if (spin.has("speed")) state.set("spin.speed", spin.get("speed").getAsFloat());
+            
+            // New per-axis format
+            if (spin.has("speedX")) state.set("spin.speedX", spin.get("speedX").getAsFloat());
+            if (spin.has("speedY")) state.set("spin.speedY", spin.get("speedY").getAsFloat());
+            if (spin.has("speedZ")) state.set("spin.speedZ", spin.get("speedZ").getAsFloat());
+            if (spin.has("oscillateX")) state.set("spin.oscillateX", spin.get("oscillateX").getAsBoolean());
+            if (spin.has("oscillateY")) state.set("spin.oscillateY", spin.get("oscillateY").getAsBoolean());
+            if (spin.has("oscillateZ")) state.set("spin.oscillateZ", spin.get("oscillateZ").getAsBoolean());
+            if (spin.has("rangeX")) state.set("spin.rangeX", spin.get("rangeX").getAsFloat());
+            if (spin.has("rangeY")) state.set("spin.rangeY", spin.get("rangeY").getAsFloat());
+            if (spin.has("rangeZ")) state.set("spin.rangeZ", spin.get("rangeZ").getAsFloat());
+            
+            // Legacy format (axis + speed) - convert to per-axis
+            if (spin.has("axis") && spin.has("speed")) {
+                String axis = spin.get("axis").getAsString().toUpperCase();
+                float speed = spin.get("speed").getAsFloat();
+                boolean oscillate = spin.has("oscillate") && spin.get("oscillate").getAsBoolean();
+                float range = spin.has("range") ? spin.get("range").getAsFloat() : 360f;
+                
+                // Reset all axes first
+                state.set("spin.speedX", 0f);
+                state.set("spin.speedY", 0f);
+                state.set("spin.speedZ", 0f);
+                
+                // Apply to the specified axis
+                switch (axis) {
+                    case "X" -> { state.set("spin.speedX", speed); state.set("spin.oscillateX", oscillate); state.set("spin.rangeX", range); }
+                    case "Y" -> { state.set("spin.speedY", speed); state.set("spin.oscillateY", oscillate); state.set("spin.rangeY", range); }
+                    case "Z" -> { state.set("spin.speedZ", speed); state.set("spin.oscillateZ", oscillate); state.set("spin.rangeZ", range); }
+                    case "XY" -> { 
+                        state.set("spin.speedX", speed); state.set("spin.speedY", speed);
+                        state.set("spin.oscillateX", oscillate); state.set("spin.oscillateY", oscillate);
+                        state.set("spin.rangeX", range); state.set("spin.rangeY", range);
+                    }
+                }
+            }
         }
 
         // Pulse (enabled = has non-zero speed/scale)

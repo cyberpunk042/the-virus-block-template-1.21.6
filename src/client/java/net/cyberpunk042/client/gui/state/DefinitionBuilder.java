@@ -379,13 +379,11 @@ public final class DefinitionBuilder {
      * Traces ALL animation details.
      */
     private static void traceAnimationDetails(FieldEditState state, Animation animation) {
-        // Spin animation
+        // Spin animation (now per-axis)
         if (state.spin() != null) {
-            PipelineTracer.trace(PipelineTracer.N1_SPIN_SPEED, 2, "state", state.spin().speed());
-            PipelineTracer.trace(PipelineTracer.N2_SPIN_AXIS, 2, "state", state.spin().axis().name());
+            PipelineTracer.trace(PipelineTracer.N1_SPIN_SPEED, 2, "state.Y", state.spin().speedY());
             if (animation.spin() != null) {
-                PipelineTracer.trace(PipelineTracer.N1_SPIN_SPEED, 3, "anim", animation.spin().speed());
-                PipelineTracer.trace(PipelineTracer.N2_SPIN_AXIS, 3, "anim", animation.spin().axis().name());
+                PipelineTracer.trace(PipelineTracer.N1_SPIN_SPEED, 3, "anim.Y", animation.spin().speedY());
             }
         }
         

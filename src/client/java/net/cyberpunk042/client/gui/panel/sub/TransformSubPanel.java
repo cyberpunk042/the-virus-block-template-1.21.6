@@ -99,7 +99,114 @@ public class TransformSubPanel extends BoundPanel {
         buildAxisOrbit("Y", "transform.orbit3d.y", content);
         buildAxisOrbit("Z", "transform.orbit3d.z", content);
         
+        // ═══════════════════════════════════════════════════════════════════════
+        // SPIN ANIMATION (per-axis continuous rotation)
+        // ═══════════════════════════════════════════════════════════════════════
+        
+        buildAxisSpin("X", "spin.speedX", "spin.oscillateX", "spin.rangeX", content);
+        buildAxisSpin("Y", "spin.speedY", "spin.oscillateY", "spin.rangeY", content);
+        buildAxisSpin("Z", "spin.speedZ", "spin.oscillateZ", "spin.rangeZ", content);
+        
         contentHeight = content.getContentHeight();
+    }
+    
+    /**
+     * Builds a single axis spin row: Speed slider + Oscillate toggle + conditional Range slider.
+     */
+    private void buildAxisSpin(String axis, String speedPath, String oscPath, String rangePath, ContentBuilder content) {
+        boolean oscillating = state.getBool(oscPath);
+        
+        if (oscillating) {
+            // [SpinX: ▬▬▬▬▬▬] [Osc ☑] [Rng°: ▬▬▬▬]
+            int fullWidth = panelWidth - GuiConstants.PADDING * 2;
+            int speedWidth = (int)(fullWidth * 0.45f);
+            int oscWidth = 40;
+            int rangeWidth = fullWidth - speedWidth - oscWidth - GAP * 2;
+            int x = GuiConstants.PADDING;
+            int y = content.getCurrentY();
+            
+            // Speed slider
+            float currentSpeed = state.getFloat(speedPath);
+            var speedSlider = net.cyberpunk042.client.gui.widget.LabeledSlider.builder("Spin" + axis)
+                .position(x, y)
+                .width(speedWidth)
+                .range(-360f, 360f)
+                .initial(currentSpeed)
+                .format("%.0f°/s")
+                .onChange(v -> state.set(speedPath, v))
+                .build();
+            widgets.add(speedSlider);
+            bindings.add(new Bound<>(speedSlider,
+                () -> state.getFloat(speedPath), v -> state.set(speedPath, v),
+                v -> v, v -> v, speedSlider::setValue));
+            
+            // Oscillate toggle
+            var oscToggle = CyclingButtonWidget.<Boolean>builder(b -> Text.literal(b ? "Osc ✓" : "Osc"))
+                .values(List.of(false, true))
+                .initially(true)
+                .omitKeyText()
+                .build(x + speedWidth + GAP, y, oscWidth, COMPACT_H, Text.empty(),
+                    (btn, val) -> {
+                        state.set(oscPath, val);
+                        rebuildContent();
+                        notifyWidgetsChanged();
+                    });
+            widgets.add(oscToggle);
+            
+            // Range slider (only when oscillating)
+            float currentRange = state.getFloat(rangePath);
+            var rangeSlider = net.cyberpunk042.client.gui.widget.LabeledSlider.builder("Rng°")
+                .position(x + speedWidth + oscWidth + GAP * 2, y)
+                .width(rangeWidth)
+                .range(1f, 360f)
+                .initial(currentRange > 0 ? currentRange : 360f)
+                .format("%.0f°")
+                .onChange(v -> state.set(rangePath, v))
+                .build();
+            widgets.add(rangeSlider);
+            bindings.add(new Bound<>(rangeSlider,
+                () -> state.getFloat(rangePath), v -> state.set(rangePath, v),
+                v -> v, v -> v, rangeSlider::setValue));
+            
+            content.advanceRow();
+        } else {
+            // [SpinX: ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬] [Osc ☐]
+            int fullWidth = panelWidth - GuiConstants.PADDING * 2;
+            int oscWidth = 40;
+            int speedWidth = fullWidth - oscWidth - GAP;
+            int x = GuiConstants.PADDING;
+            int y = content.getCurrentY();
+            
+            // Speed slider (wider when no range)
+            float currentSpeed = state.getFloat(speedPath);
+            var speedSlider = net.cyberpunk042.client.gui.widget.LabeledSlider.builder("Spin" + axis)
+                .position(x, y)
+                .width(speedWidth)
+                .range(-360f, 360f)
+                .initial(currentSpeed)
+                .format("%.0f°/s")
+                .onChange(v -> state.set(speedPath, v))
+                .build();
+            widgets.add(speedSlider);
+            bindings.add(new Bound<>(speedSlider,
+                () -> state.getFloat(speedPath), v -> state.set(speedPath, v),
+                v -> v, v -> v, speedSlider::setValue));
+            
+            // Oscillate toggle
+            var oscToggle = CyclingButtonWidget.<Boolean>builder(b -> Text.literal(b ? "Osc ✓" : "Osc"))
+                .values(List.of(false, true))
+                .initially(false)
+                .omitKeyText()
+                .build(x + speedWidth + GAP, y, oscWidth, COMPACT_H, Text.empty(),
+                    (btn, val) -> {
+                        state.set(oscPath, val);
+                        rebuildContent();
+                        notifyWidgetsChanged();
+                    });
+            widgets.add(oscToggle);
+            
+            content.advanceRow();
+        }
     }
     
     /**

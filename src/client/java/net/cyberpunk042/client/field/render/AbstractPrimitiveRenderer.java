@@ -135,8 +135,7 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
         // CP4: ALL animation segments (reuse anim from line 55)
         if (anim != null) {
             if (anim.spin() != null) {
-                PipelineTracer.trace(PipelineTracer.N1_SPIN_SPEED, 4, "prim.spin", String.valueOf(anim.spin().speed()));
-                PipelineTracer.trace(PipelineTracer.N2_SPIN_AXIS, 4, "prim.axis", anim.spin().axis().name());
+                PipelineTracer.trace(PipelineTracer.N1_SPIN_SPEED, 4, "prim.spinY", String.valueOf(anim.spin().speedY()));
             }
             if (anim.pulse() != null) {
                 PipelineTracer.trace(PipelineTracer.N3_PULSE_SPEED, 4, "prim.pulse", String.valueOf(anim.pulse().speed()));

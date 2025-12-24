@@ -94,10 +94,10 @@ public class ContentArea implements ScreenComponent {
     private void initAdvancedSubTabs() {
         int savedSubtab = GuiConfigPersistence.loadSavedSubtab(TabType.ADVANCED);
         advancedSubTabs = new SubTabPane(textRenderer)
-            .addTab("Anim", contentFactory.animation())
             .addTab("Predict", contentFactory.prediction())
             .addTab("Linking", contentFactory.linking())
             .addTab("Mods", contentFactory.modifiers())
+            .addTab("Trigger", contentFactory.trigger())
             .onTabChange(idx -> {
                 GuiConfigPersistence.saveSubtab(TabType.ADVANCED, idx);
                 onSubTabChange.run();
@@ -110,7 +110,6 @@ public class ContentArea implements ScreenComponent {
         int savedSubtab = GuiConfigPersistence.loadSavedSubtab(TabType.DEBUG);
         debugSubTabs = new SubTabPane(textRenderer)
             .addTab("Beam", contentFactory.beam())
-            .addTab("Trigger", contentFactory.trigger())
             .addTab("Force", contentFactory.force())
             .addTab("Life", contentFactory.lifecycle())
             .addTab("Bindings", contentFactory.bindings())

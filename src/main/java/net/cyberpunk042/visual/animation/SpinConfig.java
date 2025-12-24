@@ -1,145 +1,177 @@
 package net.cyberpunk042.visual.animation;
 
-import org.jetbrains.annotations.Nullable;
-
-import org.joml.Vector3f;
-import net.cyberpunk042.visual.validation.Range;
-import net.cyberpunk042.visual.validation.ValueRange;
+import com.google.gson.JsonObject;
 import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.util.json.JsonField;
 import net.cyberpunk042.util.json.JsonSerializer;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import net.cyberpunk042.visual.validation.Range;
+import net.cyberpunk042.visual.validation.ValueRange;
 
 /**
- * Configuration for continuous rotation animation.
+ * Configuration for per-axis rotation animation.
+ * 
+ * <p>Supports independent rotation on X, Y, Z axes with optional oscillation per axis.</p>
  * 
  * <h2>JSON Format</h2>
  * <pre>
  * "spin": {
- *   "axis": "Y",
- *   "speed": 0.02,
- *   "oscillate": false,
- *   "range": 360
+ *   "speedX": 0, "speedY": 45, "speedZ": 0,
+ *   "oscillateX": false, "oscillateY": false, "oscillateZ": false,
+ *   "rangeX": 360, "rangeY": 360, "rangeZ": 360
  * }
  * </pre>
  * 
- * <p>Shorthand: {@code "spin": 0.02} creates Y-axis spin at that speed.</p>
- * 
- * @see Axis
+ * <p>Legacy format is also supported:</p>
+ * <pre>
+ * "spin": { "axis": "Y", "speed": 45 }
+ * </pre>
  */
 public record SpinConfig(
-    Axis axis,
-    @Range(ValueRange.UNBOUNDED) float speed,
-    @JsonField(skipIfDefault = true) boolean oscillate,
-    @JsonField(skipIfDefault = true, defaultValue = "360") @Range(ValueRange.DEGREES_FULL) float range,
-    @JsonField(skipIfNull = true) @Nullable Vector3f customAxis
+    @Range(ValueRange.UNBOUNDED) float speedX,
+    @Range(ValueRange.UNBOUNDED) float speedY,
+    @Range(ValueRange.UNBOUNDED) float speedZ,
+    @JsonField(skipIfDefault = true) boolean oscillateX,
+    @JsonField(skipIfDefault = true) boolean oscillateY,
+    @JsonField(skipIfDefault = true) boolean oscillateZ,
+    @JsonField(skipIfDefault = true, defaultValue = "360") @Range(ValueRange.DEGREES_FULL) float rangeX,
+    @JsonField(skipIfDefault = true, defaultValue = "360") @Range(ValueRange.DEGREES_FULL) float rangeY,
+    @JsonField(skipIfDefault = true, defaultValue = "360") @Range(ValueRange.DEGREES_FULL) float rangeZ
 ) {
+    // =========================================================================
+    // Static Constants
+    // =========================================================================
+    
     /** No spin (static). */
-    public static final SpinConfig NONE = new SpinConfig(Axis.Y, 0, false, 360, null);
+    public static final SpinConfig NONE = new SpinConfig(0, 0, 0, false, false, false, 360, 360, 360);
     
     /** Default spin (slow Y-axis rotation). */
-    public static final SpinConfig DEFAULT = new SpinConfig(Axis.Y, 0.02f, false, 360, null);
+    public static final SpinConfig DEFAULT = new SpinConfig(0, 45, 0, false, false, false, 360, 360, 360);
     
-    /**
-     * Creates a simple spin around an axis.
-     * @param axis Rotation axis
-     * @param speed Rotation speed (radians per tick)
-     */
-    public static SpinConfig around(Axis axis, @Range(ValueRange.UNBOUNDED) float speed) {
-        return new SpinConfig(axis, speed, false, 360, null);
+    // =========================================================================
+    // Factory Methods
+    // =========================================================================
+    
+    /** Creates a simple Y-axis spin at the given speed (degrees/sec). */
+    public static SpinConfig aroundY(float speed) {
+        return new SpinConfig(0, speed, 0, false, false, false, 360, 360, 360);
     }
     
-    /**
-     * Creates an oscillating spin (back and forth).
-     * @param axis Rotation axis
-     * @param speed Oscillation speed
-     * @param range Maximum rotation angle
-     */
-    public static SpinConfig oscillating(Axis axis, @Range(ValueRange.UNBOUNDED) float speed, @Range(ValueRange.DEGREES_FULL) float range) {
-        return new SpinConfig(axis, speed, true, range, null);
+    /** Creates a spin on all three axes at the given speeds. */
+    public static SpinConfig combined(float speedX, float speedY, float speedZ) {
+        return new SpinConfig(speedX, speedY, speedZ, false, false, false, 360, 360, 360);
     }
     
-    /** Whether this spin is active. */
+    // =========================================================================
+    // Queries
+    // =========================================================================
+    
+    /** Whether any rotation is active. */
     public boolean isActive() {
-        return speed != 0;
+        return speedX != 0 || speedY != 0 || speedZ != 0;
     }
     
-    /** Gets the rotation axis as a vector. */
-    public Vector3f getAxisVector() {
-        if (axis == Axis.CUSTOM && customAxis != null) {
-            return new Vector3f(customAxis);
-        }
-        return axis.toVector();
-    }
+    /** Whether X-axis rotation is active. */
+    public boolean isActiveX() { return speedX != 0; }
+    
+    /** Whether Y-axis rotation is active. */
+    public boolean isActiveY() { return speedY != 0; }
+    
+    /** Whether Z-axis rotation is active. */
+    public boolean isActiveZ() { return speedZ != 0; }
     
     // =========================================================================
     // Builder
     // =========================================================================
     
     public static Builder builder() { return new Builder(); }
-    /** Create a builder pre-populated with this record's values. */
+    
     public Builder toBuilder() {
         return new Builder()
-            .axis(axis)
-            .speed(speed)
-            .oscillate(oscillate)
-            .range(range)
-            .customAxis(customAxis);
+            .speedX(speedX).speedY(speedY).speedZ(speedZ)
+            .oscillateX(oscillateX).oscillateY(oscillateY).oscillateZ(oscillateZ)
+            .rangeX(rangeX).rangeY(rangeY).rangeZ(rangeZ);
     }
     
     public static class Builder {
-        private Axis axis = Axis.Y;
-        private @Range(ValueRange.UNBOUNDED) float speed = 0.02f;
-        private boolean oscillate = false;
-        private @Range(ValueRange.DEGREES_FULL) float range = 360;
-        private @Nullable Vector3f customAxis = null;
+        private float speedX = 0, speedY = 0, speedZ = 0;
+        private boolean oscillateX = false, oscillateY = false, oscillateZ = false;
+        private float rangeX = 360, rangeY = 360, rangeZ = 360;
         
-        public Builder axis(Axis a) { this.axis = a; return this; }
-        public Builder speed(float s) { this.speed = s; return this; }
-        public Builder oscillate(boolean o) { this.oscillate = o; return this; }
-        public Builder range(float r) { this.range = r; return this; }
-        public Builder customAxis(Vector3f v) { this.customAxis = v; return this; }
+        public Builder speedX(float v) { this.speedX = v; return this; }
+        public Builder speedY(float v) { this.speedY = v; return this; }
+        public Builder speedZ(float v) { this.speedZ = v; return this; }
+        public Builder oscillateX(boolean v) { this.oscillateX = v; return this; }
+        public Builder oscillateY(boolean v) { this.oscillateY = v; return this; }
+        public Builder oscillateZ(boolean v) { this.oscillateZ = v; return this; }
+        public Builder rangeX(float v) { this.rangeX = v; return this; }
+        public Builder rangeY(float v) { this.rangeY = v; return this; }
+        public Builder rangeZ(float v) { this.rangeZ = v; return this; }
         
         public SpinConfig build() {
-            return new SpinConfig(axis, speed, oscillate, range, customAxis);
+            return new SpinConfig(speedX, speedY, speedZ, oscillateX, oscillateY, oscillateZ, rangeX, rangeY, rangeZ);
         }
     }
-
+    
     // =========================================================================
-    // JSON Parsing
+    // JSON Parsing (with legacy support)
     // =========================================================================
     
     /**
-     * Parses a SpinConfig from JSON.
-     * @param json The JSON object
-     * @return Parsed config
+     * Parses a SpinConfig from JSON. Supports both new and legacy formats.
      */
     public static SpinConfig fromJson(JsonObject json) {
         if (json == null) return NONE;
         
         Logging.FIELD.topic("parse").trace("Parsing SpinConfig...");
         
-        Axis axis = Axis.Y;
-        if (json.has("axis")) {
-            axis = Axis.fromId(json.get("axis").getAsString());
+        // Check for legacy format: {"axis": "Y", "speed": 45}
+        if (json.has("axis") && json.has("speed")) {
+            return parseLegacy(json);
         }
         
-        float speed = json.has("speed") ? json.get("speed").getAsFloat() : 0.02f;
-        boolean oscillate = json.has("oscillate") ? json.get("oscillate").getAsBoolean() : false;
-        float range = json.has("range") ? json.get("range").getAsFloat() : 360.0f;
+        // New per-axis format
+        float speedX = json.has("speedX") ? json.get("speedX").getAsFloat() : 0;
+        float speedY = json.has("speedY") ? json.get("speedY").getAsFloat() : 0;
+        float speedZ = json.has("speedZ") ? json.get("speedZ").getAsFloat() : 0;
         
-        SpinConfig result = new SpinConfig(axis, speed, oscillate, range, null);
-        Logging.FIELD.topic("parse").trace("Parsed SpinConfig: axis={}, speed={}, oscillate={}", axis, speed, oscillate);
+        boolean oscillateX = json.has("oscillateX") && json.get("oscillateX").getAsBoolean();
+        boolean oscillateY = json.has("oscillateY") && json.get("oscillateY").getAsBoolean();
+        boolean oscillateZ = json.has("oscillateZ") && json.get("oscillateZ").getAsBoolean();
+        
+        float rangeX = json.has("rangeX") ? json.get("rangeX").getAsFloat() : 360;
+        float rangeY = json.has("rangeY") ? json.get("rangeY").getAsFloat() : 360;
+        float rangeZ = json.has("rangeZ") ? json.get("rangeZ").getAsFloat() : 360;
+        
+        SpinConfig result = new SpinConfig(speedX, speedY, speedZ, oscillateX, oscillateY, oscillateZ, rangeX, rangeY, rangeZ);
+        Logging.FIELD.topic("parse").trace("Parsed SpinConfig: X={}, Y={}, Z={}", speedX, speedY, speedZ);
         return result;
     }
     
     /**
+     * Parses legacy format: {"axis": "Y", "speed": 45}
+     */
+    private static SpinConfig parseLegacy(JsonObject json) {
+        String axisStr = json.get("axis").getAsString().toUpperCase();
+        float speed = json.get("speed").getAsFloat();
+        boolean oscillate = json.has("oscillate") && json.get("oscillate").getAsBoolean();
+        float range = json.has("range") ? json.get("range").getAsFloat() : 360;
+        
+        Logging.FIELD.topic("parse").debug("Converting legacy SpinConfig: axis={}, speed={}", axisStr, speed);
+        
+        // Map old axis enum to per-axis speeds
+        return switch (axisStr) {
+            case "X" -> new SpinConfig(speed, 0, 0, oscillate, false, false, range, 360, 360);
+            case "Y" -> new SpinConfig(0, speed, 0, false, oscillate, false, 360, range, 360);
+            case "Z" -> new SpinConfig(0, 0, speed, false, false, oscillate, 360, 360, range);
+            case "XY" -> new SpinConfig(speed, speed, 0, oscillate, oscillate, false, range, range, 360);
+            default -> new SpinConfig(0, speed, 0, false, oscillate, false, 360, range, 360); // Default Y
+        };
+    }
+    
+    /**
      * Serializes this spin config to JSON.
-     * Uses reflection-based serialization with @JsonField annotations.
      */
     public JsonObject toJson() {
         return JsonSerializer.toJson(this);
     }
-
 }

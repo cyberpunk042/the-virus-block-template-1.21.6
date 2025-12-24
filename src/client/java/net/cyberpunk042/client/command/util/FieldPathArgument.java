@@ -50,7 +50,9 @@ public class FieldPathArgument implements ArgumentType<FieldPath> {
         "cylinder.height", "cylinder.segments", "cylinder.y", "cylinder.capTop", "cylinder.capBottom",
         "polyhedron.type", "polyhedron.subdivisions",
         // Animation
-        "spin.speed", "spin.axis", "spin.enabled",
+        "spin.speedX", "spin.speedY", "spin.speedZ",
+        "spin.oscillateX", "spin.oscillateY", "spin.oscillateZ",
+        "spin.rangeX", "spin.rangeY", "spin.rangeZ",
         "pulse.speed", "pulse.amplitude", "pulse.enabled",
         "alphaPulse.speed", "alphaPulse.minAlpha", "alphaPulse.maxAlpha", "alphaPulse.enabled",
         "wobble.speed", "wobble.amplitude", "wobble.enabled",

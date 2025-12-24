@@ -244,11 +244,31 @@ public final class GuiClientHandlers {
     }
     
     private static void applyAnimationUpdate(FieldEditState state, JsonObject json) {
-        // Spin
+        // Spin (per-axis or legacy format)
         if (json.has("spin")) {
             JsonObject spin = json.getAsJsonObject("spin");
-            if (spin.has("speed")) state.set("spin.speed", spin.get("speed").getAsFloat());
-            if (spin.has("axis")) state.set("spin.axis", spin.get("axis").getAsString());
+            
+            // New per-axis format
+            if (spin.has("speedX")) state.set("spin.speedX", spin.get("speedX").getAsFloat());
+            if (spin.has("speedY")) state.set("spin.speedY", spin.get("speedY").getAsFloat());
+            if (spin.has("speedZ")) state.set("spin.speedZ", spin.get("speedZ").getAsFloat());
+            if (spin.has("oscillateX")) state.set("spin.oscillateX", spin.get("oscillateX").getAsBoolean());
+            if (spin.has("oscillateY")) state.set("spin.oscillateY", spin.get("oscillateY").getAsBoolean());
+            if (spin.has("oscillateZ")) state.set("spin.oscillateZ", spin.get("oscillateZ").getAsBoolean());
+            if (spin.has("rangeX")) state.set("spin.rangeX", spin.get("rangeX").getAsFloat());
+            if (spin.has("rangeY")) state.set("spin.rangeY", spin.get("rangeY").getAsFloat());
+            if (spin.has("rangeZ")) state.set("spin.rangeZ", spin.get("rangeZ").getAsFloat());
+            
+            // Legacy format (axis + speed)
+            if (spin.has("axis") && spin.has("speed")) {
+                String axis = spin.get("axis").getAsString().toUpperCase();
+                float speed = spin.get("speed").getAsFloat();
+                switch (axis) {
+                    case "X" -> state.set("spin.speedX", speed);
+                    case "Y" -> state.set("spin.speedY", speed);
+                    case "Z" -> state.set("spin.speedZ", speed);
+                }
+            }
         }
         // Pulse
         if (json.has("pulse")) {

@@ -157,7 +157,7 @@ public class ProfileManager extends AbstractManager {
     
     public String getCurrentShapeFragmentName() { return state.getShapeType(); }
     public String getCurrentFillFragmentName() { return state.fill().mode().name(); }
-    public String getCurrentAnimationFragmentName() { return state.spin().speed() != 0 ? "spin" : "none"; }
+    public String getCurrentAnimationFragmentName() { return state.spin() != null && state.spin().isActive() ? "spin" : "none"; }
     
     /**
      * Factory reset the current profile to its original state.

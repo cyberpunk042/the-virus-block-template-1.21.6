@@ -79,45 +79,59 @@ public final class AnimationApplier {
     // =========================================================================
     
     /**
-     * Applies spin rotation.
-     * Uses {@link MathHelper#sin} for fast lookup-table based sine in oscillation mode.
+     * Applies spin rotation on all three axes.
+     * Uses YXZ rotation order (common for 3D applications).
      */
     public static void applySpin(MatrixStack matrices, SpinConfig spin, float time) {
         if (spin == null || !spin.isActive()) return;
         
-        // speed is in degrees per second from UI, convert to radians per tick
-        // time is in ticks (20 ticks/second)
-        // Therefore: angle_rad = (time / 20) * speed_deg * (π/180)
-        //                      = time * speed_deg * (π / 3600)
-        float speedRadPerTick = (float) (spin.speed() * Math.PI / 3600.0);
+        Quaternionf rotation = new Quaternionf();
         
-        float angle;
-        if (spin.oscillate()) {
-            // Oscillate within range - MathHelper.sin is a fast lookup table
-            // range is in degrees, convert to radians
-            float rangeRad = (float) Math.toRadians(spin.range());
-            float progress = MathHelper.sin(time * speedRadPerTick);
-            angle = progress * rangeRad / 2;
-        } else {
-            // Continuous rotation
-            angle = time * speedRadPerTick;
+        // Apply Y rotation first (most common, usually the "look around" axis)
+        if (spin.speedY() != 0) {
+            float angleY = calculateSpinAngle(spin.speedY(), spin.oscillateY(), spin.rangeY(), time);
+            rotation.rotateY(angleY);
         }
         
-        Quaternionf rotation = switch (spin.axis()) {
-            case X -> new Quaternionf().rotateX(angle);
-            case Y -> new Quaternionf().rotateY(angle);
-            case Z -> new Quaternionf().rotateZ(angle);
-            case CUSTOM -> {
-                if (spin.customAxis() != null) {
-                    Vector3f axis = spin.customAxis();
-                    yield new Quaternionf().rotateAxis(angle, axis.x, axis.y, axis.z);
-                }
-                yield new Quaternionf().rotateY(angle);
-            }
-        };
+        // Then X rotation (pitch)
+        if (spin.speedX() != 0) {
+            float angleX = calculateSpinAngle(spin.speedX(), spin.oscillateX(), spin.rangeX(), time);
+            rotation.rotateX(angleX);
+        }
+        
+        // Finally Z rotation (roll)
+        if (spin.speedZ() != 0) {
+            float angleZ = calculateSpinAngle(spin.speedZ(), spin.oscillateZ(), spin.rangeZ(), time);
+            rotation.rotateZ(angleZ);
+        }
         
         matrices.multiply(rotation);
-        Logging.ANIMATION.topic("spin").trace("Spin: axis={}, angle={}", spin.axis(), Math.toDegrees(angle));
+        Logging.ANIMATION.topic("spin").trace("Spin: X={}, Y={}, Z={}", spin.speedX(), spin.speedY(), spin.speedZ());
+    }
+    
+    /**
+     * Calculates the rotation angle for a single axis.
+     * 
+     * @param speed Speed in degrees/second
+     * @param oscillate Whether to oscillate back and forth
+     * @param range Oscillation range in degrees
+     * @param time Current time in ticks
+     * @return Angle in radians
+     */
+    private static float calculateSpinAngle(float speed, boolean oscillate, float range, float time) {
+        // speed is in degrees per second, time is in ticks (20 ticks/second)
+        // angle_rad = (time / 20) * speed_deg * (π/180) = time * speed * (π / 3600)
+        float speedRadPerTick = (float) (speed * Math.PI / 3600.0);
+        
+        if (oscillate) {
+            // Oscillate within range
+            float rangeRad = (float) Math.toRadians(range);
+            float progress = MathHelper.sin(time * speedRadPerTick);
+            return progress * rangeRad / 2;
+        } else {
+            // Continuous rotation
+            return time * speedRadPerTick;
+        }
     }
     
     /**

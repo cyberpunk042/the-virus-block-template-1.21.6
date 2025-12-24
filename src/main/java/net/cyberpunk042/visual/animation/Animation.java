@@ -67,7 +67,7 @@ public record Animation(
      */
     public static Animation spin(float speed) {
         return new Animation(
-            SpinConfig.around(Axis.Y, speed), PulseConfig.NONE, 0, 
+            SpinConfig.aroundY(speed), PulseConfig.NONE, 0, 
             AlphaPulseConfig.NONE, null, null, null);
     }
     
@@ -89,7 +89,7 @@ public record Animation(
      */
     public static Animation spinAndPulse(float spinSpeed, float pulseAmplitude) {
         return new Animation(
-            SpinConfig.around(Axis.Y, spinSpeed),
+            SpinConfig.aroundY(spinSpeed),
             PulseConfig.sine(pulseAmplitude, 1.0f),
             0, AlphaPulseConfig.NONE, null, null, null);
     }
@@ -203,7 +203,7 @@ public record Animation(
         private WaveConfig wave = null;
         
         public Builder spin(SpinConfig s) { this.spin = s; return this; }
-        public Builder spin(float speed) { this.spin = SpinConfig.around(Axis.Y, speed); return this; }
+        public Builder spin(float speed) { this.spin = SpinConfig.aroundY(speed); return this; }
         public Builder pulse(PulseConfig p) { this.pulse = p; return this; }
         public Builder phase(float p) { this.phase = p; return this; }
         public Builder alphaPulse(AlphaPulseConfig a) { this.alphaPulse = a; return this; }

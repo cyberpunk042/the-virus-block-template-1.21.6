@@ -484,8 +484,7 @@ public final class LayerRenderer {
             
             // CP5: ALL animation segments applied
             if (anim.spin() != null) {
-                PipelineTracer.trace(PipelineTracer.N1_SPIN_SPEED, 5, "render", String.valueOf(anim.spin().speed()));
-                PipelineTracer.trace(PipelineTracer.N2_SPIN_AXIS, 5, "render", anim.spin().axis().name());
+                PipelineTracer.trace(PipelineTracer.N1_SPIN_SPEED, 5, "render.Y", String.valueOf(anim.spin().speedY()));
             }
             if (anim.pulse() != null) {
                 PipelineTracer.trace(PipelineTracer.N3_PULSE_SPEED, 5, "render", String.valueOf(anim.pulse().speed()));

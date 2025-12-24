@@ -126,10 +126,10 @@ public class FieldPreviewRenderer {
     private static float calculateRotationY(FieldEditState state, float timeTicks) {
         float rotationY = 0f;
         
-        // Spin animation
+        // Spin animation (use Y-axis speed for preview rotation)
         var spin = state.spin();
         if (spin != null && spin.isActive()) {
-            float speed = spin.speed();
+            float speed = spin.speedY();  // Use Y-axis speed for yaw
             rotationY = (timeTicks * speed * 57.3f) % 360f;  // 57.3 = 180/PI
         }
         

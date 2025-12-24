@@ -82,13 +82,6 @@ public class ContentProviderFactory {
     // ═══════════════════════════════════════════════════════════════════════════
     
     /**
-     * Creates the Animation sub-tab content.
-     */
-    public SubTabPane.ContentProvider animation() {
-        return new PanelWrapper(new AnimationSubPanel(parent, state, 0));
-    }
-    
-    /**
      * Creates the Prediction sub-tab content.
      */
     public SubTabPane.ContentProvider prediction() {

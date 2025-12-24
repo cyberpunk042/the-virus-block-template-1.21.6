@@ -95,10 +95,15 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
     
     private Object getSpinProperty(String prop) {
         return switch (prop) {
-            case "speed" -> spin.speed();
-            case "axis" -> spin.axis().name();
-            case "oscillate" -> spin.oscillate();
-            case "range" -> spin.range();
+            case "speedX" -> spin.speedX();
+            case "speedY" -> spin.speedY();
+            case "speedZ" -> spin.speedZ();
+            case "oscillateX" -> spin.oscillateX();
+            case "oscillateY" -> spin.oscillateY();
+            case "oscillateZ" -> spin.oscillateZ();
+            case "rangeX" -> spin.rangeX();
+            case "rangeY" -> spin.rangeY();
+            case "rangeZ" -> spin.rangeZ();
             default -> null;
         };
     }
@@ -177,10 +182,15 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
     private void setSpinProperty(String prop, Object value) {
         SpinConfig.Builder b = spin.toBuilder();
         switch (prop) {
-            case "speed" -> b.speed(toFloat(value));
-            case "axis" -> b.axis(Axis.fromId(value.toString()));
-            case "oscillate" -> b.oscillate(toBool(value));
-            case "range" -> b.range(toFloat(value));
+            case "speedX" -> b.speedX(toFloat(value));
+            case "speedY" -> b.speedY(toFloat(value));
+            case "speedZ" -> b.speedZ(toFloat(value));
+            case "oscillateX" -> b.oscillateX(toBool(value));
+            case "oscillateY" -> b.oscillateY(toBool(value));
+            case "oscillateZ" -> b.oscillateZ(toBool(value));
+            case "rangeX" -> b.rangeX(toFloat(value));
+            case "rangeY" -> b.rangeY(toFloat(value));
+            case "rangeZ" -> b.rangeZ(toFloat(value));
         }
         this.spin = b.build();
     }
