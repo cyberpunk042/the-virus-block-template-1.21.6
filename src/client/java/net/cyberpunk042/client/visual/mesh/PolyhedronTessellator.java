@@ -163,12 +163,15 @@ public final class PolyhedronTessellator implements Tessellator {
         int i2 = emitVertex(builder, v2, normal, 1, 1);
         builder.emitCellFromPattern(new int[]{i0, i1, i2}, pattern);
         
-        // Back face (double-sided)
-        float[] invN = {-normal[0], -normal[1], -normal[2]};
-        int j0 = emitVertex(builder, v0, invN, 0, 0);
-        int j1 = emitVertex(builder, v2, invN, 1, 1);
-        int j2 = emitVertex(builder, v1, invN, 1, 0);
-        builder.emitCellFromPattern(new int[]{j0, j1, j2}, pattern);
+        // Back face (double-sided) - ONLY if not subdividing
+        // When subdividing, back faces are added after subdivision completes
+        if (subdivisions == 0) {
+            float[] invN = {-normal[0], -normal[1], -normal[2]};
+            int j0 = emitVertex(builder, v0, invN, 0, 0);
+            int j1 = emitVertex(builder, v2, invN, 1, 1);
+            int j2 = emitVertex(builder, v1, invN, 1, 0);
+            builder.emitCellFromPattern(new int[]{j0, j1, j2}, pattern);
+        }
     }
     
     private void emitQuadFace(MeshBuilder builder, float[][] vertices,
@@ -185,13 +188,15 @@ public final class PolyhedronTessellator implements Tessellator {
         int i3 = emitVertex(builder, v3, normal, 0, 1);
         builder.quad(i0, i1, i2, i3);
         
-        // Back face (double-sided)
-        float[] invN = {-normal[0], -normal[1], -normal[2]};
-        int j0 = emitVertex(builder, v0, invN, 0, 0);
-        int j1 = emitVertex(builder, v3, invN, 0, 1);
-        int j2 = emitVertex(builder, v2, invN, 1, 1);
-        int j3 = emitVertex(builder, v1, invN, 1, 0);
-        builder.quad(j0, j1, j2, j3);
+        // Back face (double-sided) - ONLY if not subdividing
+        if (subdivisions == 0) {
+            float[] invN = {-normal[0], -normal[1], -normal[2]};
+            int j0 = emitVertex(builder, v0, invN, 0, 0);
+            int j1 = emitVertex(builder, v3, invN, 0, 1);
+            int j2 = emitVertex(builder, v2, invN, 1, 1);
+            int j3 = emitVertex(builder, v1, invN, 1, 0);
+            builder.quad(j0, j1, j2, j3);
+        }
     }
     
     private void emitPentagonFace(MeshBuilder builder, float[][] vertices, int[] face) {
@@ -219,12 +224,14 @@ public final class PolyhedronTessellator implements Tessellator {
             int vi1 = emitVertex(builder, v1, normal, 1, 0);
             builder.emitCellFromPattern(new int[]{ci, vi0, vi1}, pattern);
             
-            // Back
-            float[] invN = {-normal[0], -normal[1], -normal[2]};
-            int cj = emitVertex(builder, center, invN, 0.5f, 0.5f);
-            int vj0 = emitVertex(builder, v1, invN, 1, 0);
-            int vj1 = emitVertex(builder, v0, invN, 0, 0);
-            builder.emitCellFromPattern(new int[]{cj, vj0, vj1}, pattern);
+            // Back - ONLY if not subdividing
+            if (subdivisions == 0) {
+                float[] invN = {-normal[0], -normal[1], -normal[2]};
+                int cj = emitVertex(builder, center, invN, 0.5f, 0.5f);
+                int vj0 = emitVertex(builder, v1, invN, 1, 0);
+                int vj1 = emitVertex(builder, v0, invN, 0, 0);
+                builder.emitCellFromPattern(new int[]{cj, vj0, vj1}, pattern);
+            }
         }
     }
     
@@ -274,11 +281,42 @@ public final class PolyhedronTessellator implements Tessellator {
                 result = subdivideOnce(result, radius, wave, time);
             }
             
+            // Add back faces for double-sided rendering
+            // The subdivision only processes front faces; now we duplicate with reversed winding
+            result = addBackFaces(result, wave, time);
+            
             Logging.RENDER.topic("tessellate")
                 .kv("finalFaces", result.primitiveCount())
-                .debug("Subdivision complete");
+                .debug("Subdivision complete (with back faces)");
             
             return result;
+        }
+        
+        /**
+         * Duplicates all triangles with reversed winding for double-sided rendering.
+         */
+        private static Mesh addBackFaces(Mesh mesh, WaveConfig wave, float time) {
+            MeshBuilder builder = MeshBuilder.triangles();
+            
+            // Copy front faces
+            mesh.forEachTriangle((v0, v1, v2) -> {
+                int i0 = builder.vertex(v0.x(), v0.y(), v0.z(), v0.nx(), v0.ny(), v0.nz(), v0.u(), v0.v());
+                int i1 = builder.vertex(v1.x(), v1.y(), v1.z(), v1.nx(), v1.ny(), v1.nz(), v1.u(), v1.v());
+                int i2 = builder.vertex(v2.x(), v2.y(), v2.z(), v2.nx(), v2.ny(), v2.nz(), v2.u(), v2.v());
+                builder.triangle(i0, i1, i2);
+            });
+            
+            // Add back faces (reversed winding, inverted normals)
+            mesh.forEachTriangle((v0, v1, v2) -> {
+                // Reversed vertex order for back face: v0, v2, v1
+                // Inverted normals
+                int j0 = builder.vertex(v0.x(), v0.y(), v0.z(), -v0.nx(), -v0.ny(), -v0.nz(), v0.u(), v0.v());
+                int j1 = builder.vertex(v2.x(), v2.y(), v2.z(), -v2.nx(), -v2.ny(), -v2.nz(), v2.u(), v2.v());
+                int j2 = builder.vertex(v1.x(), v1.y(), v1.z(), -v1.nx(), -v1.ny(), -v1.nz(), v1.u(), v1.v());
+                builder.triangle(j0, j1, j2);
+            });
+            
+            return builder.build();
         }
         
         private static Mesh subdivideOnce(Mesh mesh, float radius,

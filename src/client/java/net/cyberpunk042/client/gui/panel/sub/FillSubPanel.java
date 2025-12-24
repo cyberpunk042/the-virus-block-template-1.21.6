@@ -93,6 +93,8 @@ public class FillSubPanel extends BoundPanel {
         content.when(currentMode == FillMode.SOLID, c -> {
             // "See-Through" = !depthWrite - handled via manual toggle with inversion
             buildSeeThruToggle(c);
+            // Double-sided rendering toggle
+            buildDoubleSidedToggle(c);
         });
         
         // ═══════════════════════════════════════════════════════════════════════
@@ -200,6 +202,31 @@ public class FillSubPanel extends BoundPanel {
             toggle,
             () -> !state.fill().depthWrite(),
             v -> state.set("fill.depthWrite", !v),
+            v -> v,
+            v -> v,
+            toggle::setValue
+        ));
+        
+        content.advanceRow();
+    }
+    
+    private void buildDoubleSidedToggle(ContentBuilder content) {
+        int x = GuiConstants.PADDING;
+        int y = content.getCurrentY();
+        int w = panelWidth - GuiConstants.PADDING * 2;
+        
+        CyclingButtonWidget<Boolean> toggle = net.cyberpunk042.client.gui.util.GuiWidgets.toggle(
+            x, y, w, "Double-Sided",
+            state.fill().doubleSided(), "Render both front and back faces",
+            v -> state.set("fill.doubleSided", v)
+        );
+        widgets.add(toggle);
+        
+        // Binding for sync from state
+        bindings.add(new Bound<>(
+            toggle,
+            () -> state.fill().doubleSided(),
+            v -> state.set("fill.doubleSided", v),
             v -> v,
             v -> v,
             toggle::setValue

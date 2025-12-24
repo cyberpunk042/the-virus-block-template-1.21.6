@@ -151,10 +151,10 @@ public final class CylinderTessellator {
                 int i01 = builder.addVertex(v01);
                 int i11 = builder.addVertex(v11);
                 
-                // Indices: i00=BL(bot,angle0), i10=BR(bot,angle1), i01=TL(top,angle0), i11=TR(top,angle1)
-                // Use quadAsTrianglesFromPattern for pattern support
-                // TL=i01, TR=i11, BR=i10, BL=i00
-                builder.quadAsTrianglesFromPattern(i01, i11, i10, i00, pattern);
+                // When viewed from OUTSIDE the cylinder, angle1 (s+1) is on LEFT, angle0 (s) is on RIGHT
+                // (because angles go CCW when viewed from above)
+                // So: TL=i11 (angle1,top), TR=i01 (angle0,top), BR=i00 (angle0,bot), BL=i10 (angle1,bot)
+                builder.quadAsTrianglesFromPattern(i11, i01, i00, i10, pattern);
             }
         }
     }
@@ -169,10 +169,11 @@ public final class CylinderTessellator {
                                        WaveConfig wave, float time) {
         boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();
         
+        float ny = isTop ? 1 : -1;
+        
         // Center vertex
         Vertex center = GeometryMath.discCenter(y);
-        center = new Vertex(center.x(), center.y(), center.z(), 
-                            0, isTop ? 1 : -1, 0, 0.5f, 0.5f);
+        center = new Vertex(center.x(), center.y(), center.z(), 0, ny, 0, 0.5f, 0.5f);
         if (applyWave) {
             center = WaveDeformer.applyToVertex(center, wave, time);
         }
@@ -183,36 +184,28 @@ public final class CylinderTessellator {
         for (int s = 0; s <= segments; s++) {
             float angle = (s / (float) segments) * arc;
             Vertex v = GeometryMath.discPoint(angle, radius, y);
-            v = new Vertex(v.x(), v.y(), v.z(), 0, isTop ? 1 : -1, 0, v.u(), v.v());
+            v = new Vertex(v.x(), v.y(), v.z(), 0, ny, 0, v.u(), v.v());
             if (applyWave) {
                 v = WaveDeformer.applyToVertex(v, wave, time);
             }
             edgeIndices[s] = builder.addVertex(v);
         }
         
-        // Triangulate with pattern support
+        // Emit triangles
         for (int s = 0; s < segments; s++) {
-            // Check pattern visibility for this sector
             if (pattern != null && !pattern.shouldRender(s, segments)) {
                 continue;
             }
             
-            // Build cell vertices array: [center, edge0, edge1]
-            // Winding order (same logic as PrismTessellator):
-            // - discPoint generates vertices CCW when viewed from BELOW (-Y)
-            // - For TOP cap (viewed from +Y), reverse order for CCW from above
-            // - For BOTTOM cap (viewed from -Y), natural order for CCW from below
-            int[] cellVertices;
+            int[] vertices;
             if (isTop) {
-                // Top cap: reverse vertex order for CCW from above
-                cellVertices = new int[] { centerIdx, edgeIndices[s + 1], edgeIndices[s] };
+                // Top: s+1, s
+                vertices = new int[] { centerIdx, edgeIndices[s + 1], edgeIndices[s] };
             } else {
-                // Bottom cap: natural order for CCW from below
-                cellVertices = new int[] { centerIdx, edgeIndices[s], edgeIndices[s + 1] };
+                // Bottom: s+1, s (same as top)
+                vertices = new int[] { centerIdx, edgeIndices[s + 1], edgeIndices[s] };
             }
-            
-            // Use generic pattern-based emission
-            builder.emitCellFromPattern(cellVertices, pattern);
+            builder.emitCellFromPattern(vertices, pattern);
         }
     }
 }

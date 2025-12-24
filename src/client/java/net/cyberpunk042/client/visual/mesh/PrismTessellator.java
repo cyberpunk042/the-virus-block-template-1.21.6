@@ -166,7 +166,6 @@ public final class PrismTessellator {
                 int i11 = builder.addVertex(v11);
                 
                 // Indices: i00=BL(bot,s), i10=BR(bot,s+1), i01=TL(top,s), i11=TR(top,s+1)
-                // Use quadAsTrianglesFromPattern for pattern support
                 // TL=i01, TR=i11, BR=i10, BL=i00
                 builder.quadAsTrianglesFromPattern(i01, i11, i10, i00, pattern);
             }
@@ -183,8 +182,11 @@ public final class PrismTessellator {
                                        WaveConfig wave, float time) {
         boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();
         
+        float ny = isTop ? 1 : -1;
+        
         // Center vertex
         Vertex center = GeometryMath.prismFaceCenter(sides, y, radius);
+        center = new Vertex(center.x(), center.y(), center.z(), 0, ny, 0, 0.5f, 0.5f);
         if (applyWave) {
             center = WaveDeformer.applyToVertex(center, wave, time);
         }
@@ -194,41 +196,33 @@ public final class PrismTessellator {
         int[] edgeIndices = new int[sides];
         for (int s = 0; s < sides; s++) {
             Vertex v = GeometryMath.prismCorner(s, sides, y, radius, twist, height, yBase);
-            // Adjust normal for cap (up or down)
-            v = new Vertex(v.x(), v.y(), v.z(), 0, isTop ? 1 : -1, 0, v.u(), v.v());
+            v = new Vertex(v.x(), v.y(), v.z(), 0, ny, 0, v.u(), v.v());
             if (applyWave) {
                 v = WaveDeformer.applyToVertex(v, wave, time);
             }
             edgeIndices[s] = builder.addVertex(v);
         }
         
-        // Triangulate from center using pattern
+        // Emit triangles with correct winding for front-face visibility
+        // OpenGL uses CCW as front-face by default
+        // Top cap: viewed from +Y (looking down) - center → next → s is CCW from above
+        // Bottom cap: viewed from -Y (looking up) - center → s → next is CCW from below
         for (int s = 0; s < sides; s++) {
-            // Check pattern visibility for this sector
             if (pattern != null && !pattern.shouldRender(s, sides)) {
                 continue;
             }
             
             int next = (s + 1) % sides;
             
-            // Build cell vertices array: [center, edge0, edge1]
-            // Winding order explanation:
-            // - prismCorner generates vertices CCW when viewed from BELOW (-Y)
-            // - For TOP cap (viewed from +Y), we need CCW from above
-            // - Therefore: center → edge[next] → edge[s] (reverse order)
-            // - For BOTTOM cap (viewed from -Y), CCW from below is what prismCorner gives
-            // - Therefore: center → edge[s] → edge[next] (natural order)
-            int[] cellVertices;
+            int[] vertices;
             if (isTop) {
-                // Top cap: reverse vertex order for CCW from above
-                cellVertices = new int[] { centerIdx, edgeIndices[next], edgeIndices[s] };
+                // Top cap: next, s (matching cylinder's s+1, s)
+                vertices = new int[] { centerIdx, edgeIndices[next], edgeIndices[s] };
             } else {
-                // Bottom cap: natural order for CCW from below
-                cellVertices = new int[] { centerIdx, edgeIndices[s], edgeIndices[next] };
+                // Bottom cap: reversed winding (next, s) for visibility from below
+                vertices = new int[] { centerIdx, edgeIndices[next], edgeIndices[s] };
             }
-            
-            // Use generic pattern-based emission
-            builder.emitCellFromPattern(cellVertices, pattern);
+            builder.emitCellFromPattern(vertices, pattern);
         }
     }
 }

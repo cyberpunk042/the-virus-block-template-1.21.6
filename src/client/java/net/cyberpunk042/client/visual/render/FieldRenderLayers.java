@@ -36,44 +36,53 @@ public final class FieldRenderLayers extends RenderPhase {
     // Render Layers (using Minecraft's built-in layers)
     // ─────────────────────────────────────────────────────────────────────────────
     
-    private static final RenderLayer SOLID_TRANSLUCENT = RenderLayer.getEntityTranslucent(
-        Identifier.of("minecraft", "textures/misc/white.png")
-    );
+    private static final Identifier WHITE_TEXTURE = Identifier.of("minecraft", "textures/misc/white.png");
     
-    // For see-through mode, we use the same layer but manually control depth write
+    // Single-sided layer WITH backface culling (for doubleSided=false)
+    private static final RenderLayer SOLID_TRANSLUCENT_CULL = RenderLayer.getItemEntityTranslucentCull(WHITE_TEXTURE);
+    
+    // Double-sided layer WITHOUT backface culling (for doubleSided=true)
+    // getEntityTranslucent has no culling by default
+    private static final RenderLayer SOLID_TRANSLUCENT_NO_CULL = RenderLayer.getEntityTranslucent(WHITE_TEXTURE);
+    
+    // Default layer - use culled version for single-sided rendering
+    private static final RenderLayer SOLID_TRANSLUCENT = SOLID_TRANSLUCENT_CULL;
+    
+    // For see-through mode, we use the no-cull layer but manually control depth write
     // via GL state before the buffer is flushed - see LayerRenderer
-    // TODO: Create custom RenderLayer with RenderPipeline that has depthWrite=false
-    private static final RenderLayer SOLID_TRANSLUCENT_NO_DEPTH = SOLID_TRANSLUCENT;
-    
-    // For double-sided geometry, we use the same layer but rely on emitting 
-    // both triangle windings in the tessellator. This avoids the need for
-    // a custom render layer with non-standard culling.
-    private static final RenderLayer SOLID_TRANSLUCENT_NO_CULL = SOLID_TRANSLUCENT;
+    private static final RenderLayer SOLID_TRANSLUCENT_NO_DEPTH = SOLID_TRANSLUCENT_NO_CULL;
     
     private static final RenderLayer LINES_LAYER = RenderLayer.getLines();
     
     
     /**
-     * Translucent solid layer for field geometry (with backface culling).
+     * Translucent solid layer for field geometry with backface culling.
+     * <p>This uses getItemEntityTranslucentCull which enables culling for
+     * single-sided rendering (front faces only visible).</p>
      */
     public static RenderLayer solidTranslucent() {
         return SOLID_TRANSLUCENT;
     }
     
     /**
+     * Translucent solid layer WITH backface culling (single-sided).
+     * <p>Only front faces are visible. Use for doubleSided=false.</p>
+     */
+    public static RenderLayer solidTranslucentCull() {
+        return SOLID_TRANSLUCENT_CULL;
+    }
+    
+    /**
      * Translucent layer without depth writing (true see-through).
-     * <p>Objects behind this will still be visible.</p>
+     * <p>Objects behind this will still be visible. Uses no-cull layer.</p>
      */
     public static RenderLayer solidTranslucentNoDepth() {
         return SOLID_TRANSLUCENT_NO_DEPTH;
     }
     
     /**
-     * Translucent solid layer for double-sided geometry.
-     * <p>Note: This currently returns the same layer as solidTranslucent().
-     * Double-sided visibility is achieved by emitting both triangle windings
-     * in the tessellator. A future improvement could use GlStateManager to
-     * disable culling during rendering.</p>
+     * Translucent solid layer for double-sided geometry (no backface culling).
+     * <p>Both front and back faces are visible. Use for doubleSided=true.</p>
      */
     public static RenderLayer solidTranslucentNoCull() {
         return SOLID_TRANSLUCENT_NO_CULL;
