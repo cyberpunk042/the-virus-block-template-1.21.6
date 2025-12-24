@@ -22,6 +22,7 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
     @StateField private WobbleConfig wobble = WobbleConfig.NONE;
     @StateField private WaveConfig wave = WaveConfig.NONE;
     @StateField private ColorCycleConfig colorCycle = ColorCycleConfig.NONE;
+    @StateField private PrecessionConfig precession = null;
     
     @Override
     public String category() { return "animation"; }
@@ -36,6 +37,7 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             this.wobble = orDefault(anim.wobble(), WobbleConfig.NONE);
             this.wave = orDefault(anim.wave(), WaveConfig.NONE);
             this.colorCycle = orDefault(anim.colorCycle(), ColorCycleConfig.NONE);
+            this.precession = anim.precession();
         } else {
             reset();
         }
@@ -51,6 +53,7 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             .wobble(wobble)
             .wave(wave)
             .colorCycle(colorCycle)
+            .precession(precession)
             .build());
     }
     
@@ -73,6 +76,9 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
     public ColorCycleConfig colorCycle() { return colorCycle; }
     public void setColorCycle(ColorCycleConfig colorCycle) { this.colorCycle = colorCycle; }
     
+    public PrecessionConfig precession() { return precession; }
+    public void setPrecession(PrecessionConfig precession) { this.precession = precession; }
+    
     /**
      * Override get to handle paths like "spin.speed", "pulse.scale", etc.
      */
@@ -89,6 +95,7 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             case "wobble" -> prop != null ? getWobbleProperty(prop) : wobble;
             case "wave" -> prop != null ? getWaveProperty(prop) : wave;
             case "colorCycle" -> prop != null ? getColorCycleProperty(prop) : colorCycle;
+            case "precession" -> prop != null ? getPrecessionProperty(prop) : precession;
             default -> super.get(path);
         };
     }
@@ -154,6 +161,17 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
         };
     }
     
+    private Object getPrecessionProperty(String prop) {
+        if (precession == null) return null;
+        return switch (prop) {
+            case "enabled" -> precession.enabled();
+            case "tiltAngle" -> precession.tiltAngle();
+            case "speed" -> precession.speed();
+            case "phase" -> precession.phase();
+            default -> null;
+        };
+    }
+    
     /**
      * Override set to handle paths like "spin.speed", "pulse.scale", etc.
      */
@@ -164,6 +182,15 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
         String prop = parts.length > 1 ? parts[1] : null;
         
         if (prop == null) {
+            // Direct assignment of entire config object
+            if (field.equals("precession")) {
+                if (value == null) {
+                    this.precession = null;
+                } else if (value instanceof PrecessionConfig pc) {
+                    this.precession = pc;
+                }
+                return;
+            }
             super.set(path, value);
             return;
         }
@@ -175,6 +202,7 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             case "wobble" -> setWobbleProperty(prop, value);
             case "wave" -> setWaveProperty(prop, value);
             case "colorCycle" -> setColorCycleProperty(prop, value);
+            case "precession" -> setPrecessionProperty(prop, value);
             default -> super.set(path, value);
         }
     }
@@ -254,6 +282,28 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
         this.colorCycle = b.build();
     }
     
+    private void setPrecessionProperty(String prop, Object value) {
+        // Handle null (disable precession)
+        if (value == null && prop.isEmpty()) {
+            this.precession = null;
+            return;
+        }
+        // Handle setting entire PrecessionConfig
+        if (value instanceof PrecessionConfig pc) {
+            this.precession = pc;
+            return;
+        }
+        // Build from current or create new
+        PrecessionConfig.Builder b = precession != null ? precession.toBuilder() : PrecessionConfig.builder();
+        switch (prop) {
+            case "enabled" -> b.enabled(toBool(value));
+            case "tiltAngle" -> b.tiltAngle(toFloat(value));
+            case "speed" -> b.speed(toFloat(value));
+            case "phase" -> b.phase(toFloat(value));
+        }
+        this.precession = b.build();
+    }
+    
     private float toFloat(Object v) { return v instanceof Number n ? n.floatValue() : 0f; }
     private boolean toBool(Object v) { return v instanceof Boolean b ? b : Boolean.parseBoolean(v.toString()); }
     
@@ -265,5 +315,6 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
         this.wobble = WobbleConfig.NONE;
         this.wave = WaveConfig.NONE;
         this.colorCycle = ColorCycleConfig.NONE;
+        this.precession = null;
     }
 }

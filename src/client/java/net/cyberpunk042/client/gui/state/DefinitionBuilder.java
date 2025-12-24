@@ -634,6 +634,7 @@ public final class DefinitionBuilder {
             .wobble(state.wobble())
             .wave(state.wave())
             .colorCycle(state.colorCycle())
+            .precession(state.precession())
             .build();
     }
     

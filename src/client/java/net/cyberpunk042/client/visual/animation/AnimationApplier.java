@@ -8,6 +8,7 @@ import net.cyberpunk042.visual.animation.WobbleConfig;
 import net.cyberpunk042.visual.animation.WaveConfig;
 import net.cyberpunk042.visual.animation.AlphaPulseConfig;
 import net.cyberpunk042.visual.animation.ColorCycleConfig;
+import net.cyberpunk042.visual.animation.PrecessionConfig;
 import net.cyberpunk042.visual.animation.Waveform;
 
 import net.cyberpunk042.log.Logging;
@@ -55,22 +56,27 @@ public final class AnimationApplier {
         // Apply phase offset
         float effectiveTime = time + (animation.phase() * 100);  // phase is 0-1
         
-        // 1. Spin
+        // 1. Precession (tilt axis wobble) - applied FIRST so spin rotates within tilted frame
+        if (animation.hasPrecession()) {
+            applyPrecession(matrices, animation.precession(), effectiveTime);
+        }
+        
+        // 2. Spin
         if (animation.hasSpin()) {
             applySpin(matrices, animation.spin(), effectiveTime);
         }
         
-        // 2. Pulse (scale)
+        // 3. Pulse (scale)
         if (animation.hasPulse()) {
             applyPulse(matrices, animation.pulse(), effectiveTime);
         }
         
-        // 3. Wobble
+        // 4. Wobble
         if (animation.hasWobble()) {
             applyWobble(matrices, animation.wobble(), effectiveTime);
         }
         
-        // 4. Wave - affects vertices, not matrix transform. TODO: Implement in tessellator.
+        // 5. Wave - affects vertices, not matrix transform. Applied in tessellator.
         // if (animation.hasWave()) { ... }
     }
     
@@ -132,6 +138,47 @@ public final class AnimationApplier {
             // Continuous rotation
             return time * speedRadPerTick;
         }
+    }
+    
+    /**
+     * Applies precession (axis wobble) animation.
+     * 
+     * <p>Precession tilts the shape axis and rotates that tilt around the Y axis,
+     * creating a lighthouse/gyroscopic wobble effect. Works for any shape.</p>
+     * 
+     * <p>The transform order is:
+     * <ol>
+     *   <li>Rotate around Y by precession angle (positions the tilt direction)</li>
+     *   <li>Tilt around X by tilt angle (creates the off-axis lean)</li>
+     *   <li>Rotate back around Y to maintain local orientation</li>
+     * </ol>
+     * 
+     * @param matrices The matrix stack to modify
+     * @param precession The precession configuration
+     * @param time Current time in ticks
+     */
+    public static void applyPrecession(MatrixStack matrices, PrecessionConfig precession, float time) {
+        if (precession == null || !precession.isActive()) return;
+        
+        // Calculate the current angle around Y for the wobble direction
+        // speed is in revolutions per second, time is in ticks (20 ticks/second)
+        float precessionAngle = precession.getCurrentAngle(time / 20f);
+        
+        // Get tilt angle in radians
+        float tiltAngle = precession.tiltRadians();
+        
+        // Create the precession transform:
+        // 1. Rotate around Y to position the tilt direction
+        // 2. Tilt around X
+        // 3. The combination creates an axis that traces a cone around Y
+        Quaternionf rotation = new Quaternionf()
+            .rotateY(precessionAngle)      // Position the tilt direction
+            .rotateX(tiltAngle);           // Apply the tilt
+        
+        matrices.multiply(rotation);
+        
+        Logging.ANIMATION.topic("precession").trace(
+            "Precession: tilt={}°, angle={}rad", precession.tiltAngle(), precessionAngle);
     }
     
     /**

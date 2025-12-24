@@ -2,6 +2,7 @@ package net.cyberpunk042.client.gui.panel.sub;
 
 import net.cyberpunk042.visual.animation.WobbleConfig;
 import net.cyberpunk042.visual.animation.WaveConfig;
+import net.cyberpunk042.visual.animation.PrecessionConfig;
 import net.cyberpunk042.client.gui.panel.AbstractPanel;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
@@ -53,6 +54,11 @@ public class ModifiersSubPanel extends AbstractPanel {
     private CyclingButtonWidget<WaveDirection> waveDirection;
     // Note: Wave mode control removed - CPU mode is now the default and only option
     // since GPU wave deformation is not yet implemented
+    
+    // Precession (axis wobble)
+    private CheckboxWidget precessionEnabled;
+    private LabeledSlider precessionTilt;
+    private LabeledSlider precessionSpeed;
     
     public enum WaveDirection {
         X("X Axis"), Y("Y Axis"), Z("Z Axis"), RADIAL("Radial");
@@ -227,7 +233,42 @@ public class ModifiersSubPanel extends AbstractPanel {
             waveDirection.setValue(WaveDirection.valueOf(state.getString("wave.direction")));
         } catch (IllegalArgumentException ignored) {}
         widgets.add(waveDirection);
+        currentY += widgetH + gap;
         // Note: Mode dropdown removed - CPU is now the default and only option
+        
+        // ═══════════════════════════════════════════════════════════════════════
+        // PRECESSION - Axis wobble (lighthouse/gyroscope effect)
+        // ═══════════════════════════════════════════════════════════════════════
+        
+        PrecessionConfig precession = state.precession();
+        boolean precActive = precession != null && precession.isActive();
+        float precTilt = precession != null ? precession.tiltAngle() : 15f;
+        float precSpd = precession != null ? precession.speed() : 0.1f;
+        
+        precessionEnabled = GuiWidgets.checkbox(leftX, currentY, "Precession", precActive,
+            "Axis wobble (lighthouse effect)", textRenderer, v -> {
+                if (!v) {
+                    state.set("precession", null);
+                } else {
+                    state.set("precession", PrecessionConfig.DEFAULT);
+                }
+            });
+        widgets.add(precessionEnabled);
+        currentY += widgetH + gap;
+        
+        precessionTilt = LabeledSlider.builder("Tilt Angle")
+            .position(leftX, currentY).width(halfW).compact()
+            .range(1f, 90f).initial(precTilt).format("%.0f°")
+            .onChange(v -> { state.set("precession.tiltAngle", v); })
+            .build();
+        widgets.add(precessionTilt);
+        
+        precessionSpeed = LabeledSlider.builder("Speed")
+            .position(rightX, currentY).width(halfW).compact()
+            .range(0.01f, 2f).initial(precSpd).format("%.2f rev/s")
+            .onChange(v -> { state.set("precession.speed", v); })
+            .build();
+        widgets.add(precessionSpeed);
     }
 
     @Override
@@ -268,7 +309,8 @@ public class ModifiersSubPanel extends AbstractPanel {
             + widgetH + gap  // wave checkbox
             + sliderH + gap  // wave amp/freq
             + widgetH + gap  // wave speed/direction (direction is widget height)
-            + widgetH        // wave mode
+            + widgetH + gap  // precession checkbox
+            + sliderH        // precession tilt/speed
             + GuiConstants.PADDING;
     }
 }

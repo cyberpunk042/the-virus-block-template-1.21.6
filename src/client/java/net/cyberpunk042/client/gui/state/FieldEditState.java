@@ -80,6 +80,7 @@ public class FieldEditState {
         map.put("wobble", animationAdapter);
         map.put("wave", animationAdapter);
         map.put("colorCycle", animationAdapter);
+        map.put("precession", animationAdapter);
         
         // Shape types -> ShapeAdapter
         map.put("shapeType", shapeAdapter);
@@ -376,6 +377,7 @@ public class FieldEditState {
     public net.cyberpunk042.visual.animation.WobbleConfig wobble() { return animationAdapter.wobble(); }
     public net.cyberpunk042.visual.animation.WaveConfig wave() { return animationAdapter.wave(); }
     public net.cyberpunk042.visual.animation.ColorCycleConfig colorCycle() { return animationAdapter.colorCycle(); }
+    public net.cyberpunk042.visual.animation.PrecessionConfig precession() { return animationAdapter.precession(); }
     
     // Fill/Transform/Visibility/Arrangement - return the actual config, not adapter
     public net.cyberpunk042.visual.fill.FillConfig fill() { return fillAdapter.fill(); }
