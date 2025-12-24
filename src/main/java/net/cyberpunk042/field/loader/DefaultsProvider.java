@@ -74,6 +74,18 @@ public class DefaultsProvider {
         cylinder.addProperty("segments", 16);
         SHAPE_DEFAULTS_JSON.put("cylinder", cylinder);
         
+        JsonObject jet = new JsonObject();
+        jet.addProperty("length", 2.0f);
+        jet.addProperty("baseRadius", 0.05f);
+        jet.addProperty("topTipRadius", 0.15f);
+        jet.addProperty("bottomTipRadius", 0.15f);
+        jet.addProperty("segments", 16);
+        jet.addProperty("lengthSegments", 4);
+        jet.addProperty("dualJets", true);
+        jet.addProperty("gap", 0.1f);
+        jet.addProperty("capTip", true);
+        SHAPE_DEFAULTS_JSON.put("jet", jet);
+        
         // Transform defaults
         TRANSFORM_DEFAULTS_JSON.addProperty("anchor", "CENTER");
         TRANSFORM_DEFAULTS_JSON.addProperty("scale", 1.0f);
@@ -107,7 +119,7 @@ public class DefaultsProvider {
      */
     public static JsonObject getDefaults(String type) {
         return switch (type.toLowerCase()) {
-            case "sphere", "ring", "prism", "polyhedron", "cylinder" 
+            case "sphere", "ring", "prism", "polyhedron", "cylinder", "jet" 
                 -> SHAPE_DEFAULTS_JSON.getOrDefault(type.toLowerCase(), new JsonObject());
             case "transform" -> TRANSFORM_DEFAULTS_JSON.deepCopy();
             case "fill" -> FILL_DEFAULTS_JSON.deepCopy();
@@ -157,6 +169,7 @@ public class DefaultsProvider {
                 .polyType(PolyType.CUBE).radius(1.0f).build();
             case "cylinder" -> CylinderShape.builder()
                 .radius(0.5f).height(10.0f).segments(16).build();
+            case "jet" -> JetShape.DEFAULT;
             default -> SphereShape.defaults();
         };
     }

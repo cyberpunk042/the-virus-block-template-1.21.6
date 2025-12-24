@@ -91,6 +91,7 @@ public class FieldEditState {
         map.put("torus", shapeAdapter);
         map.put("capsule", shapeAdapter);
         map.put("cone", shapeAdapter);
+        map.put("jet", shapeAdapter);
         
         // Link properties -> LinkAdapter (panel uses paths like "primitiveId", "radiusOffset")
         map.put("primitiveId", linkAdapter);
@@ -365,6 +366,7 @@ public class FieldEditState {
     public net.cyberpunk042.visual.shape.TorusShape torus() { return shapeAdapter.torus(); }
     public net.cyberpunk042.visual.shape.CapsuleShape capsule() { return shapeAdapter.capsule(); }
     public net.cyberpunk042.visual.shape.ConeShape cone() { return shapeAdapter.cone(); }
+    public net.cyberpunk042.visual.shape.JetShape jet() { return shapeAdapter.jet(); }
     public Shape currentShape() { return shapeAdapter.currentShape(); }
     
     // Animation delegates

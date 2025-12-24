@@ -159,6 +159,7 @@ public final class ShapeWidgetSpec {
             case "torus" -> TORUS_SPECS;
             case "capsule" -> CAPSULE_SPECS;
             case "cone" -> CONE_SPECS;
+            case "jet" -> JET_SPECS;
             default -> List.of();
         };
     }
@@ -314,5 +315,45 @@ public final class ShapeWidgetSpec {
         SliderSpec.full("Top Radius", "cone.topRadius", 0f, 5f, "%.2f"),
         SliderSpec.full("Height", "cone.height", 0.5f, 10f, "%.1f"),
         new SliderSpec("Segments", "cone.segments", 8, 64, "%d", 4f, false)
+    );
+    
+    // ───────────────────────────────────────────────────────────────────────────
+    // JET (Relativistic Jets)
+    // ───────────────────────────────────────────────────────────────────────────
+    
+    private static final List<Object> JET_SPECS = List.of(
+        // === GEOMETRY ===
+        new SectionHeader("Geometry"),
+        
+        // Row 1: Length + Base Radius
+        SliderSpec.half("Length", "jet.length", 0.1f, 10f, "%.2f"),
+        SliderSpec.half("Base R", "jet.baseRadius", 0.05f, 3f, "%.2f"),
+        
+        // Row 2: Segments + Length Segments
+        SliderSpec.halfInt("Segs", "jet.segments", 4, 64),
+        SliderSpec.halfInt("Len Segs", "jet.lengthSegments", 1, 32),
+        
+        // === TIP RADII ===
+        new SectionHeader("Tip Radii"),
+        
+        // Row 3: Top Tip Radius + Bottom Tip Radius
+        SliderSpec.half("Top Tip R", "jet.topTipRadius", 0f, 3f, "%.2f"),
+        SliderSpec.half("Bot Tip R", "jet.bottomTipRadius", 0f, 3f, "%.2f"),
+        
+        // === CONFIGURATION ===
+        new SectionHeader("Configuration"),
+        
+        // Row 4: Dual Jets checkbox + Gap slider
+        CheckboxSpec.half("Dual Jets", "jet.dualJets", "Emit jets from both poles"),
+        SliderSpec.half("Gap", "jet.gap", 0f, 2f, "%.2f"),
+        
+        // Note: Hollow checkbox + inner radii are handled in ShapeSubPanel (conditional)
+        
+        // === CAPS ===
+        new SectionHeader("Caps"),
+        
+        // Row 5: Cap Base + Cap Tip
+        CheckboxSpec.half("Cap Base", "jet.capBase", "Close base end"),
+        CheckboxSpec.half("Cap Tip", "jet.capTip", "Close tip end (if not pointed)")
     );
 }

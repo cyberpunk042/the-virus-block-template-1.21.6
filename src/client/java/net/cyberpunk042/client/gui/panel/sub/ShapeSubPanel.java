@@ -81,7 +81,8 @@ public class ShapeSubPanel extends AbstractPanel {
         ICOSAHEDRON("icosahedron", "Icosahedron"),
         TORUS("torus", "Torus"),
         CAPSULE("capsule", "Capsule"),
-        CONE("cone", "Cone");
+        CONE("cone", "Cone"),
+        JET("jet", "Jet");
         
         private final String id;
         private final String label;
@@ -238,6 +239,86 @@ public class ShapeSubPanel extends AbstractPanel {
             y += step;
         }
         
+        // ═══════════════════════════════════════════════════════════════════════
+        // SPECIAL: Jet "Hollow" Checkbox + Conditional Inner Radii
+        // ═══════════════════════════════════════════════════════════════════════
+        
+        if (shapeType.equalsIgnoreCase("jet")) {
+            var textRenderer = MinecraftClient.getInstance().textRenderer;
+            boolean hollow = state.getBool("jet.hollow");
+            
+            // Row 1: Hollow checkbox + Unified toggle (side by side)
+            // NOTE: Uses same pattern as shape dropdown - direct set + rebuild, no onUserChange
+            var jetHollowCheckbox = GuiWidgets.checkbox(x, y, "Hollow", hollow, 
+                "Create hollow tube with inner wall", textRenderer, v -> {
+                    state.set("jet.hollow", v);
+                    rebuildForCurrentShape();  // Rebuild to show/hide inner radii controls
+                    if (shapeChangedCallback != null) {
+                        shapeChangedCallback.run();  // Notify parent like shape change does
+                    }
+                });
+            widgets.add(jetHollowCheckbox);
+            
+            // Unified toggle only visible when hollow is enabled
+            if (hollow) {
+                boolean unified = state.getBool("jet.unifiedInner");
+                var unifiedToggle = GuiWidgets.checkbox(x + halfW + GuiConstants.PADDING, y, 
+                    "Unified", unified, "Use wall thickness instead of custom radii", textRenderer, 
+                    v -> {
+                        state.set("jet.unifiedInner", v);
+                        rebuildForCurrentShape();  // Rebuild to swap slider types
+                        if (shapeChangedCallback != null) {
+                            shapeChangedCallback.run();
+                        }
+                    });
+                widgets.add(unifiedToggle);
+            }
+            y += step;
+            
+            
+            // Row 2: Inner radii controls (only when hollow)
+            if (hollow) {
+                boolean unified = state.getBool("jet.unifiedInner");
+                
+                // Get outer radii to calculate safe ranges
+                float baseR = state.getFloat("jet.baseRadius");
+                float topTipR = state.getFloat("jet.topTipRadius");
+                float bottomTipR = state.getFloat("jet.bottomTipRadius");
+                float minOuterR = Math.min(baseR, Math.min(topTipR, bottomTipR));
+                
+                if (unified) {
+                    // Single wall thickness slider - max is 95% of smallest outer radius
+                    float maxThickness = Math.max(0.01f, minOuterR * 0.95f);
+                    float wallThick = Math.min(state.getFloat("jet.innerWallThickness"), maxThickness);
+                    var thicknessSlider = GuiWidgets.slider(x, y, w,
+                        "Wall Thickness", 0.01f, maxThickness, wallThick, "%.2f", 
+                        "Inner wall thickness (max: " + String.format("%.2f", maxThickness) + ")",
+                        v -> onUserChange(() -> state.set("jet.innerWallThickness", v)));
+                    widgets.add(thicknessSlider);
+                } else {
+                    // Separate inner radius sliders - max is (outer - 0.01)
+                    float maxInnerBase = Math.max(0.01f, baseR - 0.01f);
+                    float innerBaseR = Math.min(state.getFloat("jet.innerBaseRadius"), maxInnerBase);
+                    var innerBaseSlider = GuiWidgets.slider(x, y, halfW,
+                        "Inner Base R", 0f, maxInnerBase, innerBaseR, "%.2f", 
+                        "Max: " + String.format("%.2f", maxInnerBase),
+                        v -> onUserChange(() -> state.set("jet.innerBaseRadius", v)));
+                    widgets.add(innerBaseSlider);
+                    
+                    // Use larger of top/bottom tip for inner tip max
+                    float tipR = Math.max(topTipR, bottomTipR);
+                    float maxInnerTip = Math.max(0.01f, tipR - 0.01f);
+                    float innerTipR = Math.min(state.getFloat("jet.innerTipRadius"), maxInnerTip);
+                    var innerTipSlider = GuiWidgets.slider(x + halfW + GuiConstants.PADDING, y, halfW,
+                        "Inner Tip R", 0f, maxInnerTip, innerTipR, "%.2f", 
+                        "Max: " + String.format("%.2f", maxInnerTip),
+                        v -> onUserChange(() -> state.set("jet.innerTipRadius", v)));
+                    widgets.add(innerTipSlider);
+                }
+                y += step;
+            }
+        }
+        
         // Track content height
         contentHeight = y - startY;
         
@@ -250,6 +331,9 @@ public class ShapeSubPanel extends AbstractPanel {
         }
         
         Logging.GUI.topic("panel").debug("Built {} controls for shape: {}", widgets.size(), shapeType);
+        
+        // Notify parent container that widgets have changed
+        notifyWidgetsChanged();
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -267,7 +351,7 @@ public class ShapeSubPanel extends AbstractPanel {
         int step = GuiConstants.COMPACT_HEIGHT + GuiConstants.COMPACT_GAP;
         
         // Shapes with per-part patterns (body, top, bottom)
-        if (shape.equals("cylinder") || shape.equals("prism") || shape.equals("beam")) {
+        if (shape.equals("cylinder") || shape.equals("prism") || shape.equals("beam") || shape.equals("jet")) {
             int padding = 2;
             int btnWidth = (w - padding * 2) / 3;
             

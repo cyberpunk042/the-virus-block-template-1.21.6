@@ -55,6 +55,7 @@ public class ShapeTypeAdapter extends TypeAdapter<Shape> {
             case "prism" -> parsePrism(json);
             case "cylinder" -> parseCylinder(json);
             case "polyhedron" -> parsePolyhedron(json);
+            case "jet" -> parseJet(json);
             default -> SphereShape.builder().radius(1.0f).latSteps(32).lonSteps(64).build();
         };
     }
@@ -93,6 +94,25 @@ public class ShapeTypeAdapter extends TypeAdapter<Shape> {
         return PolyhedronShape.builder()
             .polyType(polyType)
             .radius(json.has("radius") ? json.get("radius").getAsFloat() : 1.0f)
+            .build();
+    }
+    
+    private static JetShape parseJet(JsonObject json) {
+        float topTipRadius = json.has("topTipRadius") ? json.get("topTipRadius").getAsFloat() : 0f;
+        return JetShape.builder()
+            .length(json.has("length") ? json.get("length").getAsFloat() : 2.0f)
+            .baseRadius(json.has("baseRadius") ? json.get("baseRadius").getAsFloat() : 0.3f)
+            .topTipRadius(topTipRadius)
+            .bottomTipRadius(json.has("bottomTipRadius") ? json.get("bottomTipRadius").getAsFloat() : topTipRadius)
+            .segments(json.has("segments") ? json.get("segments").getAsInt() : 16)
+            .lengthSegments(json.has("lengthSegments") ? json.get("lengthSegments").getAsInt() : 1)
+            .dualJets(!json.has("dualJets") || json.get("dualJets").getAsBoolean())
+            .gap(json.has("gap") ? json.get("gap").getAsFloat() : 0f)
+            .hollow(json.has("hollow") && json.get("hollow").getAsBoolean())
+            .innerBaseRadius(json.has("innerBaseRadius") ? json.get("innerBaseRadius").getAsFloat() : 0f)
+            .innerTipRadius(json.has("innerTipRadius") ? json.get("innerTipRadius").getAsFloat() : 0f)
+            .capBase(!json.has("capBase") || json.get("capBase").getAsBoolean())
+            .capTip(json.has("capTip") && json.get("capTip").getAsBoolean())
             .build();
     }
 }

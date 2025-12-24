@@ -59,6 +59,7 @@ public final class PrimitiveRenderers {
         register(new TorusRenderer());
         register(new CapsuleRenderer());
         register(new ConeRenderer());
+        register(new JetRenderer());
         
         Logging.FIELD.topic("init").debug(
             "Registered {} primitive renderers", RENDERERS.size());
@@ -127,6 +128,7 @@ public final class PrimitiveRenderers {
             case TorusShape t -> "torus";
             case CapsuleShape c -> "capsule";
             case ConeShape c -> "cone";
+            case JetShape j -> "jet";
             default -> null;
         };
         

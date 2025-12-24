@@ -238,6 +238,34 @@ public final class ShapeRegistry {
             return new ConeShape(bottomRadius, topRadius, height, segments, false, true);
         });
         
+        // Jet (dual cone/tube for relativistic jets)
+        register("jet", params -> {
+            float length = getFloat(params, "length", 2.0f);
+            float baseRadius = getFloat(params, "baseRadius", 0.3f);
+            float topTipRadius = getFloat(params, "topTipRadius", 0f);
+            float bottomTipRadius = getFloat(params, "bottomTipRadius", topTipRadius);
+            int segments = getInt(params, "segments", 16);
+            int lengthSegments = getInt(params, "lengthSegments", 1);
+            boolean dualJets = params.containsKey("dualJets") ? 
+                Boolean.parseBoolean(params.get("dualJets").toString()) : true;
+            float gap = getFloat(params, "gap", 0f);
+            boolean hollow = params.containsKey("hollow") ?
+                Boolean.parseBoolean(params.get("hollow").toString()) : false;
+            float innerBaseRadius = getFloat(params, "innerBaseRadius", 0f);
+            float innerTipRadius = getFloat(params, "innerTipRadius", 0f);
+            boolean unifiedInner = params.containsKey("unifiedInner") ?
+                Boolean.parseBoolean(params.get("unifiedInner").toString()) : true;
+            float innerWallThickness = getFloat(params, "innerWallThickness", 0.02f);
+            boolean capBase = params.containsKey("capBase") ?
+                Boolean.parseBoolean(params.get("capBase").toString()) : true;
+            boolean capTip = params.containsKey("capTip") ?
+                Boolean.parseBoolean(params.get("capTip").toString()) : false;
+            return new JetShape(length, baseRadius, topTipRadius, bottomTipRadius, 
+                segments, lengthSegments, dualJets, gap, hollow, 
+                innerBaseRadius, innerTipRadius, unifiedInner, innerWallThickness,
+                capBase, capTip);
+        });
+        
         Logging.REGISTRY.topic("shape").info(
             "Registered {} default shapes: {}", 
             FACTORIES.size(), FACTORIES.keySet());

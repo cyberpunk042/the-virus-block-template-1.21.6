@@ -36,6 +36,7 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
     @StateField private TorusShape torus = TorusShape.DEFAULT;
     @StateField private CapsuleShape capsule = CapsuleShape.DEFAULT;
     @StateField private ConeShape cone = ConeShape.DEFAULT;
+    @StateField private JetShape jet = JetShape.DEFAULT;
     
     // ═══════════════════════════════════════════════════════════════════════════
     // SHAPE SELECTOR
@@ -78,6 +79,7 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
             case TorusShape t -> this.torus = t;
             case CapsuleShape c -> this.capsule = c;
             case ConeShape c -> this.cone = c;
+            case JetShape j -> this.jet = j;
             default -> Logging.GUI.topic("adapter").warn("Unknown shape type: {}", shape.getClass().getSimpleName());
         }
     }
@@ -110,6 +112,7 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
             case "torus" -> torus;
             case "capsule" -> capsule;
             case "cone" -> cone;
+            case "jet" -> jet;
             default -> {
                 Logging.GUI.topic("adapter").warn("Unknown shapeType '{}', defaulting to sphere", shapeType);
                 yield sphere;
@@ -148,6 +151,9 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
     public ConeShape cone() { return cone; }
     public void setCone(ConeShape cone) { this.cone = cone; }
     
+    public JetShape jet() { return jet; }
+    public void setJet(JetShape jet) { this.jet = jet; }
+    
     // ═══════════════════════════════════════════════════════════════════════════
     // RESET
     // ═══════════════════════════════════════════════════════════════════════════
@@ -162,6 +168,7 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
         this.torus = TorusShape.DEFAULT;
         this.capsule = CapsuleShape.DEFAULT;
         this.cone = ConeShape.DEFAULT;
+        this.jet = JetShape.DEFAULT;
         this.shapeType = "sphere";
     }
 }
