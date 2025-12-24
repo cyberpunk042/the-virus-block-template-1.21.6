@@ -50,10 +50,12 @@ public record DiscShape(
     
     /** Default full disc. */
     public static DiscShape of(float y, float radius, int segments) { 
-        return new DiscShape(y, segments, 0f, radius, 0f, 360f, 1); 
+        // Constructor: (radius, segments, y, arcStart, arcEnd, innerRadius, rings)
+        return new DiscShape(radius, segments, y, 0f, 360f, 0f, 1); 
     }
     public static DiscShape at(float y, float radius) { 
-        return new DiscShape(y, 32, 0f, radius, 0f, 360f, 1); 
+        // Constructor: (radius, segments, y, arcStart, arcEnd, innerRadius, rings)
+        return new DiscShape(radius, 32, y, 0f, 360f, 0f, 1); 
     }
     public static DiscShape defaults() { return DEFAULT; }
     

@@ -207,7 +207,7 @@ public class ShapeSubPanel extends AbstractPanel {
         // SPECIAL: Sphere Quad Pattern Dropdown
         // ═══════════════════════════════════════════════════════════════════════
         
-        if (shapeType.equalsIgnoreCase("sphere")) {
+        if (shapeType.equalsIgnoreCase("sphere") || shapeType.equalsIgnoreCase("ring")) {
             var quadPatternDropdown = GuiWidgets.enumDropdown(
                 x, y, w, GuiConstants.COMPACT_HEIGHT, "Quad Pattern",
                 net.cyberpunk042.visual.pattern.QuadPattern.class,

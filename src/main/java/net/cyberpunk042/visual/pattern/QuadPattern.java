@@ -41,6 +41,12 @@ public enum QuadPattern implements VertexPattern {
         new Corner[]{Corner.BOTTOM_LEFT, Corner.TOP_LEFT, Corner.TOP_RIGHT}
     ),
     
+    /** Standard quad fill using TL-BR diagonal split - geometrically correct. */
+    STANDARD_QUAD("standard_quad",
+        new Corner[]{Corner.TOP_LEFT, Corner.TOP_RIGHT, Corner.BOTTOM_RIGHT},  // Upper-right triangle
+        new Corner[]{Corner.TOP_LEFT, Corner.BOTTOM_RIGHT, Corner.BOTTOM_LEFT}  // Lower-left triangle
+    ),
+    
     /** Triangle pattern 1 (#43). */
     TRIANGLE_1("triangle_1",
         new Corner[]{Corner.TOP_LEFT, Corner.TOP_RIGHT, Corner.BOTTOM_RIGHT},

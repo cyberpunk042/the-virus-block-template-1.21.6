@@ -123,10 +123,9 @@ public final class DiscTessellator {
             }
             
             // Build cell vertices: [center, edge0, edge1]
-            // Winding order: discPoint generates vertices CCW from BELOW (-Y)
-            // Disc normal points UP (+Y), so we view from above
-            // Therefore: reverse order for CCW from above: center → edge[i+1] → edge[i]
-            int[] cellVertices = { centerIdx, edgeIndices[i + 1], edgeIndices[i] };
+            // Winding: discPoint uses cos/sin which moves CCW when viewed from above (+Y)
+            // For CCW from above: center → edge[i] → edge[i+1]
+            int[] cellVertices = { centerIdx, edgeIndices[i], edgeIndices[i + 1] };
             builder.emitCellFromPattern(cellVertices, pattern);
         }
         
@@ -185,10 +184,12 @@ public final class DiscTessellator {
                 continue;
             }
             
-            // Donut quad - CCW when viewed from above
-            // inner[i] → inner[i+1] → outer[i+1], and inner[i] → outer[i+1] → outer[i]
-            builder.triangle(innerIndices[i], innerIndices[i + 1], outerIndices[i + 1]);
-            builder.triangle(innerIndices[i], outerIndices[i + 1], outerIndices[i]);
+            // Donut quad - CCW when viewed from above (+Y normal)
+            // Quad corners: inner[i], inner[i+1], outer[i+1], outer[i]
+            // For CCW from above: outer[i] → inner[i] → inner[i+1] (first tri)
+            //                     outer[i] → inner[i+1] → outer[i+1] (second tri)
+            builder.triangle(outerIndices[i], innerIndices[i], innerIndices[i + 1]);
+            builder.triangle(outerIndices[i], innerIndices[i + 1], outerIndices[i + 1]);
         }
         
         return builder.build();

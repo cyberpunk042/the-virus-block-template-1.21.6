@@ -166,7 +166,8 @@ public final class ShapeRegistry {
             float y = getFloat(params, "y", 0);
             float radius = getFloat(params, "radius", 1.0f);
             int segments = getInt(params, "segments", 48);
-            return new DiscShape(y, segments, 0f, radius, 0f, 360f, 1);
+            // Constructor: (radius, segments, y, arcStart, arcEnd, innerRadius, rings)
+            return new DiscShape(radius, segments, y, 0f, 360f, 0f, 1);
         });
         
         // Prism

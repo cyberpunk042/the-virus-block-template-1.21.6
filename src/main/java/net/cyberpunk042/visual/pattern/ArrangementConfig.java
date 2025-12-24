@@ -161,8 +161,24 @@ public record ArrangementConfig(
         if (obj.has("defaultPattern")) {
             builder.defaultPattern(obj.get("defaultPattern").getAsString());
         }
-        // Note: Per-pattern configs would need PatternConfig.fromJson()
-        // For now, patterns are parsed via defaultPattern only
+        
+        // Parse all part-specific patterns
+        if (obj.has("main")) builder.main(obj.get("main").getAsString());
+        if (obj.has("poles")) builder.poles(obj.get("poles").getAsString());
+        if (obj.has("equator")) builder.equator(obj.get("equator").getAsString());
+        if (obj.has("hemisphereTop")) builder.hemisphereTop(obj.get("hemisphereTop").getAsString());
+        if (obj.has("hemisphereBottom")) builder.hemisphereBottom(obj.get("hemisphereBottom").getAsString());
+        if (obj.has("surface")) builder.surface(obj.get("surface").getAsString());
+        if (obj.has("innerEdge")) builder.innerEdge(obj.get("innerEdge").getAsString());
+        if (obj.has("outerEdge")) builder.outerEdge(obj.get("outerEdge").getAsString());
+        if (obj.has("discEdge")) builder.discEdge(obj.get("discEdge").getAsString());
+        if (obj.has("sides")) builder.sides(obj.get("sides").getAsString());
+        if (obj.has("capTop")) builder.capTop(obj.get("capTop").getAsString());
+        if (obj.has("capBottom")) builder.capBottom(obj.get("capBottom").getAsString());
+        if (obj.has("prismEdges")) builder.prismEdges(obj.get("prismEdges").getAsString());
+        if (obj.has("faces")) builder.faces(obj.get("faces").getAsString());
+        if (obj.has("polyEdges")) builder.polyEdges(obj.get("polyEdges").getAsString());
+        if (obj.has("vertices")) builder.vertices(obj.get("vertices").getAsString());
         
         return builder.build();
     }

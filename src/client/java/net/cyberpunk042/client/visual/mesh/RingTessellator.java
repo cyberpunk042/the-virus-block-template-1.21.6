@@ -153,8 +153,9 @@ public final class RingTessellator {
             int o1 = outerIndices[i + 1];
             
             // Use quadAsTrianglesFromPattern for pattern support
-            // TL=o0, TR=o1, BR=i1, BL=i0 (outer = top conceptually)
-            builder.quadAsTrianglesFromPattern(o0, o1, i1, i0, pattern);
+            // SegmentPattern expects: inner0, inner1, outer0, outer1
+            // Map to quadAsTriangles params: TL=i0, TR=i1, BR=o1, BL=o0
+            builder.quadAsTrianglesFromPattern(i0, i1, o1, o0, pattern);
         }
         
         return builder.build();
@@ -243,11 +244,11 @@ public final class RingTessellator {
                 continue;
             }
             
-            // Top face with pattern support
-            // TL=tO[i], TR=tO[i+1], BR=tI[i+1], BL=tI[i]
-            builder.quadAsTrianglesFromPattern(topOuter[i], topOuter[i + 1], topInner[i + 1], topInner[i], pattern);
+            // Top face - SegmentPattern expects: inner0, inner1, outer0, outer1
+            // TL=tI[i], TR=tI[i+1], BR=tO[i+1], BL=tO[i]
+            builder.quadAsTrianglesFromPattern(topInner[i], topInner[i + 1], topOuter[i + 1], topOuter[i], pattern);
             
-            // Bottom face with pattern support 
+            // Bottom face - same structure but for below view
             // TL=bI[i], TR=bI[i+1], BR=bO[i+1], BL=bO[i]
             builder.quadAsTrianglesFromPattern(bottomInner[i], bottomInner[i + 1], bottomOuter[i + 1], bottomOuter[i], pattern);
         }
@@ -338,14 +339,15 @@ public final class RingTessellator {
         // Arc End Caps (only if not a full ring)
         // =====================================================================
         
-        if (!isFullRing) {
-            // Start cap (at arcStart angle)
-            tessellateArcEndCap(builder, arcStart, innerR, outerR, yBottom, yTop, true);
-            
-            // End cap (at arcEnd angle + twist)
-            float endAngle = arcEnd + twist;
-            tessellateArcEndCap(builder, endAngle, innerR, outerR, yBottom, yTop, false);
-        }
+        // TEMPORARILY DISABLED FOR DEBUGGING - uncomment when fixed
+        // if (!isFullRing) {
+        //     // Start cap (at arcStart angle)
+        //     tessellateArcEndCap(builder, arcStart, innerR, outerR, yBottom, yTop, true);
+        //     
+        //     // End cap (at arcEnd angle + twist)
+        //     float endAngle = arcEnd + twist;
+        //     tessellateArcEndCap(builder, endAngle, innerR, outerR, yBottom, yTop, false);
+        // }
         
         Logging.RENDER.topic("tessellate")
             .kv("vertices", builder.vertexCount())
