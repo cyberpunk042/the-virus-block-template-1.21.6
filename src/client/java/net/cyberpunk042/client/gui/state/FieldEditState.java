@@ -440,6 +440,13 @@ public class FieldEditState {
         bindingsManager.reset();
         triggerManager.reset();
         
+        // Reset definition-level fields to defaults
+        beam = net.cyberpunk042.field.BeamConfig.NONE;
+        follow = net.cyberpunk042.field.instance.FollowConfig.DEFAULT;
+        modifiers = net.cyberpunk042.field.Modifiers.DEFAULT;
+        lifecycle = net.cyberpunk042.field.influence.LifecycleConfig.DEFAULT;
+        forceConfig = null;
+        
         markDirty();
         Logging.GUI.topic("state").info("FieldEditState reset to defaults");
         

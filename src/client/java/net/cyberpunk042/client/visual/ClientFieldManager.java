@@ -475,7 +475,7 @@ public final class ClientFieldManager {
         if (client.player != null) {
             // Use the player's RENDER position (lerped between ticks) for smooth tracking
             Vec3d playerRenderPos = client.player.getLerpedPos(tickDelta);
-            Vec3d playerCenter = playerRenderPos.add(0, client.player.getHeight() / 2.0 - 0.1, 0);
+            Vec3d playerCenter = playerRenderPos.add(0, client.player.getHeight() / 2.0 + 0.05, 0);
             
             // Check if follow is enabled in the definition
             net.cyberpunk042.field.instance.FollowConfig follow = def.follow();

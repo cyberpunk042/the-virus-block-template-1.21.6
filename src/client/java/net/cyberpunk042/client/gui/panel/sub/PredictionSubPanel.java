@@ -1,287 +1,142 @@
 package net.cyberpunk042.client.gui.panel.sub;
 
-import net.cyberpunk042.client.gui.panel.AbstractPanel;
+import net.cyberpunk042.client.gui.builder.BoundPanel;
+import net.cyberpunk042.client.gui.builder.ContentBuilder;
+import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.state.RendererCapabilities.Feature;
 import net.cyberpunk042.client.gui.state.RequiresFeature;
-import net.minecraft.client.gui.screen.Screen;
-
-import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
-import net.cyberpunk042.client.gui.util.GuiLayout;
-import net.cyberpunk042.client.gui.widget.LabeledSlider;
 import net.cyberpunk042.field.instance.FollowConfig;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.widget.ClickableWidget;
+import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import net.minecraft.text.Text;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Sub-panel for follow/movement settings.
- * Controls how the field follows the player's movement.
- * 
- * The new unified FollowConfig replaces the old separate prediction and follow mode systems.
- * 
- * Features:
- * - Preset selector (LOCKED, SMOOTH, GLIDE, LEAD, CUSTOM)
- * - enabled: Toggle following on/off (false = static field)
- * - leadOffset: Position offset in movement direction (-1 = trail, +1 = lead)
- * - responsiveness: How quickly field catches up (0.1 = floaty, 1.0 = instant)
- * - lookAhead: Offset toward player's look direction (0 = none, 0.5 = half block)
- * 
- * @see <a href="GUI_CLASS_DIAGRAM.md §4.9">PredictionSubPanel specification</a>
- * 
- * <p><b>Requires Accurate renderer mode.</b></p>
+ * Uses BoundPanel for bidirectional state binding.
  */
 @RequiresFeature(Feature.PREDICTION)
-public class PredictionSubPanel extends AbstractPanel {
-    // ═══════════════════════════════════════════════════════════════════════════
-    // FIELDS
-    // ═══════════════════════════════════════════════════════════════════════════
+public class PredictionSubPanel extends BoundPanel {
     
-    private GuiLayout layout;
-    
-    // Widgets
+    private int startY;
     private CyclingButtonWidget<FollowConfig.Preset> presetButton;
     private CyclingButtonWidget<Boolean> enabledButton;
-    private LabeledSlider leadOffsetSlider;
-    private LabeledSlider responsivenessSlider;
-    private LabeledSlider lookAheadSlider;
-    
-    // State
     private FollowConfig.Preset currentPreset = FollowConfig.Preset.LOCKED;
     private boolean applyingPreset = false;
     
-    // ═══════════════════════════════════════════════════════════════════════════
-    // CONSTRUCTOR
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    /**
-     * Creates a new PredictionSubPanel.
-     * 
-     * @param parent Parent screen
-     * @param state The GUI state to bind to
-     * @param startY Starting Y position
-     */
     public PredictionSubPanel(Screen parent, FieldEditState state, int startY) {
         super(parent, state);
         this.startY = startY;
     }
     
-    private int startY;
-    
     @Override
-    public void init(int width, int height) {
-        this.panelWidth = width;
-        this.panelHeight = height;
-        widgets.clear();
-        
+    protected void buildContent() {
+        ContentBuilder content = content(startY);
         int x = GuiConstants.PADDING;
-        int y = startY;
-        this.layout = new GuiLayout(
-            x,
-            y,
-            GuiConstants.WIDGET_HEIGHT + GuiConstants.PADDING,
-            width - GuiConstants.PADDING * 2);
+        int w = panelWidth - GuiConstants.PADDING * 2;
         
-        initWidgets();
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // INITIALIZATION
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    private void initWidgets() {
-        int controlWidth = layout.getPanelWidth() - GuiConstants.PADDING * 2;
-        int halfWidth = (controlWidth - GuiConstants.ELEMENT_SPACING) / 2;
+        // Detect preset from current values
+        detectCurrentPreset();
         
-        // ─────────────────────────────────────────────────────────────────────────
-        // Preset Selector - quick presets for common configurations
-        // ─────────────────────────────────────────────────────────────────────────
-        int rowY = layout.getCurrentY();
+        // Preset button
         presetButton = CyclingButtonWidget.<FollowConfig.Preset>builder(
-                p -> Text.literal(p.label() + " - " + p.description())
-            )
+                p -> Text.literal(p.label() + " - " + p.description()))
             .values(FollowConfig.Preset.values())
             .initially(currentPreset)
-            .build(layout.getStartX() + GuiConstants.PADDING, rowY, controlWidth,
-                GuiConstants.ELEMENT_HEIGHT, Text.literal("Preset"), 
-                (button, value) -> applyPreset(value));
+            .build(x, content.getCurrentY(), w, GuiConstants.WIDGET_HEIGHT, 
+                Text.literal("reset"), (btn, val) -> applyPreset(val));
         widgets.add(presetButton);
-        layout.nextRow();
+        content.advanceBy(GuiConstants.WIDGET_HEIGHT + GuiConstants.COMPACT_GAP);
         
-        // ─────────────────────────────────────────────────────────────────────────
-        // Enabled Toggle - master on/off for following
-        // ─────────────────────────────────────────────────────────────────────────
-        rowY = layout.getCurrentY();
-        enabledButton = CyclingButtonWidget.<Boolean>builder(
-                v -> Text.literal(v ? "Following" : "Static")
-            )
+        // Follow toggle
+        enabledButton = CyclingButtonWidget.<Boolean>builder(v -> Text.literal(v ? "Following" : "Static"))
             .values(List.of(false, true))
             .initially(state.getBool("follow.enabled"))
-            .build(
-                layout.getStartX() + GuiConstants.PADDING,
-                rowY,
-                controlWidth,
-                GuiConstants.ELEMENT_HEIGHT,
-                Text.literal("Follow"),
-                (button, value) -> onUserChange(() -> {
-                    state.set("follow.enabled", value);
-                    updateSliderStates(value);
-                })
-            );
+            .build(x, content.getCurrentY(), w, GuiConstants.WIDGET_HEIGHT,
+                Text.literal("Follow"), (btn, val) -> {
+                    state.set("follow.enabled", val);
+                    markAsCustom();
+                    updateSliderStates();
+                });
         widgets.add(enabledButton);
-        layout.nextRow();
+        content.advanceBy(GuiConstants.WIDGET_HEIGHT + GuiConstants.COMPACT_GAP);
         
-        // ─────────────────────────────────────────────────────────────────────────
-        // Lead Offset - trail/lead in movement direction
-        // -1 = trail behind, 0 = locked, +1 = lead ahead
-        // ─────────────────────────────────────────────────────────────────────────
-        rowY = layout.getCurrentY();
-        leadOffsetSlider = new LabeledSlider(
-            layout.getStartX() + GuiConstants.PADDING,
-            rowY,
-            controlWidth,
-            "Lead/Trail",
-            -1.0f, 1.0f,
-            state.getFloat("follow.leadOffset"),
-            "%.2f", null,
-            v -> onUserChange(() -> state.set("follow.leadOffset", v))
-        );
-        widgets.add(leadOffsetSlider);
-        layout.nextRow();
+        // Sliders - binding handles state sync automatically
+        content.slider("Lead/Trail", "follow.leadOffset").range(-1f, 1f).format("%.2f").add();
+        content.slider("Responsiveness", "follow.responsiveness").range(0.1f, 1f).format("%.2f").add();
+        content.slider("Look Ahead", "follow.lookAhead").range(0f, 0.5f).format("%.2f").add();
         
-        // ─────────────────────────────────────────────────────────────────────────
-        // Responsiveness - how quickly field catches up
-        // 0.1 = very floaty/slow, 1.0 = instant snap
-        // ─────────────────────────────────────────────────────────────────────────
-        rowY = layout.getCurrentY();
-        responsivenessSlider = new LabeledSlider(
-            layout.getStartX() + GuiConstants.PADDING,
-            rowY,
-            controlWidth,
-            "Responsiveness",
-            0.1f, 1.0f,
-            state.getFloat("follow.responsiveness"),
-            "%.2f", null,
-            v -> onUserChange(() -> state.set("follow.responsiveness", v))
-        );
-        widgets.add(responsivenessSlider);
-        layout.nextRow();
-        
-        // ─────────────────────────────────────────────────────────────────────────
-        // Look Ahead - offset toward look direction
-        // 0 = none, 0.5 = half block in look direction
-        // ─────────────────────────────────────────────────────────────────────────
-        rowY = layout.getCurrentY();
-        lookAheadSlider = new LabeledSlider(
-            layout.getStartX() + GuiConstants.PADDING,
-            rowY,
-            controlWidth,
-            "Look Ahead",
-            0.0f, 0.5f,
-            state.getFloat("follow.lookAhead"),
-            "%.2f", null,
-            v -> onUserChange(() -> state.set("follow.lookAhead", v))
-        );
-        widgets.add(lookAheadSlider);
-        layout.nextRow();
-        
-        // Initialize slider states
-        updateSliderStates(state.getBool("follow.enabled"));
+        contentHeight = content.getContentHeight();
+        updateSliderStates();
     }
     
-    private void updateSliderStates(boolean enabled) {
-        if (leadOffsetSlider != null) leadOffsetSlider.active = enabled;
-        if (responsivenessSlider != null) responsivenessSlider.active = enabled;
-        if (lookAheadSlider != null) lookAheadSlider.active = enabled;
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PUBLIC API
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    /** Returns all widgets for registration with the parent screen. */
-    public List<ClickableWidget> getWidgets() {
-        return widgets;
-    }
-    
-    /** 
-     * Renders the sub-panel including description.
-     */
-    @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Render widgets
-        for (ClickableWidget widget : widgets) {
-            widget.render(context, mouseX, mouseY, delta);
+    private void detectCurrentPreset() {
+        FollowConfig current = state.follow();
+        if (current == null) { currentPreset = FollowConfig.Preset.LOCKED; return; }
+        for (FollowConfig.Preset p : FollowConfig.Preset.values()) {
+            if (p == FollowConfig.Preset.CUSTOM) continue;
+            FollowConfig c = p.config();
+            if (c != null && c.enabled() == current.enabled() &&
+                Math.abs(c.leadOffset() - current.leadOffset()) < 0.01f &&
+                Math.abs(c.responsiveness() - current.responsiveness()) < 0.01f &&
+                Math.abs(c.lookAhead() - current.lookAhead()) < 0.01f) {
+                currentPreset = p; return;
+            }
         }
-        
-        // Draw description based on current values
-        float leadOffset = state.getFloat("follow.leadOffset");
-        String description;
-        if (!state.getBool("follow.enabled")) {
-            description = "Field is static (not following)";
-        } else if (Math.abs(leadOffset) < 0.05f) {
-            description = "Locked to player position";
-        } else if (leadOffset < 0) {
-            description = "Trailing behind player movement";
-        } else {
-            description = "Leading ahead of player movement";
-        }
-        
-        int descY = layout.getCurrentY() + GuiConstants.ELEMENT_SPACING;
-        context.drawTextWithShadow(
-            net.minecraft.client.MinecraftClient.getInstance().textRenderer,
-            Text.literal(description).styled(s -> s.withColor(GuiConstants.TEXT_SECONDARY)),
-            layout.getStartX() + GuiConstants.PADDING,
-            descY,
-            GuiConstants.TEXT_SECONDARY
-        );
+        currentPreset = FollowConfig.Preset.CUSTOM;
     }
     
-    /** Returns the total height of this sub-panel. */
-    public int getHeight() {
-        return layout.getCurrentY() - startY + GuiConstants.WIDGET_HEIGHT;
-    }
-
-    private void onUserChange(Runnable r) {
-        r.run();
-        if (!applyingPreset) {
-            currentPreset = FollowConfig.Preset.CUSTOM;
-            if (presetButton != null) presetButton.setValue(currentPreset);
-        }
-    }
-
     private void applyPreset(FollowConfig.Preset preset) {
         currentPreset = preset;
-        if (preset == FollowConfig.Preset.CUSTOM) {
-            return; // Don't change values for custom
-        }
+        if (preset == FollowConfig.Preset.CUSTOM) return;
         
         applyingPreset = true;
-        FollowConfig config = preset.config();
-        if (config != null) {
-            state.set("follow.enabled", config.enabled());
-            state.set("follow.leadOffset", config.leadOffset());
-            state.set("follow.responsiveness", config.responsiveness());
-            state.set("follow.lookAhead", config.lookAhead());
-            syncFromState();
+        FollowConfig cfg = preset.config();
+        if (cfg != null) {
+            state.set("follow.enabled", cfg.enabled());
+            state.set("follow.leadOffset", cfg.leadOffset());
+            state.set("follow.responsiveness", cfg.responsiveness());
+            state.set("follow.lookAhead", cfg.lookAhead());
+            syncAllFromState();
+            if (enabledButton != null) enabledButton.setValue(cfg.enabled());
+            updateSliderStates();
         }
         applyingPreset = false;
     }
-
-    private void syncFromState() {
-        if (enabledButton != null) enabledButton.setValue(state.getBool("follow.enabled"));
-        if (leadOffsetSlider != null) leadOffsetSlider.setValue(state.getFloat("follow.leadOffset"));
-        if (responsivenessSlider != null) responsivenessSlider.setValue(state.getFloat("follow.responsiveness"));
-        if (lookAheadSlider != null) lookAheadSlider.setValue(state.getFloat("follow.lookAhead"));
-        updateSliderStates(state.getBool("follow.enabled"));
+    
+    private void markAsCustom() {
+        if (!applyingPreset && currentPreset != FollowConfig.Preset.CUSTOM) {
+            currentPreset = FollowConfig.Preset.CUSTOM;
+            if (presetButton != null) presetButton.setValue(FollowConfig.Preset.CUSTOM);
+        }
     }
-
+    
+    private void updateSliderStates() {
+        boolean enabled = state.getBool("follow.enabled");
+        for (var b : bindings) {
+            if (b.widget() instanceof net.cyberpunk042.client.gui.widget.LabeledSlider s) {
+                s.active = enabled;
+            }
+        }
+    }
+    
     @Override
-    public void tick() {
-        // No per-tick updates needed
+    protected void syncAllFromState() {
+        super.syncAllFromState();
+        if (enabledButton != null) enabledButton.setValue(state.getBool("follow.enabled"));
+        detectCurrentPreset();
+        if (presetButton != null) presetButton.setValue(currentPreset);
+        updateSliderStates();
     }
+    
+    @Override
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        renderWithScroll(context, mouseX, mouseY, delta);
+    }
+    
+    @Override public void tick() {}
+    public int getHeight() { return contentHeight; }
 }
