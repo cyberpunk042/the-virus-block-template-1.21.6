@@ -5,45 +5,60 @@ package net.cyberpunk042.visual.appearance;
  * 
  * <p>Determines how colors are distributed across cells/vertices:</p>
  * <ul>
- *   <li>{@link #UNIFORM} - Same color for the entire shape</li>
- *   <li>{@link #PER_CELL} - Each cell/quad/triangle gets its own color</li>
+ *   <li>{@link #GRADIENT} - Smooth gradient based on position</li>
+ *   <li>{@link #INDEXED} - Each cell gets color based on index (stepped pattern)</li>
+ *   <li>{@link #RANDOM} - Each cell gets a random color from the palette</li>
  * </ul>
  * 
- * <p>Primarily used with RANDOM and MESH_* color modes.</p>
+ * <p>Used with MESH_RAINBOW and RANDOM color modes.</p>
  */
 public enum ColorDistribution {
     /**
-     * Uniform color distribution.
-     * The entire shape uses the same color value.
-     * For RANDOM: one random color for whole shape.
-     * For MESH_RAINBOW: all vertices at same phase (animate uniformly).
+     * Gradient/uniform distribution.
+     * Smooth color transition based on vertex position.
+     * For MESH_RAINBOW: smooth rainbow gradient across mesh.
+     * For MESH_GRADIENT: smooth primary→secondary gradient.
      */
-    UNIFORM,
+    GRADIENT,
     
     /**
-     * Per-cell color distribution.
-     * Each cell (quad, triangle, ray) gets its own color.
-     * For RANDOM: each cell picks its own random color.
-     * For MESH_RAINBOW: colors spread across cells.
+     * Indexed per-cell distribution.
+     * Each cell gets a color based on its index (golden ratio distribution).
+     * Creates a varied but repeatable pattern.
      */
-    PER_CELL;
+    INDEXED,
+    
+    /**
+     * Random per-cell distribution.
+     * Each cell gets a truly random color from the ColorSet.
+     * Creates a colorful, chaotic pattern.
+     */
+    RANDOM;
+    
+    // Backward compatibility aliases
+    public static final ColorDistribution UNIFORM = GRADIENT;
+    public static final ColorDistribution PER_CELL = INDEXED;
     
     /**
      * Default distribution.
      */
     public static ColorDistribution defaultDistribution() {
-        return UNIFORM;
+        return GRADIENT;
     }
     
     /**
-     * Parse from string (case-insensitive).
+     * Parse from string (case-insensitive, handles old names).
      */
     public static ColorDistribution fromString(String s) {
-        if (s == null) return UNIFORM;
+        if (s == null) return GRADIENT;
+        String upper = s.toUpperCase().replace("-", "_");
+        // Handle old names
+        if ("UNIFORM".equals(upper)) return GRADIENT;
+        if ("PER_CELL".equals(upper)) return INDEXED;
         try {
-            return valueOf(s.toUpperCase().replace("-", "_"));
+            return valueOf(upper);
         } catch (IllegalArgumentException e) {
-            return UNIFORM;
+            return GRADIENT;
         }
     }
 }

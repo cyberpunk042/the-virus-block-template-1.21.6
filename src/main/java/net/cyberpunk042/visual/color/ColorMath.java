@@ -208,11 +208,12 @@ public final class ColorMath {
      */
     public static int blend(int a, int b, float factor) {
         float inv = 1 - factor;
+        // Note: alpha/red/green/blue return 0-255, need to divide by 255 for float argb()
         return argb(
-            alpha(a) * inv + alpha(b) * factor,
-            red(a) * inv + red(b) * factor,
-            green(a) * inv + green(b) * factor,
-            blue(a) * inv + blue(b) * factor
+            (alpha(a) * inv + alpha(b) * factor) / 255f,
+            (red(a) * inv + red(b) * factor) / 255f,
+            (green(a) * inv + green(b) * factor) / 255f,
+            (blue(a) * inv + blue(b) * factor) / 255f
         );
     }
     

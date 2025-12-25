@@ -15,6 +15,7 @@ public record ColorContext(
     ColorSet colorSet,
     GradientDirection direction,
     ColorDistribution distribution,
+    float colorBlend,
     float timePhase,
     float time,
     float shapeRadius,
@@ -35,6 +36,7 @@ public record ColorContext(
             appearance.effectiveColorSet(),
             appearance.effectiveDirection(),
             appearance.effectiveDistribution(),
+            appearance.colorBlend(),
             appearance.timePhase(),
             time,
             shapeRadius,
@@ -48,8 +50,8 @@ public record ColorContext(
     public static ColorContext solid(int color) {
         return new ColorContext(
             ColorMode.SOLID, color, color, 
-            ColorSet.RAINBOW, GradientDirection.Y_AXIS, ColorDistribution.UNIFORM,
-            0f, 0f, 1f, 1f
+            ColorSet.RAINBOW, GradientDirection.Y_AXIS, ColorDistribution.GRADIENT,
+            0f, 0f, 0f, 1f, 1f
         );
     }
     
@@ -72,7 +74,7 @@ public record ColorContext(
     public int calculateColor(float x, float y, float z, int cellIndex) {
         return switch (mode) {
             case SOLID -> primaryColor;
-            case GRADIENT -> blendColors(primaryColor, secondaryColor, 0.5f);
+            case GRADIENT -> blendColors(primaryColor, secondaryColor, colorBlend);
             case CYCLING -> primaryColor; // Already handled in renderer
             case MESH_GRADIENT -> calculateMeshGradient(x, y, z, cellIndex);
             case MESH_RAINBOW -> calculateMeshRainbow(x, y, z, cellIndex);
@@ -82,47 +84,66 @@ public record ColorContext(
     
     /**
      * Calculate color for MESH_GRADIENT mode.
-     * Interpolates from primary to secondary based on position or cell index.
+     * Interpolates from primary to (primary→secondary blended by colorBlend) based on position.
      */
     private int calculateMeshGradient(float x, float y, float z, int cellIndex) {
         float t;
         
-        if (distribution == ColorDistribution.PER_CELL) {
-            // Each cell gets a color based on its index
-            // Use a hash function to get a pseudo-random but consistent t value per cell
-            t = (cellIndex * 0.618033988749895f) % 1f; // Golden ratio for good distribution
-        } else {
-            // UNIFORM: Smooth gradient based on vertex position
-            t = direction.calculateT(x, y, z, shapeRadius, shapeHeight);
+        switch (distribution) {
+            case INDEXED -> {
+                // Each cell gets a color based on its index (stepped pattern)
+                t = (cellIndex * 0.618033988749895f) % 1f;
+            }
+            case RANDOM -> {
+                // Each cell gets a random t value (animated by time)
+                long seed = cellIndex * 31L + (long)(timePhase * 1000) + (long)(time / 40f);
+                RANDOM.get().setSeed(seed);
+                t = RANDOM.get().nextFloat();
+            }
+            default -> {
+                // GRADIENT: Smooth gradient based on vertex position
+                t = direction.calculateT(x, y, z, shapeRadius, shapeHeight);
+            }
         }
         
         // Add time-based animation via timePhase
         t = (t + timePhase * time / 20f) % 1f;
         if (t < 0) t += 1f;
         
-        return blendColors(primaryColor, secondaryColor, t);
+        // Use colorBlend to control how far towards secondary the gradient goes
+        // colorBlend=0 → all primary, colorBlend=1 → full primary→secondary gradient
+        int targetColor = blendColors(primaryColor, secondaryColor, colorBlend);
+        return blendColors(primaryColor, targetColor, t);
     }
     
     /**
      * Calculate color for MESH_RAINBOW mode.
-     * Uses full hue spectrum based on position or cell index.
+     * Uses ColorSet's spectrum - full HSB for RAINBOW, palette interpolation for others.
      */
     private int calculateMeshRainbow(float x, float y, float z, int cellIndex) {
-        float hue;
-        
-        if (distribution == ColorDistribution.PER_CELL) {
-            // Each cell gets a color based on its index
-            hue = (cellIndex * 0.618033988749895f) % 1f; // Golden ratio for good distribution
-        } else {
-            // UNIFORM: Smooth rainbow based on vertex position
-            hue = direction.calculateT(x, y, z, shapeRadius, shapeHeight);
+        switch (distribution) {
+            case INDEXED -> {
+                // Each cell gets a color based on its index (stepped pattern)
+                float t = (cellIndex * 0.618033988749895f) % 1f;
+                t = (t + timePhase * time / 20f) % 1f;
+                if (t < 0) t += 1f;
+                return colorSet.interpolateSpectrum(t);
+            }
+            case RANDOM -> {
+                // Each cell gets a random color from the palette
+                // Use time-based seed that changes to animate
+                long seed = cellIndex * 31L + (long)(timePhase * 1000) + (long)(time / 40f);
+                RANDOM.get().setSeed(seed);
+                return colorSet.random(RANDOM.get());
+            }
+            default -> {
+                // GRADIENT: Smooth spectrum based on vertex position
+                float t = direction.calculateT(x, y, z, shapeRadius, shapeHeight);
+                t = (t + timePhase * time / 20f) % 1f;
+                if (t < 0) t += 1f;
+                return colorSet.interpolateSpectrum(t);
+            }
         }
-        
-        // Add time-based animation via timePhase
-        hue = (hue + timePhase * time / 20f) % 1f;
-        if (hue < 0) hue += 1f;
-        
-        return hsbToArgb(hue, 1f, 1f);
     }
     
     /**
@@ -130,14 +151,22 @@ public record ColorContext(
      * Uses the selected ColorSet.
      */
     private int calculateRandom(int cellIndex) {
-        if (distribution == ColorDistribution.UNIFORM) {
-            // Same random color for entire shape (seeded by time phase + frame)
-            RANDOM.get().setSeed((long)(timePhase * 1000) + (long)(time * 10));
-            return colorSet.random(RANDOM.get());
-        } else {
-            // Different color per cell from the ColorSet
-            RANDOM.get().setSeed(cellIndex * 31L + (long)(timePhase * 1000));
-            return colorSet.random(RANDOM.get());
+        switch (distribution) {
+            case INDEXED -> {
+                // Each cell gets a color based on index from the palette
+                return colorSet.color(cellIndex);
+            }
+            case RANDOM -> {
+                // Each cell gets a random color from the ColorSet (animated)
+                long seed = cellIndex * 31L + (long)(timePhase * 1000) + (long)(time / 40f);
+                RANDOM.get().setSeed(seed);
+                return colorSet.random(RANDOM.get());
+            }
+            default -> {
+                // GRADIENT: Same random color for entire shape
+                RANDOM.get().setSeed((long)(timePhase * 1000) + (long)(time * 10));
+                return colorSet.random(RANDOM.get());
+            }
         }
     }
     

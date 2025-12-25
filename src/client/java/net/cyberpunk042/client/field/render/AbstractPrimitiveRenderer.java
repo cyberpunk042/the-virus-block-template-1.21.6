@@ -196,22 +196,34 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
                 Appearance appearance = primitive.appearance();
                 ColorContext colorCtx = null;
                 if (appearance != null && appearance.isPerVertex()) {
-                    // Resolve secondary color for gradient modes
-                    // Always resolve secondary for MESH_GRADIENT - don't rely on colorBlend
-                    int secondaryColor = color; // Default to same as primary
+                    // For MESH_* modes, we need UNBLENDED primary and secondary colors
+                    // The `color` variable is already blended by resolveColor(), so we resolve fresh
+                    int primaryColor = color; // fallback
+                    int secondaryColor = color; // fallback
+                    
+                    // Resolve primary color (unblended)
+                    String primaryRef = appearance.color();
+                    if (primaryRef != null && resolver != null) {
+                        primaryColor = resolver.resolve(primaryRef);
+                    }
+                    
+                    // Resolve secondary color (unblended)
                     String secondaryRef = appearance.secondaryColor();
                     if (secondaryRef != null && resolver != null) {
                         secondaryColor = resolver.resolve(secondaryRef);
                     } else if (secondaryRef != null && secondaryRef.startsWith("#")) {
-                        // Fallback: parse hex directly
                         try {
                             secondaryColor = 0xFF000000 | Integer.parseInt(secondaryRef.substring(1), 16);
                         } catch (NumberFormatException ignored) {}
+                    } else {
+                        // No secondary specified - use primary
+                        secondaryColor = primaryColor;
                     }
+                    
                     // Get shape dimensions for gradient calculation
                     float shapeRadius = getShapeRadius(primitive);
                     float shapeHeight = getShapeHeight(primitive);
-                    colorCtx = ColorContext.from(appearance, color, secondaryColor, time, shapeRadius, shapeHeight);
+                    colorCtx = ColorContext.from(appearance, primaryColor, secondaryColor, time, shapeRadius, shapeHeight);
                 }
                 emitSolid(matrices, consumer, mesh, color, light, waveConfig, time, colorCtx);
             }
@@ -322,11 +334,12 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
             // Apply appearance color modifiers (saturation, brightness, hueShift)
             baseColor = applyAppearanceModifiers(baseColor, appearance, resolver);
             
-            // Apply CYCLING color mode (animates through hue spectrum over time)
+            // Apply CYCLING color mode (animates through color spectrum over time)
             if (appearance.isCycling()) {
-                // Cycling mode: hue shifts based on time + timePhase offset
-                float hueOffset = (time / 20f + appearance.timePhase()) * 360f;
-                baseColor = net.cyberpunk042.visual.color.ColorMath.shiftHue(baseColor, hueOffset);
+                // Cycling mode: interpolates through ColorSet based on time + timePhase
+                float t = ((time / 20f) + appearance.timePhase()) % 1f;
+                if (t < 0) t += 1f;
+                baseColor = appearance.effectiveColorSet().interpolateSpectrum(t);
             }
             
             // TODO: RANDOM and MESH_* modes require per-vertex color calculation

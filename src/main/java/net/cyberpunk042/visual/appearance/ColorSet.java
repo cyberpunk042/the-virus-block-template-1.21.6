@@ -150,6 +150,27 @@ public enum ColorSet {
     }
     
     /**
+     * Get interpolated color at position t (0-1) for rainbow/spectrum modes.
+     * For RAINBOW: uses full HSB spectrum (continuous hue).
+     * For other sets: uses palette interpolation.
+     * 
+     * @param t position 0-1
+     * @return ARGB color
+     */
+    public int interpolateSpectrum(float t) {
+        t = Math.max(0, Math.min(1, t));
+        
+        if (this == RAINBOW) {
+            // Full HSB spectrum for true rainbow
+            int rgb = java.awt.Color.HSBtoRGB(t, 1f, 1f);
+            return 0xFF000000 | (rgb & 0x00FFFFFF);
+        }
+        
+        // For all other palettes, interpolate through the defined colors
+        return interpolate(t);
+    }
+    
+    /**
      * Get a random color from this set.
      */
     public int random(java.util.Random rng) {
