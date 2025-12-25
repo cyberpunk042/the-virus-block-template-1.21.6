@@ -127,6 +127,43 @@ public class AppearanceSubPanel extends BoundPanel {
             .format("%.2f")
             .add();
         
+        // ═══════════════════════════════════════════════════════════════════
+        // ROW 7: Color Mode dropdown
+        // ═══════════════════════════════════════════════════════════════════
+        
+        content.dropdown("Color Mode", "appearance.colorMode", 
+            net.cyberpunk042.visual.appearance.ColorMode.class);
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // ROW 8: Color Distribution (UNIFORM / PER_CELL)
+        // ═══════════════════════════════════════════════════════════════════
+        
+        content.dropdown("Distribution", "appearance.colorDistribution", 
+            net.cyberpunk042.visual.appearance.ColorDistribution.class);
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // ROW 9: Color Set (for CYCLING and RANDOM modes)
+        // ═══════════════════════════════════════════════════════════════════
+        
+        content.dropdown("Color Set", "appearance.colorSet", 
+            net.cyberpunk042.visual.appearance.ColorSet.class);
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // ROW 10: Gradient Direction (for MESH_* modes)
+        // ═══════════════════════════════════════════════════════════════════
+        
+        content.dropdown("Direction", "appearance.gradientDirection", 
+            net.cyberpunk042.visual.appearance.GradientDirection.class);
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // ROW 11: Time Phase (animation offset for CYCLING and MESH_RAINBOW)
+        // ═══════════════════════════════════════════════════════════════════
+        
+        content.slider("Time Phase", "appearance.timePhase")
+            .range(0f, 1f)
+            .format("%.2f")
+            .add();
+        
         contentHeight = content.getContentHeight();
         
         Logging.GUI.topic("panel").debug("AppearanceSubPanel built with {} widgets", widgets.size());

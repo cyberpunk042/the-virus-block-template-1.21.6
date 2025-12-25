@@ -1,6 +1,9 @@
 package net.cyberpunk042.client.gui.state;
 
+import net.cyberpunk042.visual.appearance.ColorDistribution;
 import net.cyberpunk042.visual.appearance.ColorMode;
+import net.cyberpunk042.visual.appearance.ColorSet;
+import net.cyberpunk042.visual.appearance.GradientDirection;
 
 /**
  * GUI editing state for appearance properties.
@@ -20,8 +23,12 @@ public record AppearanceState(
     int primaryColor,
     int secondaryColor,
     float colorBlend,
+    // Color mode system
     ColorMode colorMode,
-    float rainbowSpeed
+    ColorDistribution colorDistribution,
+    ColorSet colorSet,
+    GradientDirection gradientDirection,
+    float timePhase
 ) {
     public static final AppearanceState DEFAULT = new AppearanceState(
         0xFF00FFFF,  // color (cyan)
@@ -35,8 +42,11 @@ public record AppearanceState(
         0xFF00FFFF,  // primaryColor
         0xFFFF00FF,  // secondaryColor (magenta)
         0f,          // colorBlend (0 = only primary, 1 = only secondary)
-        ColorMode.SOLID,  // colorMode
-        1.0f         // rainbowSpeed
+        ColorMode.SOLID,                // colorMode
+        ColorDistribution.UNIFORM,      // colorDistribution
+        ColorSet.RAINBOW,               // colorSet
+        GradientDirection.Y_AXIS,       // gradientDirection
+        0f                              // timePhase
     );
 
     // Legacy compatibility: single alpha accessor
@@ -58,7 +68,10 @@ public record AppearanceState(
             .secondaryColor(secondaryColor)
             .colorBlend(colorBlend)
             .colorMode(colorMode)
-            .rainbowSpeed(rainbowSpeed);
+            .colorDistribution(colorDistribution)
+            .colorSet(colorSet)
+            .gradientDirection(gradientDirection)
+            .timePhase(timePhase);
     }
 
     public static class Builder {
@@ -74,7 +87,10 @@ public record AppearanceState(
         private int secondaryColor = 0xFFFF00FF;
         private float colorBlend = 0f;
         private ColorMode colorMode = ColorMode.SOLID;
-        private float rainbowSpeed = 1.0f;
+        private ColorDistribution colorDistribution = ColorDistribution.UNIFORM;
+        private ColorSet colorSet = ColorSet.RAINBOW;
+        private GradientDirection gradientDirection = GradientDirection.Y_AXIS;
+        private float timePhase = 0f;
 
         public Builder color(int c) { this.color = c; return this; }
         public Builder alphaMin(float a) { this.alphaMin = a; return this; }
@@ -89,12 +105,17 @@ public record AppearanceState(
         public Builder secondaryColor(int c) { this.secondaryColor = c; return this; }
         public Builder colorBlend(float b) { this.colorBlend = b; return this; }
         public Builder colorMode(ColorMode m) { this.colorMode = m; return this; }
-        public Builder rainbowSpeed(float s) { this.rainbowSpeed = s; return this; }
+        public Builder colorDistribution(ColorDistribution d) { this.colorDistribution = d; return this; }
+        public Builder colorSet(ColorSet s) { this.colorSet = s; return this; }
+        public Builder gradientDirection(GradientDirection d) { this.gradientDirection = d; return this; }
+        public Builder timePhase(float p) { this.timePhase = p; return this; }
+        /** @deprecated Use timePhase instead */
+        @Deprecated public Builder rainbowSpeed(float s) { this.timePhase = s; return this; }
 
         public AppearanceState build() {
             return new AppearanceState(color, alphaMin, alphaMax, glow, emissive, 
                 saturation, brightness, hueShift, primaryColor, secondaryColor, colorBlend,
-                colorMode, rainbowSpeed);
+                colorMode, colorDistribution, colorSet, gradientDirection, timePhase);
         }
     }
 }

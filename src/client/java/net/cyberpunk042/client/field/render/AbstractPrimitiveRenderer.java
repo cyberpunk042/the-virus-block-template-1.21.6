@@ -10,6 +10,7 @@ import net.cyberpunk042.visual.animation.Animation;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import net.cyberpunk042.visual.appearance.Appearance;
+import net.cyberpunk042.visual.appearance.ColorContext;
 import net.cyberpunk042.visual.color.ColorResolver;
 import net.cyberpunk042.visual.fill.FillConfig;
 import net.cyberpunk042.visual.fill.FillMode;
@@ -191,7 +192,28 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
         switch (mode) {
             case SOLID -> {
                 PipelineTracer.trace(PipelineTracer.F1_FILL_MODE, 6, "emit", "SOLID");
-                emitSolid(matrices, consumer, mesh, color, light, waveConfig, time);
+                // Create ColorContext for per-vertex coloring if needed
+                Appearance appearance = primitive.appearance();
+                ColorContext colorCtx = null;
+                if (appearance != null && appearance.isPerVertex()) {
+                    // Resolve secondary color for gradient modes
+                    // Always resolve secondary for MESH_GRADIENT - don't rely on colorBlend
+                    int secondaryColor = color; // Default to same as primary
+                    String secondaryRef = appearance.secondaryColor();
+                    if (secondaryRef != null && resolver != null) {
+                        secondaryColor = resolver.resolve(secondaryRef);
+                    } else if (secondaryRef != null && secondaryRef.startsWith("#")) {
+                        // Fallback: parse hex directly
+                        try {
+                            secondaryColor = 0xFF000000 | Integer.parseInt(secondaryRef.substring(1), 16);
+                        } catch (NumberFormatException ignored) {}
+                    }
+                    // Get shape dimensions for gradient calculation
+                    float shapeRadius = getShapeRadius(primitive);
+                    float shapeHeight = getShapeHeight(primitive);
+                    colorCtx = ColorContext.from(appearance, color, secondaryColor, time, shapeRadius, shapeHeight);
+                }
+                emitSolid(matrices, consumer, mesh, color, light, waveConfig, time, colorCtx);
             }
             case WIREFRAME -> emitWireframe(matrices, consumer, mesh, color, light, fill, waveConfig, time);
             case CAGE -> emitCage(matrices, consumer, mesh, color, light, fill, primitive, waveConfig, time);
@@ -299,6 +321,16 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
             
             // Apply appearance color modifiers (saturation, brightness, hueShift)
             baseColor = applyAppearanceModifiers(baseColor, appearance, resolver);
+            
+            // Apply CYCLING color mode (animates through hue spectrum over time)
+            if (appearance.isCycling()) {
+                // Cycling mode: hue shifts based on time + timePhase offset
+                float hueOffset = (time / 20f + appearance.timePhase()) * 360f;
+                baseColor = net.cyberpunk042.visual.color.ColorMath.shiftHue(baseColor, hueOffset);
+            }
+            
+            // TODO: RANDOM and MESH_* modes require per-vertex color calculation
+            // These will be implemented in tessellators, not here
         }
         
         // Apply alpha from appearance (AlphaRange - use max value)
@@ -400,6 +432,39 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
         return color;
     }
     
+    /**
+     * Gets the radius of a primitive's shape for gradient calculation.
+     */
+    protected float getShapeRadius(Primitive primitive) {
+        if (primitive.shape() == null) return 1f;
+        var shape = primitive.shape();
+        if (shape instanceof net.cyberpunk042.visual.shape.SphereShape s) return s.radius();
+        if (shape instanceof net.cyberpunk042.visual.shape.CylinderShape c) return c.radius();
+        if (shape instanceof net.cyberpunk042.visual.shape.RingShape r) return r.outerRadius();
+        if (shape instanceof net.cyberpunk042.visual.shape.PrismShape p) return p.radius();
+        if (shape instanceof net.cyberpunk042.visual.shape.CapsuleShape c) return c.radius();
+        if (shape instanceof net.cyberpunk042.visual.shape.ConeShape c) return c.bottomRadius();
+        if (shape instanceof net.cyberpunk042.visual.shape.TorusShape t) return t.majorRadius() + t.minorRadius();
+        if (shape instanceof net.cyberpunk042.visual.shape.PolyhedronShape p) return p.radius();
+        return 1f;
+    }
+    
+    /**
+     * Gets the height of a primitive's shape for gradient calculation.
+     */
+    protected float getShapeHeight(Primitive primitive) {
+        if (primitive.shape() == null) return 1f;
+        var shape = primitive.shape();
+        if (shape instanceof net.cyberpunk042.visual.shape.CylinderShape c) return c.height();
+        if (shape instanceof net.cyberpunk042.visual.shape.RingShape r) return r.height();
+        if (shape instanceof net.cyberpunk042.visual.shape.PrismShape p) return p.height();
+        if (shape instanceof net.cyberpunk042.visual.shape.CapsuleShape c) return c.height();
+        if (shape instanceof net.cyberpunk042.visual.shape.ConeShape c) return c.height();
+        if (shape instanceof net.cyberpunk042.visual.shape.JetShape j) return j.length();
+        if (shape instanceof net.cyberpunk042.visual.shape.SphereShape s) return s.radius() * 2;
+        return 1f;
+    }
+    
     // =========================================================================
     // Emission Methods
     // =========================================================================
@@ -410,10 +475,11 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
      * @param matrices Transform stack
      * @param consumer Vertex output
      * @param mesh Source mesh
-     * @param color ARGB color
+     * @param color ARGB color (used if colorCtx is null or not per-vertex)
      * @param light Light level
      * @param waveConfig Wave animation config (null for no wave)
      * @param time Current time for wave animation
+     * @param colorCtx ColorContext for per-vertex coloring (null for uniform color)
      */
     protected void emitSolid(
             MatrixStack matrices,
@@ -422,7 +488,8 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
             int color,
             int light,
             net.cyberpunk042.visual.animation.WaveConfig waveConfig,
-            float time) {
+            float time,
+            ColorContext colorCtx) {
         
         // CP7: Final vertex emission - ALL segments that reach the vertex stage
         int a = (color >> 24) & 0xFF;
@@ -507,6 +574,11 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
         
         VertexEmitter emitter = new VertexEmitter(matrices, consumer);
         emitter.color(color).light(light);
+        
+        // Apply per-vertex coloring if context provided
+        if (colorCtx != null) {
+            emitter.colorContext(colorCtx);
+        }
         
         // Apply wave animation if configured
         if (waveConfig != null && waveConfig.isActive()) {

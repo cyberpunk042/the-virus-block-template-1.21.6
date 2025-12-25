@@ -620,6 +620,11 @@ public final class DefinitionBuilder {
             .hueShift(appState.hueShift())
             .secondaryColor(secondaryHex)
             .colorBlend(appState.colorBlend())
+            .colorMode(appState.colorMode())
+            .colorDistribution(appState.colorDistribution())
+            .colorSet(appState.colorSet())
+            .gradientDirection(appState.gradientDirection())
+            .timePhase(appState.timePhase())
             .build();
     }
     

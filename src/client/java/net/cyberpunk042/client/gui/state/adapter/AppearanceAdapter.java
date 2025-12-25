@@ -5,11 +5,15 @@ import net.cyberpunk042.client.gui.state.StateField;
 import net.cyberpunk042.field.primitive.Primitive;
 import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.visual.appearance.Appearance;
+import net.cyberpunk042.visual.appearance.ColorDistribution;
+import net.cyberpunk042.visual.appearance.ColorMode;
+import net.cyberpunk042.visual.appearance.ColorSet;
+import net.cyberpunk042.visual.appearance.GradientDirection;
 
 import java.util.Set;
 
 /**
- * Adapter for appearance state (colors, alpha, glow, emissive, etc.).
+ * Adapter for appearance state (colors, alpha, glow, emissive, color modes, etc.).
  * 
  * <p>Note: Uses AppearanceState (int colors) internally, converts to/from 
  * Appearance (String colors) when syncing with Primitive.</p>
@@ -32,19 +36,22 @@ public class AppearanceAdapter extends AbstractAdapter implements PrimitiveAdapt
             float alphaMax = app.alpha() != null ? app.alpha().max() : 1.0f;
             
             this.appearance = new AppearanceState(
-                colorInt,           // color
-                alphaMin,           // alphaMin
-                alphaMax,           // alphaMax
-                app.glow(),         // glow
-                app.emissive(),     // emissive
-                app.saturation(),   // saturation
-                app.brightness(),   // brightness
-                app.hueShift(),     // hueShift
-                colorInt,           // primaryColor
-                secondaryInt,       // secondaryColor
-                app.colorBlend(),   // colorBlend
-                app.colorMode() != null ? app.colorMode() : net.cyberpunk042.visual.appearance.ColorMode.SOLID,
-                app.rainbowSpeed()  // rainbowSpeed
+                colorInt,                                       // color
+                alphaMin,                                       // alphaMin
+                alphaMax,                                       // alphaMax
+                app.glow(),                                     // glow
+                app.emissive(),                                 // emissive
+                app.saturation(),                               // saturation
+                app.brightness(),                               // brightness
+                app.hueShift(),                                 // hueShift
+                colorInt,                                       // primaryColor
+                secondaryInt,                                   // secondaryColor
+                app.colorBlend(),                               // colorBlend
+                app.effectiveColorMode(),                       // colorMode
+                app.effectiveDistribution(),                    // colorDistribution
+                app.effectiveColorSet(),                        // colorSet
+                app.effectiveDirection(),                       // gradientDirection
+                app.timePhase()                                 // timePhase
             );
         } else {
             this.appearance = AppearanceState.DEFAULT;
@@ -70,7 +77,10 @@ public class AppearanceAdapter extends AbstractAdapter implements PrimitiveAdapt
             .secondaryColor(secondaryHex)
             .colorBlend(appearance.colorBlend())
             .colorMode(appearance.colorMode())
-            .rainbowSpeed(appearance.rainbowSpeed())
+            .colorDistribution(appearance.colorDistribution())
+            .colorSet(appearance.colorSet())
+            .gradientDirection(appearance.gradientDirection())
+            .timePhase(appearance.timePhase())
             .build());
     }
     

@@ -13,6 +13,7 @@ import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
+import net.cyberpunk042.visual.appearance.ColorContext;
 
 /**
  * Emits mesh vertices to Minecraft's VertexConsumer.
@@ -39,6 +40,10 @@ public final class VertexEmitter {
     // Wave animation support
     private WaveConfig waveConfig = null;
     private float waveTime = 0f;
+    
+    // Per-vertex color support
+    private ColorContext colorContext = null;
+    private int cellIndex = 0;
     
     /**
      * Creates an emitter with the current matrix stack entry and consumer.
@@ -144,6 +149,27 @@ public final class VertexEmitter {
         return this;
     }
     
+    /**
+     * Sets ColorContext for per-vertex color calculation.
+     * When set, color is calculated per-vertex based on position and mode.
+     * 
+     * @param ctx Color context containing mode, colors, and direction
+     * @return this emitter for chaining
+     */
+    public VertexEmitter colorContext(ColorContext ctx) {
+        this.colorContext = ctx;
+        this.cellIndex = 0;
+        return this;
+    }
+    
+    /**
+     * Clears the color context (uses uniform color from color() instead).
+     */
+    public VertexEmitter noColorContext() {
+        this.colorContext = null;
+        return this;
+    }
+    
     // =========================================================================
     // Mesh emission
     // =========================================================================
@@ -170,6 +196,7 @@ public final class VertexEmitter {
             emitVertex(v0);
             emitVertex(v1);
             emitVertex(v2);
+            cellIndex++; // Increment cell index for per-cell coloring
         });
     }
     
@@ -184,6 +211,7 @@ public final class VertexEmitter {
             emitVertex(v0);
             emitVertex(v2);
             emitVertex(v3);
+            cellIndex++; // Increment cell index for per-cell coloring
         });
     }
     
@@ -228,11 +256,20 @@ public final class VertexEmitter {
         Vector3f normal = new Vector3f(vertex.nx(), vertex.ny(), vertex.nz());
         normal.mul(normalMatrix);
         
+        // Calculate color - use ColorContext for per-vertex coloring, otherwise use uniform color
+        int vertexColor;
+        if (colorContext != null && colorContext.isPerVertex()) {
+            // Per-vertex color calculation using local (pre-transform) coordinates
+            vertexColor = colorContext.calculateColor(vertex.x(), vertex.y(), vertex.z(), cellIndex);
+        } else {
+            vertexColor = this.color;
+        }
+        
         // Decompose color
-        int a = (color >> 24) & 0xFF;
-        int r = (color >> 16) & 0xFF;
-        int g = (color >> 8) & 0xFF;
-        int b = color & 0xFF;
+        int a = (vertexColor >> 24) & 0xFF;
+        int r = (vertexColor >> 16) & 0xFF;
+        int g = (vertexColor >> 8) & 0xFF;
+        int b = vertexColor & 0xFF;
         
         consumer.vertex(pos.x(), pos.y(), pos.z())
             .color(r, g, b, a)

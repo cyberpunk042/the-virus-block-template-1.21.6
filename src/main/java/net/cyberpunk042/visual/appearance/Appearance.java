@@ -43,8 +43,12 @@ public record Appearance(
     @Range(ValueRange.DEGREES) float hueShift,
     @Nullable @JsonField(skipIfNull = true) String secondaryColor,
     @Range(ValueRange.ALPHA) float colorBlend,
+    // Color mode system
     @JsonField(skipIfDefault = true) ColorMode colorMode,
-    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true) float rainbowSpeed
+    @JsonField(skipIfDefault = true) ColorDistribution colorDistribution,
+    @JsonField(skipIfDefault = true) ColorSet colorSet,
+    @JsonField(skipIfDefault = true) GradientDirection gradientDirection,
+    @Range(ValueRange.ALPHA) @JsonField(skipIfDefault = true) float timePhase
 ){
     /** Default appearance. */
     public static Appearance defaults() { return DEFAULT; }
@@ -58,22 +62,26 @@ public record Appearance(
     }
     
     public static final Appearance DEFAULT = new Appearance(
-        "@primary", AlphaRange.DEFAULT, 0, 0, 1, 1, 0, null, 0, ColorMode.SOLID, 1.0f);
+        "@primary", AlphaRange.DEFAULT, 0, 0, 1, 1, 0, null, 0, 
+        ColorMode.SOLID, ColorDistribution.UNIFORM, ColorSet.RAINBOW, GradientDirection.Y_AXIS, 0f);
     
     /** Glowing appearance. */
     public static final Appearance GLOWING = new Appearance(
-        "@primary", AlphaRange.DEFAULT, 0.8f, 0.5f, 1, 1, 0, null, 0, ColorMode.SOLID, 1.0f);
+        "@primary", AlphaRange.DEFAULT, 0.8f, 0.5f, 1, 1, 0, null, 0, 
+        ColorMode.SOLID, ColorDistribution.UNIFORM, ColorSet.RAINBOW, GradientDirection.Y_AXIS, 0f);
     
     /** Translucent appearance. */
     public static final Appearance TRANSLUCENT = new Appearance(
-        "@primary", AlphaRange.of(0.3f), 0, 0, 1, 1, 0, null, 0, ColorMode.SOLID, 1.0f);
+        "@primary", AlphaRange.of(0.3f), 0, 0, 1, 1, 0, null, 0, 
+        ColorMode.SOLID, ColorDistribution.UNIFORM, ColorSet.RAINBOW, GradientDirection.Y_AXIS, 0f);
     
     /**
      * Creates a simple solid-color appearance.
      * @param color Color reference (e.g., "@primary", "#FF0000")
      */
     public static Appearance color(String color) {
-        return new Appearance(color, AlphaRange.OPAQUE, 0, 0, 1, 1, 0, null, 0, ColorMode.SOLID, 1.0f);
+        return new Appearance(color, AlphaRange.OPAQUE, 0, 0, 1, 1, 0, null, 0, 
+            ColorMode.SOLID, ColorDistribution.UNIFORM, ColorSet.RAINBOW, GradientDirection.Y_AXIS, 0f);
     }
     
     /**
@@ -82,7 +90,8 @@ public record Appearance(
      * @param glow Glow intensity (0-1)
      */
     public static Appearance glowing(String color, @Range(ValueRange.ALPHA) float glow) {
-        return new Appearance(color, AlphaRange.DEFAULT, glow, glow * 0.5f, 1, 1, 0, null, 0, ColorMode.SOLID, 1.0f);
+        return new Appearance(color, AlphaRange.DEFAULT, glow, glow * 0.5f, 1, 1, 0, null, 0, 
+            ColorMode.SOLID, ColorDistribution.UNIFORM, ColorSet.RAINBOW, GradientDirection.Y_AXIS, 0f);
     }
     
     /** Whether glow is active. */
@@ -93,6 +102,33 @@ public record Appearance(
     
     /** Whether secondary color is used. */
     public boolean hasSecondaryColor() { return secondaryColor != null && colorBlend > 0; }
+    
+    /** Whether gradient color mode is active. */
+    public boolean isGradientMode() { return colorMode == ColorMode.GRADIENT || colorMode == ColorMode.MESH_GRADIENT; }
+    
+    /** Whether mesh rainbow color mode is active. */
+    public boolean isMeshRainbow() { return colorMode == ColorMode.MESH_RAINBOW; }
+    
+    /** Whether cycling color mode is active. */
+    public boolean isCycling() { return colorMode == ColorMode.CYCLING; }
+    
+    /** Whether random color mode is active. */
+    public boolean isRandom() { return colorMode == ColorMode.RANDOM; }
+    
+    /** Whether per-vertex coloring is needed. */
+    public boolean isPerVertex() { return colorMode != null && colorMode.isPerVertex(); }
+    
+    /** Get effective color mode (defaults to SOLID if null). */
+    public ColorMode effectiveColorMode() { return colorMode != null ? colorMode : ColorMode.SOLID; }
+    
+    /** Get effective color distribution (defaults to UNIFORM if null). */
+    public ColorDistribution effectiveDistribution() { return colorDistribution != null ? colorDistribution : ColorDistribution.UNIFORM; }
+    
+    /** Get effective color set (defaults to RAINBOW if null). */
+    public ColorSet effectiveColorSet() { return colorSet != null ? colorSet : ColorSet.RAINBOW; }
+    
+    /** Get effective gradient direction (defaults to Y_AXIS if null). */
+    public GradientDirection effectiveDirection() { return gradientDirection != null ? gradientDirection : GradientDirection.Y_AXIS; }
     
     // =========================================================================
     // Builder
@@ -130,7 +166,12 @@ public record Appearance(
         if (json.has("secondaryColor")) builder.secondaryColor(json.get("secondaryColor").getAsString());
         if (json.has("colorBlend")) builder.colorBlend(json.get("colorBlend").getAsFloat());
         if (json.has("colorMode")) builder.colorMode(ColorMode.fromString(json.get("colorMode").getAsString()));
-        if (json.has("rainbowSpeed")) builder.rainbowSpeed(json.get("rainbowSpeed").getAsFloat());
+        if (json.has("colorDistribution")) builder.colorDistribution(ColorDistribution.fromString(json.get("colorDistribution").getAsString()));
+        if (json.has("colorSet")) builder.colorSet(ColorSet.fromString(json.get("colorSet").getAsString()));
+        if (json.has("gradientDirection")) builder.gradientDirection(GradientDirection.fromString(json.get("gradientDirection").getAsString()));
+        if (json.has("timePhase")) builder.timePhase(json.get("timePhase").getAsFloat());
+        // Legacy support
+        if (json.has("rainbowSpeed")) builder.timePhase(json.get("rainbowSpeed").getAsFloat());
         
         return builder.build();
     }
@@ -149,7 +190,10 @@ public record Appearance(
             .secondaryColor(secondaryColor)
             .colorBlend(colorBlend)
             .colorMode(colorMode)
-            .rainbowSpeed(rainbowSpeed);
+            .colorDistribution(colorDistribution)
+            .colorSet(colorSet)
+            .gradientDirection(gradientDirection)
+            .timePhase(timePhase);
     }
     /**
      * Serializes this appearance to JSON.
@@ -171,7 +215,10 @@ public record Appearance(
         private String secondaryColor = null;
         private @Range(ValueRange.ALPHA) float colorBlend = 0;
         private ColorMode colorMode = ColorMode.SOLID;
-        private float rainbowSpeed = 1.0f;
+        private ColorDistribution colorDistribution = ColorDistribution.UNIFORM;
+        private ColorSet colorSet = ColorSet.RAINBOW;
+        private GradientDirection gradientDirection = GradientDirection.Y_AXIS;
+        private float timePhase = 0f;
         
         public Builder color(String c) { this.color = c; return this; }
         public Builder alpha(AlphaRange a) { this.alpha = a; return this; }
@@ -184,11 +231,17 @@ public record Appearance(
         public Builder secondaryColor(String c) { this.secondaryColor = c; return this; }
         public Builder colorBlend(float b) { this.colorBlend = b; return this; }
         public Builder colorMode(ColorMode m) { this.colorMode = m; return this; }
-        public Builder rainbowSpeed(float s) { this.rainbowSpeed = s; return this; }
+        public Builder colorDistribution(ColorDistribution d) { this.colorDistribution = d; return this; }
+        public Builder colorSet(ColorSet s) { this.colorSet = s; return this; }
+        public Builder gradientDirection(GradientDirection d) { this.gradientDirection = d; return this; }
+        public Builder timePhase(float p) { this.timePhase = p; return this; }
+        /** @deprecated Use timePhase instead */
+        @Deprecated public Builder rainbowSpeed(float s) { this.timePhase = s; return this; }
         
         public Appearance build() {
             return new Appearance(color, alpha, glow, emissive, saturation, brightness, 
-                hueShift, secondaryColor, colorBlend, colorMode, rainbowSpeed);
+                hueShift, secondaryColor, colorBlend, colorMode, colorDistribution, 
+                colorSet, gradientDirection, timePhase);
         }
     }
 
@@ -200,14 +253,16 @@ public record Appearance(
      * Returns a copy with the specified alpha range.
      */
     public Appearance withAlpha(AlphaRange newAlpha) {
-        return new Appearance(color, newAlpha, glow, emissive, saturation, brightness, hueShift, secondaryColor, colorBlend);
+        return new Appearance(color, newAlpha, glow, emissive, saturation, brightness, hueShift, 
+            secondaryColor, colorBlend, colorMode, colorDistribution, colorSet, gradientDirection, timePhase);
     }
     
     /**
      * Returns a copy with the specified color.
      */
     public Appearance withColor(String newColor) {
-        return new Appearance(newColor, alpha, glow, emissive, saturation, brightness, hueShift, secondaryColor, colorBlend);
+        return new Appearance(newColor, alpha, glow, emissive, saturation, brightness, hueShift, 
+            secondaryColor, colorBlend, colorMode, colorDistribution, colorSet, gradientDirection, timePhase);
     }
 
 }
