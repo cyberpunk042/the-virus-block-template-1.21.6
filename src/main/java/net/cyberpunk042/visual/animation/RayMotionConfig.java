@@ -55,14 +55,14 @@ public record RayMotionConfig(
         MotionMode.NONE, 0f, 0f, 1f, 0f, 0f, 1f
     );
     
-    /** Default spiral rotation around Y-axis. */
+    /** Orbit rotation around center. */
     public static final RayMotionConfig SPIRAL = new RayMotionConfig(
-        MotionMode.SPIRAL, 45f, 0f, 1f, 0f, 0f, 1f
+        MotionMode.ORBIT, 45f, 0f, 1f, 0f, 0f, 1f
     );
     
-    /** Oscillating wave motion. */
+    /** Oscillating radial motion. */
     public static final RayMotionConfig OSCILLATE = new RayMotionConfig(
-        MotionMode.OSCILLATE, 1f, 0f, 1f, 0f, 0.3f, 2f
+        MotionMode.RADIAL_OSCILLATE, 1f, 0f, 1f, 0f, 0.3f, 2f
     );
     
     /** Radial ripple effect. */
@@ -70,9 +70,9 @@ public record RayMotionConfig(
         MotionMode.RIPPLE, 1f, 0f, 0f, 0f, 0.2f, 3f
     );
     
-    /** Linear drift in Y direction. */
+    /** Float up/down motion. */
     public static final RayMotionConfig LINEAR_UP = new RayMotionConfig(
-        MotionMode.LINEAR, 0.5f, 0f, 1f, 0f, 0f, 1f
+        MotionMode.FLOAT, 0.5f, 0f, 1f, 0f, 0f, 1f
     );
     
     // =========================================================================

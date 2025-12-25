@@ -86,6 +86,8 @@ public record ColorContext(
             case MESH_GRADIENT -> calculateMeshGradient(x, y, z, cellIndex);
             case MESH_RAINBOW -> calculateMeshRainbow(x, y, z, cellIndex);
             case RANDOM -> calculateRandom(cellIndex);
+            // TODO: Implement these modes
+            case HEAT_MAP, RANDOM_PULSE, BREATHE, REACTIVE -> primaryColor;
         };
         
         // Apply alpha to the calculated color

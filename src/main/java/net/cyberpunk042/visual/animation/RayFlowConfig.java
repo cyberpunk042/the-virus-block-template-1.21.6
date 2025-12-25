@@ -46,6 +46,7 @@ public record RayFlowConfig(
     // === Length Axis ===
     @JsonField(skipIfDefault = true) LengthMode length,
     @Range(ValueRange.UNBOUNDED) @JsonField(skipIfDefault = true) float lengthSpeed,
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "0.3") float segmentLength,
     
     // === Travel Axis ===
     @JsonField(skipIfDefault = true) TravelMode travel,
@@ -64,42 +65,42 @@ public record RayFlowConfig(
     
     /** No flow animation. */
     public static final RayFlowConfig NONE = new RayFlowConfig(
-        LengthMode.NONE, 0f,
+        LengthMode.NONE, 0f, 0.3f,
         TravelMode.NONE, 0f, 1, 0.3f,
         FlickerMode.NONE, 0f, 5f
     );
     
     /** Default radiate effect (rays grow outward). */
     public static final RayFlowConfig RADIATE = new RayFlowConfig(
-        LengthMode.RADIATE, 1f,
+        LengthMode.RADIATE, 1f, 0.3f,
         TravelMode.NONE, 0f, 1, 0.3f,
         FlickerMode.NONE, 0f, 5f
     );
     
     /** Default absorb effect (rays shrink inward). */
     public static final RayFlowConfig ABSORB = new RayFlowConfig(
-        LengthMode.ABSORB, 1f,
+        LengthMode.ABSORB, 1f, 0.3f,
         TravelMode.NONE, 0f, 1, 0.3f,
         FlickerMode.NONE, 0f, 5f
     );
     
     /** Chase particles flowing along rays. */
     public static final RayFlowConfig CHASE = new RayFlowConfig(
-        LengthMode.NONE, 0f,
+        LengthMode.NONE, 0f, 0.3f,
         TravelMode.CHASE, 1.5f, 3, 0.2f,
         FlickerMode.NONE, 0f, 5f
     );
     
     /** Scrolling energy flow. */
     public static final RayFlowConfig SCROLL = new RayFlowConfig(
-        LengthMode.NONE, 0f,
+        LengthMode.NONE, 0f, 0.3f,
         TravelMode.SCROLL, 1f, 1, 0.3f,
         FlickerMode.NONE, 0f, 5f
     );
     
     /** Twinkling stars effect. */
     public static final RayFlowConfig SCINTILLATE = new RayFlowConfig(
-        LengthMode.NONE, 0f,
+        LengthMode.NONE, 0f, 0.3f,
         TravelMode.NONE, 0f, 1, 0.3f,
         FlickerMode.SCINTILLATION, 0.5f, 8f
     );
@@ -145,6 +146,7 @@ public record RayFlowConfig(
             length = LengthMode.fromString(json.get("length").getAsString());
         }
         float lengthSpeed = json.has("lengthSpeed") ? json.get("lengthSpeed").getAsFloat() : 1f;
+        float segmentLength = json.has("segmentLength") ? json.get("segmentLength").getAsFloat() : 0.3f;
         
         TravelMode travel = TravelMode.NONE;
         if (json.has("travel")) {
@@ -162,7 +164,7 @@ public record RayFlowConfig(
         float flickerFrequency = json.has("flickerFrequency") ? json.get("flickerFrequency").getAsFloat() : 5f;
         
         return new RayFlowConfig(
-            length, lengthSpeed,
+            length, lengthSpeed, segmentLength,
             travel, travelSpeed, chaseCount, chaseWidth,
             flicker, flickerIntensity, flickerFrequency
         );
@@ -183,7 +185,7 @@ public record RayFlowConfig(
     
     public Builder toBuilder() {
         return new Builder()
-            .length(length).lengthSpeed(lengthSpeed)
+            .length(length).lengthSpeed(lengthSpeed).segmentLength(segmentLength)
             .travel(travel).travelSpeed(travelSpeed).chaseCount(chaseCount).chaseWidth(chaseWidth)
             .flicker(flicker).flickerIntensity(flickerIntensity).flickerFrequency(flickerFrequency);
     }
@@ -191,6 +193,7 @@ public record RayFlowConfig(
     public static class Builder {
         private LengthMode length = LengthMode.NONE;
         private float lengthSpeed = 1f;
+        private float segmentLength = 0.3f;
         private TravelMode travel = TravelMode.NONE;
         private float travelSpeed = 1f;
         private int chaseCount = 1;
@@ -201,6 +204,7 @@ public record RayFlowConfig(
         
         public Builder length(LengthMode m) { this.length = m; return this; }
         public Builder lengthSpeed(float s) { this.lengthSpeed = s; return this; }
+        public Builder segmentLength(float s) { this.segmentLength = s; return this; }
         public Builder travel(TravelMode m) { this.travel = m; return this; }
         public Builder travelSpeed(float s) { this.travelSpeed = s; return this; }
         public Builder chaseCount(int c) { this.chaseCount = c; return this; }
@@ -211,7 +215,7 @@ public record RayFlowConfig(
         
         public RayFlowConfig build() {
             return new RayFlowConfig(
-                length, lengthSpeed,
+                length, lengthSpeed, segmentLength,
                 travel, travelSpeed, chaseCount, chaseWidth,
                 flicker, flickerIntensity, flickerFrequency
             );

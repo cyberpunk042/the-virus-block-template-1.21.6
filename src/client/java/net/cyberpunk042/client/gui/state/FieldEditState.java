@@ -83,6 +83,8 @@ public class FieldEditState {
         map.put("precession", animationAdapter);
         map.put("rayFlow", animationAdapter);
         map.put("rayMotion", animationAdapter);
+        map.put("rayWiggle", animationAdapter);
+        map.put("rayTwist", animationAdapter);
         
         // Shape types -> ShapeAdapter
         map.put("shapeType", shapeAdapter);
@@ -384,6 +386,8 @@ public class FieldEditState {
     public net.cyberpunk042.visual.animation.PrecessionConfig precession() { return animationAdapter.precession(); }
     public net.cyberpunk042.visual.animation.RayFlowConfig rayFlow() { return animationAdapter.rayFlow(); }
     public net.cyberpunk042.visual.animation.RayMotionConfig rayMotion() { return animationAdapter.rayMotion(); }
+    public net.cyberpunk042.visual.animation.RayWiggleConfig rayWiggle() { return animationAdapter.rayWiggle(); }
+    public net.cyberpunk042.visual.animation.RayTwistConfig rayTwist() { return animationAdapter.rayTwist(); }
     
     // Fill/Transform/Visibility/Arrangement - return the actual config, not adapter
     public net.cyberpunk042.visual.fill.FillConfig fill() { return fillAdapter.fill(); }

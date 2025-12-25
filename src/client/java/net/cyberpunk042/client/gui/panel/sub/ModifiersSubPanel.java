@@ -93,6 +93,18 @@ public class ModifiersSubPanel extends BoundPanel {
         
         content.when(isRaysShape, c -> buildRayMotionSection(c));
         
+        // ═══════════════════════════════════════════════════════════════════════
+        // RAY WIGGLE - Undulation/deformation (Rays only)
+        // ═══════════════════════════════════════════════════════════════════════
+        
+        content.when(isRaysShape, c -> buildRayWiggleSection(c));
+        
+        // ═══════════════════════════════════════════════════════════════════════
+        // RAY TWIST - Axial rotation (Rays only)
+        // ═══════════════════════════════════════════════════════════════════════
+        
+        content.when(isRaysShape, c -> buildRayTwistSection(c));
+        
         contentHeight = content.getContentHeight();
         Logging.GUI.topic("panel").debug("ModifiersSubPanel built: {} widgets, isRays={}", 
             widgets.size(), isRaysShape);
@@ -376,6 +388,89 @@ public class ModifiersSubPanel extends BoundPanel {
         );
         
         c.slider("Frequency", "rayMotion.frequency").range(0.1f, 10f).format("%.1f").add();
+    }
+    
+    // =========================================================================
+    // RAY WIGGLE SECTION (Rays only)
+    // =========================================================================
+    
+    private void buildRayWiggleSection(ContentBuilder c) {
+        int x = GuiConstants.PADDING;
+        int w = panelWidth - GuiConstants.PADDING * 2;
+        int halfW = (w - GuiConstants.PADDING) / 2;
+        
+        // Section header via gap
+        c.gap();
+        
+        RayWiggleConfig wiggle = state.rayWiggle();
+        WiggleMode curMode = wiggle != null ? wiggle.mode() : WiggleMode.NONE;
+        
+        // Mode dropdown + Speed
+        CyclingButtonWidget<WiggleMode> modeDropdown = CyclingButtonWidget.<WiggleMode>builder(
+                m -> Text.literal("Wgl: " + m.displayName()))
+            .values(WiggleMode.values())
+            .initially(curMode)
+            .omitKeyText()
+            .build(x, c.getCurrentY(), halfW, COMPACT_H, Text.literal(""),
+                (btn, val) -> state.set("rayWiggle.mode", val));
+        widgets.add(modeDropdown);
+        
+        LabeledSlider speedSlider = LabeledSlider.builder("Spd")
+            .position(x + halfW + GuiConstants.PADDING, c.getCurrentY()).width(halfW)
+            .range(0.1f, 10f).initial(wiggle != null ? wiggle.speed() : 1f).format("%.1f")
+            .onChange(v -> state.set("rayWiggle.speed", v))
+            .build();
+        widgets.add(speedSlider);
+        c.advanceRow();
+        
+        // Amplitude + Frequency
+        c.sliderPair(
+            "Amp", "rayWiggle.amplitude", 0f, 0.5f,
+            "Freq", "rayWiggle.frequency", 0.5f, 20f
+        );
+        
+        // Phase offset
+        c.slider("Phase", "rayWiggle.phaseOffset").range(0f, 360f).format("%.0f°").add();
+    }
+    
+    // =========================================================================
+    // RAY TWIST SECTION (Rays only)
+    // =========================================================================
+    
+    private void buildRayTwistSection(ContentBuilder c) {
+        int x = GuiConstants.PADDING;
+        int w = panelWidth - GuiConstants.PADDING * 2;
+        int halfW = (w - GuiConstants.PADDING) / 2;
+        
+        // Section header via gap
+        c.gap();
+        
+        RayTwistConfig twist = state.rayTwist();
+        TwistMode curMode = twist != null ? twist.mode() : TwistMode.NONE;
+        
+        // Mode dropdown + Speed
+        CyclingButtonWidget<TwistMode> modeDropdown = CyclingButtonWidget.<TwistMode>builder(
+                m -> Text.literal("Twst: " + m.displayName()))
+            .values(TwistMode.values())
+            .initially(curMode)
+            .omitKeyText()
+            .build(x, c.getCurrentY(), halfW, COMPACT_H, Text.literal(""),
+                (btn, val) -> state.set("rayTwist.mode", val));
+        widgets.add(modeDropdown);
+        
+        LabeledSlider speedSlider = LabeledSlider.builder("Spd")
+            .position(x + halfW + GuiConstants.PADDING, c.getCurrentY()).width(halfW)
+            .range(0.1f, 5f).initial(twist != null ? twist.speed() : 1f).format("%.1f")
+            .onChange(v -> state.set("rayTwist.speed", v))
+            .build();
+        widgets.add(speedSlider);
+        c.advanceRow();
+        
+        // Amount (degrees) + Phase offset
+        c.sliderPair(
+            "Amount°", "rayTwist.amount", 0f, 720f,
+            "Phase°", "rayTwist.phaseOffset", 0f, 360f
+        );
     }
     
     // =========================================================================

@@ -25,6 +25,8 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
     @StateField private PrecessionConfig precession = null;
     @StateField private RayFlowConfig rayFlow = null;
     @StateField private RayMotionConfig rayMotion = null;
+    @StateField private RayWiggleConfig rayWiggle = null;
+    @StateField private RayTwistConfig rayTwist = null;
     
     @Override
     public String category() { return "animation"; }
@@ -42,6 +44,8 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             this.precession = anim.precession();
             this.rayFlow = anim.rayFlow();
             this.rayMotion = anim.rayMotion();
+            this.rayWiggle = anim.rayWiggle();
+            this.rayTwist = anim.rayTwist();
         } else {
             reset();
         }
@@ -60,6 +64,8 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             .precession(precession)
             .rayFlow(rayFlow)
             .rayMotion(rayMotion)
+            .rayWiggle(rayWiggle)
+            .rayTwist(rayTwist)
             .build());
     }
     
@@ -91,6 +97,12 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
     public RayMotionConfig rayMotion() { return rayMotion; }
     public void setRayMotion(RayMotionConfig rayMotion) { this.rayMotion = rayMotion; }
     
+    public RayWiggleConfig rayWiggle() { return rayWiggle; }
+    public void setRayWiggle(RayWiggleConfig rayWiggle) { this.rayWiggle = rayWiggle; }
+    
+    public RayTwistConfig rayTwist() { return rayTwist; }
+    public void setRayTwist(RayTwistConfig rayTwist) { this.rayTwist = rayTwist; }
+    
     /**
      * Override get to handle paths like "spin.speed", "pulse.scale", etc.
      */
@@ -110,6 +122,8 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             case "precession" -> prop != null ? getPrecessionProperty(prop) : precession;
             case "rayFlow" -> prop != null ? getRayFlowProperty(prop) : rayFlow;
             case "rayMotion" -> prop != null ? getRayMotionProperty(prop) : rayMotion;
+            case "rayWiggle" -> prop != null ? getRayWiggleProperty(prop) : rayWiggle;
+            case "rayTwist" -> prop != null ? getRayTwistProperty(prop) : rayTwist;
             default -> super.get(path);
         };
     }
@@ -219,6 +233,8 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             case "precession" -> setPrecessionProperty(prop, value);
             case "rayFlow" -> setRayFlowProperty(prop, value);
             case "rayMotion" -> setRayMotionProperty(prop, value);
+            case "rayWiggle" -> setRayWiggleProperty(prop, value);
+            case "rayTwist" -> setRayTwistProperty(prop, value);
             default -> super.set(path, value);
         }
     }
@@ -334,6 +350,8 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
         this.precession = null;
         this.rayFlow = null;
         this.rayMotion = null;
+        this.rayWiggle = null;
+        this.rayTwist = null;
     }
     
     // =========================================================================
@@ -417,6 +435,60 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             case "frequency" -> b.frequency(toFloat(value));
         }
         this.rayMotion = b.build();
+    }
+    
+    // =========================================================================
+    // Ray Wiggle Property Accessors
+    // =========================================================================
+    
+    private Object getRayWiggleProperty(String prop) {
+        if (rayWiggle == null) return null;
+        return switch (prop) {
+            case "mode" -> rayWiggle.mode();
+            case "speed" -> rayWiggle.speed();
+            case "amplitude" -> rayWiggle.amplitude();
+            case "frequency" -> rayWiggle.frequency();
+            case "phaseOffset" -> rayWiggle.phaseOffset();
+            default -> null;
+        };
+    }
+    
+    private void setRayWiggleProperty(String prop, Object value) {
+        RayWiggleConfig.Builder b = rayWiggle != null ? rayWiggle.toBuilder() : RayWiggleConfig.builder();
+        switch (prop) {
+            case "mode" -> b.mode(value instanceof WiggleMode wm ? wm : WiggleMode.fromString(value.toString()));
+            case "speed" -> b.speed(toFloat(value));
+            case "amplitude" -> b.amplitude(toFloat(value));
+            case "frequency" -> b.frequency(toFloat(value));
+            case "phaseOffset" -> b.phaseOffset(toFloat(value));
+        }
+        this.rayWiggle = b.build();
+    }
+    
+    // =========================================================================
+    // Ray Twist Property Accessors
+    // =========================================================================
+    
+    private Object getRayTwistProperty(String prop) {
+        if (rayTwist == null) return null;
+        return switch (prop) {
+            case "mode" -> rayTwist.mode();
+            case "speed" -> rayTwist.speed();
+            case "amount" -> rayTwist.amount();
+            case "phaseOffset" -> rayTwist.phaseOffset();
+            default -> null;
+        };
+    }
+    
+    private void setRayTwistProperty(String prop, Object value) {
+        RayTwistConfig.Builder b = rayTwist != null ? rayTwist.toBuilder() : RayTwistConfig.builder();
+        switch (prop) {
+            case "mode" -> b.mode(value instanceof TwistMode tm ? tm : TwistMode.fromString(value.toString()));
+            case "speed" -> b.speed(toFloat(value));
+            case "amount" -> b.amount(toFloat(value));
+            case "phaseOffset" -> b.phaseOffset(toFloat(value));
+        }
+        this.rayTwist = b.build();
     }
     
     private int toInt(Object v) { return v instanceof Number n ? n.intValue() : 0; }

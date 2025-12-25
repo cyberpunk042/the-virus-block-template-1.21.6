@@ -642,6 +642,8 @@ public final class DefinitionBuilder {
             .precession(state.precession())
             .rayFlow(state.rayFlow())
             .rayMotion(state.rayMotion())
+            .rayWiggle(state.rayWiggle())
+            .rayTwist(state.rayTwist())
             .build();
     }
     

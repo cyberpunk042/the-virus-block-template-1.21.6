@@ -366,7 +366,7 @@ public final class ShapeWidgetSpec {
         // === GEOMETRY ===
         new SectionHeader("Ray Geometry"),
         
-        // Row 1: Ray Length + Ray Width (thickness control: < 1.0 = thin, >= 1.0 = thick)
+        // Row 1: Ray Length + Ray Width
         SliderSpec.half("Ray Len", "rays.rayLength", 0.1f, 10f, "%.2f"),
         SliderSpec.half("Ray Width", "rays.rayWidth", 0.1f, 5f, "%.1f"),
         
@@ -389,28 +389,28 @@ public final class ShapeWidgetSpec {
         SliderSpec.half("Outer R", "rays.outerRadius", 0.1f, 20f, "%.2f"),
         SliderSpec.halfInt("Layers", "rays.layers", 1, 16),
         
-        // Row 5: Layer Spacing
+        // Row 5: Layer Spacing + Randomness
         SliderSpec.half("Layer Sp", "rays.layerSpacing", 0.1f, 2f, "%.2f"),
-        
-        // === VARIATION ===
-        new SectionHeader("Variation"),
-        
-        // Row 6: Randomness + Length Variation
         SliderSpec.half("Random", "rays.randomness", 0f, 1f, "%.2f"),
-        SliderSpec.half("Len Var", "rays.lengthVariation", 0f, 1f, "%.2f"),
         
-        // === FADING ===
+        // Row 6: Length Variation (full width)
+        SliderSpec.full("Len Variation", "rays.lengthVariation", 0f, 1f, "%.2f"),
+        
+        // === FADING (Alpha Gradient) ===
         new SectionHeader("Fading"),
         
         // Row 7: Fade Start + Fade End
-        SliderSpec.half("Fade St", "rays.fadeStart", 0f, 1f, "%.2f"),
+        SliderSpec.half("Fade Start", "rays.fadeStart", 0f, 1f, "%.2f"),
         SliderSpec.half("Fade End", "rays.fadeEnd", 0f, 1f, "%.2f"),
         
-        // === SEGMENTATION ===
+        // === SEGMENTATION (Dashed Effects) ===
         new SectionHeader("Segmentation"),
         
         // Row 8: Segments + Segment Gap
-        SliderSpec.halfInt("Segs", "rays.segments", 1, 10),
+        SliderSpec.halfInt("Segments", "rays.segments", 1, 10),
         SliderSpec.half("Seg Gap", "rays.segmentGap", 0f, 0.5f, "%.2f")
+        
+        // NOTE: Line Shape and Field Curvature are handled manually in ShapeSubPanel
+        // because they have CONDITIONAL visibility based on enum selection
     );
 }

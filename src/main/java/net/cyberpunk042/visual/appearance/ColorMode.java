@@ -10,6 +10,10 @@ package net.cyberpunk042.visual.appearance;
  *   <li>{@link #MESH_GRADIENT} - Per-vertex gradient from primary to secondary</li>
  *   <li>{@link #MESH_RAINBOW} - Per-vertex rainbow spectrum across mesh</li>
  *   <li>{@link #RANDOM} - Random color(s) from a color set</li>
+ *   <li>{@link #HEAT_MAP} - Color based on position/distance (inner=hot, outer=cold)</li>
+ *   <li>{@link #RANDOM_PULSE} - Random color pulses/flashes</li>
+ *   <li>{@link #BREATHE} - Saturation/brightness pulsing (breathing effect)</li>
+ *   <li>{@link #REACTIVE} - Color responds to motion/distance dynamically</li>
  * </ul>
  */
 public enum ColorMode {
@@ -46,7 +50,36 @@ public enum ColorMode {
      * Distribution controls whether uniform (one random for all)
      * or per-cell (each cell gets its own random color).
      */
-    RANDOM;
+    RANDOM,
+    
+    /**
+     * Color based on position/distance from center.
+     * Inner positions = hot colors (red/orange).
+     * Outer positions = cold colors (blue/purple).
+     * Good for rays to show energy intensity gradients.
+     */
+    HEAT_MAP,
+    
+    /**
+     * Random color pulses/flashes.
+     * Occasional bursts of random colors from the color set.
+     * Creates sparkle/flash effect.
+     */
+    RANDOM_PULSE,
+    
+    /**
+     * Saturation/brightness pulsing (breathing effect).
+     * Color intensity smoothly oscillates.
+     * Uses timePhase for animation speed.
+     */
+    BREATHE,
+    
+    /**
+     * Color responds to motion/distance dynamically.
+     * Can change based on player distance, velocity, or other factors.
+     * Good for interactive visual feedback.
+     */
+    REACTIVE;
     
     /**
      * Default color mode.
@@ -60,7 +93,7 @@ public enum ColorMode {
      */
     public static ColorMode fromString(String s) {
         if (s == null) return GRADIENT;
-        String upper = s.toUpperCase();
+        String upper = s.toUpperCase().replace(" ", "_").replace("-", "_");
         // Backward compatibility: SOLID → GRADIENT
         if ("SOLID".equals(upper)) return GRADIENT;
         try {
@@ -75,27 +108,37 @@ public enum ColorMode {
      */
     public boolean isPerVertex() {
         return this == MESH_GRADIENT || this == MESH_RAINBOW || 
-               (this == RANDOM); // RANDOM can be per-cell
+               this == RANDOM || this == HEAT_MAP || this == REACTIVE;
     }
     
     /**
      * Whether this mode uses animation/time.
      */
     public boolean isAnimated() {
-        return this == CYCLING || this == MESH_RAINBOW;
+        return this == CYCLING || this == MESH_RAINBOW || 
+               this == RANDOM_PULSE || this == BREATHE;
     }
     
     /**
      * Whether this mode uses a color set.
      */
     public boolean usesColorSet() {
-        return this == CYCLING || this == RANDOM || this == MESH_RAINBOW;
+        return this == CYCLING || this == RANDOM || this == MESH_RAINBOW ||
+               this == RANDOM_PULSE;
     }
     
     /**
      * Whether this mode uses gradient direction.
      */
     public boolean usesDirection() {
-        return this == MESH_GRADIENT || this == MESH_RAINBOW;
+        return this == MESH_GRADIENT || this == MESH_RAINBOW || this == HEAT_MAP;
+    }
+    
+    /**
+     * Whether this mode is position-dependent (uses vertex position).
+     */
+    public boolean isPositionBased() {
+        return this == HEAT_MAP || this == REACTIVE;
     }
 }
+

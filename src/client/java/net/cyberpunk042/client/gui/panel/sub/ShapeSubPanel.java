@@ -320,6 +320,102 @@ public class ShapeSubPanel extends AbstractPanel {
             }
         }
         
+        // ═══════════════════════════════════════════════════════════════════════
+        // SPECIAL: Rays Line Shape + Curvature (Conditional Controls)
+        // ═══════════════════════════════════════════════════════════════════════
+        
+        if (shapeType.equalsIgnoreCase("rays")) {
+            // Get current line shape and curvature values
+            String lineShapeStr = state.getString("rays.lineShape");
+            net.cyberpunk042.visual.shape.RayLineShape lineShape;
+            try {
+                lineShape = net.cyberpunk042.visual.shape.RayLineShape.valueOf(
+                    lineShapeStr != null ? lineShapeStr : "STRAIGHT");
+            } catch (IllegalArgumentException e) {
+                lineShape = net.cyberpunk042.visual.shape.RayLineShape.STRAIGHT;
+            }
+            
+            String curvatureStr = state.getString("rays.curvature");
+            net.cyberpunk042.visual.shape.RayCurvature curvature;
+            try {
+                curvature = net.cyberpunk042.visual.shape.RayCurvature.valueOf(
+                    curvatureStr != null ? curvatureStr : "NONE");
+            } catch (IllegalArgumentException e) {
+                curvature = net.cyberpunk042.visual.shape.RayCurvature.NONE;
+            }
+            
+            // === LINE SHAPE SECTION ===
+            // Line Shape dropdown (full width)
+            var lineShapeDropdown = GuiWidgets.enumDropdown(
+                x, y, w, GuiConstants.COMPACT_HEIGHT, "Line Shape",
+                net.cyberpunk042.visual.shape.RayLineShape.class,
+                lineShape, "Shape of individual rays (affects curvature per-ray)",
+                v -> {
+                    state.set("rays.lineShape", v.name());
+                    rebuildForCurrentShape();
+                    if (shapeChangedCallback != null) {
+                        shapeChangedCallback.run();
+                    }
+                });
+            widgets.add(lineShapeDropdown);
+            y += step;
+            
+            // Conditional: Show amplitude/frequency/segments only when lineShape != STRAIGHT
+            if (lineShape != net.cyberpunk042.visual.shape.RayLineShape.STRAIGHT) {
+                // Row: Amplitude + Frequency
+                float amp = state.getFloat("rays.lineShapeAmplitude");
+                var ampSlider = GuiWidgets.slider(x, y, halfW,
+                    "Amplitude", 0.01f, 1f, amp, "%.2f", 
+                    "How far rays deviate from straight",
+                    v -> onUserChange(() -> state.set("rays.lineShapeAmplitude", v)));
+                widgets.add(ampSlider);
+                
+                float freq = state.getFloat("rays.lineShapeFrequency");
+                var freqSlider = GuiWidgets.slider(x + halfW + GuiConstants.PADDING, y, halfW,
+                    "Frequency", 0.5f, 10f, freq, "%.1f", 
+                    "Number of wave cycles along ray",
+                    v -> onUserChange(() -> state.set("rays.lineShapeFrequency", v)));
+                widgets.add(freqSlider);
+                y += step;
+                
+                // Row: Shape Segments (full width)
+                int segs = state.getInt("rays.shapeSegments");
+                var segsSlider = GuiWidgets.slider(x, y, w,
+                    "Line Segments", 4, 64, segs, "%d", 
+                    "Smoothness of curved rays (more = smoother)",
+                    v -> onUserChange(() -> state.set("rays.shapeSegments", Math.round(v))));
+                widgets.add(segsSlider);
+                y += step;
+            }
+            
+            // === FIELD CURVATURE SECTION ===
+            // Curvature dropdown (full width)
+            var curvatureDropdown = GuiWidgets.enumDropdown(
+                x, y, w, GuiConstants.COMPACT_HEIGHT, "Field Curvature",
+                net.cyberpunk042.visual.shape.RayCurvature.class,
+                curvature, "How rays curve around the field center",
+                v -> {
+                    state.set("rays.curvature", v.name());
+                    rebuildForCurrentShape();
+                    if (shapeChangedCallback != null) {
+                        shapeChangedCallback.run();
+                    }
+                });
+            widgets.add(curvatureDropdown);
+            y += step;
+            
+            // Conditional: Show intensity only when curvature != NONE
+            if (curvature != net.cyberpunk042.visual.shape.RayCurvature.NONE) {
+                float intensity = state.getFloat("rays.curvatureIntensity");
+                var intensitySlider = GuiWidgets.slider(x, y, w,
+                    "Intensity", 0f, 1f, intensity, "%.2f", 
+                    "Strength of curvature effect (0 = straight, 1 = max curve)",
+                    v -> onUserChange(() -> state.set("rays.curvatureIntensity", v)));
+                widgets.add(intensitySlider);
+                y += step;
+            }
+        }
+        
         // Track content height
         contentHeight = y - startY;
         
@@ -350,6 +446,11 @@ public class ShapeSubPanel extends AbstractPanel {
         ArrangementConfig arr = state.arrangement();
         String shape = shapeType.toLowerCase();
         int step = GuiConstants.COMPACT_HEIGHT + GuiConstants.COMPACT_GAP;
+        
+        // Rays are lines - they don't have faces that need patterns
+        if (shape.equals("rays")) {
+            return y; // No patterns for rays
+        }
         
         // Shapes with per-part patterns (body, top, bottom)
         if (shape.equals("cylinder") || shape.equals("prism") || shape.equals("beam") || shape.equals("jet")) {

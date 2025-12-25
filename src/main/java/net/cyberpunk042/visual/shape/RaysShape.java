@@ -84,7 +84,17 @@ public record RaysShape(
     
     // === Segmentation (for dashed/dotted effects) ===
     @Range(ValueRange.STEPS) @JsonField(skipIfDefault = true, defaultValue = "1") int segments,
-    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true) float segmentGap
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true) float segmentGap,
+    
+    // === Ray Line Shape (NEW: how individual rays are curved) ===
+    @JsonField(skipIfDefault = true) RayLineShape lineShape,
+    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "0.1") float lineShapeAmplitude,
+    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "2.0") float lineShapeFrequency,
+    @Range(ValueRange.STEPS) @JsonField(skipIfDefault = true, defaultValue = "16") int shapeSegments,
+    
+    // === Field Curvature (NEW: how rays curve around center) ===
+    @JsonField(skipIfDefault = true) RayCurvature curvature,
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true) float curvatureIntensity
 ) implements Shape {
     
     // =========================================================================
@@ -107,33 +117,57 @@ public record RaysShape(
         1.0f,           // fadeStart
         1.0f,           // fadeEnd
         1,              // segments
-        0.0f            // segmentGap
+        0.0f,           // segmentGap
+        // NEW fields
+        RayLineShape.STRAIGHT, // lineShape
+        0.1f,           // lineShapeAmplitude
+        2.0f,           // lineShapeFrequency
+        16,             // shapeSegments
+        RayCurvature.NONE, // curvature
+        0.0f            // curvatureIntensity
     );
     
     /** Spherical absorption rays (converging to center). */
     public static final RaysShape ABSORPTION = new RaysShape(
         2.0f, 1.0f, 48, RayArrangement.CONVERGING, RayDistribution.RANDOM, 0.5f, 3.5f,
-        8, 0.3f, 0.1f, 0.1f, 1.0f, 0.2f, 1, 0.0f);
+        8, 0.3f, 0.1f, 0.1f, 1.0f, 0.2f, 1, 0.0f,
+        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f);
     
     /** Spherical emission rays (diverging from center). */
     public static final RaysShape EMISSION = new RaysShape(
         2.0f, 1.0f, 48, RayArrangement.DIVERGING, RayDistribution.RANDOM, 0.5f, 3.5f,
-        8, 0.3f, 0.1f, 0.1f, 0.2f, 1.0f, 1, 0.0f);
+        8, 0.3f, 0.1f, 0.1f, 0.2f, 1.0f, 1, 0.0f,
+        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f);
     
     /** Parallel laser grid. */
     public static final RaysShape LASER_GRID = new RaysShape(
         5.0f, 1.5f, 16, RayArrangement.PARALLEL, RayDistribution.UNIFORM, 0.0f, 2.0f,
-        4, 0.3f, 0.0f, 0.0f, 1.0f, 1.0f, 1, 0.0f);
+        4, 0.3f, 0.0f, 0.0f, 1.0f, 1.0f, 1, 0.0f,
+        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f);
     
     /** Dashed pulse rays. */
     public static final RaysShape PULSE = new RaysShape(
         3.0f, 1.0f, 8, RayArrangement.RADIAL, RayDistribution.UNIFORM, 0.3f, 2.5f,
-        1, 0.5f, 0.0f, 0.0f, 1.0f, 0.5f, 4, 0.2f);
+        1, 0.5f, 0.0f, 0.0f, 1.0f, 0.5f, 4, 0.2f,
+        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f);
     
     /** Sparse random stars. */
     public static final RaysShape STARS = new RaysShape(
         1.5f, 0.5f, 24, RayArrangement.SPHERICAL, RayDistribution.STOCHASTIC, 0.8f, 2.0f,
-        1, 0.5f, 0.3f, 0.3f, 0.8f, 0.3f, 1, 0.0f);
+        1, 0.5f, 0.3f, 0.3f, 0.8f, 0.3f, 1, 0.0f,
+        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f);
+    
+    /** Vortex rays (spiraling into center). */
+    public static final RaysShape VORTEX = new RaysShape(
+        2.5f, 1.0f, 24, RayArrangement.RADIAL, RayDistribution.UNIFORM, 0.3f, 3.0f,
+        1, 0.5f, 0.0f, 0.0f, 1.0f, 0.8f, 1, 0.0f,
+        RayLineShape.STRAIGHT, 0.1f, 2.0f, 32, RayCurvature.VORTEX, 0.5f);
+    
+    /** Corkscrew rays (helical shape). */
+    public static final RaysShape CORKSCREW = new RaysShape(
+        2.0f, 1.0f, 12, RayArrangement.RADIAL, RayDistribution.UNIFORM, 0.5f, 2.5f,
+        1, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1, 0.0f,
+        RayLineShape.CORKSCREW, 0.15f, 3.0f, 32, RayCurvature.NONE, 0.0f);
     
     public static RaysShape defaults() { return DEFAULT; }
     
@@ -223,6 +257,38 @@ public record RaysShape(
         return rayLength;
     }
     
+    /** Whether rays have a non-straight line shape. */
+    public boolean hasLineShape() {
+        return lineShape != null && lineShape != RayLineShape.STRAIGHT;
+    }
+    
+    /** Returns the line shape, defaulting to STRAIGHT if null. */
+    public RayLineShape effectiveLineShape() {
+        return lineShape != null ? lineShape : RayLineShape.STRAIGHT;
+    }
+    
+    /** Whether rays have field curvature (spiral/vortex). */
+    public boolean hasCurvature() {
+        return curvature != null && curvature != RayCurvature.NONE && curvatureIntensity > 0;
+    }
+    
+    /** Returns the curvature mode, defaulting to NONE if null. */
+    public RayCurvature effectiveCurvature() {
+        return curvature != null ? curvature : RayCurvature.NONE;
+    }
+    
+    /** Number of segments needed to render this ray shape properly. */
+    public int effectiveShapeSegments() {
+        if (hasLineShape()) {
+            // Use shapeSegments if we have a complex line shape
+            return Math.max(shapeSegments, lineShape.suggestedMinSegments());
+        } else if (hasCurvature()) {
+            // Curvature also needs multiple segments
+            return Math.max(shapeSegments, 16);
+        }
+        return 1; // Straight rays only need 2 vertices (1 segment)
+    }
+    
     @Override
     public JsonObject toJson() {
         return JsonSerializer.toJson(this);
@@ -250,7 +316,14 @@ public record RaysShape(
             .fadeStart(fadeStart)
             .fadeEnd(fadeEnd)
             .segments(segments)
-            .segmentGap(segmentGap);
+            .segmentGap(segmentGap)
+            // NEW fields
+            .lineShape(lineShape)
+            .lineShapeAmplitude(lineShapeAmplitude)
+            .lineShapeFrequency(lineShapeFrequency)
+            .shapeSegments(shapeSegments)
+            .curvature(curvature)
+            .curvatureIntensity(curvatureIntensity);
     }
     
     public static class Builder {
@@ -269,6 +342,13 @@ public record RaysShape(
         private float fadeEnd = 1.0f;
         private int segments = 1;
         private float segmentGap = 0.0f;
+        // NEW fields
+        private RayLineShape lineShape = RayLineShape.STRAIGHT;
+        private float lineShapeAmplitude = 0.1f;
+        private float lineShapeFrequency = 2.0f;
+        private int shapeSegments = 16;
+        private RayCurvature curvature = RayCurvature.NONE;
+        private float curvatureIntensity = 0.0f;
         
         public Builder rayLength(float v) { this.rayLength = v; return this; }
         public Builder rayWidth(float v) { this.rayWidth = v; return this; }
@@ -285,12 +365,21 @@ public record RaysShape(
         public Builder fadeEnd(float v) { this.fadeEnd = v; return this; }
         public Builder segments(int v) { this.segments = v; return this; }
         public Builder segmentGap(float v) { this.segmentGap = v; return this; }
+        // NEW field setters
+        public Builder lineShape(RayLineShape v) { this.lineShape = v != null ? v : RayLineShape.STRAIGHT; return this; }
+        public Builder lineShapeAmplitude(float v) { this.lineShapeAmplitude = v; return this; }
+        public Builder lineShapeFrequency(float v) { this.lineShapeFrequency = v; return this; }
+        public Builder shapeSegments(int v) { this.shapeSegments = v; return this; }
+        public Builder curvature(RayCurvature v) { this.curvature = v != null ? v : RayCurvature.NONE; return this; }
+        public Builder curvatureIntensity(float v) { this.curvatureIntensity = v; return this; }
         
         public RaysShape build() {
             return new RaysShape(
                 rayLength, rayWidth, count, arrangement, distribution, innerRadius, outerRadius,
                 layers, layerSpacing, randomness, lengthVariation,
-                fadeStart, fadeEnd, segments, segmentGap
+                fadeStart, fadeEnd, segments, segmentGap,
+                lineShape, lineShapeAmplitude, lineShapeFrequency, shapeSegments,
+                curvature, curvatureIntensity
             );
         }
     }

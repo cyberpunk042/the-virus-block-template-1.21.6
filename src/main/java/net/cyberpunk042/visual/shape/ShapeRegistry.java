@@ -290,8 +290,16 @@ public final class ShapeRegistry {
             float fadeEnd = getFloat(params, "fadeEnd", 1.0f);
             int segments = getInt(params, "segments", 1);
             float segmentGap = getFloat(params, "segmentGap", 0f);
+            // NEW: Line shape and curvature fields
+            RayLineShape lineShape = RayLineShape.STRAIGHT;
+            float lineShapeAmplitude = getFloat(params, "lineShapeAmplitude", 0.1f);
+            float lineShapeFrequency = getFloat(params, "lineShapeFrequency", 2.0f);
+            int shapeSegments = getInt(params, "shapeSegments", 16);
+            RayCurvature curvature = RayCurvature.NONE;
+            float curvatureIntensity = getFloat(params, "curvatureIntensity", 0f);
             return new RaysShape(rayLength, rayWidth, count, arrangement, distribution, innerRadius, outerRadius,
-                layers, layerSpacing, randomness, lengthVariation, fadeStart, fadeEnd, segments, segmentGap);
+                layers, layerSpacing, randomness, lengthVariation, fadeStart, fadeEnd, segments, segmentGap,
+                lineShape, lineShapeAmplitude, lineShapeFrequency, shapeSegments, curvature, curvatureIntensity);
         });
         
         Logging.REGISTRY.topic("shape").info(
