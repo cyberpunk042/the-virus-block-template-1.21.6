@@ -42,7 +42,7 @@ public record AppearanceState(
         0xFF00FFFF,  // primaryColor
         0xFFFF00FF,  // secondaryColor (magenta)
         0f,          // colorBlend (0 = only primary, 1 = only secondary)
-        ColorMode.SOLID,                // colorMode
+        ColorMode.GRADIENT,                // colorMode
         ColorDistribution.UNIFORM,      // colorDistribution
         ColorSet.RAINBOW,               // colorSet
         GradientDirection.Y_AXIS,       // gradientDirection
@@ -86,7 +86,7 @@ public record AppearanceState(
         private int primaryColor = 0xFF00FFFF;
         private int secondaryColor = 0xFFFF00FF;
         private float colorBlend = 0f;
-        private ColorMode colorMode = ColorMode.SOLID;
+        private ColorMode colorMode = ColorMode.GRADIENT;
         private ColorDistribution colorDistribution = ColorDistribution.UNIFORM;
         private ColorSet colorSet = ColorSet.RAINBOW;
         private GradientDirection gradientDirection = GradientDirection.Y_AXIS;

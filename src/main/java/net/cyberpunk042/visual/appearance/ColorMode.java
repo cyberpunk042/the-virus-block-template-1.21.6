@@ -5,8 +5,7 @@ package net.cyberpunk042.visual.appearance;
  * 
  * <p>Determines how colors are applied to vertices:</p>
  * <ul>
- *   <li>{@link #SOLID} - Single uniform color (uses primary)</li>
- *   <li>{@link #GRADIENT} - Global blend from primary to secondary (via colorBlend)</li>
+ *   <li>{@link #GRADIENT} - Uniform blend from primary to secondary (via colorBlend)</li>
  *   <li>{@link #CYCLING} - Animate through a color set over time</li>
  *   <li>{@link #MESH_GRADIENT} - Per-vertex gradient from primary to secondary</li>
  *   <li>{@link #MESH_RAINBOW} - Per-vertex rainbow spectrum across mesh</li>
@@ -15,15 +14,9 @@ package net.cyberpunk042.visual.appearance;
  */
 public enum ColorMode {
     /**
-     * Single solid color for the entire primitive.
-     * Uses the primary color from Appearance.
-     */
-    SOLID,
-    
-    /**
-     * Global blend from primary to secondary color.
+     * Uniform blend from primary to secondary color.
      * Blend ratio controlled by colorBlend slider.
-     * Same color for all vertices at any given moment.
+     * colorBlend=0 → pure primary, colorBlend=1 → pure secondary.
      */
     GRADIENT,
     
@@ -59,18 +52,21 @@ public enum ColorMode {
      * Default color mode.
      */
     public static ColorMode defaultMode() {
-        return SOLID;
+        return GRADIENT;
     }
     
     /**
-     * Parse from string (case-insensitive).
+     * Parse from string (case-insensitive, handles legacy SOLID).
      */
     public static ColorMode fromString(String s) {
-        if (s == null) return SOLID;
+        if (s == null) return GRADIENT;
+        String upper = s.toUpperCase();
+        // Backward compatibility: SOLID → GRADIENT
+        if ("SOLID".equals(upper)) return GRADIENT;
         try {
-            return valueOf(s.toUpperCase());
+            return valueOf(upper);
         } catch (IllegalArgumentException e) {
-            return SOLID;
+            return GRADIENT;
         }
     }
     
@@ -93,7 +89,7 @@ public enum ColorMode {
      * Whether this mode uses a color set.
      */
     public boolean usesColorSet() {
-        return this == CYCLING || this == RANDOM;
+        return this == CYCLING || this == RANDOM || this == MESH_RAINBOW;
     }
     
     /**

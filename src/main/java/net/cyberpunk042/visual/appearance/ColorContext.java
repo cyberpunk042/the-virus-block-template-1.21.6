@@ -16,6 +16,7 @@ public record ColorContext(
     GradientDirection direction,
     ColorDistribution distribution,
     float colorBlend,
+    float alpha,        // Alpha value 0-1 to apply to all calculated colors
     float timePhase,
     float time,
     float shapeRadius,
@@ -29,6 +30,12 @@ public record ColorContext(
      */
     public static ColorContext from(Appearance appearance, int resolvedPrimary, int resolvedSecondary, 
                                     float time, float shapeRadius, float shapeHeight) {
+        // Get alpha from appearance (use max of AlphaRange)
+        float alpha = 1.0f;
+        if (appearance.alpha() != null) {
+            alpha = appearance.alpha().max();
+        }
+        
         return new ColorContext(
             appearance.effectiveColorMode(),
             resolvedPrimary,
@@ -37,6 +44,7 @@ public record ColorContext(
             appearance.effectiveDirection(),
             appearance.effectiveDistribution(),
             appearance.colorBlend(),
+            alpha,
             appearance.timePhase(),
             time,
             shapeRadius,
@@ -45,13 +53,13 @@ public record ColorContext(
     }
     
     /**
-     * Creates a simple context for SOLID mode (single color).
+     * Creates a simple context for solid color (GRADIENT with blend=0).
      */
     public static ColorContext solid(int color) {
         return new ColorContext(
-            ColorMode.SOLID, color, color, 
+            ColorMode.GRADIENT, color, color, 
             ColorSet.RAINBOW, GradientDirection.Y_AXIS, ColorDistribution.GRADIENT,
-            0f, 0f, 0f, 1f, 1f
+            0f, 1f, 0f, 0f, 1f, 1f
         );
     }
     
@@ -69,17 +77,27 @@ public record ColorContext(
      * @param y Vertex Y position
      * @param z Vertex Z position
      * @param cellIndex Index of the cell (quad/triangle) this vertex belongs to
-     * @return ARGB color for this vertex
+     * @return ARGB color for this vertex (with alpha applied)
      */
     public int calculateColor(float x, float y, float z, int cellIndex) {
-        return switch (mode) {
-            case SOLID -> primaryColor;
+        int color = switch (mode) {
             case GRADIENT -> blendColors(primaryColor, secondaryColor, colorBlend);
             case CYCLING -> primaryColor; // Already handled in renderer
             case MESH_GRADIENT -> calculateMeshGradient(x, y, z, cellIndex);
             case MESH_RAINBOW -> calculateMeshRainbow(x, y, z, cellIndex);
             case RANDOM -> calculateRandom(cellIndex);
         };
+        
+        // Apply alpha to the calculated color
+        return applyAlpha(color, alpha);
+    }
+    
+    /**
+     * Apply alpha multiplier to a color.
+     */
+    private static int applyAlpha(int color, float alpha) {
+        int a = (int)(((color >> 24) & 0xFF) * alpha);
+        return (color & 0x00FFFFFF) | (a << 24);
     }
     
     /**
@@ -130,11 +148,27 @@ public record ColorContext(
                 return colorSet.interpolateSpectrum(t);
             }
             case RANDOM -> {
-                // Each cell gets a random color from the palette
-                // Use time-based seed that changes to animate
-                long seed = cellIndex * 31L + (long)(timePhase * 1000) + (long)(time / 40f);
-                RANDOM.get().setSeed(seed);
-                return colorSet.random(RANDOM.get());
+                // Each cell gets a random color, with smooth interpolation during phase changes
+                // Use timePhase to determine which "generation" of colors we're in
+                float animatedPhase = (timePhase * time / 20f) % 1f;
+                if (animatedPhase < 0) animatedPhase += 1f;
+                
+                // Current color generation (floor of phase * some factor for visible changes)
+                int generation = (int)(animatedPhase * 4); // 4 color changes per full cycle
+                float blendFactor = (animatedPhase * 4) % 1f; // How far into transition
+                
+                // Get current color (stable seed based on cell + generation)
+                long currentSeed = cellIndex * 31L + generation * 17L;
+                RANDOM.get().setSeed(currentSeed);
+                int currentColor = colorSet.random(RANDOM.get());
+                
+                // Get next color for smooth interpolation
+                long nextSeed = cellIndex * 31L + (generation + 1) * 17L;
+                RANDOM.get().setSeed(nextSeed);
+                int nextColor = colorSet.random(RANDOM.get());
+                
+                // Smooth interpolation between current and next
+                return blendColors(currentColor, nextColor, blendFactor);
             }
             default -> {
                 // GRADIENT: Smooth spectrum based on vertex position
@@ -157,15 +191,38 @@ public record ColorContext(
                 return colorSet.color(cellIndex);
             }
             case RANDOM -> {
-                // Each cell gets a random color from the ColorSet (animated)
-                long seed = cellIndex * 31L + (long)(timePhase * 1000) + (long)(time / 40f);
-                RANDOM.get().setSeed(seed);
-                return colorSet.random(RANDOM.get());
+                // Each cell gets a random color with smooth interpolation
+                float animatedPhase = (timePhase * time / 20f) % 1f;
+                if (animatedPhase < 0) animatedPhase += 1f;
+                
+                int generation = (int)(animatedPhase * 4);
+                float blendFactor = (animatedPhase * 4) % 1f;
+                
+                long currentSeed = cellIndex * 31L + generation * 17L;
+                RANDOM.get().setSeed(currentSeed);
+                int currentColor = colorSet.random(RANDOM.get());
+                
+                long nextSeed = cellIndex * 31L + (generation + 1) * 17L;
+                RANDOM.get().setSeed(nextSeed);
+                int nextColor = colorSet.random(RANDOM.get());
+                
+                return blendColors(currentColor, nextColor, blendFactor);
             }
             default -> {
-                // GRADIENT: Same random color for entire shape
-                RANDOM.get().setSeed((long)(timePhase * 1000) + (long)(time * 10));
-                return colorSet.random(RANDOM.get());
+                // GRADIENT: Same random color for entire shape (smoothly animated)
+                float animatedPhase = (timePhase * time / 20f) % 1f;
+                if (animatedPhase < 0) animatedPhase += 1f;
+                
+                int generation = (int)(animatedPhase * 4);
+                float blendFactor = (animatedPhase * 4) % 1f;
+                
+                RANDOM.get().setSeed(generation * 17L);
+                int currentColor = colorSet.random(RANDOM.get());
+                
+                RANDOM.get().setSeed((generation + 1) * 17L);
+                int nextColor = colorSet.random(RANDOM.get());
+                
+                return blendColors(currentColor, nextColor, blendFactor);
             }
         }
     }

@@ -1,286 +1,238 @@
 # Astrophysical Visual Effects Implementation Plan
 
-**Status**: DRAFT - In Discussion  
+**Status**: IN PROGRESS  
 **Last Updated**: 2024-12-24
 
 ## Overview
 
 This plan covers the implementation of astrophysical visual effects for cosmic phenomena:
-- Black holes with accretion disks
-- Relativistic jets with precession
-- Absorption rays (light converging inward)
-- Pulsars and magnetars
+- ✅ Phase 1: Relativistic Jets (COMPLETE)
+- 🔲 Phase 2: Rays Shape (straight line rays)
+- 🔲 Phase 3: Radial Rays Shape (rays emanating from center)
+- 🔲 Phase 4: Presets and Compositions (future)
 
 ---
 
-## Phase 1: Relativistic Jets
+## Phase 1: Relativistic Jets ✅ COMPLETE
 
-### 1.1 New Shape: `JetShape`
-
-**Concept**: A pair of opposing tubes/cones emanating from a central point (like poles of a sphere).
-
-**Geometry Approach**: Cylinder-based (tube with configurable radii)
-- `tipRadius = 0` → Pure cone (pointed)
-- `tipRadius > 0` → Truncated cone / tube
-- This leverages existing cylinder tessellation patterns
-
-**Properties**:
-```java
-record JetShape(
-    // === Geometry ===
-    float length,           // Length of each jet (default: 2.0)
-    float baseRadius,       // Radius at the base where jet starts (default: 0.3)
-    float tipRadius,        // Radius at the tip (0 = cone, >0 = tube, default: 0)
-    int segments,           // Radial segments (default: 16)
-    int lengthSegments,     // Segments along length for animation/patterns (default: 8)
-    
-    // === Configuration ===
-    boolean dualJets,       // true = both poles, false = single jet (default: true)
-    float separation,       // Gap between jets at center (default: 0)
-    boolean hollow,         // true = tube (hollow), false = solid cone (default: false)
-    float wallThickness,    // If hollow, thickness of wall (default: 0.05)
-    
-    // === Precession ===
-    JetPrecession precession // Precession animation config (can be null)
-) implements Shape
-```
-
-**Hollow vs Solid Support**:
-- `hollow = false` → Solid cone/cylinder (closed ends)
-- `hollow = true` → Tube with inner wall (like Ring with height)
-
-### 1.2 Jet Precession Config
-
-**Concept**: The jet axis slowly wobbles in a conical pattern (like a spinning top).
-This is SEPARATE from SpinConfig - the parent shape can spin independently.
-
-```java
-record JetPrecession(
-    boolean enabled,        // Is precession active?
-    float angle,            // Cone angle of precession in degrees (default: 15)
-    float speed,            // Rotation speed in revs/sec (default: 0.1)
-    float phase,            // Starting phase offset 0-1 (default: 0)
-    boolean syncWithParent  // Sync precession timing with parent spin? (default: false)
-)
-```
-
-### 1.3 Integration with Primitives
-
-**Decision**: **Standalone Primitive with PrimitiveLink**
-- More flexible
-- Consistent with existing multi-primitive architecture
-- Can share or differ in appearance from parent
-
-### 1.4 Implementation Notes
-
-**Inspiration: RingShape + RingTessellator**
-- Jets with `hollow=true` are structurally similar to Ring with `height > 0`
-- Use Ring's approach for inner/outer walls and wall thickness
-- This ensures consistent handling of hollow geometry across shapes
-
-**JetTessellator**:
-- Generate cone/cylinder geometry for each jet
-- If `dualJets=true`, generate both +Y and -Y directions
-- Apply precession by rotating the entire mesh around time
-- Support patterns for visual effects (e.g., striped jets)
-- Reference `RingTessellator` for hollow tube approach
-
-### 1.5 Files to Create/Modify
-
-| File | Action | Description |
-|------|--------|-------------|
-| `JetShape.java` | CREATE | New shape record |
-| `JetPrecession.java` | CREATE | Precession config record |
-| `JetTessellator.java` | CREATE | Tessellation logic |
-| `JetRenderer.java` | CREATE | Rendering logic |
-| `ShapeRegistry.java` | MODIFY | Register jet shape |
-| `PrimitiveRenderers.java` | MODIFY | Register jet renderer |
-| `ShapeTypeAdapter.java` | MODIFY | JSON parsing |
-| `ShapeSubPanel.java` | MODIFY | Add jet to GUI |
+### Summary
+- **JetShape** - Dual opposing cones/tubes
+- **JetTessellator** - Generates geometry
+- **JetRenderer** - Renders jets
+- Supports: hollow/solid, dual/single, caps, segments
 
 ---
 
-## Phase 2: Absorption Rays
+## Phase 2: Rays Shape (Current Focus)
 
-### 2.1 Concept
+### Concept
 
-Rays that converge toward the center of a shape, representing light being pulled into a gravitational source.
+A **RaysShape** is a collection of straight LINE segments in 3D space. Unlike jets which are 3D volumes (cones/cylinders), rays are **pure lines** rendered with configurable thickness.
 
-**Visual**: Lines emanating from outside the shape, all pointing toward center.
-Can cover partial or FULL spherical coverage (360° x 360°).
+Visual examples:
+- Laser beams in parallel
+- Light rays converging/diverging from a point
+- Energy pulses
+- Particle trails
 
-### 2.2 Design Decision
-
-**Decision**: Implement as **geometry lines** (new standalone shape)
-- Uses existing `MeshBuilder.lines()` 
-- No shader pipeline changes needed
-- Consistent with Jets approach
-- Fully configurable and reusable
-
-### 2.3 New Shape: `AbsorptionRaysShape`
-
-**Fully Configurable** - supports massive ray fields:
+### 2.1 RaysShape Record
 
 ```java
-record AbsorptionRaysShape(
-    // === Geometry ===
-    float innerRadius,          // Where rays end (near center, default: 0.5)
-    float outerRadius,          // Where rays start (far from center, default: 3.0)
-    float rayWidth,             // Line thickness (default: 1.0)
-    float rayLength,            // Individual ray length (if < outer-inner, rays are segments)
+record RaysShape(
+    // === Individual Ray Geometry ===
+    float rayLength,           // Length of each ray (default: 2.0)
+    float rayWidth,            // Line thickness/width (default: 1.0)
     
-    // === Distribution ===
-    RayDistribution distribution, // RADIAL_UNIFORM, RADIAL_RANDOM, SPHERICAL_UNIFORM, SPHERICAL_RANDOM
-    int rayCountTheta,          // Rays around Y axis (horizontal, 0-360°, default: 24)
-    int rayCountPhi,            // Rays around X axis (vertical, 0-180°, default: 12)
-    float thetaMin,             // Min horizontal angle in degrees (default: 0)
-    float thetaMax,             // Max horizontal angle in degrees (default: 360)
-    float phiMin,               // Min vertical angle in degrees (default: 0)
-    float phiMax,               // Max vertical angle in degrees (default: 180)
-    float randomness,           // 0 = perfect grid, 1 = fully random positions (default: 0)
+    // === Distribution & Count ===
+    int count,                 // Number of rays (default: 12)
+    RayArrangement arrangement, // How rays are arranged (default: RADIAL)
+    float innerRadius,         // Where rays start from center (default: 0.5)
+    float outerRadius,         // Where rays end from center (default: 3.0) 
     
-    // === Animation ===
-    boolean animated,           // Do rays move? (default: true)
-    float animSpeed,            // Speed of motion (default: 1.0)
-    boolean reverseDirection,   // false = inward (absorption), true = outward (emission)
-    float spawnRate,            // Rays per second (0 = static rays, default: 0)
-    float rayLifetime,          // How long each ray lives before respawning (default: 2.0)
-    boolean fadeIn,             // Rays fade in at spawn edge (default: true)
-    boolean fadeOut,            // Rays fade out at destination (default: true)
+    // === Multi-Layer Support ===
+    int layers,                // Number of vertical layers (default: 1)
+    float layerSpacing,        // Vertical spacing between layers (default: 0.5)
     
-    // === Color ===
-    RayColorMode colorMode,     // SOLID, GRADIENT, RAINBOW
-    int rayColor,               // Base color (if SOLID or GRADIENT start)
-    int rayColorEnd,            // End color (if GRADIENT)
-    float rainbowSpeed,         // Rainbow cycle speed (if RAINBOW, default: 1.0)
-    float density               // Ray density multiplier (default: 1.0)
+    // === Randomness ===
+    float randomness,          // Positional randomness 0-1 (default: 0)
+    float lengthVariation,     // Random length variation 0-1 (default: 0)
+    
+    // === Fading (per-ray, not per-shape) ===
+    float fadeStart,           // Alpha at ray start 0-1 (default: 1.0 = solid)
+    float fadeEnd,             // Alpha at ray end 0-1 (default: 1.0 = solid)
+    
+    // === Segmentation (for dashed/dotted effects) ===
+    int segments,              // Segments per ray (default: 1)
+    float segmentGap           // Gap between segments as fraction of length (default: 0)
 ) implements Shape
 ```
 
-**Distribution Modes**:
+### 2.2 RayArrangement Enum
+
 ```java
-enum RayDistribution {
-    RADIAL_UNIFORM,     // Even spacing in 2D ring pattern
-    RADIAL_RANDOM,      // Random angles in 2D ring pattern
-    SPHERICAL_UNIFORM,  // Even lat/lon grid over sphere surface
-    SPHERICAL_RANDOM    // Random positions on sphere surface
+enum RayArrangement {
+    RADIAL,         // Rays emanating from center outward (2D star on XZ plane)
+    SPHERICAL,      // Rays emanating in all 3D directions from center
+    PARALLEL,       // All rays pointing same direction (parallel beams)
+    CONVERGING,     // All rays pointing toward center point (absorption)
+    DIVERGING       // All rays pointing away from center (emission)
 }
 ```
 
-**Color Modes**:
-```java
-enum RayColorMode {
-    SOLID,      // Single color for all rays
-    GRADIENT,   // Color transitions from start to end along ray
-    RAINBOW     // Cycling through hue over time
-}
+**Visual Reference:**
+
+```
+RADIAL (XZ plane):
+         ↑
+        /|\
+       / | \
+    ←─●─→   
+       \ | /
+        \|/
+         ↓
+
+SPHERICAL (3D):
+         ↑
+       ↗ | ↖
+      ←──●──→  
+       ↙ | ↘
+         ↓
+
+PARALLEL:
+    →  →  →  →
+    →  →  →  →
+    →  →  →  →
+
+CONVERGING (inward):
+    ↘   ↓   ↙
+        ●     
+    ↗   ↑   ↖
+
+DIVERGING (outward):
+    ↗   ↑   ↖
+        ●     
+    ↘   ↓   ↙
 ```
 
-**Example Configurations**:
+### 2.3 Color Integration
+
+Rays use the existing Appearance color system:
+
+| ColorMode | Effect |
+|-----------|--------|
+| GRADIENT | Uniform blend from primary to secondary |
+| MESH_GRADIENT | Each ray fades from primary (start) to secondary (end) |
+| MESH_RAINBOW | Each ray is a different color from spectrum |
+| RANDOM | Each ray gets random color from ColorSet |
+
+**ColorDistribution** applies:
+- **GRADIENT**: Smooth gradient along each ray
+- **INDEXED**: Each ray gets a color based on its index
+- **RANDOM**: Each ray gets random color
+
+### 2.4 FadeStart/FadeEnd vs Appearance Alpha
+
+| Type | Purpose |
+|------|---------|
+| **Appearance Alpha** | Uniform transparency for entire shape |
+| **FadeStart/FadeEnd** | Per-ray gradient - ray can fade from solid to transparent |
+
+Example: 
+- `fadeStart=1.0, fadeEnd=0.0` → Rays fade out at their ends
+- `fadeStart=0.0, fadeEnd=1.0` → Rays fade in at their ends
+- Combined with `alpha=0.5` → Entire ray is 50% transparent AND fades
+
+### 2.5 Files to Create
+
+| File | Action |
+|------|--------|
+| `RaysShape.java` | CREATE - Shape record |
+| `RayArrangement.java` | CREATE - Arrangement enum |
+| `RaysTessellator.java` | CREATE - Line geometry generation |
+| `RaysRenderer.java` | CREATE - Rendering logic |
+| `ShapeRegistry.java` | MODIFY - Register shape |
+| `PrimitiveRenderers.java` | MODIFY - Register renderer |
+| `ShapeTypeAdapter.java` | MODIFY - JSON parsing |
+| `ShapeSubPanel.java` | MODIFY - GUI controls |
+
+### 2.6 Example Configurations
+
+**Black Hole Absorption (converging rays):**
 ```json
-// Massive 360x360 ray field
 {
-  "type": "absorptionRays",
-  "outerRadius": 5.0,
-  "rayCountTheta": 360,
-  "rayCountPhi": 180,
-  "distribution": "SPHERICAL_UNIFORM",
-  "animated": true,
-  "animSpeed": 0.5
-}
-
-// Sparse random rays (more organic)
-{
-  "type": "absorptionRays",
-  "outerRadius": 4.0,
-  "rayCountTheta": 24,
-  "rayCountPhi": 12,
-  "distribution": "SPHERICAL_RANDOM",
-  "randomness": 0.8
-}
-
-// Emission rays (outward from center)
-{
-  "type": "absorptionRays",
-  "convergeToCenter": false,
-  "outerRadius": 3.0,
-  "animSpeed": 2.0
+  "shape": {
+    "type": "rays",
+    "count": 48,
+    "arrangement": "SPHERICAL",
+    "layers": 8,
+    "innerRadius": 0.8,
+    "outerRadius": 4.0,
+    "fadeStart": 1.0,
+    "fadeEnd": 0.2
+  },
+  "appearance": {
+    "color": "#FF6600",
+    "colorMode": "MESH_GRADIENT",
+    "direction": "ALONG_LENGTH"
+  }
 }
 ```
 
-### 2.4 Files to Create/Modify
+**Parallel Laser Grid:**
+```json
+{
+  "shape": {
+    "type": "rays",
+    "count": 16,
+    "arrangement": "PARALLEL",
+    "rayLength": 5.0,
+    "layers": 4,
+    "layerSpacing": 0.3
+  },
+  "appearance": {
+    "colorMode": "MESH_RAINBOW",
+    "colorSet": "NEON"
+  }
+}
+```
 
-| File | Action | Description |
-|------|--------|-------------|
-| `AbsorptionRaysShape.java` | CREATE | New shape record |
-| `RayDistribution.java` | CREATE | Distribution enum |
-| `AbsorptionRaysTessellator.java` | CREATE | Line generation |
-| `AbsorptionRaysRenderer.java` | CREATE | Rendering + animation |
-| Registry/Adapter files | MODIFY | Registration |
-
----
-
-## Phase 3: Presets and Compositions (Future Work)
-
-**Note**: This phase requires more sophisticated planning and will be addressed in a future conversation.
-
-### Direction
-
-Once JetShape and AbsorptionRaysShape are implemented and tested:
-
-1. **Study composition patterns** - How do multi-primitive presets work today?
-2. **Define preset structure** - What makes a good cosmic preset?
-3. **Plan target presets**:
-   - Black Hole (event horizon + accretion disk + jets + absorption rays)
-   - Pulsar (neutron star + rotating beams)
-   - Quasar (active galactic nucleus variant)
-   - Supernova (expanding shockwave)
-   - Magnetar (extreme magnetic field visualization)
-
-4. **Consider inter-primitive relationships**:
-   - How do jets stay aligned with parent sphere?
-   - How does PrimitiveLink inheritance work for transforms?
-   - Do we need new linking modes?
-
-5. **Animation synchronization**:
-   - Can jet precession sync with parent spin?
-   - Should accretion disk rotation affect ray behavior?
-
-**This phase should NOT start until Phase 1 and 2 are complete and stable.**
+**Dashed Pulse Rays:**
+```json
+{
+  "shape": {
+    "type": "rays",
+    "count": 12,
+    "arrangement": "RADIAL",
+    "segments": 4,
+    "segmentGap": 0.2
+  }
+}
+```
 
 ---
 
-## Implementation Order
+## Phase 3: Radial Rays Shape (Future)
 
-### Step 1: JetShape Foundation
-1. Create `JetShape.java` record
-2. Create `JetTessellator.java` (basic cone geometry)
-3. Create `JetRenderer.java`
-4. Register in ShapeRegistry, PrimitiveRenderers
-5. Add JSON parsing
-6. Test basic jet rendering
+### Concept
 
-### Step 2: Jet Features
-1. Add `dualJets` toggle
-2. Add `separation` parameter
-3. Add pattern support for jet surface
+After RaysShape is complete, we may add a more specialized **RadialRaysShape** for triangular/wedge-shaped rays (like sun rays or light beams with width that expands).
 
-### Step 3: Jet Precession
-1. Create `JetPrecession.java`
-2. Integrate precession into renderer (rotates jet axis over time)
-3. Add GUI controls
+**Key Differences from RaysShape:**
+- Rays are TRIANGULAR (not lines) - they have width that can vary
+- `startWidth` and `endWidth` parameters
+- Creates wedge/pie-slice geometry instead of lines
 
-### Step 4: AbsorptionRays
-1. Create `AbsorptionRaysShape.java`
-2. Create line tessellation
-3. Add animation (rays moving inward)
-4. Register and test
+**This is NOT the current priority.** RaysShape with simple lines covers most use cases. RadialRays would add visual variety for sun-beam effects.
 
-### Step 5: GUI & Presets
-1. Add JetShape controls to ShapeSubPanel
-2. Add AbsorptionRays controls
-3. Create black_hole.json preset
-4. Create pulsar.json preset
+---
+
+## Phase 4: Presets and Compositions (Future)
+
+Once RaysShape is complete:
+1. Create black_hole.json preset (sphere + jets + rays)
+2. Create pulsar.json preset
+3. Study inter-primitive relationships
+4. Animation synchronization patterns
 
 ---
 
@@ -288,57 +240,32 @@ Once JetShape and AbsorptionRaysShape are implemented and tested:
 
 | Question | Decision |
 |----------|----------|
-| Jet geometry | **Cylinder-based** - `tipRadius=0` gives cone, `tipRadius>0` gives tube |
-| Jet hollow/solid | Support **BOTH** via `hollow` parameter |
-| Absorption rays distribution | **FULLY CONFIGURABLE** - radial/spherical, uniform/random |
-| Rays as geometry or shader | **Geometry lines** - simpler, fits existing architecture |
-| Jet appearance | **Own appearance** - it's a standalone shape with own Appearance config |
-| Jet precession | **Separate from SpinConfig** - lives in JetPrecession config |
+| Jet geometry | Cylinder-based (tipRadius controls shape) ✅ |
+| Rays vs RadialRays | Start with simple line Rays, triangular RadialRays later |
+| Ray color | Use existing ColorMode/ColorSet system |
+| Ray fade | Separate from Appearance alpha (fadeStart/fadeEnd) |
+| Arrangements | Support all 5: RADIAL, SPHERICAL, PARALLEL, CONVERGING, DIVERGING |
 
 ---
 
-## Summary
+## Implementation Order
 
-### New Files to Create
-
-**Phase 1 - Jets:**
-- `src/main/java/net/cyberpunk042/visual/shape/JetShape.java`
-- `src/main/java/net/cyberpunk042/visual/shape/JetPrecession.java`
-- `src/client/java/net/cyberpunk042/client/visual/mesh/JetTessellator.java`
-- `src/client/java/net/cyberpunk042/client/field/render/JetRenderer.java`
-
-**Phase 2 - Absorption Rays:**
-- `src/main/java/net/cyberpunk042/visual/shape/AbsorptionRaysShape.java`
-- `src/main/java/net/cyberpunk042/visual/shape/RayDistribution.java`
-- `src/client/java/net/cyberpunk042/client/visual/mesh/AbsorptionRaysTessellator.java`
-- `src/client/java/net/cyberpunk042/client/field/render/AbsorptionRaysRenderer.java`
-
-### Files to Modify
-- `ShapeRegistry.java` - register new shapes
-- `PrimitiveRenderers.java` - register new renderers
-- `ShapeTypeAdapter.java` - JSON parsing
-- `ShapeSubPanel.java` - GUI controls
-- `ShapeAdapter.java` - state management
-- `FieldEditState.java` - state bindings
-- `DefaultsProvider.java` - default values
+### Current: Phase 2 - RaysShape
+1. Create `RaysShape.java` record
+2. Create `RayArrangement.java` enum  
+3. Create `RaysTessellator.java` (line generation)
+4. Create `RaysRenderer.java`
+5. Register in ShapeRegistry, PrimitiveRenderers
+6. Add JSON parsing
+7. Test all arrangement modes
+8. Add GUI controls
 
 ---
 
 ## Notes
 
-- Ring shape is now working with proper CellType.QUAD ✅
-- DiscShape has been removed ✅
-- PrimitiveLink system exists for parent-child relationships
-- Existing animation system (SpinConfig) is separate from jet precession
-- Cone shape may have tessellation issues (winding bug) - Jets will use cylinder-based approach
-
----
-
-## Next Steps
-
-For the next conversation, start with:
-1. Implement `JetShape.java` record
-2. Implement `JetTessellator.java` 
-3. Test basic jet rendering
-4. Then add hollow/solid, dual jets, precession
-5. Finally implement AbsorptionRays
+- Ring shape working with CellType.QUAD ✅
+- DiscShape removed ✅
+- JetShape complete ✅
+- ColorContext now includes alpha ✅
+- Per-vertex colors (MESH_GRADIENT, MESH_RAINBOW, RANDOM) now respect alpha ✅

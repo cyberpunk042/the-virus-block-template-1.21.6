@@ -63,17 +63,17 @@ public record Appearance(
     
     public static final Appearance DEFAULT = new Appearance(
         "@primary", AlphaRange.DEFAULT, 0, 0, 1, 1, 0, null, 0, 
-        ColorMode.SOLID, ColorDistribution.UNIFORM, ColorSet.RAINBOW, GradientDirection.Y_AXIS, 0f);
+        ColorMode.GRADIENT, ColorDistribution.UNIFORM, ColorSet.RAINBOW, GradientDirection.Y_AXIS, 0f);
     
     /** Glowing appearance. */
     public static final Appearance GLOWING = new Appearance(
         "@primary", AlphaRange.DEFAULT, 0.8f, 0.5f, 1, 1, 0, null, 0, 
-        ColorMode.SOLID, ColorDistribution.UNIFORM, ColorSet.RAINBOW, GradientDirection.Y_AXIS, 0f);
+        ColorMode.GRADIENT, ColorDistribution.UNIFORM, ColorSet.RAINBOW, GradientDirection.Y_AXIS, 0f);
     
     /** Translucent appearance. */
     public static final Appearance TRANSLUCENT = new Appearance(
         "@primary", AlphaRange.of(0.3f), 0, 0, 1, 1, 0, null, 0, 
-        ColorMode.SOLID, ColorDistribution.UNIFORM, ColorSet.RAINBOW, GradientDirection.Y_AXIS, 0f);
+        ColorMode.GRADIENT, ColorDistribution.UNIFORM, ColorSet.RAINBOW, GradientDirection.Y_AXIS, 0f);
     
     /**
      * Creates a simple solid-color appearance.
@@ -81,7 +81,7 @@ public record Appearance(
      */
     public static Appearance color(String color) {
         return new Appearance(color, AlphaRange.OPAQUE, 0, 0, 1, 1, 0, null, 0, 
-            ColorMode.SOLID, ColorDistribution.UNIFORM, ColorSet.RAINBOW, GradientDirection.Y_AXIS, 0f);
+            ColorMode.GRADIENT, ColorDistribution.UNIFORM, ColorSet.RAINBOW, GradientDirection.Y_AXIS, 0f);
     }
     
     /**
@@ -91,7 +91,7 @@ public record Appearance(
      */
     public static Appearance glowing(String color, @Range(ValueRange.ALPHA) float glow) {
         return new Appearance(color, AlphaRange.DEFAULT, glow, glow * 0.5f, 1, 1, 0, null, 0, 
-            ColorMode.SOLID, ColorDistribution.UNIFORM, ColorSet.RAINBOW, GradientDirection.Y_AXIS, 0f);
+            ColorMode.GRADIENT, ColorDistribution.UNIFORM, ColorSet.RAINBOW, GradientDirection.Y_AXIS, 0f);
     }
     
     /** Whether glow is active. */
@@ -119,7 +119,7 @@ public record Appearance(
     public boolean isPerVertex() { return colorMode != null && colorMode.isPerVertex(); }
     
     /** Get effective color mode (defaults to SOLID if null). */
-    public ColorMode effectiveColorMode() { return colorMode != null ? colorMode : ColorMode.SOLID; }
+    public ColorMode effectiveColorMode() { return colorMode != null ? colorMode : ColorMode.GRADIENT; }
     
     /** Get effective color distribution (defaults to UNIFORM if null). */
     public ColorDistribution effectiveDistribution() { return colorDistribution != null ? colorDistribution : ColorDistribution.UNIFORM; }
@@ -214,7 +214,7 @@ public record Appearance(
         private @Range(ValueRange.DEGREES) float hueShift = 0;
         private String secondaryColor = null;
         private @Range(ValueRange.ALPHA) float colorBlend = 0;
-        private ColorMode colorMode = ColorMode.SOLID;
+        private ColorMode colorMode = ColorMode.GRADIENT;
         private ColorDistribution colorDistribution = ColorDistribution.UNIFORM;
         private ColorSet colorSet = ColorSet.RAINBOW;
         private GradientDirection gradientDirection = GradientDirection.Y_AXIS;
