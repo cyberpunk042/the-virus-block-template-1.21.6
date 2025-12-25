@@ -52,8 +52,8 @@ public final class FieldRenderLayers extends RenderPhase {
     // via GL state before the buffer is flushed - see LayerRenderer
     private static final RenderLayer SOLID_TRANSLUCENT_NO_DEPTH = SOLID_TRANSLUCENT_NO_CULL;
     
+    // Standard lines layer
     private static final RenderLayer LINES_LAYER = RenderLayer.getLines();
-    
     
     /**
      * Translucent solid layer for field geometry with backface culling.
@@ -104,20 +104,28 @@ public final class FieldRenderLayers extends RenderPhase {
     /**
      * Lines layer for wireframe rendering with custom width.
      * 
-     * <p>Uses two rendering modes:
-     * - width >= 1.0: LINES_LAYER (THICK lines)
-     * - width < 1.0: getDebugLineStrip (THIN lines)</p>
+     * <p>Provides two discrete widths:</p>
+     * <ul>
+     *   <li>THIN (width < 1.0): Uses standard getLines() - 1px lines</li>
+     *   <li>THICK (width >= 1.0): Uses getDebugLineStrip(3.0) - thicker lines</li>
+     * </ul>
      * 
-     * @param width Line width slider value (0.1 = thin, 1.0+ = thick)
+     * <p><b>Note:</b> OpenGL line width is GPU-dependent. We use LINE_STRIP for 
+     * thick mode because getLines() doesn't support width parameter. The LINE_STRIP
+     * draw mode connects vertices differently but works for our discrete line pairs.</p>
+     * 
+     * @param width Line width - values < 1.0 use thin, >= 1.0 use thick
      * @return RenderLayer configured for line rendering
      */
     public static RenderLayer lines(float width) {
-        if (width >= 1.0f) {
-            // Higher values = THICK lines (using LINES_LAYER)
+        if (width < 1.0f) {
+            // Thin lines - standard 1px
             return LINES_LAYER;
+        } else {
+            // Thick lines - use debug line strip with width
+            // Note: Width of 3.0 provides visible distinction from thin lines
+            return RenderLayer.getDebugLineStrip(3.0);
         }
-        // Lower values = THIN lines (using getDebugLineStrip)
-        return RenderLayer.getDebugLineStrip(width);
     }
     
     // Legacy aliases

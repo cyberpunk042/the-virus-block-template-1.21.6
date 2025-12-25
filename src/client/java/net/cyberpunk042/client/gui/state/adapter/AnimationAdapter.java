@@ -23,6 +23,8 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
     @StateField private WaveConfig wave = WaveConfig.NONE;
     @StateField private ColorCycleConfig colorCycle = ColorCycleConfig.NONE;
     @StateField private PrecessionConfig precession = null;
+    @StateField private RayFlowConfig rayFlow = null;
+    @StateField private RayMotionConfig rayMotion = null;
     
     @Override
     public String category() { return "animation"; }
@@ -38,6 +40,8 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             this.wave = orDefault(anim.wave(), WaveConfig.NONE);
             this.colorCycle = orDefault(anim.colorCycle(), ColorCycleConfig.NONE);
             this.precession = anim.precession();
+            this.rayFlow = anim.rayFlow();
+            this.rayMotion = anim.rayMotion();
         } else {
             reset();
         }
@@ -54,6 +58,8 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             .wave(wave)
             .colorCycle(colorCycle)
             .precession(precession)
+            .rayFlow(rayFlow)
+            .rayMotion(rayMotion)
             .build());
     }
     
@@ -79,6 +85,12 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
     public PrecessionConfig precession() { return precession; }
     public void setPrecession(PrecessionConfig precession) { this.precession = precession; }
     
+    public RayFlowConfig rayFlow() { return rayFlow; }
+    public void setRayFlow(RayFlowConfig rayFlow) { this.rayFlow = rayFlow; }
+    
+    public RayMotionConfig rayMotion() { return rayMotion; }
+    public void setRayMotion(RayMotionConfig rayMotion) { this.rayMotion = rayMotion; }
+    
     /**
      * Override get to handle paths like "spin.speed", "pulse.scale", etc.
      */
@@ -96,6 +108,8 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             case "wave" -> prop != null ? getWaveProperty(prop) : wave;
             case "colorCycle" -> prop != null ? getColorCycleProperty(prop) : colorCycle;
             case "precession" -> prop != null ? getPrecessionProperty(prop) : precession;
+            case "rayFlow" -> prop != null ? getRayFlowProperty(prop) : rayFlow;
+            case "rayMotion" -> prop != null ? getRayMotionProperty(prop) : rayMotion;
             default -> super.get(path);
         };
     }
@@ -203,6 +217,8 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             case "wave" -> setWaveProperty(prop, value);
             case "colorCycle" -> setColorCycleProperty(prop, value);
             case "precession" -> setPrecessionProperty(prop, value);
+            case "rayFlow" -> setRayFlowProperty(prop, value);
+            case "rayMotion" -> setRayMotionProperty(prop, value);
             default -> super.set(path, value);
         }
     }
@@ -316,5 +332,92 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
         this.wave = WaveConfig.NONE;
         this.colorCycle = ColorCycleConfig.NONE;
         this.precession = null;
+        this.rayFlow = null;
+        this.rayMotion = null;
     }
+    
+    // =========================================================================
+    // Ray Flow Property Accessors
+    // =========================================================================
+    
+    private Object getRayFlowProperty(String prop) {
+        if (rayFlow == null) return null;
+        return switch (prop) {
+            case "length" -> rayFlow.length();
+            case "lengthSpeed" -> rayFlow.lengthSpeed();
+            case "travel" -> rayFlow.travel();
+            case "travelSpeed" -> rayFlow.travelSpeed();
+            case "chaseCount" -> rayFlow.chaseCount();
+            case "chaseWidth" -> rayFlow.chaseWidth();
+            case "flicker" -> rayFlow.flicker();
+            case "flickerIntensity" -> rayFlow.flickerIntensity();
+            case "flickerFrequency" -> rayFlow.flickerFrequency();
+            default -> null;
+        };
+    }
+    
+    private void setRayFlowProperty(String prop, Object value) {
+        RayFlowConfig.Builder b = rayFlow != null ? rayFlow.toBuilder() : RayFlowConfig.builder();
+        switch (prop) {
+            case "length" -> b.length(value instanceof LengthMode lm ? lm : LengthMode.fromString(value.toString()));
+            case "lengthSpeed" -> b.lengthSpeed(toFloat(value));
+            case "travel" -> b.travel(value instanceof TravelMode tm ? tm : TravelMode.fromString(value.toString()));
+            case "travelSpeed" -> b.travelSpeed(toFloat(value));
+            case "chaseCount" -> b.chaseCount(toInt(value));
+            case "chaseWidth" -> b.chaseWidth(toFloat(value));
+            case "flicker" -> b.flicker(value instanceof FlickerMode fm ? fm : FlickerMode.fromString(value.toString()));
+            case "flickerIntensity" -> b.flickerIntensity(toFloat(value));
+            case "flickerFrequency" -> b.flickerFrequency(toFloat(value));
+        }
+        this.rayFlow = b.build();
+    }
+    
+    // =========================================================================
+    // Ray Motion Property Accessors
+    // =========================================================================
+    
+    private Object getRayMotionProperty(String prop) {
+        if (rayMotion == null) return null;
+        return switch (prop) {
+            case "mode" -> rayMotion.mode();
+            case "speed" -> rayMotion.speed();
+            case "directionX" -> rayMotion.directionX();
+            case "directionY" -> rayMotion.directionY();
+            case "directionZ" -> rayMotion.directionZ();
+            case "amplitude" -> rayMotion.amplitude();
+            case "frequency" -> rayMotion.frequency();
+            default -> null;
+        };
+    }
+    
+    private void setRayMotionProperty(String prop, Object value) {
+        RayMotionConfig.Builder b = rayMotion != null ? rayMotion.toBuilder() : RayMotionConfig.builder();
+        switch (prop) {
+            case "mode" -> b.mode(value instanceof MotionMode mm ? mm : MotionMode.fromString(value.toString()));
+            case "speed" -> b.speed(toFloat(value));
+            case "directionX" -> {
+                float x = toFloat(value);
+                float y = rayMotion != null ? rayMotion.directionY() : 1f;
+                float z = rayMotion != null ? rayMotion.directionZ() : 0f;
+                b.direction(x, y, z);
+            }
+            case "directionY" -> {
+                float x = rayMotion != null ? rayMotion.directionX() : 0f;
+                float y = toFloat(value);
+                float z = rayMotion != null ? rayMotion.directionZ() : 0f;
+                b.direction(x, y, z);
+            }
+            case "directionZ" -> {
+                float x = rayMotion != null ? rayMotion.directionX() : 0f;
+                float y = rayMotion != null ? rayMotion.directionY() : 1f;
+                float z = toFloat(value);
+                b.direction(x, y, z);
+            }
+            case "amplitude" -> b.amplitude(toFloat(value));
+            case "frequency" -> b.frequency(toFloat(value));
+        }
+        this.rayMotion = b.build();
+    }
+    
+    private int toInt(Object v) { return v instanceof Number n ? n.intValue() : 0; }
 }

@@ -84,11 +84,7 @@ public record RaysShape(
     
     // === Segmentation (for dashed/dotted effects) ===
     @Range(ValueRange.STEPS) @JsonField(skipIfDefault = true, defaultValue = "1") int segments,
-    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true) float segmentGap,
-    
-    // === Flow Animation ===
-    @JsonField(skipIfDefault = true) float flowSpeed,      // Speed of flow (0 = no flow, positive = outward, negative = inward)
-    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "0.3") float flowWidth // Width of visible window (0.1 = narrow beam, 1.0 = full ray)
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true) float segmentGap
 ) implements Shape {
     
     // =========================================================================
@@ -111,35 +107,33 @@ public record RaysShape(
         1.0f,           // fadeStart
         1.0f,           // fadeEnd
         1,              // segments
-        0.0f,           // segmentGap
-        0.0f,           // flowSpeed (0 = no flow)
-        0.3f            // flowWidth
+        0.0f            // segmentGap
     );
     
-    /** Spherical absorption rays (converging to center) with inward flow. */
+    /** Spherical absorption rays (converging to center). */
     public static final RaysShape ABSORPTION = new RaysShape(
         2.0f, 1.0f, 48, RayArrangement.CONVERGING, RayDistribution.RANDOM, 0.5f, 3.5f,
-        8, 0.3f, 0.1f, 0.1f, 1.0f, 0.2f, 1, 0.0f, -1.0f, 0.3f); // Negative flow = inward
+        8, 0.3f, 0.1f, 0.1f, 1.0f, 0.2f, 1, 0.0f);
     
-    /** Spherical emission rays (diverging from center) with outward flow. */
+    /** Spherical emission rays (diverging from center). */
     public static final RaysShape EMISSION = new RaysShape(
         2.0f, 1.0f, 48, RayArrangement.DIVERGING, RayDistribution.RANDOM, 0.5f, 3.5f,
-        8, 0.3f, 0.1f, 0.1f, 0.2f, 1.0f, 1, 0.0f, 1.0f, 0.3f); // Positive flow = outward
+        8, 0.3f, 0.1f, 0.1f, 0.2f, 1.0f, 1, 0.0f);
     
     /** Parallel laser grid. */
     public static final RaysShape LASER_GRID = new RaysShape(
         5.0f, 1.5f, 16, RayArrangement.PARALLEL, RayDistribution.UNIFORM, 0.0f, 2.0f,
-        4, 0.3f, 0.0f, 0.0f, 1.0f, 1.0f, 1, 0.0f, 0.0f, 0.3f);
+        4, 0.3f, 0.0f, 0.0f, 1.0f, 1.0f, 1, 0.0f);
     
     /** Dashed pulse rays. */
     public static final RaysShape PULSE = new RaysShape(
         3.0f, 1.0f, 8, RayArrangement.RADIAL, RayDistribution.UNIFORM, 0.3f, 2.5f,
-        1, 0.5f, 0.0f, 0.0f, 1.0f, 0.5f, 4, 0.2f, 0.5f, 0.2f); // Slow flow
+        1, 0.5f, 0.0f, 0.0f, 1.0f, 0.5f, 4, 0.2f);
     
     /** Sparse random stars. */
     public static final RaysShape STARS = new RaysShape(
         1.5f, 0.5f, 24, RayArrangement.SPHERICAL, RayDistribution.STOCHASTIC, 0.8f, 2.0f,
-        1, 0.5f, 0.3f, 0.3f, 0.8f, 0.3f, 1, 0.0f, 0.0f, 0.3f);
+        1, 0.5f, 0.3f, 0.3f, 0.8f, 0.3f, 1, 0.0f);
     
     public static RaysShape defaults() { return DEFAULT; }
     
@@ -221,11 +215,6 @@ public record RaysShape(
         return segments > 1 && segmentGap > 0;
     }
     
-    /** Whether flow animation is enabled. */
-    public boolean hasFlow() {
-        return flowSpeed != 0f;
-    }
-    
     /** Ray length accounting for inner/outer radius. */
     public float effectiveRayLength() {
         if (arrangement == RayArrangement.CONVERGING || arrangement == RayArrangement.DIVERGING) {
@@ -261,9 +250,7 @@ public record RaysShape(
             .fadeStart(fadeStart)
             .fadeEnd(fadeEnd)
             .segments(segments)
-            .segmentGap(segmentGap)
-            .flowSpeed(flowSpeed)
-            .flowWidth(flowWidth);
+            .segmentGap(segmentGap);
     }
     
     public static class Builder {
@@ -282,8 +269,6 @@ public record RaysShape(
         private float fadeEnd = 1.0f;
         private int segments = 1;
         private float segmentGap = 0.0f;
-        private float flowSpeed = 0.0f;
-        private float flowWidth = 0.3f;
         
         public Builder rayLength(float v) { this.rayLength = v; return this; }
         public Builder rayWidth(float v) { this.rayWidth = v; return this; }
@@ -300,15 +285,12 @@ public record RaysShape(
         public Builder fadeEnd(float v) { this.fadeEnd = v; return this; }
         public Builder segments(int v) { this.segments = v; return this; }
         public Builder segmentGap(float v) { this.segmentGap = v; return this; }
-        public Builder flowSpeed(float v) { this.flowSpeed = v; return this; }
-        public Builder flowWidth(float v) { this.flowWidth = v; return this; }
         
         public RaysShape build() {
             return new RaysShape(
                 rayLength, rayWidth, count, arrangement, distribution, innerRadius, outerRadius,
                 layers, layerSpacing, randomness, lengthVariation,
-                fadeStart, fadeEnd, segments, segmentGap,
-                flowSpeed, flowWidth
+                fadeStart, fadeEnd, segments, segmentGap
             );
         }
     }

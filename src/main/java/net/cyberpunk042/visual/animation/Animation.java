@@ -33,6 +33,8 @@ import net.cyberpunk042.util.json.JsonSerializer;
  * @see ColorCycleConfig
  * @see WobbleConfig
  * @see WaveConfig
+ * @see RayFlowConfig
+ * @see RayMotionConfig
  */
 public record Animation(
     @JsonField(skipUnless = "isActive") SpinConfig spin,
@@ -42,26 +44,28 @@ public record Animation(
     @Nullable @JsonField(skipUnless = "isActive") ColorCycleConfig colorCycle,
     @Nullable @JsonField(skipUnless = "isActive") WobbleConfig wobble,
     @Nullable @JsonField(skipUnless = "isActive") WaveConfig wave,
-    @Nullable @JsonField(skipUnless = "isActive") PrecessionConfig precession
+    @Nullable @JsonField(skipUnless = "isActive") PrecessionConfig precession,
+    @Nullable @JsonField(skipUnless = "isActive") RayFlowConfig rayFlow,
+    @Nullable @JsonField(skipUnless = "isActive") RayMotionConfig rayMotion
 ){
     /** No animation (static). */
     public static Animation none() { return NONE; }
     
     public static final Animation NONE = new Animation(
-        SpinConfig.NONE, PulseConfig.NONE, 0, AlphaPulseConfig.NONE, null, null, null, null);
+        SpinConfig.NONE, PulseConfig.NONE, 0, AlphaPulseConfig.NONE, null, null, null, null, null, null);
     
     /** Default animation (slow spin). */
     public static final Animation DEFAULT = new Animation(
-        SpinConfig.DEFAULT, PulseConfig.NONE, 0, AlphaPulseConfig.NONE, null, null, null, null);
+        SpinConfig.DEFAULT, PulseConfig.NONE, 0, AlphaPulseConfig.NONE, null, null, null, null, null, null);
 
     
     /** Spinning animation. */
     public static final Animation SPINNING = new Animation(
-        SpinConfig.DEFAULT, PulseConfig.NONE, 0, AlphaPulseConfig.NONE, null, null, null, null);
+        SpinConfig.DEFAULT, PulseConfig.NONE, 0, AlphaPulseConfig.NONE, null, null, null, null, null, null);
     
     /** Pulsing animation. */
     public static final Animation PULSING = new Animation(
-        SpinConfig.NONE, PulseConfig.DEFAULT, 0, AlphaPulseConfig.NONE, null, null, null, null);
+        SpinConfig.NONE, PulseConfig.DEFAULT, 0, AlphaPulseConfig.NONE, null, null, null, null, null, null);
     
     /**
      * Creates spin animation.
@@ -70,7 +74,7 @@ public record Animation(
     public static Animation spin(float speed) {
         return new Animation(
             SpinConfig.aroundY(speed), PulseConfig.NONE, 0, 
-            AlphaPulseConfig.NONE, null, null, null, null);
+            AlphaPulseConfig.NONE, null, null, null, null, null, null);
     }
     
     /**
@@ -81,7 +85,7 @@ public record Animation(
     public static Animation pulse(float amplitude, float speed) {
         return new Animation(
             SpinConfig.NONE, PulseConfig.sine(amplitude, speed), 0,
-            AlphaPulseConfig.NONE, null, null, null, null);
+            AlphaPulseConfig.NONE, null, null, null, null, null, null);
     }
     
     /**
@@ -93,7 +97,7 @@ public record Animation(
         return new Animation(
             SpinConfig.aroundY(spinSpeed),
             PulseConfig.sine(pulseAmplitude, 1.0f),
-            0, AlphaPulseConfig.NONE, null, null, null, null);
+            0, AlphaPulseConfig.NONE, null, null, null, null, null, null);
     }
     
     /** Whether any animation is active. */
@@ -104,7 +108,9 @@ public record Animation(
                (colorCycle != null && colorCycle.isActive()) ||
                (wobble != null && wobble.isActive()) ||
                (wave != null && wave.isActive()) ||
-               (precession != null && precession.isActive());
+               (precession != null && precession.isActive()) ||
+               (rayFlow != null && rayFlow.isActive()) ||
+               (rayMotion != null && rayMotion.isActive());
     }
     
     /** Whether spin is active. */
@@ -127,6 +133,12 @@ public record Animation(
     
     /** Whether precession is active. */
     public boolean hasPrecession() { return precession != null && precession.isActive(); }
+    
+    /** Whether ray flow animation is active. */
+    public boolean hasRayFlow() { return rayFlow != null && rayFlow.isActive(); }
+    
+    /** Whether ray motion animation is active. */
+    public boolean hasRayMotion() { return rayMotion != null && rayMotion.isActive(); }
     
 
     // =========================================================================
@@ -180,7 +192,17 @@ public record Animation(
             precession = PrecessionConfig.fromJson(json.getAsJsonObject("precession"));
         }
         
-        Animation result = new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession);
+        RayFlowConfig rayFlow = null;
+        if (json.has("rayFlow")) {
+            rayFlow = RayFlowConfig.fromJson(json.getAsJsonObject("rayFlow"));
+        }
+        
+        RayMotionConfig rayMotion = null;
+        if (json.has("rayMotion")) {
+            rayMotion = RayMotionConfig.fromJson(json.getAsJsonObject("rayMotion"));
+        }
+        
+        Animation result = new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession, rayFlow, rayMotion);
         Logging.FIELD.topic("parse").trace("Parsed Animation: hasSpin={}, hasPulse={}, phase={}", 
             result.hasSpin(), result.hasPulse(), phase);
         return result;
@@ -201,7 +223,9 @@ public record Animation(
             .colorCycle(colorCycle)
             .wobble(wobble)
             .wave(wave)
-            .precession(precession);
+            .precession(precession)
+            .rayFlow(rayFlow)
+            .rayMotion(rayMotion);
     }
     
     public static class Builder {
@@ -213,6 +237,8 @@ public record Animation(
         private WobbleConfig wobble = null;
         private WaveConfig wave = null;
         private PrecessionConfig precession = null;
+        private RayFlowConfig rayFlow = null;
+        private RayMotionConfig rayMotion = null;
         
         public Builder spin(SpinConfig s) { this.spin = s; return this; }
         public Builder spin(float speed) { this.spin = SpinConfig.aroundY(speed); return this; }
@@ -223,9 +249,11 @@ public record Animation(
         public Builder wobble(WobbleConfig w) { this.wobble = w; return this; }
         public Builder wave(WaveConfig w) { this.wave = w; return this; }
         public Builder precession(PrecessionConfig p) { this.precession = p; return this; }
+        public Builder rayFlow(RayFlowConfig r) { this.rayFlow = r; return this; }
+        public Builder rayMotion(RayMotionConfig r) { this.rayMotion = r; return this; }
         
         public Animation build() {
-            return new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession);
+            return new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession, rayFlow, rayMotion);
         }
     }
 
@@ -237,28 +265,42 @@ public record Animation(
      * Returns a copy with the specified spin config.
      */
     public Animation withSpin(SpinConfig newSpin) {
-        return new Animation(newSpin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession);
+        return new Animation(newSpin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession, rayFlow, rayMotion);
     }
     
     /**
      * Returns a copy with the specified pulse config.
      */
     public Animation withPulse(PulseConfig newPulse) {
-        return new Animation(spin, newPulse, phase, alphaPulse, colorCycle, wobble, wave, precession);
+        return new Animation(spin, newPulse, phase, alphaPulse, colorCycle, wobble, wave, precession, rayFlow, rayMotion);
     }
     
     /**
      * Returns a copy with the specified phase.
      */
     public Animation withPhase(float newPhase) {
-        return new Animation(spin, pulse, newPhase, alphaPulse, colorCycle, wobble, wave, precession);
+        return new Animation(spin, pulse, newPhase, alphaPulse, colorCycle, wobble, wave, precession, rayFlow, rayMotion);
     }
     
     /**
      * Returns a copy with the specified precession config.
      */
     public Animation withPrecession(PrecessionConfig newPrecession) {
-        return new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, newPrecession);
+        return new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, newPrecession, rayFlow, rayMotion);
+    }
+    
+    /**
+     * Returns a copy with the specified ray flow config.
+     */
+    public Animation withRayFlow(RayFlowConfig newRayFlow) {
+        return new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession, newRayFlow, rayMotion);
+    }
+    
+    /**
+     * Returns a copy with the specified ray motion config.
+     */
+    public Animation withRayMotion(RayMotionConfig newRayMotion) {
+        return new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession, rayFlow, newRayMotion);
     }
     
     /**

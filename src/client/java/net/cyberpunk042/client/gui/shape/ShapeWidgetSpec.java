@@ -366,9 +366,9 @@ public final class ShapeWidgetSpec {
         // === GEOMETRY ===
         new SectionHeader("Ray Geometry"),
         
-        // Row 1: Ray Length + Ray Width (< 1.0 = thin lines, >= 1.0 = thick lines)
+        // Row 1: Ray Length + Ray Width (thickness control: < 1.0 = thin, >= 1.0 = thick)
         SliderSpec.half("Ray Len", "rays.rayLength", 0.1f, 10f, "%.2f"),
-        SliderSpec.half("Thick", "rays.rayWidth", 0.1f, 2f, "%.1f"),
+        SliderSpec.half("Ray Width", "rays.rayWidth", 0.1f, 5f, "%.1f"),
         
         // === DISTRIBUTION ===
         new SectionHeader("Distribution"),

@@ -640,6 +640,8 @@ public final class DefinitionBuilder {
             .wave(state.wave())
             .colorCycle(state.colorCycle())
             .precession(state.precession())
+            .rayFlow(state.rayFlow())
+            .rayMotion(state.rayMotion())
             .build();
     }
     
