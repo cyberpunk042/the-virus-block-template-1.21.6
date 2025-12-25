@@ -42,7 +42,9 @@ public record Appearance(
     @Range(ValueRange.ALPHA) float brightness,
     @Range(ValueRange.DEGREES) float hueShift,
     @Nullable @JsonField(skipIfNull = true) String secondaryColor,
-    @Range(ValueRange.ALPHA) float colorBlend
+    @Range(ValueRange.ALPHA) float colorBlend,
+    @JsonField(skipIfDefault = true) ColorMode colorMode,
+    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true) float rainbowSpeed
 ){
     /** Default appearance. */
     public static Appearance defaults() { return DEFAULT; }
@@ -56,22 +58,22 @@ public record Appearance(
     }
     
     public static final Appearance DEFAULT = new Appearance(
-        "@primary", AlphaRange.DEFAULT, 0, 0, 1, 1, 0, null, 0);
+        "@primary", AlphaRange.DEFAULT, 0, 0, 1, 1, 0, null, 0, ColorMode.SOLID, 1.0f);
     
     /** Glowing appearance. */
     public static final Appearance GLOWING = new Appearance(
-        "@primary", AlphaRange.DEFAULT, 0.8f, 0.5f, 1, 1, 0, null, 0);
+        "@primary", AlphaRange.DEFAULT, 0.8f, 0.5f, 1, 1, 0, null, 0, ColorMode.SOLID, 1.0f);
     
     /** Translucent appearance. */
     public static final Appearance TRANSLUCENT = new Appearance(
-        "@primary", AlphaRange.of(0.3f), 0, 0, 1, 1, 0, null, 0);
+        "@primary", AlphaRange.of(0.3f), 0, 0, 1, 1, 0, null, 0, ColorMode.SOLID, 1.0f);
     
     /**
      * Creates a simple solid-color appearance.
      * @param color Color reference (e.g., "@primary", "#FF0000")
      */
     public static Appearance color(String color) {
-        return new Appearance(color, AlphaRange.OPAQUE, 0, 0, 1, 1, 0, null, 0);
+        return new Appearance(color, AlphaRange.OPAQUE, 0, 0, 1, 1, 0, null, 0, ColorMode.SOLID, 1.0f);
     }
     
     /**
@@ -80,7 +82,7 @@ public record Appearance(
      * @param glow Glow intensity (0-1)
      */
     public static Appearance glowing(String color, @Range(ValueRange.ALPHA) float glow) {
-        return new Appearance(color, AlphaRange.DEFAULT, glow, glow * 0.5f, 1, 1, 0, null, 0);
+        return new Appearance(color, AlphaRange.DEFAULT, glow, glow * 0.5f, 1, 1, 0, null, 0, ColorMode.SOLID, 1.0f);
     }
     
     /** Whether glow is active. */
@@ -123,7 +125,12 @@ public record Appearance(
         if (json.has("glow")) builder.glow(json.get("glow").getAsFloat());
         if (json.has("emissive")) builder.emissive(json.get("emissive").getAsFloat());
         if (json.has("saturation")) builder.saturation(json.get("saturation").getAsFloat());
-        // Note: PatternConfig is handled separately via ArrangementConfig
+        if (json.has("brightness")) builder.brightness(json.get("brightness").getAsFloat());
+        if (json.has("hueShift")) builder.hueShift(json.get("hueShift").getAsFloat());
+        if (json.has("secondaryColor")) builder.secondaryColor(json.get("secondaryColor").getAsString());
+        if (json.has("colorBlend")) builder.colorBlend(json.get("colorBlend").getAsFloat());
+        if (json.has("colorMode")) builder.colorMode(ColorMode.fromString(json.get("colorMode").getAsString()));
+        if (json.has("rainbowSpeed")) builder.rainbowSpeed(json.get("rainbowSpeed").getAsFloat());
         
         return builder.build();
     }
@@ -134,14 +141,15 @@ public record Appearance(
         return new Builder()
             .color(color)
             .alpha(alpha)
-            .alpha(alpha)
             .glow(glow)
             .emissive(emissive)
             .saturation(saturation)
             .brightness(brightness)
             .hueShift(hueShift)
             .secondaryColor(secondaryColor)
-            .colorBlend(colorBlend);
+            .colorBlend(colorBlend)
+            .colorMode(colorMode)
+            .rainbowSpeed(rainbowSpeed);
     }
     /**
      * Serializes this appearance to JSON.
@@ -162,6 +170,8 @@ public record Appearance(
         private @Range(ValueRange.DEGREES) float hueShift = 0;
         private String secondaryColor = null;
         private @Range(ValueRange.ALPHA) float colorBlend = 0;
+        private ColorMode colorMode = ColorMode.SOLID;
+        private float rainbowSpeed = 1.0f;
         
         public Builder color(String c) { this.color = c; return this; }
         public Builder alpha(AlphaRange a) { this.alpha = a; return this; }
@@ -173,10 +183,12 @@ public record Appearance(
         public Builder hueShift(float h) { this.hueShift = h; return this; }
         public Builder secondaryColor(String c) { this.secondaryColor = c; return this; }
         public Builder colorBlend(float b) { this.colorBlend = b; return this; }
+        public Builder colorMode(ColorMode m) { this.colorMode = m; return this; }
+        public Builder rainbowSpeed(float s) { this.rainbowSpeed = s; return this; }
         
         public Appearance build() {
             return new Appearance(color, alpha, glow, emissive, saturation, brightness, 
-                hueShift, secondaryColor, colorBlend);
+                hueShift, secondaryColor, colorBlend, colorMode, rainbowSpeed);
         }
     }
 

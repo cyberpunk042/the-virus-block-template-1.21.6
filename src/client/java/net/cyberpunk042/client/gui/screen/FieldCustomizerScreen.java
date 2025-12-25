@@ -469,14 +469,23 @@ public class FieldCustomizerScreen extends Screen {
         // MODAL HANDLING - MUST be first to block ALL background interaction
         // ═══════════════════════════════════════════════════════════════════
         if (activeModal != null && activeModal.isVisible()) {
-            // ONLY process modal widgets, NOT super.mouseClicked which would hit background
+            // First, check if the modal's custom click handler wants to process this
+            // (e.g., color palette grid clicks)
+            if (activeModal.handleCustomClick(mouseX, mouseY)) {
+                return true;  // Custom handler consumed the click
+            }
+            
+            // Process modal widgets (buttons, text fields, etc.)
             for (ClickableWidget w : activeModal.getWidgets()) {
                 if (w.isMouseOver(mouseX, mouseY)) {
+                    // Set focus for the widget (important for text fields)
+                    setFocused(w);
+                    w.setFocused(true);
                     w.mouseClicked(mouseX, mouseY, button);
                     return true;
                 }
             }
-            // Click was outside modal widgets but modal is visible - block it
+            // Click was inside modal but not on any widget - block it
             return true;
         }
         

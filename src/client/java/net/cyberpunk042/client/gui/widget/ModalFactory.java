@@ -108,6 +108,8 @@ public final class ModalFactory {
     /**
      * Creates a modal for entering a color value as a string.
      * Supports theme references like @primary, @beam, or hex codes like #FF00FF.
+     * 
+     * <p>Includes a color palette grid for quick visual selection.</p>
      */
     public static ModalDialog createColorInputModal(
             String currentColorString,
@@ -117,17 +119,35 @@ public final class ModalFactory {
             Runnable onClose) {
         
         final TextFieldWidget[] fieldHolder = new TextFieldWidget[1];
+        final ColorPaletteGrid[] paletteHolder = new ColorPaletteGrid[1];
         
-        ModalDialog modal = new ModalDialog("Enter Color", textRenderer, screenWidth, screenHeight)
-            .size(300, 150)
+        ModalDialog modal = new ModalDialog("Select Color", textRenderer, screenWidth, screenHeight)
+            .size(320, 250)  // Taller to accommodate palette
             .content((bounds, tr) -> {
                 List<ClickableWidget> widgets = new java.util.ArrayList<>();
                 
-                // Help text label (draw as part of content, positioned above field)
-                // The modal renders this, so we just need the field
+                // Color palette grid (top portion)
+                paletteHolder[0] = new ColorPaletteGrid(
+                    bounds.x(), bounds.y() + 5, bounds.width(),
+                    // On color selected (hex)
+                    color -> {
+                        String hex = String.format("#%06X", color & 0xFFFFFF);
+                        if (fieldHolder[0] != null) {
+                            fieldHolder[0].setText(hex);
+                        }
+                    },
+                    // On theme selected (@name)
+                    themeName -> {
+                        if (fieldHolder[0] != null) {
+                            fieldHolder[0].setText(themeName);
+                        }
+                    }
+                );
                 
+                // Text input field (below palette)
+                int fieldY = bounds.y() + paletteHolder[0].getHeight() + 15;
                 TextFieldWidget field = new TextFieldWidget(tr, 
-                    bounds.x(), bounds.y() + 25, bounds.width(), 20, net.minecraft.text.Text.literal(""));
+                    bounds.x(), fieldY, bounds.width(), 20, net.minecraft.text.Text.literal(""));
                 field.setText(currentColorString);
                 field.setMaxLength(64);
                 field.visible = true;
@@ -145,6 +165,21 @@ public final class ModalFactory {
                     onSubmit.accept(fieldHolder[0].getText());
                 }
             }, true);
+        
+        // Set custom click handler to handle palette clicks
+        modal.setClickHandler((mouseX, mouseY) -> {
+            if (paletteHolder[0] != null && paletteHolder[0].handleClick(mouseX, mouseY)) {
+                return true;
+            }
+            return false;
+        });
+        
+        // Set custom render handler to draw the palette
+        modal.setExtraRenderer((context, mouseX, mouseY, delta) -> {
+            if (paletteHolder[0] != null) {
+                paletteHolder[0].render(context, mouseX, mouseY, delta);
+            }
+        });
         
         modal.onClose(onClose);
         

@@ -42,7 +42,9 @@ public class AppearanceAdapter extends AbstractAdapter implements PrimitiveAdapt
                 app.hueShift(),     // hueShift
                 colorInt,           // primaryColor
                 secondaryInt,       // secondaryColor
-                app.colorBlend()    // colorBlend
+                app.colorBlend(),   // colorBlend
+                app.colorMode() != null ? app.colorMode() : net.cyberpunk042.visual.appearance.ColorMode.SOLID,
+                app.rainbowSpeed()  // rainbowSpeed
             );
         } else {
             this.appearance = AppearanceState.DEFAULT;
@@ -67,6 +69,8 @@ public class AppearanceAdapter extends AbstractAdapter implements PrimitiveAdapt
             .hueShift(appearance.hueShift())
             .secondaryColor(secondaryHex)
             .colorBlend(appearance.colorBlend())
+            .colorMode(appearance.colorMode())
+            .rainbowSpeed(appearance.rainbowSpeed())
             .build());
     }
     

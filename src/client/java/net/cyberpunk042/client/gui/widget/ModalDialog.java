@@ -53,6 +53,10 @@ public class ModalDialog {
     private ContentBuilder contentBuilder;
     private Runnable onClose;
     
+    // Custom handlers for extended content
+    private java.util.function.BiPredicate<Double, Double> clickHandler;
+    private ExtraRenderer extraRenderer;
+    
     public ModalDialog(String title, TextRenderer textRenderer, int screenWidth, int screenHeight) {
         this.title = title;
         this.textRenderer = textRenderer;
@@ -88,6 +92,28 @@ public class ModalDialog {
     public ModalDialog onClose(Runnable callback) {
         this.onClose = callback;
         return this;
+    }
+    
+    /**
+     * Sets a custom click handler for extended content (e.g., color palette).
+     * Returns true if the click was handled.
+     */
+    public ModalDialog setClickHandler(java.util.function.BiPredicate<Double, Double> handler) {
+        this.clickHandler = handler;
+        return this;
+    }
+    
+    /**
+     * Sets an extra renderer for custom content that isn't a standard widget.
+     */
+    public ModalDialog setExtraRenderer(ExtraRenderer renderer) {
+        this.extraRenderer = renderer;
+        return this;
+    }
+    
+    @FunctionalInterface
+    public interface ExtraRenderer {
+        void render(DrawContext context, int mouseX, int mouseY, float delta);
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -222,15 +248,33 @@ public class ModalDialog {
         int buttonAreaY = dialogBounds.bottom() - BUTTON_HEIGHT - PADDING - 4;
         context.fill(dialogBounds.x() + PADDING, buttonAreaY,
                      dialogBounds.right() - PADDING, buttonAreaY + 1, 0xFF333333);
+        
+        // Render extra custom content (e.g., color palette grid)
+        if (extraRenderer != null) {
+            extraRenderer.render(context, mouseX, mouseY, delta);
+        }
     }
     
     /**
-     * Checks if a click is within the dialog.
+     * Checks if a click is within the dialog bounds.
      * Used to prevent clicks from passing through to the screen behind.
      */
     public boolean containsClick(double mouseX, double mouseY) {
         if (!visible) return false;
         return dialogBounds.contains(mouseX, mouseY);
+    }
+    
+    /**
+     * Handle custom click events (e.g., color palette grid).
+     * Call this before processing standard widgets.
+     * @return true if the click was handled
+     */
+    public boolean handleCustomClick(double mouseX, double mouseY) {
+        if (!visible) return false;
+        if (clickHandler != null && clickHandler.test(mouseX, mouseY)) {
+            return true;
+        }
+        return false;
     }
     
     /**

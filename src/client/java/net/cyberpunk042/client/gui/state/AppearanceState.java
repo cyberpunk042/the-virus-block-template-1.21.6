@@ -1,5 +1,7 @@
 package net.cyberpunk042.client.gui.state;
 
+import net.cyberpunk042.visual.appearance.ColorMode;
+
 /**
  * GUI editing state for appearance properties.
  * 
@@ -17,7 +19,9 @@ public record AppearanceState(
     float hueShift,
     int primaryColor,
     int secondaryColor,
-    float colorBlend
+    float colorBlend,
+    ColorMode colorMode,
+    float rainbowSpeed
 ) {
     public static final AppearanceState DEFAULT = new AppearanceState(
         0xFF00FFFF,  // color (cyan)
@@ -30,7 +34,9 @@ public record AppearanceState(
         0f,          // hueShift (0 = no shift)
         0xFF00FFFF,  // primaryColor
         0xFFFF00FF,  // secondaryColor (magenta)
-        0f           // colorBlend (0 = only primary, 1 = only secondary)
+        0f,          // colorBlend (0 = only primary, 1 = only secondary)
+        ColorMode.SOLID,  // colorMode
+        1.0f         // rainbowSpeed
     );
 
     // Legacy compatibility: single alpha accessor
@@ -50,7 +56,9 @@ public record AppearanceState(
             .hueShift(hueShift)
             .primaryColor(primaryColor)
             .secondaryColor(secondaryColor)
-            .colorBlend(colorBlend);
+            .colorBlend(colorBlend)
+            .colorMode(colorMode)
+            .rainbowSpeed(rainbowSpeed);
     }
 
     public static class Builder {
@@ -65,6 +73,8 @@ public record AppearanceState(
         private int primaryColor = 0xFF00FFFF;
         private int secondaryColor = 0xFFFF00FF;
         private float colorBlend = 0f;
+        private ColorMode colorMode = ColorMode.SOLID;
+        private float rainbowSpeed = 1.0f;
 
         public Builder color(int c) { this.color = c; return this; }
         public Builder alphaMin(float a) { this.alphaMin = a; return this; }
@@ -78,10 +88,13 @@ public record AppearanceState(
         public Builder primaryColor(int c) { this.primaryColor = c; return this; }
         public Builder secondaryColor(int c) { this.secondaryColor = c; return this; }
         public Builder colorBlend(float b) { this.colorBlend = b; return this; }
+        public Builder colorMode(ColorMode m) { this.colorMode = m; return this; }
+        public Builder rainbowSpeed(float s) { this.rainbowSpeed = s; return this; }
 
         public AppearanceState build() {
             return new AppearanceState(color, alphaMin, alphaMax, glow, emissive, 
-                saturation, brightness, hueShift, primaryColor, secondaryColor, colorBlend);
+                saturation, brightness, hueShift, primaryColor, secondaryColor, colorBlend,
+                colorMode, rainbowSpeed);
         }
     }
 }
