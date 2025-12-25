@@ -160,6 +160,7 @@ public final class ShapeWidgetSpec {
             case "capsule" -> CAPSULE_SPECS;
             case "cone" -> CONE_SPECS;
             case "jet" -> JET_SPECS;
+            case "rays" -> RAYS_SPECS;
             default -> List.of();
         };
     }
@@ -355,5 +356,61 @@ public final class ShapeWidgetSpec {
         // Row 5: Cap Base + Cap Tip
         CheckboxSpec.half("Cap Base", "jet.capBase", "Close base end"),
         CheckboxSpec.half("Cap Tip", "jet.capTip", "Close tip end (if not pointed)")
+    );
+    
+    // ───────────────────────────────────────────────────────────────────────────
+    // RAYS (Line Segments)
+    // ───────────────────────────────────────────────────────────────────────────
+    
+    private static final List<Object> RAYS_SPECS = List.of(
+        // === GEOMETRY ===
+        new SectionHeader("Ray Geometry"),
+        
+        // Row 1: Ray Length + Ray Width (< 1.0 = thin lines, >= 1.0 = thick lines)
+        SliderSpec.half("Ray Len", "rays.rayLength", 0.1f, 10f, "%.2f"),
+        SliderSpec.half("Thick", "rays.rayWidth", 0.1f, 2f, "%.1f"),
+        
+        // === DISTRIBUTION ===
+        new SectionHeader("Distribution"),
+        
+        // Row 2: Count + Arrangement
+        SliderSpec.halfInt("Count", "rays.count", 1, 128),
+        EnumDropdownSpec.half("Arrange", "rays.arrangement", 
+            net.cyberpunk042.visual.shape.RayArrangement.class, 
+            net.cyberpunk042.visual.shape.RayArrangement.RADIAL),
+        
+        // Row 3: Distribution mode + Inner Radius
+        EnumDropdownSpec.half("Distrib", "rays.distribution",
+            net.cyberpunk042.visual.shape.RayDistribution.class,
+            net.cyberpunk042.visual.shape.RayDistribution.UNIFORM),
+        SliderSpec.half("Inner R", "rays.innerRadius", 0f, 10f, "%.2f"),
+        
+        // Row 4: Outer Radius + Layers
+        SliderSpec.half("Outer R", "rays.outerRadius", 0.1f, 20f, "%.2f"),
+        SliderSpec.halfInt("Layers", "rays.layers", 1, 16),
+        
+        // Row 5: Layer Spacing
+        SliderSpec.half("Layer Sp", "rays.layerSpacing", 0.1f, 2f, "%.2f"),
+        
+        // === VARIATION ===
+        new SectionHeader("Variation"),
+        
+        // Row 6: Randomness + Length Variation
+        SliderSpec.half("Random", "rays.randomness", 0f, 1f, "%.2f"),
+        SliderSpec.half("Len Var", "rays.lengthVariation", 0f, 1f, "%.2f"),
+        
+        // === FADING ===
+        new SectionHeader("Fading"),
+        
+        // Row 7: Fade Start + Fade End
+        SliderSpec.half("Fade St", "rays.fadeStart", 0f, 1f, "%.2f"),
+        SliderSpec.half("Fade End", "rays.fadeEnd", 0f, 1f, "%.2f"),
+        
+        // === SEGMENTATION ===
+        new SectionHeader("Segmentation"),
+        
+        // Row 8: Segments + Segment Gap
+        SliderSpec.halfInt("Segs", "rays.segments", 1, 10),
+        SliderSpec.half("Seg Gap", "rays.segmentGap", 0f, 0.5f, "%.2f")
     );
 }

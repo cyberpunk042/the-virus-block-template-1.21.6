@@ -281,10 +281,24 @@ public final class VertexEmitter {
     
     /**
      * Emits a line vertex (for LINES render layer).
+     * <p>Supports ColorContext for per-vertex coloring and wave animation.
      */
     private void emitLineVertex(Vertex v, Vertex other) {
+        float vx = v.x();
+        float vy = v.y();
+        float vz = v.z();
+        
+        // Apply wave displacement if configured
+        if (waveConfig != null && waveConfig.isActive()) {
+            float[] displaced = AnimationApplier.applyWaveToVertex(
+                waveConfig, vx, vy, vz, waveTime);
+            vx = displaced[0];
+            vy = displaced[1];
+            vz = displaced[2];
+        }
+        
         // Transform position
-        Vector4f pos = new Vector4f(v.x(), v.y(), v.z(), 1.0f);
+        Vector4f pos = new Vector4f(vx, vy, vz, 1.0f);
         pos.mul(positionMatrix);
         
         // For lines, normal is the direction
@@ -296,10 +310,19 @@ public final class VertexEmitter {
         dir.normalize();
         dir.mul(normalMatrix);
         
-        int a = (color >> 24) & 0xFF;
-        int r = (color >> 16) & 0xFF;
-        int g = (color >> 8) & 0xFF;
-        int b = color & 0xFF;
+        // Calculate color - use ColorContext for per-vertex coloring, otherwise use uniform color
+        int vertexColor;
+        if (colorContext != null && colorContext.isPerVertex()) {
+            // Per-vertex color calculation using local (pre-transform) coordinates
+            vertexColor = colorContext.calculateColor(v.x(), v.y(), v.z(), cellIndex);
+        } else {
+            vertexColor = this.color;
+        }
+        
+        int a = (vertexColor >> 24) & 0xFF;
+        int r = (vertexColor >> 16) & 0xFF;
+        int g = (vertexColor >> 8) & 0xFF;
+        int b = vertexColor & 0xFF;
         
         consumer.vertex(pos.x(), pos.y(), pos.z())
             .color(r, g, b, a)

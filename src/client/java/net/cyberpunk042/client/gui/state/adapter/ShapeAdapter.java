@@ -37,6 +37,7 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
     @StateField private CapsuleShape capsule = CapsuleShape.DEFAULT;
     @StateField private ConeShape cone = ConeShape.DEFAULT;
     @StateField private JetShape jet = JetShape.DEFAULT;
+    @StateField private RaysShape rays = RaysShape.DEFAULT;
     
     // ═══════════════════════════════════════════════════════════════════════════
     // SHAPE SELECTOR
@@ -80,6 +81,7 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
             case CapsuleShape c -> this.capsule = c;
             case ConeShape c -> this.cone = c;
             case JetShape j -> this.jet = j;
+            case RaysShape r -> this.rays = r;
             default -> Logging.GUI.topic("adapter").warn("Unknown shape type: {}", shape.getClass().getSimpleName());
         }
     }
@@ -113,6 +115,7 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
             case "capsule" -> capsule;
             case "cone" -> cone;
             case "jet" -> jet;
+            case "rays" -> rays;
             default -> {
                 Logging.GUI.topic("adapter").warn("Unknown shapeType '{}', defaulting to sphere", shapeType);
                 yield sphere;
@@ -154,6 +157,9 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
     public JetShape jet() { return jet; }
     public void setJet(JetShape jet) { this.jet = jet; }
     
+    public RaysShape rays() { return rays; }
+    public void setRays(RaysShape rays) { this.rays = rays; }
+    
     // ═══════════════════════════════════════════════════════════════════════════
     // RESET
     // ═══════════════════════════════════════════════════════════════════════════
@@ -169,6 +175,7 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
         this.capsule = CapsuleShape.DEFAULT;
         this.cone = ConeShape.DEFAULT;
         this.jet = JetShape.DEFAULT;
+        this.rays = RaysShape.DEFAULT;
         this.shapeType = "sphere";
     }
 }

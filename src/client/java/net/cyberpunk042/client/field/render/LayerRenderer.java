@@ -237,6 +237,7 @@ public final class LayerRenderer {
      * - SOLID → solidTranslucent, solidTranslucentNoDepth (if depthWrite=false), or NoCull (if doubleSided)
      * - WIREFRAME, CAGE → lines with custom thickness via RenderPhase.LineWidth
      * - POINTS → solidTranslucent (uses tiny quads)
+     * - RaysShape → Always lines, uses rayWidth to select thin/thick (rayWidth < 1.0 = thin, >= 1.0 = thick)
      */
     private static VertexConsumer getConsumerForPrimitive(VertexConsumerProvider consumers, Primitive primitive) {
         FillConfig fill = primitive.fill();
@@ -244,6 +245,14 @@ public final class LayerRenderer {
         boolean doubleSided = fill != null && fill.doubleSided();
         boolean depthWrite = fill == null || fill.depthWrite();
         float wireThickness = fill != null ? fill.wireThickness() : 1.0f;
+        
+        // Special case: RaysShape is always rendered as lines regardless of fill mode
+        // Uses rayWidth to select between THICK (>=1.0) and THIN (<1.0) lines
+        if (primitive.shape() instanceof net.cyberpunk042.visual.shape.RaysShape rays) {
+            // Use rayWidth from shape if available, otherwise fall back to fill wireThickness
+            float thickness = rays.rayWidth();
+            return consumers.getBuffer(FieldRenderLayers.lines(thickness));
+        }
         
         return switch (mode) {
             case WIREFRAME, CAGE -> consumers.getBuffer(FieldRenderLayers.lines(wireThickness));

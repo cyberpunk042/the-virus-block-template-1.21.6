@@ -56,6 +56,7 @@ public class ShapeTypeAdapter extends TypeAdapter<Shape> {
             case "cylinder" -> parseCylinder(json);
             case "polyhedron" -> parsePolyhedron(json);
             case "jet" -> parseJet(json);
+            case "rays" -> parseRays(json);
             default -> SphereShape.builder().radius(1.0f).latSteps(32).lonSteps(64).build();
         };
     }
@@ -113,6 +114,36 @@ public class ShapeTypeAdapter extends TypeAdapter<Shape> {
             .innerTipRadius(json.has("innerTipRadius") ? json.get("innerTipRadius").getAsFloat() : 0f)
             .capBase(!json.has("capBase") || json.get("capBase").getAsBoolean())
             .capTip(json.has("capTip") && json.get("capTip").getAsBoolean())
+            .build();
+    }
+    
+    private static RaysShape parseRays(JsonObject json) {
+        RayArrangement arrangement = RayArrangement.RADIAL;
+        if (json.has("arrangement")) {
+            arrangement = RayArrangement.fromString(json.get("arrangement").getAsString());
+        }
+        RayDistribution distribution = RayDistribution.UNIFORM;
+        if (json.has("distribution")) {
+            try {
+                distribution = RayDistribution.valueOf(json.get("distribution").getAsString().toUpperCase());
+            } catch (IllegalArgumentException ignored) {}
+        }
+        return RaysShape.builder()
+            .rayLength(json.has("rayLength") ? json.get("rayLength").getAsFloat() : 2.0f)
+            .rayWidth(json.has("rayWidth") ? json.get("rayWidth").getAsFloat() : 1.0f)
+            .count(json.has("count") ? json.get("count").getAsInt() : 12)
+            .arrangement(arrangement)
+            .distribution(distribution)
+            .innerRadius(json.has("innerRadius") ? json.get("innerRadius").getAsFloat() : 0.5f)
+            .outerRadius(json.has("outerRadius") ? json.get("outerRadius").getAsFloat() : 3.0f)
+            .layers(json.has("layers") ? json.get("layers").getAsInt() : 1)
+            .layerSpacing(json.has("layerSpacing") ? json.get("layerSpacing").getAsFloat() : 0.5f)
+            .randomness(json.has("randomness") ? json.get("randomness").getAsFloat() : 0f)
+            .lengthVariation(json.has("lengthVariation") ? json.get("lengthVariation").getAsFloat() : 0f)
+            .fadeStart(json.has("fadeStart") ? json.get("fadeStart").getAsFloat() : 1.0f)
+            .fadeEnd(json.has("fadeEnd") ? json.get("fadeEnd").getAsFloat() : 1.0f)
+            .segments(json.has("segments") ? json.get("segments").getAsInt() : 1)
+            .segmentGap(json.has("segmentGap") ? json.get("segmentGap").getAsFloat() : 0f)
             .build();
     }
 }

@@ -266,6 +266,34 @@ public final class ShapeRegistry {
                 capBase, capTip);
         });
         
+        // Rays (collection of straight line segments)
+        register("rays", params -> {
+            float rayLength = getFloat(params, "rayLength", 2.0f);
+            float rayWidth = getFloat(params, "rayWidth", 1.0f);
+            int count = getInt(params, "count", 12);
+            String arrangementStr = getString(params, "arrangement", "RADIAL");
+            RayArrangement arrangement = RayArrangement.fromString(arrangementStr);
+            String distributionStr = getString(params, "distribution", "UNIFORM");
+            RayDistribution distribution;
+            try {
+                distribution = RayDistribution.valueOf(distributionStr.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                distribution = RayDistribution.UNIFORM;
+            }
+            float innerRadius = getFloat(params, "innerRadius", 0.5f);
+            float outerRadius = getFloat(params, "outerRadius", 3.0f);
+            int layers = getInt(params, "layers", 1);
+            float layerSpacing = getFloat(params, "layerSpacing", 0.5f);
+            float randomness = getFloat(params, "randomness", 0f);
+            float lengthVariation = getFloat(params, "lengthVariation", 0f);
+            float fadeStart = getFloat(params, "fadeStart", 1.0f);
+            float fadeEnd = getFloat(params, "fadeEnd", 1.0f);
+            int segments = getInt(params, "segments", 1);
+            float segmentGap = getFloat(params, "segmentGap", 0f);
+            return new RaysShape(rayLength, rayWidth, count, arrangement, distribution, innerRadius, outerRadius,
+                layers, layerSpacing, randomness, lengthVariation, fadeStart, fadeEnd, segments, segmentGap);
+        });
+        
         Logging.REGISTRY.topic("shape").info(
             "Registered {} default shapes: {}", 
             FACTORIES.size(), FACTORIES.keySet());
