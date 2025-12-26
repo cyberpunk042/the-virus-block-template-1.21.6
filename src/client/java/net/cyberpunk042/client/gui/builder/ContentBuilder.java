@@ -131,19 +131,21 @@ public class ContentBuilder {
     
     /**
      * Adds a small info text line (for descriptions, hints).
-     * Uses gray color and smaller spacing.
+     * Uses gray color, smaller font (75% scale), and compact spacing.
      * 
      * @param text The info text
      * @return this builder for chaining
      */
     public ContentBuilder infoText(String text) {
-        net.minecraft.client.gui.widget.TextWidget widget = new net.minecraft.client.gui.widget.TextWidget(
-            leftPadding(), currentY, availableWidth(), 10,
-            Text.literal(text), getTextRenderer()
-        );
-        widget.setTextColor(0x888888);
+        net.cyberpunk042.client.gui.widget.ScaledTextWidget widget = 
+            new net.cyberpunk042.client.gui.widget.ScaledTextWidget(
+                leftPadding(), currentY, availableWidth(), 7,  // Compact height
+                Text.literal(text), getTextRenderer(), 0.50f   // 75% scale
+            );
+        widget.setTextColor(0xFF888888);  // Gray with full alpha
+        widget.alignLeft();
         widgets.add(widget);
-        currentY += 12; // Small text with gap
+        currentY += 8; // Compact spacing for small descriptions
         return this;
     }
     

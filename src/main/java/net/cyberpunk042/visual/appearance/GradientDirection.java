@@ -47,10 +47,11 @@ public enum GradientDirection {
     ANGULAR;
     
     /**
-     * Default direction.
+     * Default direction. ANGULAR works correctly for all shapes
+     * regardless of vertex coordinate centering.
      */
     public static GradientDirection defaultDirection() {
-        return Y_AXIS;
+        return ANGULAR;
     }
     
     /**

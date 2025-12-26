@@ -60,7 +60,16 @@ public class LabeledSlider extends SliderWidget {
     }
     
     private static double normalizeValue(float value, float min, float max) {
-        return (value - min) / (max - min);
+        // Handle edge cases
+        if (Float.isNaN(value) || Float.isInfinite(value)) {
+            return 0.0;
+        }
+        if (max <= min) {
+            return 0.0;
+        }
+        // Normalize and clamp to [0, 1]
+        double normalized = (value - min) / (max - min);
+        return Math.max(0.0, Math.min(1.0, normalized));
     }
     
     /**

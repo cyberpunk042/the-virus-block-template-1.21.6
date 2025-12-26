@@ -128,14 +128,19 @@ public record ColorContext(
             }
         }
         
-        // Add time-based animation via timePhase
-        // Use ping-pong instead of modulo to avoid abrupt transitions
-        float animOffset = timePhase * time / 20f;
+        // Add time-based animation
+        // time/20f = animation progress (~1 cycle per second), timePhase = starting offset
+        // Use modulo 2 to keep in ping-pong range (0-2)
+        float animOffset = (time / 20f + timePhase) % 2f;
+        if (animOffset < 0) animOffset += 2f;  // Handle negative time
+        
         t = t + animOffset;
         // Ping-pong: fold values outside [0,1] back into range smoothly
+        // Use modulo first to handle large values
+        t = t % 2f;
+        if (t < 0) t += 2f;
         if (t > 1f) {
             t = 2f - t; // Fold back: 1.5 -> 0.5, 2.0 -> 0.0
-            if (t < 0f) t = -t; // Handle values > 2
         }
         t = Math.max(0f, Math.min(1f, t));
         
