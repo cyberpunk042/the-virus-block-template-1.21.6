@@ -134,6 +134,14 @@ public abstract class BoundPanel extends AbstractPanel implements StateChangeLis
     }
     
     /**
+     * Returns the content builder for this panel.
+     * Used by PanelWrapper to offset labels alongside widgets.
+     */
+    public ContentBuilder getContentBuilder() {
+        return contentBuilder;
+    }
+    
+    /**
      * Called when disposing the panel. Unregisters state listeners.
      */
     public void dispose() {
@@ -231,19 +239,13 @@ public abstract class BoundPanel extends AbstractPanel implements StateChangeLis
     }
     
     /**
-     * Overrides to also offset labels when widgets are offset.
+     * Labels are now TextWidget instances in the widget list, so
+     * they get offset automatically by super.applyBoundsOffset().
      */
     @Override
     public void applyBoundsOffset() {
         super.applyBoundsOffset();
-        // Also offset labels to match widget positions
-        if (contentBuilder != null) {
-            Logging.GUI.topic("labels").info("{}.applyBoundsOffset: bounds=({},{}), contentBuilder labels={}",
-                getClass().getSimpleName(), bounds.x(), bounds.y(), contentBuilder.getLabels().size());
-            contentBuilder.offsetLabels(bounds.x(), bounds.y());
-        } else {
-            Logging.GUI.topic("labels").warn("{}.applyBoundsOffset: contentBuilder is NULL!", getClass().getSimpleName());
-        }
+        // Labels are now widgets - no separate handling needed
     }
     
     /**
@@ -304,28 +306,33 @@ public abstract class BoundPanel extends AbstractPanel implements StateChangeLis
     /**
      * Renders widgets with scissor clipping.
      * Widgets are already at visual positions (via setScrollOffset).
+     * Labels are now TextWidget instances in the widgets list - no separate rendering needed.
      */
     @Override
     protected void renderWithScroll(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {
-        if (bounds == null || bounds.isEmpty()) return;
+        // Calculate effective bounds for rendering
+        // When bounds is empty, widgets are at their local coordinates (no offset needed)
+        int boundsX = (bounds != null && !bounds.isEmpty()) ? bounds.x() : 0;
+        int boundsY = (bounds != null && !bounds.isEmpty()) ? bounds.y() : 0;
+        int boundsRight = (bounds != null && !bounds.isEmpty()) ? bounds.right() : panelWidth;
+        int boundsBottom = (bounds != null && !bounds.isEmpty()) ? bounds.bottom() : panelHeight;
         
-        // Clip to panel bounds
-        context.enableScissor(bounds.x(), bounds.y(), bounds.right(), bounds.bottom());
+        // Clip to panel bounds (if we have them)
+        if (bounds != null && !bounds.isEmpty()) {
+            context.enableScissor(boundsX, boundsY, boundsRight, boundsBottom);
+        }
         
-        // Render all widgets (already at visual positions)
+        // Render all widgets (includes TextWidget labels now)
         for (var widget : widgets) {
             widget.render(context, mouseX, mouseY, delta);
         }
         
-        // Render labels (section headers, info text) from ContentBuilder
-        if (contentBuilder != null) {
-            contentBuilder.renderLabels(context, scrollOffset, bounds.x(), bounds.y());
+        if (bounds != null && !bounds.isEmpty()) {
+            context.disableScissor();
         }
         
-        context.disableScissor();
-        
         // Render scroll indicator if scrollable
-        if (isScrollable()) {
+        if (isScrollable() && bounds != null && !bounds.isEmpty()) {
             renderScrollIndicator(context);
         }
     }

@@ -133,8 +133,9 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
                 secondaryColor = primaryColor;
             }
             
+            // For rays, we pass t (0-1) as Y coordinate, so use height=1.0
             colorCtx = ColorContext.from(app, primaryColor, secondaryColor, time, 
-                shape.outerRadius(), shape.outerRadius());
+                shape.outerRadius(), 1.0f);  // height=1.0 since y=t ranges 0-1
         }
         
         // === Emit Lines with Fade + Animation Support ===
@@ -452,8 +453,17 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
         // Calculate color
         int vertexColor;
         if (colorCtx != null && colorCtx.isPerVertex()) {
-            // Pass rayIndex as cellIndex so each ray can get a different color
-            vertexColor = colorCtx.calculateColor(originalVertex.x(), originalVertex.y(), originalVertex.z(), rayIndex);
+            // For rays, use the parametric t value (position along ray) for gradient
+            float rayT = originalVertex.u(); // 0 at base, 1 at tip
+            // Center around 0 for Y_AXIS direction formula: t = (y + height/2) / height
+            // With height=1.0: y from -0.5 to +0.5 gives t from 0 to 1
+            float centeredY = rayT - 0.5f;
+            vertexColor = colorCtx.calculateColor(
+                originalVertex.x(), 
+                centeredY,  // Centered for Y_AXIS formula
+                originalVertex.z(), 
+                rayIndex
+            );
         } else {
             vertexColor = baseColor;
         }

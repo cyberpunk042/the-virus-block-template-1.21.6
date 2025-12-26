@@ -86,8 +86,10 @@ public record ColorContext(
             case MESH_GRADIENT -> calculateMeshGradient(x, y, z, cellIndex);
             case MESH_RAINBOW -> calculateMeshRainbow(x, y, z, cellIndex);
             case RANDOM -> calculateRandom(cellIndex);
-            // TODO: Implement these modes
-            case HEAT_MAP, RANDOM_PULSE, BREATHE, REACTIVE -> primaryColor;
+            case HEAT_MAP -> calculateHeatMap(x, y, z);
+            case RANDOM_PULSE -> calculateRandomPulse(cellIndex);
+            case BREATHE -> calculateBreathe();
+            case REACTIVE -> calculateReactive(x, y, z);
         };
         
         // Apply alpha to the calculated color
@@ -127,13 +129,20 @@ public record ColorContext(
         }
         
         // Add time-based animation via timePhase
-        t = (t + timePhase * time / 20f) % 1f;
-        if (t < 0) t += 1f;
+        // Use ping-pong instead of modulo to avoid abrupt transitions
+        float animOffset = timePhase * time / 20f;
+        t = t + animOffset;
+        // Ping-pong: fold values outside [0,1] back into range smoothly
+        if (t > 1f) {
+            t = 2f - t; // Fold back: 1.5 -> 0.5, 2.0 -> 0.0
+            if (t < 0f) t = -t; // Handle values > 2
+        }
+        t = Math.max(0f, Math.min(1f, t));
         
-        // Use colorBlend to control how far towards secondary the gradient goes
-        // colorBlend=0 → all primary, colorBlend=1 → full primary→secondary gradient
-        int targetColor = blendColors(primaryColor, secondaryColor, colorBlend);
-        return blendColors(primaryColor, targetColor, t);
+        // Blend from primary to secondary based on t
+        // colorBlend controls the maximum extent (1.0 = full secondary at t=1)
+        float effectiveBlend = t * colorBlend;
+        return blendColors(primaryColor, secondaryColor, effectiveBlend);
     }
     
     /**
@@ -258,5 +267,96 @@ public record ColorContext(
     private static int hsbToArgb(float hue, float saturation, float brightness) {
         int rgb = java.awt.Color.HSBtoRGB(hue, saturation, brightness);
         return 0xFF000000 | (rgb & 0x00FFFFFF); // Ensure full alpha
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // NEW COLOR MODES
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Calculate color for HEAT_MAP mode.
+     * Inner positions = hot colors (red/orange), outer = cold (blue/purple).
+     */
+    private int calculateHeatMap(float x, float y, float z) {
+        // Distance from center (use y for rays since it's the t value 0-1)
+        float t = direction.calculateT(x, y, z, shapeRadius, shapeHeight);
+        
+        // Add time-based animation
+        t = (t + timePhase * time / 30f) % 1f;
+        if (t < 0) t += 1f;
+        
+        // Heat map: blend from primary (hot/inner) to secondary (cold/outer)
+        // Reverse so center (t=0) is hot = secondary, edge (t=1) is cold = primary
+        return blendColors(secondaryColor, primaryColor, t);
+    }
+    
+    /**
+     * Calculate color for RANDOM_PULSE mode.
+     * Occasional bursts of random colors from the color set.
+     */
+    private int calculateRandomPulse(int cellIndex) {
+        // Animated phase - faster animation for visible effect
+        float animPhase = (time / 10f + timePhase + cellIndex * 0.15f) % 1f;
+        
+        // Pulse happens in a wider window for more visibility
+        float pulseWindow = 0.25f;  // 25% of cycle is "pulsing"
+        float pulseFraction = animPhase % 0.5f;  // 2 pulses per cycle
+        
+        if (pulseFraction < pulseWindow) {
+            // In pulse - show random color from set
+            float blendFactor = pulseFraction / pulseWindow;  // Fade in/out
+            blendFactor = 1f - Math.abs(2f * blendFactor - 1f);  // Triangle wave 0→1→0
+            
+            int generation = (int)(time / 3f) + cellIndex;
+            RANDOM.get().setSeed(generation * 31L);
+            int pulseColor = colorSet.random(RANDOM.get());
+            
+            return blendColors(primaryColor, pulseColor, blendFactor);
+        }
+        
+        return primaryColor;  // Base color when not pulsing
+    }
+    
+    /**
+     * Calculate color for BREATHE mode.
+     * Smooth brightness/saturation pulsing (breathing effect).
+     */
+    private int calculateBreathe() {
+        // Smooth sine wave oscillation - faster for visible effect
+        float breathePhase = (time / 20f + timePhase) % 1f;
+        float intensity = 0.5f + 0.5f * (float)Math.sin(breathePhase * 2 * Math.PI);
+        
+        // Extract HSB from primary color
+        int r = (primaryColor >> 16) & 0xFF;
+        int g = (primaryColor >> 8) & 0xFF;
+        int b = primaryColor & 0xFF;
+        
+        float[] hsb = java.awt.Color.RGBtoHSB(r, g, b, null);
+        
+        // Modulate brightness (keep hue and saturation)
+        float minBrightness = 0.2f;  // Darker minimum for more visible pulse
+        float maxBrightness = 1.0f;
+        float newBrightness = minBrightness + (maxBrightness - minBrightness) * intensity;
+        
+        return hsbToArgb(hsb[0], hsb[1], newBrightness);
+    }
+    
+    /**
+     * Calculate color for REACTIVE mode.
+     * Color responds to position dynamically (wave-like effect).
+     */
+    private int calculateReactive(float x, float y, float z) {
+        // Position-based wave pattern
+        float t = direction.calculateT(x, y, z, shapeRadius, shapeHeight);
+        
+        // Traveling wave: position + time creates moving pattern
+        float wavePhase = (t + time / 20f + timePhase) % 1f;
+        if (wavePhase < 0) wavePhase += 1f;
+        
+        // Sine wave creates smooth oscillation
+        float wave = 0.5f + 0.5f * (float)Math.sin(wavePhase * 4 * Math.PI);
+        
+        // Blend between primary and secondary based on wave
+        return blendColors(primaryColor, secondaryColor, wave);
     }
 }

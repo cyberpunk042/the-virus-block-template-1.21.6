@@ -42,7 +42,7 @@ public class PanelWrapper implements SubTabPane.ContentProvider {
             initialized = true;
         }
         
-        // If bounds changed, we need to reposition widgets
+        // If bounds changed, we need to reposition widgets (labels are now widgets too)
         if (currentBounds == null || !currentBounds.equals(bounds)) {
             // Reset widgets to origin then apply new offset
             if (currentBounds != null) {

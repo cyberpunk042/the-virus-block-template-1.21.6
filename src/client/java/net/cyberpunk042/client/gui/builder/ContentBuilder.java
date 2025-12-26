@@ -101,25 +101,31 @@ public class ContentBuilder {
     }
     
     // ─────────────────────────────────────────────────────────────────────────────
-    // STATIC TEXT (labels, headers, descriptions)
+    // STATIC TEXT (labels, headers, descriptions) - NOW USING PROPER TextWidget
     // ─────────────────────────────────────────────────────────────────────────────
     
-    // For now, these just add to a list that the panel can render in its render method.
-    // The actual rendering happens in the panel's render() via renderLabels().
-    
-    private record LabelEntry(int x, int y, String text, int color, boolean small) {}
-    private final List<LabelEntry> labels = new ArrayList<>();
+    // Get text renderer for creating TextWidgets
+    private static net.minecraft.client.font.TextRenderer getTextRenderer() {
+        return net.minecraft.client.MinecraftClient.getInstance().textRenderer;
+    }
     
     /**
      * Adds a section header with separator styling.
+     * Creates a proper TextWidget that is registered like any other widget.
      * Example: "── Ray Motion ──"
      * 
      * @param text The header text
      * @return this builder for chaining
      */
     public ContentBuilder sectionHeader(String text) {
-        labels.add(new LabelEntry(GuiConstants.PADDING, currentY + 2, "§f── " + text + " ──", 0xFFFFFF, false));
-        currentY += 12; // Headers are slightly taller
+        String displayText = "── " + text + " ──";
+        net.minecraft.client.gui.widget.TextWidget widget = new net.minecraft.client.gui.widget.TextWidget(
+            leftPadding(), currentY + 2, availableWidth(), 12,
+            Text.literal(displayText), getTextRenderer()
+        );
+        widget.setTextColor(0xFFFFFF);
+        widgets.add(widget);
+        currentY += 14; // Headers are slightly taller with gap
         return this;
     }
     
@@ -131,8 +137,13 @@ public class ContentBuilder {
      * @return this builder for chaining
      */
     public ContentBuilder infoText(String text) {
-        labels.add(new LabelEntry(GuiConstants.PADDING, currentY, "§7" + text, 0x888888, true));
-        currentY += 10; // Small text uses less space
+        net.minecraft.client.gui.widget.TextWidget widget = new net.minecraft.client.gui.widget.TextWidget(
+            leftPadding(), currentY, availableWidth(), 10,
+            Text.literal(text), getTextRenderer()
+        );
+        widget.setTextColor(0x888888);
+        widgets.add(widget);
+        currentY += 12; // Small text with gap
         return this;
     }
     
@@ -144,61 +155,27 @@ public class ContentBuilder {
      * @return this builder for chaining
      */
     public ContentBuilder label(String text, int color) {
-        labels.add(new LabelEntry(GuiConstants.PADDING, currentY, text, color, false));
-        currentY += 12;
+        net.minecraft.client.gui.widget.TextWidget widget = new net.minecraft.client.gui.widget.TextWidget(
+            leftPadding(), currentY, availableWidth(), 12,
+            Text.literal(text), getTextRenderer()
+        );
+        widget.setTextColor(color);
+        widgets.add(widget);
+        currentY += 14;
         return this;
     }
     
-    /**
-     * Gets the list of labels to render. Call from panel's render() method.
-     */
-    public List<LabelEntry> getLabels() {
-        return labels;
-    }
+    // DEPRECATED: These methods exist for backward compatibility but are no longer used
+    // Labels are now proper widgets, so no separate label list or rendering needed.
     
-    /**
-     * Offsets all label positions by dx, dy.
-     * Call this when widgets are offset (e.g., in applyBoundsOffset).
-     */
+    @Deprecated
     public void offsetLabels(int dx, int dy) {
-        net.cyberpunk042.log.Logging.GUI.topic("labels").info(
-            "offsetLabels called: dx={}, dy={}, labelCount={}", dx, dy, labels.size());
-        for (int i = 0; i < labels.size(); i++) {
-            LabelEntry old = labels.get(i);
-            labels.set(i, new LabelEntry(old.x + dx, old.y + dy, old.text, old.color, old.small));
-        }
+        // No-op: labels are now widgets and get offset via offsetWidgets()
     }
     
-    /**
-     * Renders all labels. Call this from the panel's render() method.
-     * 
-     * @param context The draw context
-     * @param scrollOffset Current scroll offset
-     * @param boundsX The panel's x position in screen coordinates
-     * @param boundsY The panel's y position in screen coordinates
-     */
+    @Deprecated
     public void renderLabels(net.minecraft.client.gui.DrawContext context, int scrollOffset, int boundsX, int boundsY) {
-        var textRenderer = net.minecraft.client.MinecraftClient.getInstance().textRenderer;
-        
-        // Debug: log first label details
-        if (!labels.isEmpty()) {
-            LabelEntry first = labels.get(0);
-            // Labels are now pre-offset like widgets, so use coords directly (just apply scroll)
-            int firstRenderX = first.x;
-            int firstRenderY = first.y - scrollOffset;
-            net.cyberpunk042.log.Logging.GUI.topic("labels").info(
-                "First label '{}' at screen ({}, {}), entry.y={}, color=0x{}", 
-                first.text.substring(0, Math.min(20, first.text.length())),
-                firstRenderX, firstRenderY, first.y, Integer.toHexString(first.color));
-        }
-        
-        for (LabelEntry entry : labels) {
-            // Labels are already at absolute screen coordinates (offset applied via offsetLabels)
-            // Just apply scroll offset for Y
-            int renderX = entry.x;
-            int renderY = entry.y - scrollOffset;
-            context.drawTextWithShadow(textRenderer, entry.text, renderX, renderY, entry.color);
-        }
+        // No-op: labels are now widgets and render via widget.render()
     }
     
     /** Gets the total content height (for panel sizing). */

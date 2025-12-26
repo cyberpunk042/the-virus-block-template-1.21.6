@@ -124,12 +124,17 @@ public class ModifiersSubPanel extends BoundPanel {
         // ═══════════════════════════════════════════════════════════════════════
         
         if (isRaysShape) {
+            // Compute compatibility and display inline warning if any
             checkRayCompatibility();
+            if (currentWarning != null && !currentWarning.isEmpty()) {
+                content.gap();
+                content.label("⚠ " + currentWarning, currentWarningColor);
+            }
         }
         
         contentHeight = content.getContentHeight();
-        Logging.GUI.topic("panel").debug("ModifiersSubPanel built: {} widgets, isRays={}", 
-            widgets.size(), isRaysShape);
+        Logging.GUI.topic("panel").debug("ModifiersSubPanel built: {} widgets, isRays={}, warning={}",
+            widgets.size(), isRaysShape, currentWarning);
     }
     
     /**

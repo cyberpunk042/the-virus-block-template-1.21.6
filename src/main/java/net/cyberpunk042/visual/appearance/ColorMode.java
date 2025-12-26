@@ -108,7 +108,8 @@ public enum ColorMode {
      */
     public boolean isPerVertex() {
         return this == MESH_GRADIENT || this == MESH_RAINBOW || 
-               this == RANDOM || this == HEAT_MAP || this == REACTIVE;
+               this == RANDOM || this == HEAT_MAP || this == REACTIVE ||
+               this == RANDOM_PULSE || this == BREATHE;
     }
     
     /**
