@@ -170,11 +170,40 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
             net.cyberpunk042.visual.fill.FillConfig fill = primitive.fill();
             net.cyberpunk042.visual.fill.FillMode mode = fill != null ? fill.mode() : net.cyberpunk042.visual.fill.FillMode.SOLID;
             
-            switch (mode) {
-                case SOLID -> emitRayTriangles(matrices, consumer, mesh, color, baseAlpha, light, colorCtx);
-                case WIREFRAME -> emitWireframe(matrices, consumer, mesh, color, light, fill, waveConfig, time);
-                case CAGE -> emitCage(matrices, consumer, mesh, color, light, fill, primitive, waveConfig, time);
-                case POINTS -> emitPoints(matrices, consumer, mesh, color, light, fill, waveConfig, time);
+            Logging.FIELD.topic("render").info("[RAYS_3D] Rendering mode={}, meshType={}, vertexCount={}, indexCount={}",
+                mode, mesh.primitiveType(), mesh.vertexCount(), mesh.indexCount());
+            
+            try {
+                switch (mode) {
+                    case SOLID -> emitRayTriangles(matrices, consumer, mesh, color, baseAlpha, light, colorCtx);
+                    case WIREFRAME, CAGE -> {
+                        Logging.FIELD.topic("render").info("[RAYS_3D] Emitting wireframe manually...");
+                        // Emit triangles as lines directly, using same pattern as LINE rays
+                        MatrixStack.Entry entry = matrices.peek();
+                        org.joml.Matrix4f positionMatrix = entry.getPositionMatrix();
+                        org.joml.Matrix3f normalMatrix = entry.getNormalMatrix();
+                        
+                        int a = (color >> 24) & 0xFF;
+                        int r = (color >> 16) & 0xFF;
+                        int g = (color >> 8) & 0xFF;
+                        int b = color & 0xFF;
+                        
+                        // Iterate through triangles and emit each edge as a line
+                        mesh.forEachTriangle((v0, v1, v2) -> {
+                            // Edge 0-1
+                            emitEdge(consumer, positionMatrix, normalMatrix, v0, v1, r, g, b, a);
+                            // Edge 1-2
+                            emitEdge(consumer, positionMatrix, normalMatrix, v1, v2, r, g, b, a);
+                            // Edge 2-0
+                            emitEdge(consumer, positionMatrix, normalMatrix, v2, v0, r, g, b, a);
+                        });
+                        Logging.FIELD.topic("render").info("[RAYS_3D] Wireframe DONE");
+                    }
+                    case POINTS -> emitPoints(matrices, consumer, mesh, color, light, fill, waveConfig, time);
+                }
+            } catch (Exception e) {
+                Logging.FIELD.topic("render").error("[RAYS_3D] EXCEPTION in fill mode {}: {}", mode, e.getMessage());
+                e.printStackTrace();
             }
             
             Logging.FIELD.topic("render").trace("[RAYS] DONE 3D: {} vertices, mode={}", mesh.vertexCount(), mode);
@@ -565,6 +594,46 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
         int b = vertexColor & 0xFF;
         
         consumer.vertex(pos.x(), pos.y(), pos.z())
+            .color(r, g, b, a)
+            .normal(dir.x(), dir.y(), dir.z());
+    }
+    
+    /**
+     * Emits a single edge (2 vertices = 1 line) for wireframe rendering.
+     * Uses same vertex format as LINE rays.
+     */
+    private void emitEdge(VertexConsumer consumer, 
+                          org.joml.Matrix4f positionMatrix, 
+                          org.joml.Matrix3f normalMatrix,
+                          net.cyberpunk042.client.visual.mesh.Vertex v0, 
+                          net.cyberpunk042.client.visual.mesh.Vertex v1,
+                          int r, int g, int b, int a) {
+        // Direction from v0 to v1
+        float dx = v1.x() - v0.x();
+        float dy = v1.y() - v0.y();
+        float dz = v1.z() - v0.z();
+        float len = (float)Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (len > 0) {
+            dx /= len;
+            dy /= len;
+            dz /= len;
+        }
+        
+        // Transform normal (direction) through normal matrix
+        org.joml.Vector3f dir = new org.joml.Vector3f(dx, dy, dz);
+        dir.mul(normalMatrix);
+        
+        // Emit first vertex
+        org.joml.Vector4f p0 = new org.joml.Vector4f(v0.x(), v0.y(), v0.z(), 1.0f);
+        p0.mul(positionMatrix);
+        consumer.vertex(p0.x(), p0.y(), p0.z())
+            .color(r, g, b, a)
+            .normal(dir.x(), dir.y(), dir.z());
+        
+        // Emit second vertex
+        org.joml.Vector4f p1 = new org.joml.Vector4f(v1.x(), v1.y(), v1.z(), 1.0f);
+        p1.mul(positionMatrix);
+        consumer.vertex(p1.x(), p1.y(), p1.z())
             .color(r, g, b, a)
             .normal(dir.x(), dir.y(), dir.z());
     }

@@ -255,8 +255,15 @@ public final class LayerRenderer {
             
             if (is3DRay) {
                 // 3D ray types respect fill mode like other shapes
+                net.cyberpunk042.log.Logging.FIELD.topic("render").info(
+                    "[LAYER] 3D ray detected: rayType={}, mode={}, wireThickness={}", 
+                    rayType, mode, wireThickness);
                 return switch (mode) {
-                    case WIREFRAME, CAGE -> consumers.getBuffer(FieldRenderLayers.lines(wireThickness));
+                    case WIREFRAME, CAGE -> {
+                        net.cyberpunk042.log.Logging.FIELD.topic("render").info(
+                            "[LAYER] Returning LINES consumer for 3D ray WIREFRAME/CAGE");
+                        yield consumers.getBuffer(FieldRenderLayers.lines(wireThickness));
+                    }
                     case SOLID, POINTS -> {
                         if (doubleSided) {
                             yield consumers.getBuffer(FieldRenderLayers.solidTranslucentNoCull());
