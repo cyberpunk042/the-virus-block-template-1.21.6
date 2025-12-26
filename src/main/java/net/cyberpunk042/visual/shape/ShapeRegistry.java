@@ -298,10 +298,13 @@ public final class ShapeRegistry {
             RayCurvature curvature = RayCurvature.NONE;
             float curvatureIntensity = getFloat(params, "curvatureIntensity", 0f);
             RayType rayType = RayType.LINE;
+            float shapeIntensity = getFloat(params, "shapeIntensity", 1.0f);
+            float shapeLength = getFloat(params, "shapeLength", 1.0f);
             RayOrientation rayOrientation = RayOrientation.ALONG_RAY;
             return new RaysShape(rayLength, rayWidth, count, arrangement, distribution, innerRadius, outerRadius,
                 layers, layerSpacing, randomness, lengthVariation, fadeStart, fadeEnd, segments, segmentGap,
-                lineShape, lineShapeAmplitude, lineShapeFrequency, shapeSegments, curvature, curvatureIntensity, rayType, rayOrientation);
+                lineShape, lineShapeAmplitude, lineShapeFrequency, shapeSegments, curvature, curvatureIntensity, 
+                rayType, shapeIntensity, shapeLength, rayOrientation);
         });
         
         Logging.REGISTRY.topic("shape").info(

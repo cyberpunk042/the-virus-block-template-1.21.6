@@ -3,6 +3,7 @@ package net.cyberpunk042.client.visual.mesh.ray;
 import net.cyberpunk042.client.visual.mesh.MeshBuilder;
 import net.cyberpunk042.client.visual.mesh.VectorMath;
 import net.cyberpunk042.visual.shape.ShapeMath;
+import net.cyberpunk042.visual.shape.SphereDeformation;
 
 /**
  * Ray-specific 3D geometry utilities.
@@ -56,27 +57,38 @@ public final class Ray3DGeometryUtils {
     /**
      * Generates a droplet/teardrop shape for rays.
      * 
-     * <p>Delegates to {@link VectorMath#generatePolarSurface} with droplet radius function.</p>
+     * <p>Uses SphereDeformation.DROPLET.computeFullVertex - same approach as sphere!</p>
      * 
      * @param builder MeshBuilder to add geometry to
      * @param center Center position
      * @param direction Direction the tip points (normalized)
      * @param radius Radius at the fattest point
-     * @param sharpness How pointy: 1.0 = hemisphere, 2.0 = teardrop, 4.0 = needle
+     * @param intensity Blend amount: 0=sphere, 1=full droplet
+     * @param length Axial stretch: <1 oblate, 1 normal, >1 prolate
      * @param rings Number of latitude rings
      * @param segments Number of longitude segments
+     * @param pattern Pattern for cell rendering (null = filled)
      */
     public static void generateDroplet(
             MeshBuilder builder,
             float[] center,
             float[] direction,
             float radius,
-            float sharpness,
+            float intensity,
+            float length,
             int rings,
-            int segments) {
+            int segments,
+            net.cyberpunk042.visual.pattern.VertexPattern pattern) {
         
-        VectorMath.generatePolarSurface(builder, center, direction, radius, rings, segments,
-            theta -> ShapeMath.droplet(theta, sharpness));
+        // Use SphereDeformation.DROPLET - it handles intensity and length correctly!
+        SphereDeformation deformation = SphereDeformation.DROPLET;
+        
+        VectorMath.FullVertexFunction vertexFunc = (theta, phi, r) -> 
+            deformation.computeFullVertex(theta, phi, r, intensity, length);
+        
+        // Use the same grid generation as sphere - with pattern support
+        VectorMath.generateLatLonGridFullOriented(
+            builder, center, direction, radius, rings, segments, vertexFunc, pattern);
     }
     
     /**

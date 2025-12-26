@@ -95,6 +95,16 @@ public record RayContext(
     float[] orientationVector,
     
     // ═══════════════════════════════════════════════════════════════════════════
+    // 3D Shape Parameters (for DROPLET, CONE, ARROW, etc.)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /** Shape deformation intensity (0-1). */
+    float shapeIntensity,
+    
+    /** Axial stretch factor (<1 oblate, 1 normal, >1 prolate). */
+    float shapeLength,
+    
+    // ═══════════════════════════════════════════════════════════════════════════
     // Animation
     // ═══════════════════════════════════════════════════════════════════════════
     
@@ -203,6 +213,8 @@ public record RayContext(
         private int shapeSegments = 1;
         private net.cyberpunk042.visual.shape.RayOrientation orientation = net.cyberpunk042.visual.shape.RayOrientation.ALONG_RAY;
         private float[] orientationVector = new float[] { 0, 0, 1 };
+        private float shapeIntensity = 1.0f;
+        private float shapeLength = 1.0f;
         private WaveConfig wave = null;
         private float time = 0.0f;
         private boolean hasWave = false;
@@ -255,6 +267,8 @@ public record RayContext(
             this.orientationVector = v != null ? v : new float[] { 0, 0, 1 }; 
             return this; 
         }
+        public Builder shapeIntensity(float v) { this.shapeIntensity = v; return this; }
+        public Builder shapeLength(float v) { this.shapeLength = v; return this; }
         public Builder wave(WaveConfig v) { this.wave = v; return this; }
         public Builder time(float v) { this.time = v; return this; }
         public Builder hasWave(boolean v) { this.hasWave = v; return this; }
@@ -284,6 +298,7 @@ public record RayContext(
                 lineShape, lineShapeAmplitude, lineShapeFrequency,
                 curvature, curvatureIntensity, shapeSegments,
                 orientation, orientationVector,
+                shapeIntensity, shapeLength,
                 wave, time, hasWave
             );
         }

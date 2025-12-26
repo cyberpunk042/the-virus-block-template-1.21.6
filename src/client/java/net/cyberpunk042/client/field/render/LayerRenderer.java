@@ -246,12 +246,25 @@ public final class LayerRenderer {
         boolean depthWrite = fill == null || fill.depthWrite();
         float wireThickness = fill != null ? fill.wireThickness() : 1.0f;
         
-        // Special case: RaysShape is always rendered as lines regardless of fill mode
-        // Uses rayWidth to select between THICK (>=1.0) and THIN (<1.0) lines
+        // Special case: RaysShape - use LINES for 2D rays, SOLID for 3D rays
         if (primitive.shape() instanceof net.cyberpunk042.visual.shape.RaysShape rays) {
-            // Use rayWidth from shape if available, otherwise fall back to fill wireThickness
-            float thickness = rays.rayWidth();
-            return consumers.getBuffer(FieldRenderLayers.lines(thickness));
+            // Check if this is a 3D ray type with proper tessellator
+            net.cyberpunk042.visual.shape.RayType rayType = rays.effectiveRayType();
+            boolean is3DRay = rayType.is3D() && 
+                net.cyberpunk042.client.visual.mesh.ray.RayTypeTessellatorRegistry.isImplemented(rayType);
+            
+            if (is3DRay) {
+                // 3D ray types (droplet, etc.) use solid triangle rendering
+                if (doubleSided) {
+                    return consumers.getBuffer(FieldRenderLayers.solidTranslucentNoCull());
+                } else {
+                    return consumers.getBuffer(FieldRenderLayers.solidTranslucent());
+                }
+            } else {
+                // 2D ray types use line rendering
+                float thickness = rays.rayWidth();
+                return consumers.getBuffer(FieldRenderLayers.lines(thickness));
+            }
         }
         
         return switch (mode) {

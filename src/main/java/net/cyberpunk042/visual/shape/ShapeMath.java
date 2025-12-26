@@ -93,15 +93,21 @@ public final class ShapeMath {
     }
     
     /**
-     * Spheroid vertex position (stretched/squashed sphere).
+     * Astrophysical spheroid vertex position (oblate with equatorial bulge).
      * 
-     * <p>Oblate (length &lt; 1): squashed along Y axis (disc-like)<br>
-     * Prolate (length &gt; 1): stretched along Y axis (football-like)</p>
+     * <p><b>True oblate spheroid (like planets):</b><br>
+     * When length &lt; 1: polar axis compresses AND equator bulges outward.<br>
+     * When length &gt; 1: polar axis stretches AND equator contracts.<br>
+     * This matches how rotating planets deform (centrifugal force at equator).</p>
      * 
-     * @param theta Polar angle
-     * @param phi Azimuthal angle
-     * @param radius Equatorial radius
-     * @param length Axial stretch factor (height = radius * length)
+     * <p>Formula uses volume-preserving deformation where a² * c = r³<br>
+     * For oblate (c &lt; r): a = r * sqrt(r/c) = r / sqrt(length)<br>
+     * For prolate (c &gt; r): a = r * sqrt(r/c) = r / sqrt(length)</p>
+     * 
+     * @param theta Polar angle (0 = top pole, π = bottom pole)
+     * @param phi Azimuthal angle (0 to 2π)
+     * @param radius Base radius (sphere radius at length=1)
+     * @param length Polar axis ratio: &lt;1 = oblate (disc), &gt;1 = prolate (football)
      */
     public static float[] spheroidVertex(float theta, float phi, float radius, float length) {
         float sinTheta = (float) Math.sin(theta);
@@ -109,10 +115,17 @@ public final class ShapeMath {
         float sinPhi = (float) Math.sin(phi);
         float cosPhi = (float) Math.cos(phi);
         
+        // Polar radius (c) = radius * length
+        float c = radius * length;
+        
+        // Equatorial radius (a) using volume-preserving formula: a²c = r³
+        // a = r * sqrt(r/c) = r / sqrt(length)
+        float a = radius / (float) Math.sqrt(length);
+        
         return new float[] {
-            radius * sinTheta * cosPhi,      // X (equatorial)
-            radius * length * cosTheta,      // Y (axial, stretched)
-            radius * sinTheta * sinPhi       // Z (equatorial)
+            a * sinTheta * cosPhi,      // X (equatorial, bulges when length < 1)
+            c * cosTheta,               // Y (polar axis)
+            a * sinTheta * sinPhi       // Z (equatorial, bulges when length < 1)
         };
     }
     
@@ -311,6 +324,47 @@ public final class ShapeMath {
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
+    // Normal Calculation (Proper Gradient-Based)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Computes the proper normal for a spheroid at the given position.
+     * 
+     * <p>For spheroid with equatorial radius a and polar radius c:
+     * Normal = normalize(x/a², y/a², z/c²)</p>
+     * 
+     * <p>Note: For a sphere (a=c), this reduces to normalize(position).</p>
+     * 
+     * @param x Position X
+     * @param y Position Y (polar axis)
+     * @param z Position Z
+     * @param a Equatorial radius
+     * @param c Polar radius (a*length)
+     * @return Normalized normal vector {nx, ny, nz}
+     */
+    public static float[] spheroidNormal(float x, float y, float z, float a, float c) {
+        // Gradient of implicit surface: (x/a², y/c², z/a²)
+        // Note: Y is the polar axis in our coordinate system
+        float a2 = a * a;
+        float c2 = c * c;
+        
+        float nx = x / a2;
+        float ny = y / c2;  // Y is polar axis
+        float nz = z / a2;
+        
+        return normalize(new float[] { nx, ny, nz });
+    }
+    
+    /**
+     * Normalizes a 3D vector.
+     */
+    public static float[] normalize(float[] v) {
+        float len = (float) Math.sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
+        if (len < 0.0001f) return new float[] { 0, 1, 0 };  // Default up
+        return new float[] { v[0]/len, v[1]/len, v[2]/len };
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
     // Blending Utilities
     // ═══════════════════════════════════════════════════════════════════════════
     
@@ -326,3 +380,4 @@ public final class ShapeMath {
         };
     }
 }
+

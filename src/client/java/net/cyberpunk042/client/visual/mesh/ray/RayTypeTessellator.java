@@ -42,6 +42,22 @@ public interface RayTypeTessellator {
     void tessellate(MeshBuilder builder, RaysShape shape, RayContext context);
     
     /**
+     * Tessellates a single ray with pattern and visibility support.
+     * 
+     * @param builder The mesh builder to emit vertices and primitives to
+     * @param shape The parent rays shape configuration
+     * @param context The computed context for this specific ray
+     * @param pattern Pattern for cell rendering (or null for filled)
+     * @param visibility Visibility mask (or null for full visibility)
+     */
+    default void tessellate(MeshBuilder builder, RaysShape shape, RayContext context,
+                            net.cyberpunk042.visual.pattern.VertexPattern pattern,
+                            net.cyberpunk042.visual.visibility.VisibilityMask visibility) {
+        // Default: ignore pattern and visibility
+        tessellate(builder, shape, context);
+    }
+    
+    /**
      * Returns the name of this tessellator for debugging/logging.
      */
     default String name() {

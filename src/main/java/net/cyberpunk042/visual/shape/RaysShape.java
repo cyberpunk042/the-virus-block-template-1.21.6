@@ -99,6 +99,12 @@ public record RaysShape(
     // === Ray Type (visual appearance: LINE, DROPLET, KAMEHAMEHA, etc.) ===
     @JsonField(skipIfDefault = true) RayType rayType,
     
+    // === 3D Shape Control (for DROPLET, CONE, ARROW, etc.) ===
+    /** Deformation intensity for 3D ray types (0 = default, 1 = maximum effect) */
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "1.0") float shapeIntensity,
+    /** Axial stretch for 3D ray types: <1 oblate, 1 = normal, >1 = prolate */
+    @Range(ValueRange.POSITIVE_NONZERO) @JsonField(skipIfDefault = true, defaultValue = "1.0") float shapeLength,
+    
     // === Ray Orientation (direction for 3D ray types) ===
     @JsonField(skipIfDefault = true) RayOrientation rayOrientation
 ) implements Shape {
@@ -132,6 +138,8 @@ public record RaysShape(
         RayCurvature.NONE, // curvature
         0.0f,           // curvatureIntensity
         RayType.LINE,   // rayType
+        1.0f,           // shapeIntensity
+        1.0f,           // shapeLength
         RayOrientation.ALONG_RAY  // rayOrientation
     );
     
@@ -139,43 +147,43 @@ public record RaysShape(
     public static final RaysShape ABSORPTION = new RaysShape(
         2.0f, 1.0f, 48, RayArrangement.CONVERGING, RayDistribution.RANDOM, 0.5f, 3.5f,
         8, 0.3f, 0.1f, 0.1f, 1.0f, 0.2f, 1, 0.0f,
-        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, RayOrientation.ALONG_RAY);
+        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY);
     
     /** Spherical emission rays (diverging from center). */
     public static final RaysShape EMISSION = new RaysShape(
         2.0f, 1.0f, 48, RayArrangement.DIVERGING, RayDistribution.RANDOM, 0.5f, 3.5f,
         8, 0.3f, 0.1f, 0.1f, 0.2f, 1.0f, 1, 0.0f,
-        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, RayOrientation.ALONG_RAY);
+        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY);
     
     /** Parallel laser grid. */
     public static final RaysShape LASER_GRID = new RaysShape(
         5.0f, 1.5f, 16, RayArrangement.PARALLEL, RayDistribution.UNIFORM, 0.0f, 2.0f,
         4, 0.3f, 0.0f, 0.0f, 1.0f, 1.0f, 1, 0.0f,
-        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, RayOrientation.ALONG_RAY);
+        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY);
     
     /** Dashed pulse rays. */
     public static final RaysShape PULSE = new RaysShape(
         3.0f, 1.0f, 8, RayArrangement.RADIAL, RayDistribution.UNIFORM, 0.3f, 2.5f,
         1, 0.5f, 0.0f, 0.0f, 1.0f, 0.5f, 4, 0.2f,
-        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, RayOrientation.ALONG_RAY);
+        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY);
     
     /** Sparse random stars. */
     public static final RaysShape STARS = new RaysShape(
         1.5f, 0.5f, 24, RayArrangement.SPHERICAL, RayDistribution.STOCHASTIC, 0.8f, 2.0f,
         1, 0.5f, 0.3f, 0.3f, 0.8f, 0.3f, 1, 0.0f,
-        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, RayOrientation.ALONG_RAY);
+        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY);
     
     /** Vortex rays (spiraling into center). */
     public static final RaysShape VORTEX = new RaysShape(
         2.5f, 1.0f, 24, RayArrangement.RADIAL, RayDistribution.UNIFORM, 0.3f, 3.0f,
         1, 0.5f, 0.0f, 0.0f, 1.0f, 0.8f, 1, 0.0f,
-        RayLineShape.STRAIGHT, 0.1f, 2.0f, 32, RayCurvature.VORTEX, 0.5f, RayType.LINE, RayOrientation.ALONG_RAY);
+        RayLineShape.STRAIGHT, 0.1f, 2.0f, 32, RayCurvature.VORTEX, 0.5f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY);
     
     /** Corkscrew rays (helical shape). */
     public static final RaysShape CORKSCREW = new RaysShape(
         2.0f, 1.0f, 12, RayArrangement.RADIAL, RayDistribution.UNIFORM, 0.5f, 2.5f,
         1, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1, 0.0f,
-        RayLineShape.CORKSCREW, 0.15f, 3.0f, 32, RayCurvature.NONE, 0.0f, RayType.LINE, RayOrientation.ALONG_RAY);
+        RayLineShape.CORKSCREW, 0.15f, 3.0f, 32, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY);
     
     public static RaysShape defaults() { return DEFAULT; }
     
@@ -223,14 +231,14 @@ public record RaysShape(
     
     @Override
     public CellType primaryCellType() {
-        return CellType.EDGE; // Rays are line segments
+        // 3D ray types use quads (like sphere), 2D types use edges (line segments)
+        return effectiveRayType().is3D() ? CellType.QUAD : CellType.EDGE;
     }
     
     @Override
     public Map<String, CellType> getParts() {
-        return Map.of(
-            "rays", CellType.EDGE
-        );
+        CellType cellType = primaryCellType();
+        return Map.of("rays", cellType);
     }
     
     @Override
@@ -345,6 +353,8 @@ public record RaysShape(
             .curvature(curvature)
             .curvatureIntensity(curvatureIntensity)
             .rayType(rayType)
+            .shapeIntensity(shapeIntensity)
+            .shapeLength(shapeLength)
             .rayOrientation(rayOrientation);
     }
     
@@ -372,6 +382,8 @@ public record RaysShape(
         private RayCurvature curvature = RayCurvature.NONE;
         private float curvatureIntensity = 0.0f;
         private RayType rayType = RayType.LINE;
+        private float shapeIntensity = 1.0f;
+        private float shapeLength = 1.0f;
         private RayOrientation rayOrientation = RayOrientation.ALONG_RAY;
         
         public Builder rayLength(float v) { this.rayLength = v; return this; }
@@ -397,6 +409,8 @@ public record RaysShape(
         public Builder curvature(RayCurvature v) { this.curvature = v != null ? v : RayCurvature.NONE; return this; }
         public Builder curvatureIntensity(float v) { this.curvatureIntensity = v; return this; }
         public Builder rayType(RayType v) { this.rayType = v != null ? v : RayType.LINE; return this; }
+        public Builder shapeIntensity(float v) { this.shapeIntensity = v; return this; }
+        public Builder shapeLength(float v) { this.shapeLength = v; return this; }
         public Builder rayOrientation(RayOrientation v) { this.rayOrientation = v != null ? v : RayOrientation.ALONG_RAY; return this; }
         
         public RaysShape build() {
@@ -405,7 +419,7 @@ public record RaysShape(
                 layers, layerSpacing, randomness, lengthVariation,
                 fadeStart, fadeEnd, segments, segmentGap,
                 lineShape, lineShapeAmplitude, lineShapeFrequency, shapeSegments,
-                curvature, curvatureIntensity, rayType, rayOrientation
+                curvature, curvatureIntensity, rayType, shapeIntensity, shapeLength, rayOrientation
             );
         }
     }

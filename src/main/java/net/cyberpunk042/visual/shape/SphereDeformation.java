@@ -130,6 +130,40 @@ public enum SphereDeformation {
     }
     
     /**
+     * Computes BOTH position AND normal for proper lighting.
+     * 
+     * <p>For spheroids, normals ≠ normalize(position). Uses gradient-based normals.</p>
+     * 
+     * @return {x, y, z, nx, ny, nz} - 6 element array
+     */
+    public float[] computeFullVertex(float theta, float phi, float radius, 
+            float intensity, float length) {
+        float[] pos = computeVertex(theta, phi, radius, intensity, length);
+        
+        // Compute proper normal based on shape type
+        float[] normal;
+        
+        // Volume-preserving spheroid radii (matches ShapeMath.spheroidVertex):
+        // polar radius c = radius * length
+        // equatorial radius a = radius / sqrt(length)
+        float c = radius * length;
+        float a = radius / (float) Math.sqrt(length);
+        
+        if (this == NONE || this == SPHEROID) {
+            // Use proper spheroid normal with correct a and c
+            normal = ShapeMath.spheroidNormal(pos[0], pos[1], pos[2], a, c);
+        } else {
+            // For other shapes, approximate with spheroid normal
+            normal = ShapeMath.spheroidNormal(pos[0], pos[1], pos[2], a, c);
+        }
+        
+        return new float[] { 
+            pos[0], pos[1], pos[2],
+            normal[0], normal[1], normal[2] 
+        };
+    }
+    
+    /**
      * Simplified computeVertex without length (uses length = 1.0).
      */
     public float[] computeVertex(float theta, float phi, float radius, float intensity) {

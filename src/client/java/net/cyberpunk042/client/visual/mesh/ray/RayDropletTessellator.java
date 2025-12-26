@@ -31,9 +31,6 @@ public class RayDropletTessellator implements RayTypeTessellator {
     /** Singleton instance. */
     public static final RayDropletTessellator INSTANCE = new RayDropletTessellator();
     
-    /** Default sharpness for droplets (2.0 = classic teardrop). */
-    private static final float DEFAULT_SHARPNESS = 2.0f;
-    
     /** Minimum rings for smooth droplet. */
     private static final int MIN_RINGS = 6;
     
@@ -44,6 +41,13 @@ public class RayDropletTessellator implements RayTypeTessellator {
     
     @Override
     public void tessellate(MeshBuilder builder, RaysShape shape, RayContext context) {
+        tessellate(builder, shape, context, null, null);
+    }
+    
+    @Override
+    public void tessellate(MeshBuilder builder, RaysShape shape, RayContext context,
+                          net.cyberpunk042.visual.pattern.VertexPattern pattern,
+                          net.cyberpunk042.visual.visibility.VisibilityMask visibility) {
         // Get droplet parameters
         float length = context.length();
         float baseRadius = length * 0.5f;  // Radius = half the ray length for an inscribed droplet
@@ -65,12 +69,15 @@ public class RayDropletTessellator implements RayTypeTessellator {
         int rings = Math.max(MIN_RINGS, totalSegs / 2);
         int segments = Math.max(MIN_SEGMENTS, totalSegs / 2);
         
-        // Generate the droplet using the shared polar surface generator
-        float sharpness = DEFAULT_SHARPNESS;
+        // shapeIntensity controls blend: 0=sphere, 1=full droplet
+        // shapeLength controls axial stretch
+        float intensity = context.shapeIntensity();
+        float length = context.shapeLength();
         
+        // Generate the droplet using SphereDeformation with pattern support
         Ray3DGeometryUtils.generateDroplet(
             builder, center, direction, baseRadius,
-            sharpness, rings, segments
+            intensity, length, rings, segments, pattern
         );
     }
 }

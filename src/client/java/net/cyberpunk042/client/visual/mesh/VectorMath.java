@@ -51,6 +51,16 @@ public final class VectorMath {
     }
     
     /**
+     * Functional interface for computing BOTH position AND normal.
+     * Required for proper spheroid lighting (normals differ from position direction).
+     */
+    @FunctionalInterface
+    public interface FullVertexFunction {
+        /** Returns {x, y, z, nx, ny, nz} position + normal for given spherical coordinates. */
+        float[] apply(float theta, float phi, float radius);
+    }
+    
+    /**
      * Generates a polar surface with FULL feature support.
      * 
      * <p><b>Core algorithm extracted from SphereTessellator.tessellateUvSphere().</b></p>
@@ -437,6 +447,187 @@ public final class VectorMath {
                 int bottomRight = vertexIndices[lat + 1][lon + 1];
                 
                 // Use pattern-aware quad emission if available
+                if (pattern != null) {
+                    builder.quadAsTrianglesFromPattern(topLeft, topRight, bottomRight, bottomLeft, pattern);
+                } else {
+                    builder.triangle(topLeft, topRight, bottomRight);
+                    builder.triangle(topLeft, bottomRight, bottomLeft);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Generates a lat/lon grid with arbitrary orientation (center + direction).
+     * 
+     * <p>For 3D ray types (droplet, etc.) that need to point in any direction.</p>
+     * 
+     * @param builder MeshBuilder
+     * @param center Center position
+     * @param direction Direction the pole points (normalized)
+     * @param radius Base radius
+     * @param latSteps Latitude resolution
+     * @param lonSteps Longitude resolution
+     * @param fullVertexFunc Returns {x,y,z,nx,ny,nz} for theta,phi,radius
+     */
+    public static void generateLatLonGridFullOriented(
+            MeshBuilder builder,
+            float[] center,
+            float[] direction,
+            float radius,
+            int latSteps,
+            int lonSteps,
+            FullVertexFunction fullVertexFunc) {
+        generateLatLonGridFullOriented(builder, center, direction, radius, latSteps, lonSteps, 
+            fullVertexFunc, null);
+    }
+    
+    /**
+     * Generates a lat/lon grid with arbitrary orientation and optional pattern.
+     */
+    public static void generateLatLonGridFullOriented(
+            MeshBuilder builder,
+            float[] center,
+            float[] direction,
+            float radius,
+            int latSteps,
+            int lonSteps,
+            FullVertexFunction fullVertexFunc,
+            net.cyberpunk042.visual.pattern.VertexPattern pattern) {
+        
+        // Build basis vectors (u, v perpendicular to direction)
+        float[] up = new float[] { 0, 1, 0 };
+        if (Math.abs(dot(direction, up)) > 0.99f) {
+            up = new float[] { 1, 0, 0 };
+        }
+        float[] u = normalize(cross(direction, up));
+        float[] v = normalize(cross(direction, u));
+        
+        int[][] vertexIndices = new int[latSteps + 1][lonSteps + 1];
+        
+        for (int lat = 0; lat <= latSteps; lat++) {
+            float theta = lat / (float) latSteps * PI;
+            
+            for (int lon = 0; lon <= lonSteps; lon++) {
+                float phi = lon / (float) lonSteps * TWO_PI;
+                
+                // Get position + normal from vertex function (in local coords)
+                float[] full = fullVertexFunc.apply(theta, phi, radius);
+                float lx = full[0], ly = full[1], lz = full[2];
+                float lnx = full[3], lny = full[4], lnz = full[5];
+                
+                // Transform local coords to world coords using basis
+                // Local Y = direction, Local X = u, Local Z = v
+                float[] pos = add(center, 
+                    add(scale(u, lx),
+                        add(scale(direction, ly),
+                            scale(v, lz))));
+                            
+                float[] normal = add(scale(u, lnx),
+                    add(scale(direction, lny),
+                        scale(v, lnz)));
+                normal = normalize(normal);
+                
+                vertexIndices[lat][lon] = builder.addVertex(
+                    Vertex.pos(pos[0], pos[1], pos[2])
+                        .withNormal(normal[0], normal[1], normal[2]));
+            }
+        }
+        
+        // Generate triangles with pattern if provided
+        int totalCells = latSteps * lonSteps;
+        for (int lat = 0; lat < latSteps; lat++) {
+            for (int lon = 0; lon < lonSteps; lon++) {
+                // Check pattern
+                if (pattern != null && !pattern.shouldRender(lat * lonSteps + lon, totalCells)) {
+                    continue;
+                }
+                
+                int topLeft = vertexIndices[lat][lon];
+                int topRight = vertexIndices[lat][lon + 1];
+                int bottomLeft = vertexIndices[lat + 1][lon];
+                int bottomRight = vertexIndices[lat + 1][lon + 1];
+                
+                // Use pattern-aware quad emission if it's a QuadPattern
+                if (pattern instanceof net.cyberpunk042.visual.pattern.QuadPattern quadPattern) {
+                    builder.quadAsTrianglesFromPattern(topLeft, topRight, bottomRight, bottomLeft, quadPattern);
+                } else {
+                    builder.triangle(topLeft, topRight, bottomRight);
+                    builder.triangle(topLeft, bottomRight, bottomLeft);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Generates a latitude/longitude grid with FULL vertex data (position + normal).
+     * 
+     * <p>Uses {@link FullVertexFunction} for proper spheroid normals.</p>
+     */
+    public static void generateLatLonGridFull(
+            MeshBuilder builder,
+            float radius,
+            int latSteps,
+            int lonSteps,
+            float latStart,
+            float latEnd,
+            float lonStart,
+            float lonEnd,
+            FullVertexFunction fullVertexFunc,
+            VertexPattern pattern,
+            VisibilityMask visibility,
+            WaveConfig wave,
+            float time) {
+        
+        float latRange = latEnd - latStart;
+        float lonRange = lonEnd - lonStart;
+        
+        boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();
+        
+        int[][] vertexIndices = new int[latSteps + 1][lonSteps + 1];
+        
+        for (int lat = 0; lat <= latSteps; lat++) {
+            float latNorm = latStart + (lat / (float) latSteps) * latRange;
+            float theta = latNorm * PI;
+            
+            for (int lon = 0; lon <= lonSteps; lon++) {
+                float lonNorm = lonStart + (lon / (float) lonSteps) * lonRange;
+                float phi = lonNorm * TWO_PI;
+                
+                // Get position + normal (6 elements: x, y, z, nx, ny, nz)
+                float[] fullVertex = fullVertexFunc.apply(theta, phi, radius);
+                
+                Vertex v = Vertex.pos(fullVertex[0], fullVertex[1], fullVertex[2])
+                    .withNormal(fullVertex[3], fullVertex[4], fullVertex[5]);
+                
+                if (applyWave) {
+                    v = WaveDeformer.applyToVertex(v, wave, time);
+                }
+                
+                vertexIndices[lat][lon] = builder.addVertex(v);
+            }
+        }
+        
+        // Generate triangles
+        for (int lat = 0; lat < latSteps; lat++) {
+            float latFrac = lat / (float) latSteps;
+            
+            for (int lon = 0; lon < lonSteps; lon++) {
+                float lonFrac = lon / (float) lonSteps;
+                
+                if (visibility != null && !visibility.isVisible(lonFrac, latFrac)) {
+                    continue;
+                }
+                
+                if (pattern != null && !pattern.shouldRender(lat * lonSteps + lon, latSteps * lonSteps)) {
+                    continue;
+                }
+                
+                int topLeft = vertexIndices[lat][lon];
+                int topRight = vertexIndices[lat][lon + 1];
+                int bottomLeft = vertexIndices[lat + 1][lon];
+                int bottomRight = vertexIndices[lat + 1][lon + 1];
+                
                 if (pattern != null) {
                     builder.quadAsTrianglesFromPattern(topLeft, topRight, bottomRight, bottomLeft, pattern);
                 } else {

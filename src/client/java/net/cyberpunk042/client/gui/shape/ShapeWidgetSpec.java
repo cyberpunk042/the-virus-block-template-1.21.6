@@ -417,7 +417,25 @@ public final class ShapeWidgetSpec {
         
         // Row 8: Segments + Segment Gap
         SliderSpec.halfInt("Segments", "rays.segments", 1, 10),
-        SliderSpec.half("Seg Gap", "rays.segmentGap", 0f, 0.5f, "%.2f")
+        SliderSpec.half("Seg Gap", "rays.segmentGap", 0f, 0.5f, "%.2f"),
+        
+        // === 3D RAY TYPE ===
+        new SectionHeader("Ray Type"),
+        
+        // Row 9: Ray Type dropdown
+        EnumDropdownSpec.full("Ray Type", "rays.rayType",
+            net.cyberpunk042.visual.shape.RayType.class,
+            net.cyberpunk042.visual.shape.RayType.LINE),
+        
+        // Row 10: Orientation + Line Segments (for 3D types)
+        EnumDropdownSpec.half("Orientation", "rays.rayOrientation",
+            net.cyberpunk042.visual.shape.RayOrientation.class,
+            net.cyberpunk042.visual.shape.RayOrientation.ALONG_RAY),
+        SliderSpec.halfInt("Line Segments", "rays.shapeSegments", 4, 64),
+        
+        // Row 11: Shape Intensity + Shape Length (for 3D types like droplet)
+        SliderSpec.half("Intensity", "rays.shapeIntensity", 0f, 1f, "%.2f"),
+        SliderSpec.half("Length", "rays.shapeLength", 0.2f, 3f, "%.2f")
         
         // NOTE: Line Shape and Field Curvature are handled manually in ShapeSubPanel
         // because they have CONDITIONAL visibility based on enum selection

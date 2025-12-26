@@ -54,7 +54,7 @@ public final class RaysTessellator {
      * @return Mesh containing the ray geometry
      */
     public static Mesh tessellate(RaysShape shape) {
-        return tessellate(shape, null, 0);
+        return tessellate(shape, null, null, 0);
     }
     
     /**
@@ -66,9 +66,41 @@ public final class RaysTessellator {
      * @return Mesh containing the ray geometry
      */
     public static Mesh tessellate(RaysShape shape, WaveConfig wave, float time) {
-        // Choose mesh type based on ray type
+        return tessellate(shape, null, wave, time);
+    }
+    
+    /**
+     * Tessellates rays shape into a mesh with pattern and optional wave deformation.
+     * 
+     * @param shape The rays shape definition
+     * @param pattern Pattern for tessellation (or null for filled)
+     * @param wave Wave configuration (or null for no wave)
+     * @param time Current time for wave animation
+     * @return Mesh containing the ray geometry
+     */
+    public static Mesh tessellate(RaysShape shape, net.cyberpunk042.visual.pattern.VertexPattern pattern, 
+                                   WaveConfig wave, float time) {
+        return tessellate(shape, pattern, null, wave, time);
+    }
+    
+    /**
+     * Tessellates rays shape with full pattern, visibility, and wave support.
+     */
+    public static Mesh tessellate(RaysShape shape, net.cyberpunk042.visual.pattern.VertexPattern pattern, 
+                                   net.cyberpunk042.visual.visibility.VisibilityMask visibility,
+                                   WaveConfig wave, float time) {
         RayType rayType = shape.effectiveRayType();
-        MeshBuilder builder = rayType.is3D() ? MeshBuilder.triangles() : MeshBuilder.lines();
+        
+        // Get the tessellator for this ray type
+        RayTypeTessellator tessellator = RayTypeTessellatorRegistry.get(rayType);
+        
+        // Choose mesh type based on BOTH ray type AND tessellator capability
+        // If using RayLineTessellator (fallback for unimplemented types), must use LINES
+        // Only use TRIANGLES if the type is 3D AND has a proper 3D tessellator
+        boolean is3DWithProperTessellator = rayType.is3D() && 
+            RayTypeTessellatorRegistry.isImplemented(rayType);
+        
+        MeshBuilder builder = is3DWithProperTessellator ? MeshBuilder.triangles() : MeshBuilder.lines();
         
         int count = shape.count();
         int layers = Math.max(1, shape.layers());
@@ -76,11 +108,10 @@ public final class RaysTessellator {
         Random rng = new Random(42); // Deterministic random for stable results
         
         Logging.FIELD.topic("tessellation").debug(
-            "Tessellating rays: count={}, layers={}, arrangement={}, rayType={}, wave={}", 
-            count, layers, shape.arrangement(), rayType, wave != null && wave.isActive());
-        
-        // Get the tessellator for this ray type
-        RayTypeTessellator tessellator = RayTypeTessellatorRegistry.get(rayType);
+            "Tessellating rays: count={}, layers={}, arrangement={}, rayType={}, tessellator={}, meshType={}, pattern={}", 
+            count, layers, shape.arrangement(), rayType, tessellator.name(),
+            is3DWithProperTessellator ? "TRIANGLES" : "LINES",
+            pattern != null ? pattern.getClass().getSimpleName() : "null");
         
         // Generate rays for each layer
         for (int layer = 0; layer < layers; layer++) {
@@ -88,8 +119,8 @@ public final class RaysTessellator {
                 // Compute context for this ray
                 RayContext context = RayPositioner.computeContext(shape, i, layer, rng, wave, time);
                 
-                // Delegate to type-specific tessellator
-                tessellator.tessellate(builder, shape, context);
+                // Delegate to type-specific tessellator with pattern and visibility
+                tessellator.tessellate(builder, shape, context, pattern, visibility);
             }
         }
         

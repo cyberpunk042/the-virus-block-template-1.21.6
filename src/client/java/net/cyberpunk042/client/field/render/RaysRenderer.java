@@ -62,7 +62,21 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
             "[RAYS] Tessellating: count={}, arrangement={}, layers={}, wave={}",
             shape.count(), shape.arrangement(), shape.layers(), wave != null && wave.isActive());
         
-        return RaysTessellator.tessellate(shape, wave, time);
+        // Resolve pattern from arrangement config (same as SphereRenderer)
+        net.cyberpunk042.visual.pattern.VertexPattern pattern = null;
+        net.cyberpunk042.visual.pattern.ArrangementConfig arrangement = primitive.arrangement();
+        if (arrangement != null) {
+            pattern = arrangement.resolvePattern("main", shape.primaryCellType());
+            Logging.RENDER.topic("tessellate").debug(
+                "[RAYS] Pattern resolved: {} for CellType={}", 
+                pattern != null ? pattern.getClass().getSimpleName() : "null",
+                shape.primaryCellType());
+        }
+        
+        // Get visibility mask (same as SphereRenderer)
+        net.cyberpunk042.visual.visibility.VisibilityMask visibility = primitive.visibility();
+        
+        return RaysTessellator.tessellate(shape, pattern, visibility, wave, time);
     }
     
     /**

@@ -114,6 +114,8 @@ public final class RayPositioner {
             .shapeSegments(shapeSegments)
             .orientation(orientation)
             .orientationVector(orientationVector)
+            .shapeIntensity(shape.shapeIntensity())
+            .shapeLength(shape.shapeLength())
             .wave(wave)
             .time(time)
             .hasWave(hasWave)
