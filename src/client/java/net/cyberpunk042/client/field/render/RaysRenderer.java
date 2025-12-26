@@ -166,9 +166,18 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
             Logging.FIELD.topic("render").trace("[RAYS] DONE lines: {} vertices", mesh.vertexCount());
         } else {
             // Triangle-based 3D ray rendering (droplet, egg, sphere ray types)
-            emitRayTriangles(matrices, consumer, mesh, color, baseAlpha, light, colorCtx);
+            // RESPECT FILL MODE like other shapes
+            net.cyberpunk042.visual.fill.FillConfig fill = primitive.fill();
+            net.cyberpunk042.visual.fill.FillMode mode = fill != null ? fill.mode() : net.cyberpunk042.visual.fill.FillMode.SOLID;
             
-            Logging.FIELD.topic("render").trace("[RAYS] DONE triangles: {} vertices", mesh.vertexCount());
+            switch (mode) {
+                case SOLID -> emitRayTriangles(matrices, consumer, mesh, color, baseAlpha, light, colorCtx);
+                case WIREFRAME -> emitWireframe(matrices, consumer, mesh, color, light, fill, waveConfig, time);
+                case CAGE -> emitCage(matrices, consumer, mesh, color, light, fill, primitive, waveConfig, time);
+                case POINTS -> emitPoints(matrices, consumer, mesh, color, light, fill, waveConfig, time);
+            }
+            
+            Logging.FIELD.topic("render").trace("[RAYS] DONE 3D: {} vertices, mode={}", mesh.vertexCount(), mode);
         }
     }
     

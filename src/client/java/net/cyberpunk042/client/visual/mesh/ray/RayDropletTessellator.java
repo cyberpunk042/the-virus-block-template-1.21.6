@@ -72,12 +72,12 @@ public class RayDropletTessellator implements RayTypeTessellator {
         // shapeIntensity controls blend: 0=sphere, 1=full droplet
         // shapeLength controls axial stretch
         float intensity = context.shapeIntensity();
-        float length = context.shapeLength();
+        float axialLength = context.shapeLength();
         
-        // Generate the droplet using SphereDeformation with pattern support
+        // Generate the droplet using SphereDeformation with pattern and visibility support
         Ray3DGeometryUtils.generateDroplet(
             builder, center, direction, baseRadius,
-            intensity, length, rings, segments, pattern
+            intensity, axialLength, rings, segments, pattern, visibility
         );
     }
 }

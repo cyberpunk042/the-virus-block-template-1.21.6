@@ -479,11 +479,11 @@ public final class VectorMath {
             int lonSteps,
             FullVertexFunction fullVertexFunc) {
         generateLatLonGridFullOriented(builder, center, direction, radius, latSteps, lonSteps, 
-            fullVertexFunc, null);
+            fullVertexFunc, null, null);
     }
     
     /**
-     * Generates a lat/lon grid with arbitrary orientation and optional pattern.
+     * Generates a lat/lon grid with arbitrary orientation and pattern.
      */
     public static void generateLatLonGridFullOriented(
             MeshBuilder builder,
@@ -494,14 +494,32 @@ public final class VectorMath {
             int lonSteps,
             FullVertexFunction fullVertexFunc,
             net.cyberpunk042.visual.pattern.VertexPattern pattern) {
+        generateLatLonGridFullOriented(builder, center, direction, radius, latSteps, lonSteps, 
+            fullVertexFunc, pattern, null);
+    }
+    
+    /**
+     * Generates a lat/lon grid with arbitrary orientation, pattern, and visibility.
+     */
+    public static void generateLatLonGridFullOriented(
+            MeshBuilder builder,
+            float[] center,
+            float[] direction,
+            float radius,
+            int latSteps,
+            int lonSteps,
+            FullVertexFunction fullVertexFunc,
+            net.cyberpunk042.visual.pattern.VertexPattern pattern,
+            net.cyberpunk042.visual.visibility.VisibilityMask visibility) {
         
         // Build basis vectors (u, v perpendicular to direction)
+        // Use right-handed coordinate system for correct winding
         float[] up = new float[] { 0, 1, 0 };
         if (Math.abs(dot(direction, up)) > 0.99f) {
             up = new float[] { 1, 0, 0 };
         }
-        float[] u = normalize(cross(direction, up));
-        float[] v = normalize(cross(direction, u));
+        float[] u = normalize(cross(up, direction));  // Right-handed
+        float[] v = normalize(cross(direction, u));   // Right-handed
         
         int[][] vertexIndices = new int[latSteps + 1][lonSteps + 1];
         
@@ -534,10 +552,19 @@ public final class VectorMath {
             }
         }
         
-        // Generate triangles with pattern if provided
+        // Generate triangles with pattern and visibility
         int totalCells = latSteps * lonSteps;
         for (int lat = 0; lat < latSteps; lat++) {
+            float latFrac = lat / (float) latSteps;
+            
             for (int lon = 0; lon < lonSteps; lon++) {
+                float lonFrac = lon / (float) lonSteps;
+                
+                // Check visibility mask
+                if (visibility != null && !visibility.isVisible(lonFrac, latFrac)) {
+                    continue;
+                }
+                
                 // Check pattern
                 if (pattern != null && !pattern.shouldRender(lat * lonSteps + lon, totalCells)) {
                     continue;

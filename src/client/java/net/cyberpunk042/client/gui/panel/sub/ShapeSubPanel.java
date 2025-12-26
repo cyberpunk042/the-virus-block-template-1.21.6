@@ -139,6 +139,9 @@ public class ShapeSubPanel extends AbstractPanel {
     public void rebuildForCurrentShape() {
         boolean needsOffset = bounds != null && !bounds.isEmpty();
         
+        // Reset scroll offset to avoid position corruption
+        scrollOffset = 0;
+        
         widgets.clear();
         controlBuilder.clear();
         
@@ -205,14 +208,39 @@ public class ShapeSubPanel extends AbstractPanel {
         widgets.addAll(controlBuilder.getWidgets());
         
         // ═══════════════════════════════════════════════════════════════════════
-        // SPECIAL: Sphere Quad Pattern Dropdown
+        // SPECIAL: Quad Pattern Dropdown (for shapes that use QUAD cells)
         // ═══════════════════════════════════════════════════════════════════════
         
-        if (shapeType.equalsIgnoreCase("sphere") || shapeType.equalsIgnoreCase("ring")) {
+        // Sphere, Ring, and 3D Rays all use QUAD cells and need pattern control
+        boolean needsQuadPattern = shapeType.equalsIgnoreCase("sphere") 
+            || shapeType.equalsIgnoreCase("ring");
+        
+        // For rays, check if it's a 3D type (which uses QUAD cells)
+        if (shapeType.equalsIgnoreCase("rays")) {
+            String rayTypeStr = state.getString("rays.rayType");
+            try {
+                var rayType = net.cyberpunk042.visual.shape.RayType.valueOf(
+                    rayTypeStr != null ? rayTypeStr : "LINE");
+                needsQuadPattern = rayType.is3D();
+            } catch (IllegalArgumentException ignored) {}
+        }
+        
+        if (needsQuadPattern) {
+            // Get current pattern from state
+            String patternId = state.getString("arrangement.defaultPattern");
+            net.cyberpunk042.visual.pattern.QuadPattern currentPattern = 
+                net.cyberpunk042.visual.pattern.QuadPattern.FILLED_1;
+            if (patternId != null) {
+                var found = net.cyberpunk042.visual.pattern.QuadPattern.fromId(patternId);
+                if (found != null) {
+                    currentPattern = found;
+                }
+            }
+            
             var quadPatternDropdown = GuiWidgets.enumDropdown(
                 x, y, w, GuiConstants.COMPACT_HEIGHT, "Quad Pattern",
                 net.cyberpunk042.visual.pattern.QuadPattern.class,
-                net.cyberpunk042.visual.pattern.QuadPattern.FILLED_1,
+                currentPattern,
                 "Cell-level pattern for quad tessellation",
                 v -> onUserChange(() -> state.set("arrangement.defaultPattern", v.id()))
             );

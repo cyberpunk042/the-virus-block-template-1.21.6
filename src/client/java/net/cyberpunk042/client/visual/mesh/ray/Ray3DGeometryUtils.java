@@ -68,6 +68,7 @@ public final class Ray3DGeometryUtils {
      * @param rings Number of latitude rings
      * @param segments Number of longitude segments
      * @param pattern Pattern for cell rendering (null = filled)
+     * @param visibility Visibility mask (null = full visibility)
      */
     public static void generateDroplet(
             MeshBuilder builder,
@@ -78,7 +79,8 @@ public final class Ray3DGeometryUtils {
             float length,
             int rings,
             int segments,
-            net.cyberpunk042.visual.pattern.VertexPattern pattern) {
+            net.cyberpunk042.visual.pattern.VertexPattern pattern,
+            net.cyberpunk042.visual.visibility.VisibilityMask visibility) {
         
         // Use SphereDeformation.DROPLET - it handles intensity and length correctly!
         SphereDeformation deformation = SphereDeformation.DROPLET;
@@ -86,9 +88,9 @@ public final class Ray3DGeometryUtils {
         VectorMath.FullVertexFunction vertexFunc = (theta, phi, r) -> 
             deformation.computeFullVertex(theta, phi, r, intensity, length);
         
-        // Use the same grid generation as sphere - with pattern support
+        // Use the same grid generation as sphere - with pattern and visibility support
         VectorMath.generateLatLonGridFullOriented(
-            builder, center, direction, radius, rings, segments, vertexFunc, pattern);
+            builder, center, direction, radius, rings, segments, vertexFunc, pattern, visibility);
     }
     
     /**
