@@ -496,11 +496,11 @@ public final class RaysTessellator {
                 py += offset[1];
                 pz += offset[2];
                 
-                // Apply wave deformation if active
+                // Apply wave deformation if active (use LINEAR for lines)
                 WaveConfig wave = currentWave.get();
                 Float time = currentTime.get();
                 if (wave != null && wave.isActive() && wave.isCpuMode() && time != null) {
-                    float[] deformed = WaveDeformer.apply(px, py, pz, wave, time);
+                    float[] deformed = WaveDeformer.applyLinear(px, py, pz, wave, time);
                     px = deformed[0];
                     py = deformed[1];
                     pz = deformed[2];

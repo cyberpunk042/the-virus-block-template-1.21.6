@@ -166,6 +166,18 @@ public class ContentBuilder {
      */
     public void renderLabels(net.minecraft.client.gui.DrawContext context, int scrollOffset, int boundsX, int boundsY) {
         var textRenderer = net.minecraft.client.MinecraftClient.getInstance().textRenderer;
+        
+        // Debug: log first label details
+        if (!labels.isEmpty()) {
+            LabelEntry first = labels.get(0);
+            int firstRenderX = boundsX + first.x;
+            int firstRenderY = boundsY + first.y - scrollOffset;
+            net.cyberpunk042.log.Logging.GUI.topic("labels").info(
+                "First label '{}' at screen ({}, {}), entry.y={}, color=0x{}", 
+                first.text.substring(0, Math.min(20, first.text.length())),
+                firstRenderX, firstRenderY, first.y, Integer.toHexString(first.color));
+        }
+        
         for (LabelEntry entry : labels) {
             // entry.x and entry.y are in content coordinates (local)
             // Add bounds offset to get screen coordinates

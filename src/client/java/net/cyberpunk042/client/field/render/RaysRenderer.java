@@ -180,7 +180,7 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
         // Wave configuration for RADIATE/ABSORB
         final float waveArc = flowConfig != null ? flowConfig.effectiveWaveArc() : 1.0f;
         final WaveDistribution waveDist = flowConfig != null ? flowConfig.effectiveWaveDistribution() : WaveDistribution.SEQUENTIAL;
-        final int waveCount = flowConfig != null ? Math.max(1, flowConfig.waveCount()) : 1;
+        final float sweepCopies = flowConfig != null ? Math.max(0.1f, flowConfig.waveCount()) : 1.0f;
         
         // Pre-compute random offsets for RANDOM distribution (seeded by ray index)
         // This ensures consistent randomization per ray across frames
@@ -212,16 +212,19 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
                     rayOffset = (float) idx / rayCount;
                 }
                 
-                // Apply wave arc: waveArc=1.0 means all rays participate,
-                // waveArc=0.25 means only 25% of rays are visible at once
-                // Scale the phase offset so that rays are compressed into the waveArc
+                // Apply wave scale (compression/frequency)
                 float scaledOffset = rayOffset * waveArc;
                 
-                // Apply wave count: multiply to create multiple simultaneous wave peaks
-                // waveCount=1: single sweep (0-1), waveCount=2: two sweeps (each ray sees 2 cycles)
-                float phase = baseLengthPhase + scaledOffset;
-                phase = (phase * waveCount) % 1.0f;
+                // Apply sweep copies - trim below 1, duplicate above 1
+                // For TRIM (< 1): compress the ray distribution
+                // For DUPLICATE (> 1): we handle this below by checking multiple windows
+                if (sweepCopies < 1.0f) {
+                    // Trim mode: compress visible region
+                    // sweepCopies=0.5 means rays are spread over only half the circle
+                    scaledOffset = rayOffset * sweepCopies * waveArc;
+                }
                 
+                float phase = (baseLengthPhase + scaledOffset) % 1.0f;
                 rayLengthPhase = phase;
             } else {
                 rayLengthPhase = baseLengthPhase;
@@ -247,32 +250,74 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
                 switch (lengthMode) {
                     case RADIATE -> {
                         // Ray flows OUTWARD: visible window starts at inner, moves toward outer
-                        // phase 0 → window at t=0 (inner end)
-                        // phase 1 → window at t=1 (outer end), wraps back
-                        //
-                        // The window slides from inner to outer, creating outward flow.
-                        // When it reaches outer (disappears off the end), it respawns at inner.
-                        //
-                        // Window center travels from 0 to (1 + segmentLength)
-                        // so that the window fully exits before wrapping
                         float travelRange = 1.0f + segmentLength;
                         float windowCenter = rayLengthPhase * travelRange;
                         windowStart = windowCenter - segmentLength * 0.5f;
                         windowEnd = windowCenter + segmentLength * 0.5f;
+                        
+                        // SWEEP DUPLICATION: create multiple visibility windows
+                        // sweepCopies=2 means 2 full-size windows 180° apart
+                        // sweepCopies=3 means 3 full-size windows 120° apart
+                        if (sweepCopies > 1.0f) {
+                            int copies = (int) Math.ceil(sweepCopies);
+                            // Check if ray falls in ANY of the duplicated windows
+                            // We iterate through each copy position and check visibility
+                            boolean inAnyWindow = false;
+                            for (int c = 0; c < copies; c++) {
+                                float copyOffset = (float) c / copies;
+                                float copyPhase = (rayLengthPhase + copyOffset) % 1.0f;
+                                float copyCenter = copyPhase * travelRange;
+                                float copyStart = copyCenter - segmentLength * 0.5f;
+                                float copyEnd = copyCenter + segmentLength * 0.5f;
+                                // Check if ANY point of the ray (t from 0 to 1) is in this window
+                                if (copyEnd >= 0 && copyStart <= 1) {
+                                    inAnyWindow = true;
+                                    // Use the best matching window
+                                    if (copyStart <= t0 && t1 <= copyEnd) {
+                                        windowStart = copyStart;
+                                        windowEnd = copyEnd;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (!inAnyWindow) {
+                                // Ray is not in any window - hide it
+                                windowStart = -1;
+                                windowEnd = -1;
+                            }
+                        }
                     }
                     case ABSORB -> {
                         // Ray flows INWARD: visible window starts at outer, moves toward inner
-                        // phase 0 → window at t=1 (outer end)
-                        // phase 1 → window at t=0 (inner end), wraps back
-                        //
-                        // The window slides from outer to inner, creating inward "absorption" flow.
-                        // When it reaches inner (disappears), it respawns at outer.
-                        //
-                        // Window center travels from 1 to (-segmentLength)
                         float travelRange = 1.0f + segmentLength;
                         float windowCenter = 1.0f - (rayLengthPhase * travelRange);
                         windowStart = windowCenter - segmentLength * 0.5f;
                         windowEnd = windowCenter + segmentLength * 0.5f;
+                        
+                        // SWEEP DUPLICATION: create multiple visibility windows
+                        if (sweepCopies > 1.0f) {
+                            int copies = (int) Math.ceil(sweepCopies);
+                            boolean inAnyWindow = false;
+                            for (int c = 0; c < copies; c++) {
+                                float copyOffset = (float) c / copies;
+                                float copyPhase = (rayLengthPhase + copyOffset) % 1.0f;
+                                float copyCenter = 1.0f - (copyPhase * travelRange);
+                                float copyStart = copyCenter - segmentLength * 0.5f;
+                                float copyEnd = copyCenter + segmentLength * 0.5f;
+                                if (copyEnd >= 0 && copyStart <= 1) {
+                                    inAnyWindow = true;
+                                    if (copyStart <= t0 && t1 <= copyEnd) {
+                                        windowStart = copyStart;
+                                        windowEnd = copyEnd;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (!inAnyWindow) {
+                                windowStart = -1;
+                                windowEnd = -1;
+                            }
+                        }
                     }
                     case SEGMENT -> {
                         // SEGMENT: sliding window (original behavior)
@@ -503,9 +548,11 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
     private float calculateLengthPhase(RayFlowConfig flow, float time) {
         if (flow == null || !flow.hasLength()) return 1f;
         
-        float speed = Math.max(0.1f, flow.lengthSpeed()); // Ensure visible speed
-        // One full cycle per 2 seconds at speed=1
-        float phase = (time * speed * 0.25f) % 1.0f;
+        float speed = flow.lengthSpeed();
+        // One full cycle per ~20 seconds at speed=1 (slower base rate)
+        // speed=0.01 → ~2000 seconds per cycle (very slow)
+        // speed=1.0 → ~20 seconds per cycle
+        float phase = (time * speed * 0.05f) % 1.0f;
         if (phase < 0) phase += 1.0f;
         
         return switch (flow.length()) {
@@ -514,7 +561,7 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
             case RADIATE, ABSORB -> phase;
             case PULSE -> {
                 // Oscillate between 0.2 and 1.0 (never fully invisible)
-                float sine = (float)Math.sin(time * speed * Math.PI);
+                float sine = (float)Math.sin(time * speed * 0.1f * Math.PI);
                 yield 0.6f + 0.4f * sine;
             }
             case SEGMENT -> phase; // 0→1 slides the segment position

@@ -386,7 +386,7 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             case "segmentLength" -> b.segmentLength(toFloat(value));
             case "waveArc" -> b.waveArc(toFloat(value));
             case "waveDistribution" -> b.waveDistribution(value instanceof WaveDistribution wd ? wd : WaveDistribution.fromString(value.toString()));
-            case "waveCount" -> b.waveCount(toInt(value));
+            case "waveCount" -> b.waveCount(toFloat(value));
             case "travel" -> b.travel(value instanceof TravelMode tm ? tm : TravelMode.fromString(value.toString()));
             case "travelSpeed" -> b.travelSpeed(toFloat(value));
             case "chaseCount" -> b.chaseCount(toInt(value));

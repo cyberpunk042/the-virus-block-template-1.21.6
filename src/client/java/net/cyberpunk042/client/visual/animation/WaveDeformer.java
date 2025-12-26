@@ -114,6 +114,53 @@ public final class WaveDeformer {
     }
     
     /**
+     * Applies wave deformation using LINEAR displacement (for lines/rays).
+     * 
+     * <p>Unlike radial mode, this displaces vertices in a fixed direction perpendicular
+     * to the wave propagation, creating visible wavy effects on line primitives.</p>
+     * 
+     * @param x Original X position
+     * @param y Original Y position  
+     * @param z Original Z position
+     * @param wave Wave configuration
+     * @param time Current time in ticks
+     * @return Array of 3 floats [x, y, z] with wave applied
+     */
+    public static float[] applyLinear(float x, float y, float z, WaveConfig wave, float time) {
+        if (wave == null || !wave.isActive()) {
+            return new float[]{x, y, z};
+        }
+        
+        // Only apply if CPU mode
+        if (!wave.isCpuMode()) {
+            return new float[]{x, y, z};
+        }
+        
+        // Use modulo to prevent sin overflow with large time values
+        float safeTime = time % 1000f;
+        
+        // Calculate phase based on direction
+        // For lines, we want the wave to vary along the ray length
+        float phase;
+        switch (wave.direction()) {
+            case X -> phase = x * wave.frequency() + safeTime * wave.speed();
+            case Z -> phase = z * wave.frequency() + safeTime * wave.speed();
+            default -> phase = (x + z) * wave.frequency() + safeTime * wave.speed(); // Y: use radial distance
+        }
+        
+        float displacement = MathHelper.sin(phase) * wave.amplitude();
+        
+        // LINEAR displacement perpendicular to wave direction
+        // This makes lines visibly wavy
+        return switch (wave.direction()) {
+            case Y -> new float[]{x, y + displacement, z}; // Wave in XZ, displace in Y
+            case X -> new float[]{x, y + displacement, z}; // Wave along X, displace in Y
+            case Z -> new float[]{x, y + displacement, z}; // Wave along Z, displace in Y
+            default -> new float[]{x, y + displacement, z};
+        };
+    }
+    
+    /**
      * Convenience method that returns a new Vertex with wave applied.
      * Preserves normal direction.
      */

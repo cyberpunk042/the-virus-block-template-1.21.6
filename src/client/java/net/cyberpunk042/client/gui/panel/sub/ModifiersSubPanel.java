@@ -338,11 +338,17 @@ public class ModifiersSubPanel extends BoundPanel {
         // 1.0 = full ray visible, lower values = particle-like effect
         c.slider("Seg Len", "rayFlow.segmentLength").range(0.1f, 1.0f).format("%.2f").add();
         
-        // Wave Arc: how much of the circle is lit at once (0.25=90°, 0.5=180°, 1.0=360°)
-        c.slider("Wave Arc", "rayFlow.waveArc").range(0.1f, 1.0f).format("%.2f").add();
+        // Wave Scale: controls visibility wave pattern (speed/frequency)
+        // < 1.0: compression (rays grouped tighter)
+        // = 1.0: normal
+        // > 1.0: faster phase cycling
+        c.slider("Wave Scale", "rayFlow.waveArc").range(0.1f, 10.0f).format("%.1f").add();
         
-        // Wave Count: number of simultaneous visible wave regions (1=single sweep, 2=double, 4=quad)
-        c.slider("Wave #", "rayFlow.waveCount").range(1, 8).format("%.0f").add();
+        // Sweep Copies: controls arc width and duplication
+        // < 1.0: trims the arc (0.5 = 180° visible, 0.25 = 90° visible)
+        // = 1.0: normal full circle sweep
+        // > 1.0: duplicates the sweep (2 = two sweeps 180° apart, 3 = three at 120°)
+        c.slider("Sweep #", "rayFlow.waveCount").range(0.1f, 5.0f).format("%.1f").add();
         
         // Wave Distribution: SEQUENTIAL (coherent wave) vs RANDOM (scattered)
         WaveDistribution curWaveDist = flow != null && flow.waveDistribution() != null 
