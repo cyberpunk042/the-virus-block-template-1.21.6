@@ -1,0 +1,270 @@
+package net.cyberpunk042.client.visual.mesh.ray;
+
+import net.cyberpunk042.visual.animation.WaveConfig;
+import net.cyberpunk042.visual.shape.RayCurvature;
+import net.cyberpunk042.visual.shape.RayLineShape;
+
+/**
+ * Computed context for a single ray, containing all position and shape data.
+ * 
+ * <p>This is computed by {@link RayPositioner} and passed to 
+ * {@link RayTypeTessellator} implementations for geometry generation.
+ * 
+ * <h2>Coordinate System</h2>
+ * <p>All positions are in local space relative to the field origin.
+ * 
+ * @see RayPositioner
+ * @see RayTypeTessellator
+ */
+public record RayContext(
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Position Data
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /** Start position [x, y, z] of the ray. */
+    float[] start,
+    
+    /** End position [x, y, z] of the ray. */
+    float[] end,
+    
+    /** Normalized direction vector [x, y, z] from start to end. */
+    float[] direction,
+    
+    /** Actual length of this ray (may vary due to randomness). */
+    float length,
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Ray Identity
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /** Ray index (0 to count-1). */
+    int index,
+    
+    /** Total count of rays. */
+    int count,
+    
+    /** Layer index (0 to layers-1). */
+    int layerIndex,
+    
+    /** Normalized t value for this ray (index / count). */
+    float t,
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Appearance
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /** Ray width (thickness). */
+    float width,
+    
+    /** Fade alpha at start (0-1). */
+    float fadeStart,
+    
+    /** Fade alpha at end (0-1). */
+    float fadeEnd,
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Shape Modifiers
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /** Line shape (how the ray is bent: straight, wavy, corkscrew). */
+    RayLineShape lineShape,
+    
+    /** Line shape amplitude. */
+    float lineShapeAmplitude,
+    
+    /** Line shape frequency. */
+    float lineShapeFrequency,
+    
+    /** Curvature mode (how rays curve around center: vortex, spiral). */
+    RayCurvature curvature,
+    
+    /** Curvature intensity. */
+    float curvatureIntensity,
+    
+    /** Number of segments for complex shapes. */
+    int shapeSegments,
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Animation
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /** Wave configuration (or null if no wave). */
+    WaveConfig wave,
+    
+    /** Current animation time. */
+    float time,
+    
+    /** Whether wave deformation is active. */
+    boolean hasWave
+) {
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Utility Methods
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /** 
+     * Creates a copy of the start position array.
+     * Use when you need to modify values without affecting the original.
+     */
+    public float[] startCopy() {
+        return new float[] { start[0], start[1], start[2] };
+    }
+    
+    /** 
+     * Creates a copy of the end position array.
+     * Use when you need to modify values without affecting the original.
+     */
+    public float[] endCopy() {
+        return new float[] { end[0], end[1], end[2] };
+    }
+    
+    /** 
+     * Creates a copy of the direction vector array.
+     */
+    public float[] directionCopy() {
+        return new float[] { direction[0], direction[1], direction[2] };
+    }
+    
+    /**
+     * Interpolates a position along the ray.
+     * @param t Parametric value (0 = start, 1 = end)
+     * @return Interpolated position [x, y, z]
+     */
+    public float[] interpolate(float t) {
+        return new float[] {
+            start[0] + (end[0] - start[0]) * t,
+            start[1] + (end[1] - start[1]) * t,
+            start[2] + (end[2] - start[2]) * t
+        };
+    }
+    
+    /**
+     * Calculates the fade alpha at a given t.
+     * @param t Parametric value (0 = start, 1 = end)
+     * @return Alpha value (0-1)
+     */
+    public float fadeAt(float t) {
+        return fadeStart + (fadeEnd - fadeStart) * t;
+    }
+    
+    /**
+     * Whether this ray needs multi-segment tessellation.
+     */
+    public boolean needsMultiSegment() {
+        return lineShape != RayLineShape.STRAIGHT 
+            || curvature != RayCurvature.NONE 
+            || shapeSegments > 1
+            || hasWave;
+    }
+    
+    /**
+     * Whether the ray has fading (non-uniform alpha).
+     */
+    public boolean hasFade() {
+        return fadeStart != fadeEnd || fadeStart < 1.0f || fadeEnd < 1.0f;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Builder
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /** Creates a builder for constructing RayContext instances. */
+    public static Builder builder() {
+        return new Builder();
+    }
+    
+    public static class Builder {
+        private float[] start = new float[3];
+        private float[] end = new float[3];
+        private float[] direction = new float[3];
+        private float length = 1.0f;
+        private int index = 0;
+        private int count = 1;
+        private int layerIndex = 0;
+        private float t = 0.0f;
+        private float width = 1.0f;
+        private float fadeStart = 1.0f;
+        private float fadeEnd = 1.0f;
+        private RayLineShape lineShape = RayLineShape.STRAIGHT;
+        private float lineShapeAmplitude = 0.1f;
+        private float lineShapeFrequency = 2.0f;
+        private RayCurvature curvature = RayCurvature.NONE;
+        private float curvatureIntensity = 0.0f;
+        private int shapeSegments = 1;
+        private WaveConfig wave = null;
+        private float time = 0.0f;
+        private boolean hasWave = false;
+        
+        public Builder start(float[] v) { 
+            this.start = v != null ? v : new float[3]; 
+            return this; 
+        }
+        public Builder start(float x, float y, float z) { 
+            this.start = new float[] { x, y, z }; 
+            return this; 
+        }
+        public Builder end(float[] v) { 
+            this.end = v != null ? v : new float[3]; 
+            return this; 
+        }
+        public Builder end(float x, float y, float z) { 
+            this.end = new float[] { x, y, z }; 
+            return this; 
+        }
+        public Builder direction(float[] v) { 
+            this.direction = v != null ? v : new float[3]; 
+            return this; 
+        }
+        public Builder length(float v) { this.length = v; return this; }
+        public Builder index(int v) { this.index = v; return this; }
+        public Builder count(int v) { this.count = v; return this; }
+        public Builder layerIndex(int v) { this.layerIndex = v; return this; }
+        public Builder t(float v) { this.t = v; return this; }
+        public Builder width(float v) { this.width = v; return this; }
+        public Builder fadeStart(float v) { this.fadeStart = v; return this; }
+        public Builder fadeEnd(float v) { this.fadeEnd = v; return this; }
+        public Builder lineShape(RayLineShape v) { 
+            this.lineShape = v != null ? v : RayLineShape.STRAIGHT; 
+            return this; 
+        }
+        public Builder lineShapeAmplitude(float v) { this.lineShapeAmplitude = v; return this; }
+        public Builder lineShapeFrequency(float v) { this.lineShapeFrequency = v; return this; }
+        public Builder curvature(RayCurvature v) { 
+            this.curvature = v != null ? v : RayCurvature.NONE; 
+            return this; 
+        }
+        public Builder curvatureIntensity(float v) { this.curvatureIntensity = v; return this; }
+        public Builder shapeSegments(int v) { this.shapeSegments = v; return this; }
+        public Builder wave(WaveConfig v) { this.wave = v; return this; }
+        public Builder time(float v) { this.time = v; return this; }
+        public Builder hasWave(boolean v) { this.hasWave = v; return this; }
+        
+        /**
+         * Computes direction from start and end, and sets length.
+         * Call this after setting start and end.
+         */
+        public Builder computeDirectionAndLength() {
+            float dx = end[0] - start[0];
+            float dy = end[1] - start[1];
+            float dz = end[2] - start[2];
+            this.length = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (length > 0.0001f) {
+                this.direction = new float[] { dx / length, dy / length, dz / length };
+            } else {
+                this.direction = new float[] { 0, 1, 0 }; // Default up
+            }
+            return this;
+        }
+        
+        public RayContext build() {
+            return new RayContext(
+                start, end, direction, length,
+                index, count, layerIndex, t,
+                width, fadeStart, fadeEnd,
+                lineShape, lineShapeAmplitude, lineShapeFrequency,
+                curvature, curvatureIntensity, shapeSegments,
+                wave, time, hasWave
+            );
+        }
+    }
+}

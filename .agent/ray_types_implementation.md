@@ -3,216 +3,182 @@
 ## Overview
 Add a RayType selector to allow rays to be rendered as different shapes (lines, droplets, energy beams, etc.) instead of only flat ribbon lines.
 
-## Architecture
-
-### Current Flow
-```
-RaysShape (config) → RaysTessellator (mesh) → RaysRenderer (GPU)
-```
-
-### New Flow
-```
-RaysShape (config + rayType + type-specific params)
-    ↓
-RaysTessellator (delegates to specific tessellator)
-    ├── RayLineTessellator
-    ├── RayDropletTessellator
-    ├── RayKamehamehaTessellator
-    └── ... more
-    ↓
-RaysRenderer (unchanged)
-```
-
-## Design Decisions
-1. **Separate tessellators** per ray type for clean separation
-2. **Flat fields** in RaysShape (all type-specific params, unused ones keep defaults)
-3. **Animation compatibility** - existing ray animations apply to all types
-4. **GUI** - one panel with dynamic fields based on selected type
-
 ---
 
-## Phase 1: Foundation
+## ✅ COMPLETED - Phase 1: Foundation
 
-### Step 1.1: Create RayType Enum
+### ✅ Step 1.1: RayType Enum
 **File:** `src/main/java/net/cyberpunk042/visual/shape/RayType.java`
+- 17 ray types in 4 categories (Basic, Energy, Particle, Organic)
+- Category enum for UI grouping
+- Helper methods: `is3D()`, `isProcedural()`, `suggestedMinSegments()`
 
-```java
-public enum RayType {
-    LINE("Line", "Default flat ribbon rays"),
-    DROPLET("Droplet", "Teardrop shapes"),
-    KAMEHAMEHA("Kamehameha", "Energy beam with bulbous end"),
-    ARROW("Arrow", "Line with arrowhead"),
-    CONE("Cone", "3D conical rays"),
-    CAPSULE("Capsule", "Cylinder with rounded ends"),
-    LIGHTNING("Lightning", "Jagged bolt"),
-    BEADS("Beads", "Chain of spheres");
-    
-    private final String displayName;
-    private final String description;
-    
-    // ... standard enum methods
-}
-```
-
-### Step 1.2: Extend RaysShape
+### ✅ Step 1.2: RaysShape Updated
 **File:** `src/main/java/net/cyberpunk042/visual/shape/RaysShape.java`
-
-Add new fields:
-```java
-// Type selector
-RayType rayType,  // default: LINE
-
-// Droplet params
-float dropletHeadRadius,    // default: 0.2
-float dropletTailTaper,     // default: 0.8
-
-// Kamehameha params
-float kamehamehaBeamWidth,  // default: 0.3
-float kamehamehaEndBulb,    // default: 0.5
-
-// Arrow params
-float arrowHeadWidth,       // default: 0.2
-float arrowHeadLength,      // default: 0.3
-
-// Beads params
-float beadRadius,           // default: 0.1
-int beadCount,              // default: 5
-float beadSpacing,          // default: 0.2
-
-// Lightning params
-float lightningJagged,      // default: 0.3
-int lightningSegments,      // default: 8
-```
+- Added `RayType rayType` field to record
+- Updated all presets (DEFAULT, ABSORPTION, etc.)
+- Updated Builder with `rayType()` setter
+- Added `effectiveRayType()` helper method
 
 ---
 
-## Phase 2: Tessellator Infrastructure
+## ✅ COMPLETED - Phase 2: Infrastructure
 
-### Step 2.1: Create RayTypeTessellator Interface
+### ✅ Step 2.1: RayContext Record
+**File:** `src/client/java/net/cyberpunk042/client/visual/mesh/ray/RayContext.java`
+- Data container for computed ray position data
+- Fields: start, end, direction, width, fade, lineShape, curvature, wave, etc.
+- Builder with `computeDirectionAndLength()` helper
+
+### ✅ Step 2.2: RayPositioner Utility
+**File:** `src/client/java/net/cyberpunk042/client/visual/mesh/ray/RayPositioner.java`
+- Extracted positioning logic from RaysTessellator
+- `computeContext()` - main API
+- `computeDistribution()` - UNIFORM, RANDOM, STOCHASTIC
+- `computePosition()` - RADIAL, SPHERICAL, CONVERGING, PARALLEL
+
+### ✅ Step 2.3: RayTypeTessellator Interface
 **File:** `src/client/java/net/cyberpunk042/client/visual/mesh/ray/RayTypeTessellator.java`
+- `tessellate(builder, shape, context)` - main method
+- `name()`, `isProcedural()` - helper methods
 
-```java
-public interface RayTypeTessellator {
-    void tessellateRay(
-        MeshBuilder builder,
-        RaysShape shape,
-        int rayIndex,
-        Vec3d start,
-        Vec3d end,
-        float width,
-        float t  // normalized position 0-1 along ray
-    );
-}
-```
-
-### Step 2.2: Refactor Current Line Logic
+### ✅ Step 2.4: RayLineTessellator
 **File:** `src/client/java/net/cyberpunk042/client/visual/mesh/ray/RayLineTessellator.java`
+- Default LINE type implementation
+- Supports: simple line, segmented, shaped, combined
 
-Extract current quad emission logic from RaysTessellator into this class.
+### ✅ Step 2.5: RayTypeTessellatorRegistry
+**File:** `src/client/java/net/cyberpunk042/client/visual/mesh/ray/RayTypeTessellatorRegistry.java`
+- Maps RayType → RayTypeTessellator
+- Fallback to LINE if not registered
 
-### Step 2.3: Update RaysTessellator to Delegate
+### ✅ Step 2.6: RayGeometryUtils
+**File:** `src/client/java/net/cyberpunk042/client/visual/mesh/ray/RayGeometryUtils.java`
+- Common geometry utilities for all tessellators
+- `interpolate()`, `computeDirectionAndLength()`
+- `computePerpendicularFrame()` - right/up vectors
+- `computeLineShapeOffset()` - sine wave, corkscrew, zigzag, etc.
+- `computeCurvedPosition()` - vortex, spiral curvature
+- Vector math: `normalize()`, `dot()`, `cross()`, `scale()`, `add()`
+
+---
+
+## 🔄 IN PROGRESS - Phase 3: Integration
+
+### Step 3.1: Update RaysTessellator to Use New Infrastructure
 **File:** `src/client/java/net/cyberpunk042/client/visual/mesh/RaysTessellator.java`
+- Refactor to use RayPositioner.computeContext()
+- Delegate to RayTypeTessellatorRegistry.get(rayType)
+- Remove duplicate position calculation code
 
-```java
-private static final Map<RayType, RayTypeTessellator> TESSELLATORS = Map.of(
-    RayType.LINE, new RayLineTessellator(),
-    RayType.DROPLET, new RayDropletTessellator(),
-    // ... etc
-);
+**Tasks:**
+- [ ] Replace inline position calculation with RayPositioner
+- [ ] Use RayTypeTessellatorRegistry for delegation
+- [ ] Test that LINE type still works correctly
 
-// In tessellate():
-RayTypeTessellator typeTess = TESSELLATORS.get(shape.rayType());
-typeTess.tessellateRay(builder, shape, i, start, end, width, t);
-```
-
----
-
-## Phase 3: Type Implementations
-
-### Step 3.1: RayDropletTessellator
-Tessellates teardrop shapes:
-- Sphere at head (near center)
-- Tapered cone/point at tail
-
-### Step 3.2: RayKamehamehaTessellator
-Tessellates energy beam:
-- Cylinder beam
-- Larger sphere at the end
-- Maybe glow vertices
-
-### Step 3.3: RayArrowTessellator
-Tessellates arrows:
-- Thin shaft quad
-- Triangular arrowhead at tip
-
-### Step 3.4: Additional Types (Future)
-- RayCapsuleTessellator
-- RayLightningTessellator
-- RayBeadsTessellator
-- RayConeTessellator
+### Step 3.2: Verify Build & Test
+- [ ] Compile project
+- [ ] Test in-game that rays render correctly
+- [ ] Verify animations still work
 
 ---
 
-## Phase 4: GUI Integration
+## 📋 TODO - Phase 4: Type Implementations
 
-### Step 4.1: Add RayType Dropdown to ShapeSubPanel
-In the Rays shape section, add:
-```java
-content.dropdown("Ray Type", "rays.rayType", RayType.class);
-```
+### Tier 1: Basic Geometry (Priority: High)
+| Type | Status | Complexity |
+|------|--------|------------|
+| `DROPLET` | ⬜ TODO | Medium |
+| `CONE` | ⬜ TODO | Medium |
+| `ARROW` | ⬜ TODO | Medium |
+| `CAPSULE` | ⬜ TODO | Medium |
 
-### Step 4.2: Conditional Fields Based on Type
-```java
-content.when(rayType == DROPLET, builder -> {
-    builder.slider("Head Radius", "rays.dropletHeadRadius").range(0.05f, 1f).add();
-    builder.slider("Tail Taper", "rays.dropletTailTaper").range(0f, 1f).add();
-});
+### Tier 2: Energy/Effect (Priority: Medium)
+| Type | Status | Complexity |
+|------|--------|------------|
+| `KAMEHAMEHA` | ⬜ TODO | Medium |
+| `LASER` | ⬜ TODO | Low |
+| `LIGHTNING` | ⬜ TODO | High |
+| `FIRE_JET` | ⬜ TODO | High |
+| `PLASMA` | ⬜ TODO | High |
 
-content.when(rayType == KAMEHAMEHA, builder -> {
-    builder.slider("Beam Width", "rays.kamehamehaBeamWidth").range(0.1f, 1f).add();
-    builder.slider("End Bulb", "rays.kamehamehaEndBulb").range(0f, 2f).add();
-});
-// ... etc
-```
+### Tier 3: Particle/Object (Priority: Low)
+| Type | Status | Complexity |
+|------|--------|------------|
+| `BEADS` | ⬜ TODO | Medium |
+| `CUBES` | ⬜ TODO | Medium |
+| `STARS` | ⬜ TODO | Medium |
+| `CRYSTALS` | ⬜ TODO | High |
 
----
-
-## Phase 5: Testing & Polish
-
-### Step 5.1: Test Each Ray Type
-- Verify tessellation is correct
-- Test with animations (flow, wiggle, twist)
-- Test with different counts, arrangements
-
-### Step 5.2: Performance Check
-- Ensure complex types don't cause FPS drops at high ray counts
-
-### Step 5.3: Presets
-- Create preset JSON files for each ray type
+### Tier 4: Organic (Priority: Low)
+| Type | Status | Complexity |
+|------|--------|------------|
+| `TENDRIL` | ⬜ TODO | High |
+| `SPINE` | ⬜ TODO | High |
+| `ROOT` | ⬜ TODO | Very High |
 
 ---
 
-## File Summary
+## 📋 TODO - Phase 5: GUI Integration
 
-| File | Action |
-|------|--------|
-| `visual/shape/RayType.java` | CREATE - Enum |
-| `visual/shape/RaysShape.java` | MODIFY - Add fields |
-| `client/visual/mesh/ray/RayTypeTessellator.java` | CREATE - Interface |
-| `client/visual/mesh/ray/RayLineTessellator.java` | CREATE - Extract from current |
-| `client/visual/mesh/ray/RayDropletTessellator.java` | CREATE |
-| `client/visual/mesh/ray/RayKamehamehaTessellator.java` | CREATE |
-| `client/visual/mesh/ray/RayArrowTessellator.java` | CREATE |
-| `client/visual/mesh/RaysTessellator.java` | MODIFY - Delegate to type tessellators |
-| `client/gui/panel/sub/ShapeSubPanel.java` | MODIFY - Add type selector + conditional fields |
-| `client/gui/state/adapter/ShapeAdapter.java` | MODIFY - Add ray type fields |
+### Step 5.1: Add RayType Dropdown
+**File:** `src/client/java/net/cyberpunk042/client/gui/panel/sub/ShapeSubPanel.java`
+- Add dropdown selector for RayType
+- Show type description in info text
+
+### Step 5.2: Conditional Type-Specific Fields
+- Show/hide fields based on selected RayType
+- Each type has its own parameter sliders
+
+### Step 5.3: ShapeAdapter Updates
+**File:** `src/client/java/net/cyberpunk042/client/gui/state/adapter/ShapeAdapter.java`
+- Add binding for rayType field
+- Add bindings for type-specific parameters
 
 ---
 
-## Priority Order
+## 📋 TODO - Phase 6: Type-Specific Parameters
 
-1. **Foundation** (Phase 1) - RayType enum, RaysShape fields
-2. **Line Refactor** (Phase 2.2) - Extract current logic
-3. **Droplet** (Phase 3.1) - First new type
-4. **GUI** (Phase 4) - Selector and fields
-5. **More Types** (Phase 3.2+) - Kamehameha, Arrow, etc.
+Add these fields to RaysShape when implementing each type:
+
+### DROPLET
+- `dropletHeadRadius` (0.1 - 1.0)
+- `dropletTaper` (0.0 - 1.0)
+
+### CONE
+- `coneSegments` (4 - 32)
+- `coneBaseRadius` (0.1 - 1.0)
+
+### ARROW
+- `arrowHeadWidth` (0.1 - 1.0)
+- `arrowHeadLength` (0.1 - 0.5)
+- `arrowShaftWidth` (0.05 - 0.3)
+
+### KAMEHAMEHA
+- `kameBeamWidth` (0.1 - 1.0)
+- `kameEndBulbSize` (0.1 - 2.0)
+- `kameGlowIntensity` (0.0 - 3.0)
+
+*(More parameters defined as needed per type)*
+
+---
+
+## 🔧 Utility Classes Created
+
+| File | Purpose |
+|------|---------|
+| `ray/RayContext.java` | Computed position data container |
+| `ray/RayPositioner.java` | Position calculation utility |
+| `ray/RayTypeTessellator.java` | Tessellator interface |
+| `ray/RayLineTessellator.java` | LINE type tessellator |
+| `ray/RayTypeTessellatorRegistry.java` | Type → Tessellator mapping |
+
+---
+
+## Next Immediate Steps
+
+1. **Update RaysTessellator** - Wire up the new infrastructure
+2. **Verify build compiles** - Ensure no breaking changes
+3. **Test in-game** - Confirm LINE type still works
+4. **Implement DROPLET** - First 3D type as proof of concept
+5. **Add GUI controls** - RayType dropdown in ShapeSubPanel

@@ -360,7 +360,7 @@ public class ShapeSubPanel extends AbstractPanel {
             widgets.add(lineShapeDropdown);
             y += step;
             
-            // Conditional: Show amplitude/frequency/segments only when lineShape != STRAIGHT
+            // Conditional: Show amplitude/frequency only when lineShape != STRAIGHT
             if (lineShape != net.cyberpunk042.visual.shape.RayLineShape.STRAIGHT) {
                 // Row: Amplitude + Frequency
                 float amp = state.getFloat("rays.lineShapeAmplitude");
@@ -377,16 +377,16 @@ public class ShapeSubPanel extends AbstractPanel {
                     v -> onUserChange(() -> state.set("rays.lineShapeFrequency", v)));
                 widgets.add(freqSlider);
                 y += step;
-                
-                // Row: Shape Segments (full width)
-                int segs = state.getInt("rays.shapeSegments");
-                var segsSlider = GuiWidgets.slider(x, y, w,
-                    "Line Segments", 4, 128, segs, "%d", 
-                    "Smoothness of curved rays (more = smoother)",
-                    v -> onUserChange(() -> state.set("rays.shapeSegments", Math.round(v))));
-                widgets.add(segsSlider);
-                y += step;
             }
+            
+            // Shape Segments - ALWAYS visible (needed for travel animations even on straight rays)
+            int segs = state.getInt("rays.shapeSegments");
+            var segsSlider = GuiWidgets.slider(x, y, w,
+                "Line Segments", 1, 256, segs, "%d", 
+                "Vertex count per ray (more = smoother travel animations)",
+                v -> onUserChange(() -> state.set("rays.shapeSegments", Math.round(v))));
+            widgets.add(segsSlider);
+            y += step;
             
             // === FIELD CURVATURE SECTION ===
             // Curvature dropdown (full width)
