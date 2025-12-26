@@ -1,11 +1,16 @@
 package net.cyberpunk042.client.visual.render;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
+import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderPhase;
 import net.minecraft.util.Identifier;
 import net.cyberpunk042.visual.layer.BlendMode;
 import org.lwjgl.opengl.GL14;
+
+import java.util.OptionalDouble;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 
 /**
  * Custom render layers and blend utilities for field visual effects.
@@ -112,9 +117,9 @@ public final class FieldRenderLayers extends RenderPhase {
      * 
      * <p><b>Note:</b> OpenGL line width is GPU-dependent. We use LINE_STRIP for 
      * thick mode because getLines() doesn't support width parameter. The LINE_STRIP
-     * draw mode connects vertices differently but works for our discrete line pairs.</p>
+     * draw mode connects vertices differently but works for our discrete line pairs.&lt;/p&gt;
      * 
-     * @param width Line width - values < 1.0 use thin, >= 1.0 use thick
+     * @param width Line width - values &lt; 1.0 use thin, &gt;= 1.0 use thick
      * @return RenderLayer configured for line rendering
      */
     public static RenderLayer lines(float width) {
@@ -122,10 +127,53 @@ public final class FieldRenderLayers extends RenderPhase {
             // Thin lines - standard 1px
             return LINES_LAYER;
         } else {
-            // Thick lines - use debug line strip with width
-            // Note: Width of 3.0 provides visible distinction from thin lines
-            return RenderLayer.getDebugLineStrip(3.0);
+            // Try custom discrete lines with width
+            return linesWithWidth(width);
         }
+    }
+    
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Custom Lines Layer with Variable Width (EXPERIMENTAL)
+    // ─────────────────────────────────────────────────────────────────────────────
+    
+    // Cache for custom line width layers (avoid recreating every frame)
+    private static final Map<Float, RenderLayer> LINES_WIDTH_CACHE = new ConcurrentHashMap<>();
+    
+    /**
+     * Creates a discrete lines layer with custom width.
+     * 
+     * <p>Uses GL_LINES draw mode (not LINE_STRIP) so vertices are drawn as 
+     * independent pairs: (v0,v1), (v2,v3), etc. - no unwanted connections.</p>
+     * 
+     * <p><b>Note:</b> Line width support depends on GPU/driver. Some systems
+     * cap line width at 1.0. This is a best-effort implementation.</p>
+     * 
+     * @param width Desired line width
+     * @return RenderLayer with discrete lines and custom width
+     */
+    public static RenderLayer linesWithWidth(float width) {
+        // Clamp width to avoid extreme values
+        float clampedWidth = Math.max(0.5f, Math.min(width, 10.0f));
+        
+        // Round to 0.5 increments for cache efficiency
+        float cacheKey = Math.round(clampedWidth * 2) / 2.0f;
+        
+        return LINES_WIDTH_CACHE.computeIfAbsent(cacheKey, w -> {
+            // Try to create custom RenderLayer with LINES pipeline and LineWidth
+            try {
+                return RenderLayer.of(
+                    "field_lines_" + w,
+                    256,
+                    RenderPipelines.LINES,
+                    RenderLayer.MultiPhaseParameters.builder()
+                        .lineWidth(new LineWidth(OptionalDouble.of(w)))
+                        .build(false) // false = doesn't affect outline
+                );
+            } catch (Exception e) {
+                // Fallback to standard lines if custom layer fails
+                return LINES_LAYER;
+            }
+        });
     }
     
     // Legacy aliases

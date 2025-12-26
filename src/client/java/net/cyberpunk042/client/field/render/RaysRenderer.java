@@ -885,7 +885,7 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
                 
                 // Rays aligned with precession direction tilt outward, opposite tilt inward
                 float tiltFactor = (float)Math.cos(angleDiff);
-                float displacement = tiltFactor * amp * 0.5f;
+                float displacement = tiltFactor * amp * 1.0f;
                 
                 // Apply displacement radially
                 float nx = x / dist;
@@ -903,7 +903,7 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
                     yield new float[]{x, y, z};
                 }
                 float phase = dist * freq - time * speed * 2.0f;
-                float wave = (float)Math.sin(phase * Math.PI * 2.0f) * amp * 0.3f;
+                float wave = (float)Math.sin(phase * Math.PI * 2.0f) * amp * 0.8f;
                 float nx = x / dist;
                 float nz = z / dist;
                 yield new float[]{x + nx * wave, y, z + nz * wave};

@@ -381,7 +381,7 @@ public class ShapeSubPanel extends AbstractPanel {
                 // Row: Shape Segments (full width)
                 int segs = state.getInt("rays.shapeSegments");
                 var segsSlider = GuiWidgets.slider(x, y, w,
-                    "Line Segments", 4, 64, segs, "%d", 
+                    "Line Segments", 4, 128, segs, "%d", 
                     "Smoothness of curved rays (more = smoother)",
                     v -> onUserChange(() -> state.set("rays.shapeSegments", Math.round(v))));
                 widgets.add(segsSlider);
@@ -408,7 +408,7 @@ public class ShapeSubPanel extends AbstractPanel {
             if (curvature != net.cyberpunk042.visual.shape.RayCurvature.NONE) {
                 float intensity = state.getFloat("rays.curvatureIntensity");
                 var intensitySlider = GuiWidgets.slider(x, y, w,
-                    "Intensity", 0f, 1f, intensity, "%.2f", 
+                    "Intensity", 0f, 3f, intensity, "%.2f", 
                     "Strength of curvature effect (0 = straight, 1 = max curve)",
                     v -> onUserChange(() -> state.set("rays.curvatureIntensity", v)));
                 widgets.add(intensitySlider);

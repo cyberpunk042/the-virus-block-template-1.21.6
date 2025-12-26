@@ -374,7 +374,7 @@ public final class ShapeWidgetSpec {
         new SectionHeader("Distribution"),
         
         // Row 2: Count + Arrangement
-        SliderSpec.halfInt("Count", "rays.count", 1, 128),
+        SliderSpec.halfInt("Count", "rays.count", 1, 1000),
         EnumDropdownSpec.half("Arrange", "rays.arrangement", 
             net.cyberpunk042.visual.shape.RayArrangement.class, 
             net.cyberpunk042.visual.shape.RayArrangement.RADIAL),

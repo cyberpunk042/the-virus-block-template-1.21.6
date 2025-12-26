@@ -291,7 +291,7 @@ public class ModifiersSubPanel extends BoundPanel {
         
         LabeledSlider lenSpeedSlider = LabeledSlider.builder("LSpd")
             .position(x + halfW + GuiConstants.PADDING, c.getCurrentY()).width(halfW)
-            .range(0.1f, 5f).initial(flow != null ? flow.lengthSpeed() : 1f).format("%.1f")
+            .range(0.01f, 2f).initial(flow != null ? flow.lengthSpeed() : 0.5f).format("%.2f")
             .onChange(v -> state.set("rayFlow.lengthSpeed", v))
             .build();
         widgets.add(lenSpeedSlider);
@@ -309,7 +309,7 @@ public class ModifiersSubPanel extends BoundPanel {
         
         LabeledSlider travelSpeedSlider = LabeledSlider.builder("TSpd")
             .position(x + halfW + GuiConstants.PADDING, c.getCurrentY()).width(halfW)
-            .range(0.1f, 5f).initial(flow != null ? flow.travelSpeed() : 1f).format("%.1f")
+            .range(0.01f, 2f).initial(flow != null ? flow.travelSpeed() : 0.5f).format("%.2f")
             .onChange(v -> state.set("rayFlow.travelSpeed", v))
             .build();
         widgets.add(travelSpeedSlider);
@@ -369,7 +369,7 @@ public class ModifiersSubPanel extends BoundPanel {
         
         LabeledSlider speedSlider = LabeledSlider.builder("Spd")
             .position(x + halfW + GuiConstants.PADDING, c.getCurrentY()).width(halfW)
-            .range(0.1f, 5f).initial(motion != null ? motion.speed() : 1f).format("%.1f")
+            .range(0.01f, 2f).initial(motion != null ? motion.speed() : 0.5f).format("%.2f")
             .onChange(v -> state.set("rayMotion.speed", v))
             .build();
         widgets.add(speedSlider);
@@ -417,7 +417,7 @@ public class ModifiersSubPanel extends BoundPanel {
         
         LabeledSlider speedSlider = LabeledSlider.builder("Spd")
             .position(x + halfW + GuiConstants.PADDING, c.getCurrentY()).width(halfW)
-            .range(0.1f, 10f).initial(wiggle != null ? wiggle.speed() : 1f).format("%.1f")
+            .range(0.01f, 3f).initial(wiggle != null ? wiggle.speed() : 0.5f).format("%.2f")
             .onChange(v -> state.set("rayWiggle.speed", v))
             .build();
         widgets.add(speedSlider);
@@ -460,7 +460,7 @@ public class ModifiersSubPanel extends BoundPanel {
         
         LabeledSlider speedSlider = LabeledSlider.builder("Spd")
             .position(x + halfW + GuiConstants.PADDING, c.getCurrentY()).width(halfW)
-            .range(0.1f, 5f).initial(twist != null ? twist.speed() : 1f).format("%.1f")
+            .range(0.01f, 2f).initial(twist != null ? twist.speed() : 0.5f).format("%.2f")
             .onChange(v -> state.set("rayTwist.speed", v))
             .build();
         widgets.add(speedSlider);
