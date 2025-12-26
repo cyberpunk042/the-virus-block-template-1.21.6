@@ -161,6 +161,8 @@ public class ContentBuilder {
      * Call this when widgets are offset (e.g., in applyBoundsOffset).
      */
     public void offsetLabels(int dx, int dy) {
+        net.cyberpunk042.log.Logging.GUI.topic("labels").info(
+            "offsetLabels called: dx={}, dy={}, labelCount={}", dx, dy, labels.size());
         for (int i = 0; i < labels.size(); i++) {
             LabelEntry old = labels.get(i);
             labels.set(i, new LabelEntry(old.x + dx, old.y + dy, old.text, old.color, old.small));

@@ -182,6 +182,12 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
         final WaveDistribution waveDist = flowConfig != null ? flowConfig.effectiveWaveDistribution() : WaveDistribution.SEQUENTIAL;
         final float sweepCopies = flowConfig != null ? Math.max(0.1f, flowConfig.waveCount()) : 1.0f;
         
+        // Debug: Log sweep copies value once per second
+        if (time % 20 < 1 && flowConfig != null) {
+            net.cyberpunk042.log.Logging.FIELD.topic("sweep").debug(
+                "sweepCopies={}, numCopies={}", sweepCopies, (int) Math.ceil(sweepCopies));
+        }
+        
         // Pre-compute random offsets for RANDOM distribution (seeded by ray index)
         // This ensures consistent randomization per ray across frames
         
@@ -200,7 +206,6 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
             
             // Calculate per-ray phase for RADIATE/ABSORB (staggered for continuous flow)
             float rayLengthPhase;
-            boolean rayVisible = true; // Can be set to false by TRIM mode
             
             if (staggerPhase) {
                 // Ray's angular position around circle (0 to 1 = 0° to 360°)
@@ -211,67 +216,18 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
                     rayAngle = (float) idx / rayCount;
                 }
                 
-                // === SWEEP COPIES SYSTEM ===
-                // sweepCopies < 1: TRIM - reduce angular coverage of sweep
-                // sweepCopies = 1: Normal - single full sweep
-                // sweepCopies > 1: DUPLICATE - create N identical visibility windows
+                // Apply wave scale (splitting) - independent of sweep
+                // Sweep width is now handled in RADIATE/ABSORB via travelRange scaling
+                float scaledAngle = rayAngle * waveArc;
                 
-                // The "sweep" is a visible angular wedge that rotates.
-                // sweepArcWidth controls how wide each wedge is (in angular terms)
-                // For now, use waveArc to control the wedge width
-                float sweepArcWidth = waveArc;  // Angular width of one sweep (0.25 = 90°)
-                
-                // For TRIM: reduce the arc width further
-                if (sweepCopies < 1.0f) {
-                    sweepArcWidth = sweepArcWidth * sweepCopies;
-                }
-                
-                // Number of visibility windows
-                int numCopies = sweepCopies >= 1.0f ? (int) Math.ceil(sweepCopies) : 1;
-                
-                // Check if this ray falls within ANY of the N visibility windows
-                boolean inAnyWindow = false;
-                float positionInWindow = 0f;  // -1 to +1, 0 = center of window
-                
-                for (int c = 0; c < numCopies; c++) {
-                    // Center of this copy's sweep (evenly distributed around circle)
-                    float windowCenter = (baseLengthPhase + (float)c / numCopies) % 1.0f;
-                    
-                    // Circular distance from ray to window center
-                    float angularDist = rayAngle - windowCenter;
-                    // Wrap to [-0.5, 0.5] range (shortest path around circle)
-                    if (angularDist < -0.5f) angularDist += 1.0f;
-                    if (angularDist > 0.5f) angularDist -= 1.0f;
-                    
-                    // Is ray within this window's angular width?
-                    if (Math.abs(angularDist) <= sweepArcWidth / 2.0f) {
-                        inAnyWindow = true;
-                        // Position within window: -1 at leading edge, 0 at center, +1 at trailing
-                        positionInWindow = angularDist / (sweepArcWidth / 2.0f);
-                        break;
-                    }
-                }
-                
-                if (!inAnyWindow) {
-                    rayVisible = false;
-                }
-                
-                // Convert position within window to rayLengthPhase
-                // positionInWindow: -1 (leading) to +1 (trailing)
-                // rayLengthPhase: 0 (segment at inner) to 1 (segment at outer)
-                // Map so center of window = center of animation cycle
-                float phase = (positionInWindow + 1.0f) / 2.0f;  // 0 to 1
+                // Calculate phase for this ray
+                float phase = (baseLengthPhase + scaledAngle) % 1.0f;
                 rayLengthPhase = phase;
             } else {
                 rayLengthPhase = baseLengthPhase;
             }
             
             // === Handle LengthMode animations ===
-            // All modes use t-based geometry clipping for proper continuous flow
-            // Skip rays hidden by TRIM mode
-            if (!rayVisible) {
-                return; // Skip this ray entirely in trim mode
-            }
             
             if (flowConfig != null && flowConfig.hasLength()) {
                 LengthMode lengthMode = flowConfig.length();
@@ -291,19 +247,32 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
                 switch (lengthMode) {
                     case RADIATE -> {
                         // Ray flows OUTWARD: visible window starts at inner, moves toward outer
-                        float travelRange = 1.0f + segmentLength;
-                        float windowCenter = rayLengthPhase * travelRange;
+                        
+                        // === SWEEP WIDTH CONTROL ===
+                        // sweepCopies controls the WIDTH of the visible emission arc
+                        // > 1: WIDER beam (more rays visible at once)
+                        // < 1: NARROWER beam (fewer rays visible at once)
+                        // This is achieved by scaling travelRange:
+                        // - Smaller travelRange = window stays visible longer = wider beam
+                        // - Larger travelRange = window passes through faster = narrower beam
+                        float baseTravelRange = 1.0f + segmentLength;
+                        float effectiveTravelRange = baseTravelRange / sweepCopies;
+                        
+                        float windowCenter = rayLengthPhase * effectiveTravelRange;
                         windowStart = windowCenter - segmentLength * 0.5f;
                         windowEnd = windowCenter + segmentLength * 0.5f;
-                        // Note: Duplication is now handled in phase calculation above
                     }
                     case ABSORB -> {
                         // Ray flows INWARD: visible window starts at outer, moves toward inner
-                        float travelRange = 1.0f + segmentLength;
-                        float windowCenter = 1.0f - (rayLengthPhase * travelRange);
+                        
+                        // === SWEEP WIDTH CONTROL (same as RADIATE) ===
+                        float baseTravelRange = 1.0f + segmentLength;
+                        float effectiveTravelRange = baseTravelRange / sweepCopies;
+                        
+                        // ABSORB: window starts at outer (1) and moves toward inner (0)
+                        float windowCenter = 1.0f - (rayLengthPhase * effectiveTravelRange);
                         windowStart = windowCenter - segmentLength * 0.5f;
                         windowEnd = windowCenter + segmentLength * 0.5f;
-                        // Note: Duplication is now handled in phase calculation above
                     }
                     case SEGMENT -> {
                         // SEGMENT: sliding window (original behavior)

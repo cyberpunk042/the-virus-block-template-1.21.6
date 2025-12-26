@@ -88,6 +88,24 @@ public abstract class BoundPanel extends AbstractPanel implements StateChangeLis
     }
     
     /**
+     * Override reflow to use proper initialization with bounds offsetting.
+     */
+    @Override
+    protected void reflow() {
+        if (bounds.isEmpty()) return;
+        
+        // Use bounds dimensions if panel dimensions not set
+        int width = panelWidth > 0 ? panelWidth : bounds.width();
+        int height = panelHeight > 0 ? panelHeight : bounds.height();
+        
+        // Rebuild content
+        init(width, height);
+        
+        // Apply bounds offset so widgets and labels are positioned correctly
+        applyBoundsOffset();
+    }
+    
+    /**
      * Build the panel content using bindings.
      * 
      * <p>Subclasses override this to create their UI. Use {@link #content(int)}
@@ -220,7 +238,11 @@ public abstract class BoundPanel extends AbstractPanel implements StateChangeLis
         super.applyBoundsOffset();
         // Also offset labels to match widget positions
         if (contentBuilder != null) {
+            Logging.GUI.topic("labels").info("{}.applyBoundsOffset: bounds=({},{}), contentBuilder labels={}",
+                getClass().getSimpleName(), bounds.x(), bounds.y(), contentBuilder.getLabels().size());
             contentBuilder.offsetLabels(bounds.x(), bounds.y());
+        } else {
+            Logging.GUI.topic("labels").warn("{}.applyBoundsOffset: contentBuilder is NULL!", getClass().getSimpleName());
         }
     }
     
