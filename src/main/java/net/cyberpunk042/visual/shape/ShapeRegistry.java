@@ -149,7 +149,7 @@ public final class ShapeRegistry {
             float lonStart = getFloat(params, "lonStart", 0.0f);
             float lonEnd = getFloat(params, "lonEnd", 1.0f);
             SphereAlgorithm algorithm = SphereAlgorithm.values()[0];
-            return new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm, SphereDeformation.NONE, 0f);
+            return new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm, SphereDeformation.NONE, 0f, 1f);
         });
         
         // Ring

@@ -142,7 +142,8 @@ public final class SphereTessellator {
     /**
      * Tessellates using latitude/longitude grid.
      * 
-     * <p><b>Delegates to {@link VectorMath#generateLatLonGrid}</b> for all features.</p>
+     * <p><b>Delegates to {@link VectorMath#generateLatLonGridVertex}</b> for proper
+     * vertex position deformation (droplet, egg, cone, etc.).</p>
      */
     private static Mesh tessellateLatLon(SphereShape shape, VertexPattern pattern,
                                           VisibilityMask visibility, WaveConfig wave, float time) {
@@ -160,17 +161,17 @@ public final class SphereTessellator {
         boolean applyDeformation = shape.hasDeformation();
         SphereDeformation deformation = shape.effectiveDeformation();
         float deformIntensity = shape.deformationIntensity();
+        float deformLength = shape.deformationLength();
         
-        // Build the radius function for deformation
-        VectorMath.RadiusFunction radiusFunc = applyDeformation 
-            ? theta -> deformation.computeRadiusFactor(theta, deformIntensity)
-            : null;
+        // Build the vertex function for proper deformation (with length)
+        VectorMath.VertexFunction vertexFunc = (theta, phi, r) -> 
+            deformation.computeVertex(theta, phi, r, deformIntensity, deformLength);
         
-        // Generate the entire surface using the shared algorithm
-        VectorMath.generateLatLonGrid(
+        // Generate the entire surface using the shared algorithm with proper vertex positions
+        VectorMath.generateLatLonGridVertex(
             builder, radius, latSteps, lonSteps,
             latStart, latEnd, lonStart, lonEnd,
-            radiusFunc, pattern, visibility, wave, time
+            vertexFunc, pattern, visibility, wave, time
         );
         
         boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();

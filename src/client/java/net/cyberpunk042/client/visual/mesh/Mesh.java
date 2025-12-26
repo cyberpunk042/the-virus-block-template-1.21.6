@@ -145,6 +145,20 @@ public final class Mesh {
         return vertices.isEmpty();
     }
     
+    /**
+     * Returns true if this mesh uses LINES primitive type.
+     */
+    public boolean isLines() {
+        return primitiveType == PrimitiveType.LINES;
+    }
+    
+    /**
+     * Returns true if this mesh uses TRIANGLES primitive type.
+     */
+    public boolean isTriangles() {
+        return primitiveType == PrimitiveType.TRIANGLES;
+    }
+    
     // ─────────────────────────────────────────────────────────────────────────────
     // Iteration - Functional interface for each primitive type
     // ─────────────────────────────────────────────────────────────────────────────

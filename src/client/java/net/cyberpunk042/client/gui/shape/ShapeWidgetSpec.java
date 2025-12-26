@@ -182,12 +182,14 @@ public final class ShapeWidgetSpec {
         SliderSpec.half("Start", "sphere.latStart", 0f, 1f, "%.2f"),
         SliderSpec.half("End", "sphere.latEnd", 0f, 1f, "%.2f"),
         
-        // Row 4: Deformation (droplet, egg, etc.)
+        // Row 4: Deformation (droplet, egg, cone, spheroid, etc.)
         new SectionHeader("Deformation"),
-        EnumDropdownSpec.half("Shape", "sphere.deformation", 
+        EnumDropdownSpec.half("Deform", "sphere.deformation", 
             net.cyberpunk042.visual.shape.SphereDeformation.class, 
             net.cyberpunk042.visual.shape.SphereDeformation.NONE),
-        SliderSpec.half("Intensity", "sphere.deformationIntensity", 0f, 1f, "%.2f")
+        SliderSpec.half("Intensity", "sphere.deformationIntensity", 0f, 1f, "%.2f"),
+        // Length = axial stretch: <1 = oblate (squashed), 1 = normal, >1 = prolate (elongated)
+        SliderSpec.half("Length", "sphere.deformationLength", 0.2f, 3f, "%.2f")
         
         // Note: QuadPattern dropdown is added separately in ShapeSubPanel
     );

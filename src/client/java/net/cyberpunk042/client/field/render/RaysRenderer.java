@@ -138,18 +138,65 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
                 shape.outerRadius(), 1.0f);  // height=1.0 since y=t ranges 0-1
         }
         
-        // === Emit Lines with Fade + Animation Support ===
-        float fadeStart = shape.fadeStart();
-        float fadeEnd = shape.fadeEnd();
-        boolean hasFade = fadeStart != 1.0f || fadeEnd != 1.0f;
+        // === Check mesh type and render appropriately ===
+        if (mesh.isLines()) {
+            // Line-based ray rendering (original behavior)
+            float fadeStart = shape.fadeStart();
+            float fadeEnd = shape.fadeEnd();
+            boolean hasFade = fadeStart != 1.0f || fadeEnd != 1.0f;
+            
+            emitRayLines(matrices, consumer, mesh, color, baseAlpha, light, 
+                         colorCtx, waveConfig, time, fadeStart, fadeEnd, hasFade,
+                         flowConfig, motionConfig, wiggleConfig, twistConfig);
+            
+            Logging.FIELD.topic("render").trace("[RAYS] DONE lines: {} vertices", mesh.vertexCount());
+        } else {
+            // Triangle-based 3D ray rendering (droplet, egg, sphere ray types)
+            emitRayTriangles(matrices, consumer, mesh, color, baseAlpha, light, colorCtx);
+            
+            Logging.FIELD.topic("render").trace("[RAYS] DONE triangles: {} vertices", mesh.vertexCount());
+        }
+    }
+    
+    /**
+     * Emits 3D ray triangles (for droplet, egg, sphere ray types).
+     */
+    private void emitRayTriangles(MatrixStack matrices, VertexConsumer consumer,
+                                   Mesh mesh, int baseColor, float baseAlpha, int light,
+                                   ColorContext colorCtx) {
+        MatrixStack.Entry entry = matrices.peek();
+        Matrix4f positionMatrix = entry.getPositionMatrix();
+        Matrix3f normalMatrix = entry.getNormalMatrix();
         
-        emitRayLines(matrices, consumer, mesh, color, baseAlpha, light, 
-                     colorCtx, waveConfig, time, fadeStart, fadeEnd, hasFade,
-                     flowConfig, motionConfig, wiggleConfig, twistConfig);
+        // Simple triangle rendering - each triangle rendered as-is
+        mesh.forEachTriangle((v0, v1, v2) -> {
+            emitVertex(consumer, positionMatrix, normalMatrix, v0, baseColor, baseAlpha, light, colorCtx);
+            emitVertex(consumer, positionMatrix, normalMatrix, v1, baseColor, baseAlpha, light, colorCtx);
+            emitVertex(consumer, positionMatrix, normalMatrix, v2, baseColor, baseAlpha, light, colorCtx);
+        });
+    }
+    
+    private void emitVertex(VertexConsumer consumer, Matrix4f positionMatrix, Matrix3f normalMatrix,
+                            Vertex v, int color, float alpha, int light, ColorContext colorCtx) {
+        float x = v.x(), y = v.y(), z = v.z();
+        float nx = v.nx(), ny = v.ny(), nz = v.nz();
         
-        Logging.FIELD.topic("render").trace("[RAYS] DONE: {} vertices, fade={}, flow={}, motion={}, wiggle={}, twist={}", 
-            mesh.vertexCount(), hasFade, flowConfig != null, motionConfig != null, 
-            wiggleConfig != null, twistConfig != null);
+        // Apply color context if available
+        int finalColor = color;
+        if (colorCtx != null) {
+            finalColor = colorCtx.calculateColor(x, y, z, 0);
+        }
+        
+        // Apply alpha
+        int a = (int) ((finalColor >> 24 & 0xFF) * alpha);
+        finalColor = (a << 24) | (finalColor & 0x00FFFFFF);
+        
+        consumer.vertex(positionMatrix, x, y, z)
+            .color(finalColor)
+            .texture(v.u(), v.v())
+            .overlay(net.minecraft.client.render.OverlayTexture.DEFAULT_UV)
+            .light(light)
+            .normal(nx, ny, nz);
     }
     
     /**

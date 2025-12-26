@@ -41,6 +41,16 @@ public final class VectorMath {
     }
     
     /**
+     * Functional interface for computing deformed vertex positions.
+     * Used for proper parametric shape deformation (droplet, cone, etc.).
+     */
+    @FunctionalInterface
+    public interface VertexFunction {
+        /** Returns {x, y, z} vertex position for given spherical coordinates. */
+        float[] apply(float theta, float phi, float radius);
+    }
+    
+    /**
      * Generates a polar surface with FULL feature support.
      * 
      * <p><b>Core algorithm extracted from SphereTessellator.tessellateUvSphere().</b></p>
@@ -288,6 +298,111 @@ public final class VectorMath {
                 
                 // Use Vertex.spherical for vertex position (consistent with existing code)
                 Vertex v = Vertex.spherical(theta, phi, deformedRadius);
+                
+                // Apply wave deformation if active
+                if (applyWave) {
+                    v = WaveDeformer.applyToVertex(v, wave, time);
+                }
+                
+                vertexIndices[lat][lon] = builder.addVertex(v);
+            }
+        }
+        
+        // Generate triangles for each quad cell
+        for (int lat = 0; lat < latSteps; lat++) {
+            float latFrac = lat / (float) latSteps;
+            
+            for (int lon = 0; lon < lonSteps; lon++) {
+                float lonFrac = lon / (float) lonSteps;
+                
+                // Check visibility mask
+                if (visibility != null && !visibility.isVisible(lonFrac, latFrac)) {
+                    continue;
+                }
+                
+                // Check pattern
+                if (pattern != null && !pattern.shouldRender(lat * lonSteps + lon, latSteps * lonSteps)) {
+                    continue;
+                }
+                
+                // Get quad corner indices
+                int topLeft = vertexIndices[lat][lon];
+                int topRight = vertexIndices[lat][lon + 1];
+                int bottomLeft = vertexIndices[lat + 1][lon];
+                int bottomRight = vertexIndices[lat + 1][lon + 1];
+                
+                // Use pattern-aware quad emission if available
+                if (pattern != null) {
+                    builder.quadAsTrianglesFromPattern(topLeft, topRight, bottomRight, bottomLeft, pattern);
+                } else {
+                    builder.triangle(topLeft, topRight, bottomRight);
+                    builder.triangle(topLeft, bottomRight, bottomLeft);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Generates a latitude/longitude grid with PROPER vertex deformation.
+     * 
+     * <p>Uses {@link VertexFunction} to compute vertex positions directly,
+     * enabling proper parametric shape deformations (droplet, cone, etc.).</p>
+     * 
+     * @param builder MeshBuilder to add vertices/triangles to
+     * @param radius Base radius
+     * @param latSteps Number of latitude steps
+     * @param lonSteps Number of longitude steps
+     * @param latStart Start latitude (0 = top, 1 = bottom)
+     * @param latEnd End latitude
+     * @param lonStart Start longitude
+     * @param lonEnd End longitude  
+     * @param vertexFunc Vertex position function (takes theta, phi, radius → {x,y,z})
+     * @param pattern Vertex pattern for cell rendering
+     * @param visibility Visibility mask (null = all visible)
+     * @param wave Wave deformation config (null = no wave)
+     * @param time Current time for wave animation
+     */
+    public static void generateLatLonGridVertex(
+            MeshBuilder builder,
+            float radius,
+            int latSteps,
+            int lonSteps,
+            float latStart,
+            float latEnd,
+            float lonStart,
+            float lonEnd,
+            VertexFunction vertexFunc,
+            VertexPattern pattern,
+            VisibilityMask visibility,
+            WaveConfig wave,
+            float time) {
+        
+        float latRange = latEnd - latStart;
+        float lonRange = lonEnd - lonStart;
+        
+        // Check if wave deformation should be applied
+        boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();
+        
+        // Generate vertex grid
+        int[][] vertexIndices = new int[latSteps + 1][lonSteps + 1];
+        
+        for (int lat = 0; lat <= latSteps; lat++) {
+            float latNorm = latStart + (lat / (float) latSteps) * latRange;
+            float theta = latNorm * PI;  // 0 to PI (top to bottom)
+            
+            for (int lon = 0; lon <= lonSteps; lon++) {
+                float lonNorm = lonStart + (lon / (float) lonSteps) * lonRange;
+                float phi = lonNorm * TWO_PI;  // 0 to 2PI (around)
+                
+                // Compute deformed vertex position using the vertex function
+                float[] pos = vertexFunc.apply(theta, phi, radius);
+                
+                // Compute normal (approximate as direction from origin)
+                float[] normal = normalize(pos);
+                
+                // Create vertex
+                Vertex v = Vertex.pos(pos[0], pos[1], pos[2])
+                    .withNormal(normal[0], normal[1], normal[2]);
                 
                 // Apply wave deformation if active
                 if (applyWave) {

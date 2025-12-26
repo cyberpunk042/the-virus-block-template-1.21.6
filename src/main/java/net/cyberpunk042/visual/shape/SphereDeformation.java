@@ -3,16 +3,14 @@ package net.cyberpunk042.visual.shape;
 /**
  * Controls deformation of sphere shapes into other polar forms.
  * 
- * <p>Uses polar shape functions from {@link ShapeMath} to modify 
- * the sphere's radius based on the polar angle (θ), creating droplet, 
- * egg, and other organic shapes.</p>
+ * <p>Uses parametric shape functions from {@link ShapeMath} to compute
+ * vertex positions for various organic and geometric shapes.</p>
  * 
- * <h2>Shape Functions</h2>
+ * <h2>Shape Categories</h2>
  * <ul>
- *   <li><b>NONE:</b> r(θ) = 1 (standard sphere)</li>
- *   <li><b>DROPLET:</b> r(θ) = sin(θ/2)^power (teardrop, pointy at top)</li>
- *   <li><b>EGG:</b> r(θ) = 1 + asymmetry*cos(θ) (fatter at one end)</li>
- *   <li><b>BULLET:</b> r(θ) = hemisphere + cylinder (rounded tip)</li>
+ *   <li><b>Symmetric:</b> SPHEROID (oblate/prolate)</li>
+ *   <li><b>Organic:</b> OVOID, EGG, PEAR</li>
+ *   <li><b>Directional:</b> DROPLET, BULLET, CONE</li>
  * </ul>
  * 
  * @see SphereShape
@@ -20,22 +18,34 @@ package net.cyberpunk042.visual.shape;
  */
 public enum SphereDeformation {
     
+    // ─── Symmetric ───
     /** No deformation - standard sphere. */
     NONE("None", "Standard sphere"),
     
+    /** Spheroid - sphere stretched/squashed along Y axis. */
+    SPHEROID("Spheroid", "Stretched (prolate) or squashed (oblate) sphere"),
+    
+    // ─── Organic/Natural ───
+    /** Ovoid - smooth egg-like, softer asymmetry. */
+    OVOID("Ovoid", "Smooth egg-like shape"),
+    
+    /** Egg shape - asymmetric, fatter at bottom. */
+    EGG("Egg", "Egg shape (fatter bottom)"),
+    
+    /** Pear shape - strong base mass, tapered top. */
+    PEAR("Pear", "Pear shape (wide base, narrow top)"),
+    
+    // ─── Directional/Flow ───
     /** Droplet/teardrop shape - pointy at top, fat at bottom. */
-    DROPLET("Droplet", "Teardrop shape (pointy top)"),
+    DROPLET("Droplet", "Teardrop (pointy top)"),
     
     /** Droplet reversed - fat at top, pointy at bottom. */
-    DROPLET_INVERTED("Droplet Inverted", "Teardrop shape (pointy bottom)"),
-    
-    /** Egg shape - asymmetric, fatter at one end. */
-    EGG("Egg", "Egg shape (one end fatter)"),
+    DROPLET_INVERTED("Droplet ↓", "Teardrop (pointy bottom)"),
     
     /** Bullet shape - hemispherical tip, cylindrical body. */
-    BULLET("Bullet", "Rounded tip, flat base"),
+    BULLET("Bullet", "Rounded tip + cylinder"),
     
-    /** Cone-like - pointy tip, wide base. */
+    /** Cone - pointy tip, wide base. */
     CONE("Cone", "Conical taper");
     
     private final String displayName;
@@ -50,56 +60,105 @@ public enum SphereDeformation {
     public String description() { return description; }
     
     /**
-     * Computes the radius multiplier for the given polar angle.
-     * <p>Delegates to {@link ShapeMath} functions for the actual math.</p>
+     * Computes the deformed vertex position for the given spherical coordinates.
      * 
-     * @param theta Polar angle (0 = top/north, π = bottom/south)
-     * @param intensity Deformation intensity (0 = none, 1 = full effect)
-     * @return Radius multiplier (0.0 to 1.0+)
+     * <p>Uses proper parametric equations from {@link ShapeMath}.</p>
+     * 
+     * @param theta Polar angle (0 = top, π = bottom)
+     * @param phi Azimuthal angle (0 to 2π)
+     * @param radius Base radius
+     * @param intensity Deformation intensity (0 = sphere, 1 = full effect)
+     * @param length Axial stretch factor (1 = normal, >1 = elongated, <1 = squashed)
+     * @return {x, y, z} vertex position
      */
-    public float computeRadiusFactor(float theta, float intensity) {
+    public float[] computeVertex(float theta, float phi, float radius, 
+            float intensity, float length) {
+        // Get sphere position for blending
+        float[] spherePos = ShapeMath.sphereVertex(theta, phi, radius);
+        
         if (intensity <= 0.0f || this == NONE) {
-            return 1.0f;  // No deformation = sphere
+            // Apply only length stretch to sphere
+            if (length != 1.0f) {
+                return ShapeMath.spheroidVertex(theta, phi, radius, length);
+            }
+            return spherePos;
         }
         
-        // Get raw shape factor from shared math utilities
-        float rawFactor = switch (this) {
-            case NONE -> ShapeMath.sphere(theta);
+        // Get target shape position
+        float[] shapePos = switch (this) {
+            case NONE -> spherePos;
             
-            case DROPLET -> {
-                // Use power based on intensity: 1.0 to 3.0
-                float power = 1.0f + intensity * 2.0f;
-                yield ShapeMath.droplet(theta, power);
-            }
+            case SPHEROID -> ShapeMath.spheroidVertex(theta, phi, radius, length);
             
-            case DROPLET_INVERTED -> {
-                // Use power based on intensity: 1.0 to 3.0
-                float power = 1.0f + intensity * 2.0f;
-                yield ShapeMath.dropletInverted(theta, power);
+            case OVOID -> {
+                float asymmetry = intensity * 0.3f;  // 0 to 0.3
+                yield ShapeMath.ovoidVertex(theta, phi, radius, asymmetry, length);
             }
             
             case EGG -> {
-                // Asymmetry based on intensity: 0 to 0.4
-                float asymmetry = intensity * 0.4f;
-                yield ShapeMath.egg(theta, asymmetry);
+                float asymmetry = intensity * 0.4f;  // 0 to 0.4
+                yield ShapeMath.eggVertex(theta, phi, radius, asymmetry, length);
             }
             
-            case BULLET -> ShapeMath.bullet(theta);
+            case PEAR -> ShapeMath.pearVertex(theta, phi, radius, intensity, length);
             
-            case CONE -> {
-                // Blend cone with sphere based on intensity
-                float coneFactor = ShapeMath.cone(theta);
-                yield ShapeMath.blend(coneFactor, intensity);
+            case DROPLET -> {
+                float power = 0.5f + intensity * 1.5f;  // 0.5 to 2.0
+                yield ShapeMath.dropletVertex(theta, phi, radius, power, length);
             }
+            
+            case DROPLET_INVERTED -> {
+                float power = 0.5f + intensity * 1.5f;
+                yield ShapeMath.dropletInvertedVertex(theta, phi, radius, power, length);
+            }
+            
+            case BULLET -> ShapeMath.bulletVertex(theta, phi, radius, length);
+            
+            case CONE -> ShapeMath.coneVertex(theta, phi, radius, length);
         };
         
-        return rawFactor;
+        // For SPHEROID, don't blend - it IS the sphere with stretch
+        if (this == SPHEROID) {
+            return shapePos;
+        }
+        
+        // Blend between sphere (with length) and target shape
+        float[] baseSphere = length != 1.0f 
+            ? ShapeMath.spheroidVertex(theta, phi, radius, length) 
+            : spherePos;
+        return ShapeMath.blendVertex(baseSphere, shapePos, intensity);
     }
     
     /**
-     * Whether this deformation creates a pointy end (needs special handling).
+     * Simplified computeVertex without length (uses length = 1.0).
+     */
+    public float[] computeVertex(float theta, float phi, float radius, float intensity) {
+        return computeVertex(theta, phi, radius, intensity, 1.0f);
+    }
+    
+    /**
+     * Computes the radius multiplier (legacy method).
+     */
+    public float computeRadiusFactor(float theta, float intensity) {
+        if (intensity <= 0.0f || this == NONE) {
+            return 1.0f;
+        }
+        
+        return switch (this) {
+            case NONE, SPHEROID -> ShapeMath.sphere(theta);
+            case OVOID, EGG -> ShapeMath.egg(theta, intensity * 0.4f);
+            case PEAR -> ShapeMath.egg(theta, intensity * 0.5f);
+            case DROPLET -> ShapeMath.droplet(theta, 1.0f + intensity * 2.0f);
+            case DROPLET_INVERTED -> ShapeMath.dropletInverted(theta, 1.0f + intensity * 2.0f);
+            case BULLET -> ShapeMath.bullet(theta);
+            case CONE -> ShapeMath.blend(ShapeMath.cone(theta), intensity);
+        };
+    }
+    
+    /**
+     * Whether this deformation creates a pointy end.
      */
     public boolean hasPointyEnd() {
-        return this == DROPLET || this == DROPLET_INVERTED || this == CONE;
+        return this == DROPLET || this == DROPLET_INVERTED || this == CONE || this == PEAR;
     }
 }

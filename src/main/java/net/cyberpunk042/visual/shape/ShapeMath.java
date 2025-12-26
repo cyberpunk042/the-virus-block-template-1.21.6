@@ -3,18 +3,21 @@ package net.cyberpunk042.visual.shape;
 /**
  * Pure math functions for polar shape deformation.
  * 
- * <p>These functions define how radius varies with polar angle (θ) to create
- * various organic shapes from a sphere. θ=0 is the "tip" (top/north pole),
- * θ=π is the "base" (bottom/south pole).</p>
+ * <p>These functions compute deformed vertex positions from spherical coordinates.
+ * θ=0 is the "tip" (top/north pole), θ=π is the "base" (bottom/south pole).</p>
  * 
- * <p>All functions return a radius factor in range [0, 1+] that multiplies
- * the base radius.</p>
+ * <h2>Shape Categories</h2>
+ * <ul>
+ *   <li><b>Symmetric:</b> Sphere, Spheroid (oblate/prolate), Ellipsoid</li>
+ *   <li><b>Organic:</b> Ovoid, Egg, Pear</li>
+ *   <li><b>Directional:</b> Teardrop/Droplet, Bullet, Cone</li>
+ * </ul>
  * 
- * <h2>Usage</h2>
- * <pre>
- * float factor = ShapeMath.droplet(theta, 2.0f);
- * float deformedRadius = baseRadius * factor;
- * </pre>
+ * <h2>Key Parameters</h2>
+ * <ul>
+ *   <li><b>length:</b> Axial stretch (1 = sphere, &gt;1 = prolate, &lt;1 = oblate)</li>
+ *   <li><b>intensity:</b> Deformation strength (0 = sphere, 1 = full effect)</li>
+ * </ul>
  * 
  * @see SphereDeformation
  */
@@ -22,57 +25,31 @@ public final class ShapeMath {
     
     private static final float PI = (float) Math.PI;
     private static final float HALF_PI = (float) (Math.PI * 0.5);
+    private static final float TWO_PI = (float) (Math.PI * 2);
     
     private ShapeMath() {} // Utility class
     
     // ═══════════════════════════════════════════════════════════════════════════
-    // Polar Shape Functions
+    // Radius Factor Functions (legacy - for simple radius scaling)
     // ═══════════════════════════════════════════════════════════════════════════
     
-    /**
-     * Sphere: constant radius.
-     * r(θ) = 1
-     */
+    /** Sphere: constant radius. */
     public static float sphere(float theta) {
         return 1.0f;
     }
     
-    /**
-     * Droplet/teardrop shape.
-     * r(θ) = sin(θ/2)^power
-     * 
-     * <p>Creates a shape that's pointed at θ=0 (tip) and full radius at θ=π (base).</p>
-     * 
-     * @param theta Polar angle (0 = tip, π = base)
-     * @param power Sharpness: 1.0 = hemisphere, 2.0 = teardrop, 4.0+ = very pointy
-     * @return Radius factor (0 to 1)
-     */
+    /** Droplet radius factor: sin(θ/2)^power */
     public static float droplet(float theta, float power) {
         float base = (float) Math.sin(theta * 0.5f);
-        return (float) Math.pow(base, power);
+        return (float) Math.pow(Math.max(0.0001f, base), power);
     }
     
-    /**
-     * Egg/oval shape (asymmetric).
-     * r(θ) = 1 + asymmetry × cos(θ)
-     * 
-     * <p>Creates a shape that's fatter at one end (θ=0 is wider).</p>
-     * 
-     * @param theta Polar angle (0 to π)
-     * @param asymmetry Degree of asymmetry: 0 = sphere, 0.3 = egg shape
-     * @return Radius factor (> 0)
-     */
+    /** Egg radius factor: 1 + asymmetry × cos(θ) */
     public static float egg(float theta, float asymmetry) {
         return 1.0f + asymmetry * (float) Math.cos(theta);
     }
     
-    /**
-     * Bullet/capsule tip shape.
-     * r(θ) = sin(θ) for θ in [0, π/2], then 1 for θ in [π/2, π]
-     * 
-     * @param theta Polar angle (0 to π)
-     * @return Radius factor (0 to 1)
-     */
+    /** Bullet radius factor */
     public static float bullet(float theta) {
         if (theta < HALF_PI) {
             return (float) Math.sin(theta);
@@ -80,37 +57,272 @@ public final class ShapeMath {
         return 1.0f;
     }
     
-    /**
-     * Cone shape.
-     * r(θ) = θ/π (linear from 0 at tip to 1 at base)
-     * 
-     * @param theta Polar angle (0 = tip, π = base)
-     * @return Radius factor (0 to 1)
-     */
+    /** Cone radius factor: θ/π */
     public static float cone(float theta) {
         return theta / PI;
     }
     
-    /**
-     * Inverted droplet (pointy at bottom instead of top).
-     * 
-     * @param theta Polar angle (0 to π)
-     * @param power Sharpness: 1.0 = hemisphere, 2.0 = teardrop
-     * @return Radius factor (0 to 1)
-     */
+    /** Inverted droplet radius factor */
     public static float dropletInverted(float theta, float power) {
-        float flippedTheta = PI - theta;
-        return droplet(flippedTheta, power);
+        return droplet(PI - theta, power);
+    }
+    
+    /** Blends between sphere and shape */
+    public static float blend(float shapeFactor, float intensity) {
+        return 1.0f + (shapeFactor - 1.0f) * Math.min(1.0f, intensity);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Direct Vertex Position Functions (Proper Parametric Geometry)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Sphere vertex position (standard spherical coordinates).
+     */
+    public static float[] sphereVertex(float theta, float phi, float radius) {
+        float sinTheta = (float) Math.sin(theta);
+        float cosTheta = (float) Math.cos(theta);
+        float sinPhi = (float) Math.sin(phi);
+        float cosPhi = (float) Math.cos(phi);
+        
+        return new float[] {
+            radius * sinTheta * cosPhi,  // X
+            radius * cosTheta,           // Y (up)
+            radius * sinTheta * sinPhi   // Z
+        };
     }
     
     /**
-     * Blends between sphere (factor=1) and another shape.
+     * Spheroid vertex position (stretched/squashed sphere).
      * 
-     * @param shapeFactor The raw shape factor
-     * @param intensity Blend amount: 0 = sphere, 1 = full shape
-     * @return Blended factor
+     * <p>Oblate (length &lt; 1): squashed along Y axis (disc-like)<br>
+     * Prolate (length &gt; 1): stretched along Y axis (football-like)</p>
+     * 
+     * @param theta Polar angle
+     * @param phi Azimuthal angle
+     * @param radius Equatorial radius
+     * @param length Axial stretch factor (height = radius * length)
      */
-    public static float blend(float shapeFactor, float intensity) {
-        return 1.0f + (shapeFactor - 1.0f) * Math.min(1.0f, intensity);
+    public static float[] spheroidVertex(float theta, float phi, float radius, float length) {
+        float sinTheta = (float) Math.sin(theta);
+        float cosTheta = (float) Math.cos(theta);
+        float sinPhi = (float) Math.sin(phi);
+        float cosPhi = (float) Math.cos(phi);
+        
+        return new float[] {
+            radius * sinTheta * cosPhi,      // X (equatorial)
+            radius * length * cosTheta,      // Y (axial, stretched)
+            radius * sinTheta * sinPhi       // Z (equatorial)
+        };
+    }
+    
+    /**
+     * Ellipsoid vertex position (three unequal axes).
+     * 
+     * @param theta Polar angle
+     * @param phi Azimuthal angle
+     * @param radius Base radius (X axis)
+     * @param lengthY Y axis scale factor
+     * @param lengthZ Z axis scale factor
+     */
+    public static float[] ellipsoidVertex(float theta, float phi, float radius, 
+            float lengthY, float lengthZ) {
+        float sinTheta = (float) Math.sin(theta);
+        float cosTheta = (float) Math.cos(theta);
+        float sinPhi = (float) Math.sin(phi);
+        float cosPhi = (float) Math.cos(phi);
+        
+        return new float[] {
+            radius * sinTheta * cosPhi,           // X
+            radius * lengthY * cosTheta,          // Y (scaled)
+            radius * lengthZ * sinTheta * sinPhi  // Z (scaled)
+        };
+    }
+    
+    /**
+     * Ovoid vertex position (smooth egg-like, symmetric but stretched at one end).
+     * 
+     * <p>Similar to egg but with softer asymmetry.</p>
+     * 
+     * @param theta Polar angle
+     * @param phi Azimuthal angle
+     * @param radius Base radius
+     * @param asymmetry Asymmetry factor (0 = sphere, 0.2-0.4 = typical ovoid)
+     * @param length Axial stretch
+     */
+    public static float[] ovoidVertex(float theta, float phi, float radius, 
+            float asymmetry, float length) {
+        float sinTheta = (float) Math.sin(theta);
+        float cosTheta = (float) Math.cos(theta);
+        float sinPhi = (float) Math.sin(phi);
+        float cosPhi = (float) Math.cos(phi);
+        
+        // Ovoid profile: smoother transition than egg
+        // Use cosine-based asymmetry that's gentler
+        float radiusFactor = 1.0f + asymmetry * 0.5f * (1.0f + (float) Math.cos(theta));
+        float modRadius = radius * radiusFactor;
+        
+        return new float[] {
+            modRadius * sinTheta * cosPhi,  // X
+            radius * length * cosTheta,     // Y (axial)
+            modRadius * sinTheta * sinPhi   // Z
+        };
+    }
+    
+    /**
+     * Egg vertex position (asymmetric - fatter at bottom).
+     */
+    public static float[] eggVertex(float theta, float phi, float radius, 
+            float asymmetry, float length) {
+        float sinTheta = (float) Math.sin(theta);
+        float cosTheta = (float) Math.cos(theta);
+        float sinPhi = (float) Math.sin(phi);
+        float cosPhi = (float) Math.cos(phi);
+        
+        // Egg profile: wider at bottom (θ=π), narrower at top (θ=0)
+        float radiusFactor = 1.0f + asymmetry * (float) Math.cos(theta);
+        float modRadius = radius * radiusFactor;
+        
+        return new float[] {
+            modRadius * sinTheta * cosPhi,  // X
+            radius * length * cosTheta,     // Y (axial)
+            modRadius * sinTheta * sinPhi   // Z
+        };
+    }
+    
+    /**
+     * Pear vertex position (strong base mass, tapered top).
+     * 
+     * <p>Uses piriform (pear-shaped) curve profile.</p>
+     * 
+     * @param theta Polar angle (0 = narrow top, π = wide base)
+     * @param phi Azimuthal angle
+     * @param radius Base radius at widest point
+     * @param intensity Pear-ness (0 = sphere, 1 = strong pear)
+     * @param length Axial stretch
+     */
+    public static float[] pearVertex(float theta, float phi, float radius, 
+            float intensity, float length) {
+        float sinTheta = (float) Math.sin(theta);
+        float cosTheta = (float) Math.cos(theta);
+        float sinPhi = (float) Math.sin(phi);
+        float cosPhi = (float) Math.cos(phi);
+        
+        // Piriform profile: (1 + sin(θ)) * cos(θ) for radial component
+        // Creates a pear shape with narrow top and wide bottom
+        float normalized = theta / PI;  // 0 to 1
+        float pearProfile = (float) Math.pow(normalized, 0.7f + 0.3f * intensity);
+        
+        // Blend with sphere
+        float sphereRadius = radius * sinTheta;
+        float pearRadius = radius * pearProfile * sinTheta;
+        float finalRadius = sphereRadius * (1 - intensity) + pearRadius * intensity;
+        
+        return new float[] {
+            finalRadius * cosPhi,           // X
+            radius * length * cosTheta,     // Y (axial)
+            finalRadius * sinPhi            // Z
+        };
+    }
+    
+    /**
+     * Droplet/teardrop vertex position.
+     * 
+     * <p>Pointed tip at θ=0, rounded base at θ=π.</p>
+     */
+    public static float[] dropletVertex(float theta, float phi, float radius, 
+            float power, float length) {
+        float sinTheta = (float) Math.sin(theta);
+        float cosTheta = (float) Math.cos(theta);
+        float sinPhi = (float) Math.sin(phi);
+        float cosPhi = (float) Math.cos(phi);
+        
+        // Teardrop profile: (1 - cos(θ)) creates the taper
+        float profile = (1.0f - cosTheta) * (float) Math.pow(Math.abs(sinTheta), power);
+        float normalizedProfile = profile * radius * 0.5f;
+        
+        return new float[] {
+            normalizedProfile * cosPhi,     // X
+            radius * length * cosTheta,     // Y (axial)
+            normalizedProfile * sinPhi      // Z
+        };
+    }
+    
+    /**
+     * Droplet inverted vertex position (pointy at bottom).
+     */
+    public static float[] dropletInvertedVertex(float theta, float phi, float radius, 
+            float power, float length) {
+        float[] pos = dropletVertex(PI - theta, phi, radius, power, length);
+        pos[1] = -pos[1];  // Flip Y
+        return pos;
+    }
+    
+    /**
+     * Bullet/capsule-tip vertex position.
+     * 
+     * <p>Hemisphere on top, cylinder below.</p>
+     */
+    public static float[] bulletVertex(float theta, float phi, float radius, float length) {
+        float sinPhi = (float) Math.sin(phi);
+        float cosPhi = (float) Math.cos(phi);
+        
+        float x, y, z;
+        
+        if (theta < HALF_PI) {
+            // Top hemisphere (0 to π/2)
+            float sinTheta = (float) Math.sin(theta);
+            float cosTheta = (float) Math.cos(theta);
+            
+            x = radius * sinTheta * cosPhi;
+            y = radius * cosTheta;  // Top part
+            z = radius * sinTheta * sinPhi;
+        } else {
+            // Bottom cylinder (π/2 to π)
+            float t = (theta - HALF_PI) / HALF_PI;  // 0 to 1
+            
+            x = radius * cosPhi;
+            y = -radius * length * t;  // Extends down based on length
+            z = radius * sinPhi;
+        }
+        
+        return new float[] { x, y, z };
+    }
+    
+    /**
+     * Cone vertex position.
+     */
+    public static float[] coneVertex(float theta, float phi, float radius, float length) {
+        float sinPhi = (float) Math.sin(phi);
+        float cosPhi = (float) Math.cos(phi);
+        
+        // Linear taper: 0 at tip (θ=0), 1 at base (θ=π)
+        float taper = theta / PI;
+        float ringRadius = radius * taper;
+        
+        // Map θ to Y with length scaling
+        float y = radius * length * (float) Math.cos(theta);
+        
+        return new float[] {
+            ringRadius * cosPhi,  // X
+            y,                    // Y
+            ringRadius * sinPhi   // Z
+        };
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Blending Utilities
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Blends between two vertex positions.
+     */
+    public static float[] blendVertex(float[] a, float[] b, float t) {
+        float inv = 1.0f - t;
+        return new float[] {
+            a[0] * inv + b[0] * t,
+            a[1] * inv + b[1] * t,
+            a[2] * inv + b[2] * t
+        };
     }
 }
