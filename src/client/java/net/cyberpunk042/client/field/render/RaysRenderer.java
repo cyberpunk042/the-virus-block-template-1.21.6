@@ -1,6 +1,7 @@
 package net.cyberpunk042.client.field.render;
 
 import net.cyberpunk042.client.visual.animation.AnimationApplier;
+import net.cyberpunk042.client.visual.animation.WaveDeformer;
 import net.cyberpunk042.client.visual.mesh.Mesh;
 import net.cyberpunk042.client.visual.mesh.RaysTessellator;
 import net.cyberpunk042.client.visual.mesh.Vertex;
@@ -58,10 +59,10 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
         }
         
         Logging.RENDER.topic("tessellate").debug(
-            "[RAYS] Tessellating: count={}, arrangement={}, layers={}",
-            shape.count(), shape.arrangement(), shape.layers());
+            "[RAYS] Tessellating: count={}, arrangement={}, layers={}, wave={}",
+            shape.count(), shape.arrangement(), shape.layers(), wave != null && wave.isActive());
         
-        return RaysTessellator.tessellate(shape);
+        return RaysTessellator.tessellate(shape, wave, time);
     }
     
     /**
@@ -176,6 +177,14 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
         final boolean staggerPhase = flowConfig != null && 
             (flowConfig.length() == LengthMode.RADIATE || flowConfig.length() == LengthMode.ABSORB);
         
+        // Wave configuration for RADIATE/ABSORB
+        final float waveArc = flowConfig != null ? flowConfig.effectiveWaveArc() : 1.0f;
+        final WaveDistribution waveDist = flowConfig != null ? flowConfig.effectiveWaveDistribution() : WaveDistribution.SEQUENTIAL;
+        final int waveCount = flowConfig != null ? Math.max(1, flowConfig.waveCount()) : 1;
+        
+        // Pre-compute random offsets for RANDOM distribution (seeded by ray index)
+        // This ensures consistent randomization per ray across frames
+        
         // For each line segment (pairs of vertices: v0=start/center, v1=end/outer)
         final int[] rayIndex = {0};
         mesh.forEachLine((v0, v1) -> {
@@ -190,12 +199,30 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
             float t1 = v1.u();
             
             // Calculate per-ray phase for RADIATE/ABSORB (staggered for continuous flow)
-            // Each ray has a unique phase offset so rays are evenly distributed across the cycle
             float rayLengthPhase;
             if (staggerPhase) {
-                // Stagger phase by ray index - creates continuous flow effect
-                float rayOffset = (float) idx / rayCount;
-                rayLengthPhase = (baseLengthPhase + rayOffset) % 1.0f;
+                // Calculate ray phase offset based on distribution mode
+                float rayOffset;
+                if (waveDist == WaveDistribution.RANDOM) {
+                    // Use a hash function to get consistent random offset per ray
+                    // Golden ratio-based hash for good distribution
+                    rayOffset = (idx * 0.618033988749895f) % 1.0f;
+                } else {
+                    // SEQUENTIAL: evenly distributed by index
+                    rayOffset = (float) idx / rayCount;
+                }
+                
+                // Apply wave arc: waveArc=1.0 means all rays participate,
+                // waveArc=0.25 means only 25% of rays are visible at once
+                // Scale the phase offset so that rays are compressed into the waveArc
+                float scaledOffset = rayOffset * waveArc;
+                
+                // Apply wave count: multiply to create multiple simultaneous wave peaks
+                // waveCount=1: single sweep (0-1), waveCount=2: two sweeps (each ray sees 2 cycles)
+                float phase = baseLengthPhase + scaledOffset;
+                phase = (phase * waveCount) % 1.0f;
+                
+                rayLengthPhase = phase;
             } else {
                 rayLengthPhase = baseLengthPhase;
             }
@@ -353,13 +380,8 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
                 }
             }
             
-            // === Apply Wave Animation ===
-            if (waveConfig != null && waveConfig.isActive()) {
-                float[] w0 = AnimationApplier.applyWaveToVertex(waveConfig, x0, y0, z0, time);
-                float[] w1 = AnimationApplier.applyWaveToVertex(waveConfig, x1, y1, z1, time);
-                x0 = w0[0]; y0 = w0[1]; z0 = w0[2];
-                x1 = w1[0]; y1 = w1[1]; z1 = w1[2];
-            }
+            // NOTE: Wave deformation is now applied at tessellation time in RaysTessellator
+            // This ensures proper multi-segment tessellation for smooth wave effects
             
             // Emit both vertices of the line
             emitLineVertex(consumer, x0, y0, z0, x1, y1, z1, positionMatrix, normalMatrix,
@@ -430,7 +452,8 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
         // Calculate color
         int vertexColor;
         if (colorCtx != null && colorCtx.isPerVertex()) {
-            vertexColor = colorCtx.calculateColor(originalVertex.x(), originalVertex.y(), originalVertex.z(), 0);
+            // Pass rayIndex as cellIndex so each ray can get a different color
+            vertexColor = colorCtx.calculateColor(originalVertex.x(), originalVertex.y(), originalVertex.z(), rayIndex);
         } else {
             vertexColor = baseColor;
         }

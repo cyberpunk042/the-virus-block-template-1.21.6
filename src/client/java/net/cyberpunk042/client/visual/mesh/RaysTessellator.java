@@ -1,6 +1,8 @@
 package net.cyberpunk042.client.visual.mesh;
 
+import net.cyberpunk042.client.visual.animation.WaveDeformer;
 import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.visual.animation.WaveConfig;
 import net.cyberpunk042.visual.shape.RayArrangement;
 import net.cyberpunk042.visual.shape.RayCurvature;
 import net.cyberpunk042.visual.shape.RayDistribution;
@@ -41,39 +43,64 @@ public final class RaysTessellator {
     
     private RaysTessellator() {}
     
+    // Thread-local state for wave config (avoids passing through all methods)
+    private static final ThreadLocal<WaveConfig> currentWave = new ThreadLocal<>();
+    private static final ThreadLocal<Float> currentTime = new ThreadLocal<>();
+    
     /**
-     * Tessellates rays shape into a line mesh.
+     * Tessellates rays shape into a line mesh (without wave deformation).
      * 
      * @param shape The rays shape definition
      * @return Mesh containing line segments
      */
     public static Mesh tessellate(RaysShape shape) {
+        return tessellate(shape, null, 0);
+    }
+    
+    /**
+     * Tessellates rays shape into a line mesh with optional wave deformation.
+     * 
+     * @param shape The rays shape definition
+     * @param wave Wave configuration (or null for no wave)
+     * @param time Current time for wave animation
+     * @return Mesh containing line segments
+     */
+    public static Mesh tessellate(RaysShape shape, WaveConfig wave, float time) {
         MeshBuilder builder = MeshBuilder.lines();
         
-        int count = shape.count();
-        int layers = Math.max(1, shape.layers());
-        float layerSpacing = shape.layerSpacing();
-        RayArrangement arrangement = shape.arrangement();
-        RayDistribution distribution = shape.distribution();
+        // Store wave config for use by inner methods
+        currentWave.set(wave);
+        currentTime.set(time);
         
-        Random rng = new Random(42); // Deterministic random for stable results
-        
-        Logging.FIELD.topic("tessellation").debug(
-            "Tessellating rays: count={}, layers={}, arrangement={}, distribution={}", 
-            count, layers, arrangement, distribution);
-        
-        // Generate rays for each layer
-        for (int layer = 0; layer < layers; layer++) {
-            // For RADIAL/PARALLEL: layerOffset is Y displacement
-            // For 3D modes: layerScale creates concentric shells (innerRadius grows)
-            float layerT = layers > 1 ? (float) layer / (layers - 1) : 0f; // 0 to 1
+        try {
+            int count = shape.count();
+            int layers = Math.max(1, shape.layers());
+            float layerSpacing = shape.layerSpacing();
+            RayArrangement arrangement = shape.arrangement();
+            RayDistribution distribution = shape.distribution();
             
-            for (int i = 0; i < count; i++) {
-                tessellateRay(builder, shape, i, count, layer, layerT, layerSpacing, rng);
+            Random rng = new Random(42); // Deterministic random for stable results
+            
+            Logging.FIELD.topic("tessellation").debug(
+                "Tessellating rays: count={}, layers={}, arrangement={}, distribution={}, wave={}", 
+                count, layers, arrangement, distribution, wave != null && wave.isActive());
+            
+            // Generate rays for each layer
+            for (int layer = 0; layer < layers; layer++) {
+                // For RADIAL/PARALLEL: layerOffset is Y displacement
+                // For 3D modes: layerScale creates concentric shells (innerRadius grows)
+                float layerT = layers > 1 ? (float) layer / (layers - 1) : 0f; // 0 to 1
+                
+                for (int i = 0; i < count; i++) {
+                    tessellateRay(builder, shape, i, count, layer, layerT, layerSpacing, rng);
+                }
             }
+            
+            return builder.build();
+        } finally {
+            currentWave.remove();
+            currentTime.remove();
         }
-        
-        return builder.build();
     }
     
     /**
@@ -260,14 +287,25 @@ public final class RaysTessellator {
         }
         
         // Determine if we need multi-segment tessellation
-        // Needed when: lineShape is not STRAIGHT, curvature is not NONE, or shapeSegments > 1
+        // Needed when: lineShape is not STRAIGHT, curvature is not NONE, shapeSegments > 1, or wave is active
         RayLineShape lineShape = shape.effectiveLineShape();
         RayCurvature curvature = shape.effectiveCurvature();
         int shapeSegments = shape.effectiveShapeSegments();
         
+        // Check for wave - need multi-segment to apply wave deformation
+        WaveConfig wave = currentWave.get();
+        Float time = currentTime.get();
+        boolean hasWave = wave != null && wave.isActive() && wave.isCpuMode();
+        
+        // Force minimum segments for wave deformation (at least 16 for smooth wave)
+        if (hasWave && shapeSegments < 16) {
+            shapeSegments = 16;
+        }
+        
         boolean needsMultiSegment = lineShape != RayLineShape.STRAIGHT 
                                  || curvature != RayCurvature.NONE 
-                                 || shapeSegments > 1;
+                                 || shapeSegments > 1
+                                 || hasWave;
         boolean isSegmented = shape.isSegmented();
         
         if (isSegmented && needsMultiSegment) {
@@ -278,7 +316,7 @@ public final class RaysTessellator {
             // Simple dashed ray (straight line segments with gaps)
             tessellateSegmentedRay(builder, start, end, shape.segments(), shape.segmentGap());
         } else if (needsMultiSegment) {
-            // Multi-segment ray for complex shapes/curvature (continuous, no gaps)
+            // Multi-segment ray for complex shapes/curvature/wave (continuous, no gaps)
             tessellateShapedRay(builder, shape, start, end, lineShape, curvature, shapeSegments);
         } else {
             // Simple single line segment (2 vertices)
@@ -457,6 +495,16 @@ public final class RaysTessellator {
                 px += offset[0];
                 py += offset[1];
                 pz += offset[2];
+                
+                // Apply wave deformation if active
+                WaveConfig wave = currentWave.get();
+                Float time = currentTime.get();
+                if (wave != null && wave.isActive() && wave.isCpuMode() && time != null) {
+                    float[] deformed = WaveDeformer.apply(px, py, pz, wave, time);
+                    px = deformed[0];
+                    py = deformed[1];
+                    pz = deformed[2];
+                }
                 
                 // Store vertex with t in UV.u and RAY AXIS DIRECTION in normal
                 // The normal stores the ray's central axis direction for Twist animation

@@ -166,19 +166,37 @@ These shapes have vertices offset from the central axis, so rotating around the 
 
 ## GUI Warning Implementation Notes
 
-The following scenarios should trigger info tooltips or warning messages:
+The following scenarios now trigger info tooltips or warning messages via `RayCompatibilityHint.java`:
+
+### ✅ Implemented
 
 1. **Wiggle mode selected + Line Shape is STRAIGHT + Line Segments = 1**
-   - Message: "⚠️ Wiggle requires multi-segment rays. Set Line Shape ≠ STRAIGHT or increase Line Segments."
+   - Message: "⚠ Wiggle needs multi-segment rays"
+   - Triggered in `ModifiersSubPanel` when ray sections are built
 
-2. **Twist mode selected + Line Shape is STRAIGHT**
-   - Message: "⚠️ Twist requires a 3D Line Shape (CORKSCREW, SPRING, HELIX) to be visible."
-
+2. **Twist mode selected + Line Shape is not 3D (CORKSCREW, SPRING, HELIX, DOUBLE_HELIX)**
+   - Message: "⚠ Twist needs 3D shape (CORKSCREW/HELIX)"
+   
 3. **PRECESS mode selected + Ray Count > 50**
-   - Message: "⚠️ PRECESS mode may cause lag with many rays. Consider reducing Count or using ANGULAR_DRIFT."
+   - Message: "⚠ PRECESS + [N] rays may lag"
 
-4. **Multiple ray animations active + Count > 100**
-   - Message: "⚠️ Multiple animations with high ray count may impact performance."
+4. **High segment count (>64) + High ray count (>100)**
+   - Message: "⚠ High segments + count may lag"
 
-5. **Curvature ≠ NONE + Line Segments > 64**
-   - Message: "⚠️ High segment count with curvature may impact performance."
+### Usage
+
+The `RayCompatibilityHint.compute(state, callback)` method is called from `ModifiersSubPanel.checkRayCompatibility()`.
+
+Tooltips for individual animation modes can be retrieved via:
+```java
+String hint = RayCompatibilityHint.getModeHint("wiggle", "WHIP");
+// Returns: "Requires Line Shape ≠ STRAIGHT or Line Segments > 1"
+```
+
+### Line Width Improvements (Dec 2024)
+
+Variable line width now works correctly via custom `RenderLayer`:
+- Range: **0.01 to 10.0**
+- Uses `RenderPipelines.LINES` (discrete pairs, no unwanted vertex connections)
+- Cached by width for performance
+- Located in `FieldRenderLayers.linesWithWidth(float width)`

@@ -99,11 +99,12 @@ public final class FieldRenderLayers extends RenderPhase {
     public static RenderLayer solidTranslucent(Identifier texture) {
         return RenderLayer.getEntityTranslucent(texture);
     }
+    
     /**
      * Lines layer for wireframe rendering with default width (1.0).
      */
     public static RenderLayer lines() {
-        return LINES_LAYER;
+        return linesWithWidth(1.0f);
     }
     
     /**
@@ -117,23 +118,18 @@ public final class FieldRenderLayers extends RenderPhase {
      * 
      * <p><b>Note:</b> OpenGL line width is GPU-dependent. We use LINE_STRIP for 
      * thick mode because getLines() doesn't support width parameter. The LINE_STRIP
-     * draw mode connects vertices differently but works for our discrete line pairs.&lt;/p&gt;
+     * draw mode connects vertices differently but works for our discrete line pairs.</p>
      * 
-     * @param width Line width - values &lt; 1.0 use thin, &gt;= 1.0 use thick
+     * @param width Line width (0.01 to 10.0)
      * @return RenderLayer configured for line rendering
      */
     public static RenderLayer lines(float width) {
-        if (width < 1.0f) {
-            // Thin lines - standard 1px
-            return LINES_LAYER;
-        } else {
-            // Try custom discrete lines with width
-            return linesWithWidth(width);
-        }
+        // Always use custom layer for variable width support
+        return linesWithWidth(width);
     }
     
     // ─────────────────────────────────────────────────────────────────────────────
-    // Custom Lines Layer with Variable Width (EXPERIMENTAL)
+    // Custom Lines Layer with Variable Width
     // ─────────────────────────────────────────────────────────────────────────────
     
     // Cache for custom line width layers (avoid recreating every frame)
@@ -146,20 +142,25 @@ public final class FieldRenderLayers extends RenderPhase {
      * independent pairs: (v0,v1), (v2,v3), etc. - no unwanted connections.</p>
      * 
      * <p><b>Note:</b> Line width support depends on GPU/driver. Some systems
-     * cap line width at 1.0. This is a best-effort implementation.</p>
+     * may clamp very thin or thick widths. This is a best-effort implementation.</p>
      * 
-     * @param width Desired line width
+     * @param width Desired line width (0.01 to 10.0)
      * @return RenderLayer with discrete lines and custom width
      */
     public static RenderLayer linesWithWidth(float width) {
-        // Clamp width to avoid extreme values
-        float clampedWidth = Math.max(0.5f, Math.min(width, 10.0f));
+        // Clamp width to valid range
+        float clampedWidth = Math.max(0.01f, Math.min(width, 10.0f));
         
-        // Round to 0.5 increments for cache efficiency
-        float cacheKey = Math.round(clampedWidth * 2) / 2.0f;
+        // Cache key: round to 0.01 for thin (<1), 0.1 for thick (>=1)
+        float cacheKey;
+        if (clampedWidth < 1.0f) {
+            cacheKey = Math.round(clampedWidth * 100) / 100.0f; // 0.01 increments
+        } else {
+            cacheKey = Math.round(clampedWidth * 10) / 10.0f; // 0.1 increments
+        }
         
         return LINES_WIDTH_CACHE.computeIfAbsent(cacheKey, w -> {
-            // Try to create custom RenderLayer with LINES pipeline and LineWidth
+            // Create custom RenderLayer with LINES pipeline and LineWidth
             try {
                 return RenderLayer.of(
                     "field_lines_" + w,

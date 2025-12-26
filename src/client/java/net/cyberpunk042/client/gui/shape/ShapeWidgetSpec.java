@@ -368,7 +368,7 @@ public final class ShapeWidgetSpec {
         
         // Row 1: Ray Length + Ray Width
         SliderSpec.half("Ray Len", "rays.rayLength", 0.1f, 10f, "%.2f"),
-        SliderSpec.half("Ray Width", "rays.rayWidth", 0.1f, 5f, "%.1f"),
+        SliderSpec.half("Ray Width", "rays.rayWidth", 0.01f, 10f, "%.2f"),
         
         // === DISTRIBUTION ===
         new SectionHeader("Distribution"),

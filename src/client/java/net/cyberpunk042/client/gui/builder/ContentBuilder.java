@@ -100,6 +100,81 @@ public class ContentBuilder {
         return currentY;
     }
     
+    // ─────────────────────────────────────────────────────────────────────────────
+    // STATIC TEXT (labels, headers, descriptions)
+    // ─────────────────────────────────────────────────────────────────────────────
+    
+    // For now, these just add to a list that the panel can render in its render method.
+    // The actual rendering happens in the panel's render() via renderLabels().
+    
+    private record LabelEntry(int x, int y, String text, int color, boolean small) {}
+    private final List<LabelEntry> labels = new ArrayList<>();
+    
+    /**
+     * Adds a section header with separator styling.
+     * Example: "── Ray Motion ──"
+     * 
+     * @param text The header text
+     * @return this builder for chaining
+     */
+    public ContentBuilder sectionHeader(String text) {
+        labels.add(new LabelEntry(GuiConstants.PADDING, currentY + 2, "§f── " + text + " ──", 0xFFFFFF, false));
+        currentY += 12; // Headers are slightly taller
+        return this;
+    }
+    
+    /**
+     * Adds a small info text line (for descriptions, hints).
+     * Uses gray color and smaller spacing.
+     * 
+     * @param text The info text
+     * @return this builder for chaining
+     */
+    public ContentBuilder infoText(String text) {
+        labels.add(new LabelEntry(GuiConstants.PADDING, currentY, "§7" + text, 0x888888, true));
+        currentY += 10; // Small text uses less space
+        return this;
+    }
+    
+    /**
+     * Adds a label with custom color.
+     * 
+     * @param text The label text
+     * @param color ARGB color
+     * @return this builder for chaining
+     */
+    public ContentBuilder label(String text, int color) {
+        labels.add(new LabelEntry(GuiConstants.PADDING, currentY, text, color, false));
+        currentY += 12;
+        return this;
+    }
+    
+    /**
+     * Gets the list of labels to render. Call from panel's render() method.
+     */
+    public List<LabelEntry> getLabels() {
+        return labels;
+    }
+    
+    /**
+     * Renders all labels. Call this from the panel's render() method.
+     * 
+     * @param context The draw context
+     * @param scrollOffset Current scroll offset
+     * @param boundsX The panel's x position in screen coordinates
+     * @param boundsY The panel's y position in screen coordinates
+     */
+    public void renderLabels(net.minecraft.client.gui.DrawContext context, int scrollOffset, int boundsX, int boundsY) {
+        var textRenderer = net.minecraft.client.MinecraftClient.getInstance().textRenderer;
+        for (LabelEntry entry : labels) {
+            // entry.x and entry.y are in content coordinates (local)
+            // Add bounds offset to get screen coordinates
+            int renderX = boundsX + entry.x;
+            int renderY = boundsY + entry.y - scrollOffset;
+            context.drawTextWithShadow(textRenderer, entry.text, renderX, renderY, entry.color);
+        }
+    }
+    
     /** Gets the total content height (for panel sizing). */
     public int getContentHeight() {
         return currentY - startY + GuiConstants.PADDING;

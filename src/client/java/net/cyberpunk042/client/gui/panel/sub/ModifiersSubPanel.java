@@ -4,6 +4,7 @@ import net.cyberpunk042.visual.animation.*;
 import net.cyberpunk042.client.gui.builder.Bound;
 import net.cyberpunk042.client.gui.builder.BoundPanel;
 import net.cyberpunk042.client.gui.builder.ContentBuilder;
+import net.cyberpunk042.client.gui.shape.RayCompatibilityHint;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.gui.util.GuiWidgets;
@@ -35,10 +36,23 @@ public class ModifiersSubPanel extends BoundPanel {
     
     private final int startY;
     
+    // Warning callback for ray compatibility hints
+    private java.util.function.BiConsumer<String, Integer> warningCallback;
+    private String currentWarning = null;
+    private int currentWarningColor = 0;
+    
     public ModifiersSubPanel(Screen parent, FieldEditState state) {
         super(parent, state);
         this.startY = GuiConstants.PADDING;
         Logging.GUI.topic("panel").debug("ModifiersSubPanel created (BoundPanel version)");
+    }
+    
+    /**
+     * Sets the callback for displaying ray compatibility warnings.
+     * @param callback BiConsumer accepting (warningText, color) - null text clears warning
+     */
+    public void setWarningCallback(java.util.function.BiConsumer<String, Integer> callback) {
+        this.warningCallback = callback;
     }
 
     @Override
@@ -105,9 +119,30 @@ public class ModifiersSubPanel extends BoundPanel {
         
         content.when(isRaysShape, c -> buildRayTwistSection(c));
         
+        // ═══════════════════════════════════════════════════════════════════════
+        // RAY COMPATIBILITY CHECK - Show warnings for incompatible configurations
+        // ═══════════════════════════════════════════════════════════════════════
+        
+        if (isRaysShape) {
+            checkRayCompatibility();
+        }
+        
         contentHeight = content.getContentHeight();
         Logging.GUI.topic("panel").debug("ModifiersSubPanel built: {} widgets, isRays={}", 
             widgets.size(), isRaysShape);
+    }
+    
+    /**
+     * Checks ray animation configuration for compatibility issues and sends warnings.
+     */
+    private void checkRayCompatibility() {
+        RayCompatibilityHint.compute(state, (warning, color) -> {
+            currentWarning = warning;
+            currentWarningColor = color;
+            if (warningCallback != null) {
+                warningCallback.accept(warning, color);
+            }
+        });
     }
     
     // =========================================================================
@@ -271,8 +306,10 @@ public class ModifiersSubPanel extends BoundPanel {
         int w = panelWidth - GuiConstants.PADDING * 2;
         int halfW = (w - GuiConstants.PADDING) / 2;
         
-        // Section header via gap
+        // Section header
         c.gap();
+        c.sectionHeader("Ray Flow");
+        c.infoText("Length/alpha animations along rays");
         
         RayFlowConfig flow = state.rayFlow();
         LengthMode curLength = flow != null ? flow.length() : LengthMode.NONE;
@@ -295,6 +332,29 @@ public class ModifiersSubPanel extends BoundPanel {
             .onChange(v -> state.set("rayFlow.lengthSpeed", v))
             .build();
         widgets.add(lenSpeedSlider);
+        c.advanceRow();
+        
+        // Segment Length slider (visible ray portion for RADIATE/ABSORB/SEGMENT)
+        // 1.0 = full ray visible, lower values = particle-like effect
+        c.slider("Seg Len", "rayFlow.segmentLength").range(0.1f, 1.0f).format("%.2f").add();
+        
+        // Wave Arc: how much of the circle is lit at once (0.25=90°, 0.5=180°, 1.0=360°)
+        c.slider("Wave Arc", "rayFlow.waveArc").range(0.1f, 1.0f).format("%.2f").add();
+        
+        // Wave Count: number of simultaneous visible wave regions (1=single sweep, 2=double, 4=quad)
+        c.slider("Wave #", "rayFlow.waveCount").range(1, 8).format("%.0f").add();
+        
+        // Wave Distribution: SEQUENTIAL (coherent wave) vs RANDOM (scattered)
+        WaveDistribution curWaveDist = flow != null && flow.waveDistribution() != null 
+            ? flow.waveDistribution() : WaveDistribution.SEQUENTIAL;
+        CyclingButtonWidget<WaveDistribution> waveDistDropdown = CyclingButtonWidget.<WaveDistribution>builder(
+                m -> Text.literal("Wave: " + m.displayName()))
+            .values(WaveDistribution.values())
+            .initially(curWaveDist)
+            .omitKeyText()
+            .build(x, c.getCurrentY(), w, COMPACT_H, Text.literal(""),
+                (btn, val) -> state.set("rayFlow.waveDistribution", val));
+        widgets.add(waveDistDropdown);
         c.advanceRow();
         
         // Travel dropdown + Speed
@@ -351,8 +411,10 @@ public class ModifiersSubPanel extends BoundPanel {
         int w = panelWidth - GuiConstants.PADDING * 2;
         int halfW = (w - GuiConstants.PADDING) / 2;
         
-        // Section header via gap
+        // Section header
         c.gap();
+        c.sectionHeader("Ray Motion");
+        c.infoText("Geometry movement (orbit, drift...)");
         
         RayMotionConfig motion = state.rayMotion();
         MotionMode curMode = motion != null ? motion.mode() : MotionMode.NONE;
@@ -399,8 +461,10 @@ public class ModifiersSubPanel extends BoundPanel {
         int w = panelWidth - GuiConstants.PADDING * 2;
         int halfW = (w - GuiConstants.PADDING) / 2;
         
-        // Section header via gap
+        // Section header
         c.gap();
+        c.sectionHeader("Ray Wiggle");
+        c.infoText("Undulation (needs multi-segment rays)");
         
         RayWiggleConfig wiggle = state.rayWiggle();
         WiggleMode curMode = wiggle != null ? wiggle.mode() : WiggleMode.NONE;
@@ -442,8 +506,10 @@ public class ModifiersSubPanel extends BoundPanel {
         int w = panelWidth - GuiConstants.PADDING * 2;
         int halfW = (w - GuiConstants.PADDING) / 2;
         
-        // Section header via gap
+        // Section header
         c.gap();
+        c.sectionHeader("Ray Twist");
+        c.infoText("Axial rotation (needs 3D shapes)");
         
         RayTwistConfig twist = state.rayTwist();
         TwistMode curMode = twist != null ? twist.mode() : TwistMode.NONE;

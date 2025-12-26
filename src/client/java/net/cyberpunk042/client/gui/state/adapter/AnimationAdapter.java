@@ -363,6 +363,10 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
         return switch (prop) {
             case "length" -> rayFlow.length();
             case "lengthSpeed" -> rayFlow.lengthSpeed();
+            case "segmentLength" -> rayFlow.segmentLength();
+            case "waveArc" -> rayFlow.waveArc();
+            case "waveDistribution" -> rayFlow.waveDistribution();
+            case "waveCount" -> rayFlow.waveCount();
             case "travel" -> rayFlow.travel();
             case "travelSpeed" -> rayFlow.travelSpeed();
             case "chaseCount" -> rayFlow.chaseCount();
@@ -379,6 +383,10 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
         switch (prop) {
             case "length" -> b.length(value instanceof LengthMode lm ? lm : LengthMode.fromString(value.toString()));
             case "lengthSpeed" -> b.lengthSpeed(toFloat(value));
+            case "segmentLength" -> b.segmentLength(toFloat(value));
+            case "waveArc" -> b.waveArc(toFloat(value));
+            case "waveDistribution" -> b.waveDistribution(value instanceof WaveDistribution wd ? wd : WaveDistribution.fromString(value.toString()));
+            case "waveCount" -> b.waveCount(toInt(value));
             case "travel" -> b.travel(value instanceof TravelMode tm ? tm : TravelMode.fromString(value.toString()));
             case "travelSpeed" -> b.travelSpeed(toFloat(value));
             case "chaseCount" -> b.chaseCount(toInt(value));

@@ -20,33 +20,30 @@ import net.cyberpunk042.visual.validation.ValueRange;
  *   <li><b>Flicker</b>: Random/rhythmic alpha overlay (SCINTILLATION, STROBE)</li>
  * </ul>
  * 
- * <p>All three axes can be combined simultaneously for complex effects.</p>
+ * <h2>Wave Configuration</h2>
+ * <ul>
+ *   <li><b>waveArc</b>: How much of the circle is lit at once (0.25=90°, 0.5=180°, 1.0=360°)</li>
+ *   <li><b>waveDistribution</b>: SEQUENTIAL (rotating wedge) vs RANDOM (scattered)</li>
+ * </ul>
  * 
- * <h2>JSON Format</h2>
- * <pre>
- * "rayFlow": {
- *   "length": "RADIATE",
- *   "lengthSpeed": 1.0,
- *   "travel": "CHASE",
- *   "travelSpeed": 2.0,
- *   "chaseCount": 3,
- *   "chaseWidth": 0.2,
- *   "flicker": "SCINTILLATION",
- *   "flickerIntensity": 0.3,
- *   "flickerFrequency": 5.0
- * }
- * </pre>
+ * <p>All axes can be combined simultaneously for complex effects.</p>
  * 
  * @see LengthMode
  * @see TravelMode
  * @see FlickerMode
+ * @see WaveDistribution
  * @see Animation
  */
 public record RayFlowConfig(
     // === Length Axis ===
     @JsonField(skipIfDefault = true) LengthMode length,
     @Range(ValueRange.UNBOUNDED) @JsonField(skipIfDefault = true) float lengthSpeed,
-    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "0.3") float segmentLength,
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "1.0") float segmentLength,
+    
+    // === Wave Configuration (for RADIATE/ABSORB) ===
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "1.0") float waveArc,
+    @JsonField(skipIfDefault = true) WaveDistribution waveDistribution,
+    @Range(ValueRange.STEPS) @JsonField(skipIfDefault = true, defaultValue = "1") int waveCount,
     
     // === Travel Axis ===
     @JsonField(skipIfDefault = true) TravelMode travel,
@@ -65,42 +62,48 @@ public record RayFlowConfig(
     
     /** No flow animation. */
     public static final RayFlowConfig NONE = new RayFlowConfig(
-        LengthMode.NONE, 0f, 0.3f,
+        LengthMode.NONE, 0f, 1.0f,
+        1.0f, WaveDistribution.SEQUENTIAL, 1,
         TravelMode.NONE, 0f, 1, 0.3f,
         FlickerMode.NONE, 0f, 5f
     );
     
     /** Default radiate effect (rays grow outward). */
     public static final RayFlowConfig RADIATE = new RayFlowConfig(
-        LengthMode.RADIATE, 1f, 0.3f,
+        LengthMode.RADIATE, 1f, 1.0f,
+        1.0f, WaveDistribution.SEQUENTIAL, 1,
         TravelMode.NONE, 0f, 1, 0.3f,
         FlickerMode.NONE, 0f, 5f
     );
     
     /** Default absorb effect (rays shrink inward). */
     public static final RayFlowConfig ABSORB = new RayFlowConfig(
-        LengthMode.ABSORB, 1f, 0.3f,
+        LengthMode.ABSORB, 1f, 1.0f,
+        1.0f, WaveDistribution.SEQUENTIAL, 1,
         TravelMode.NONE, 0f, 1, 0.3f,
         FlickerMode.NONE, 0f, 5f
     );
     
     /** Chase particles flowing along rays. */
     public static final RayFlowConfig CHASE = new RayFlowConfig(
-        LengthMode.NONE, 0f, 0.3f,
+        LengthMode.NONE, 0f, 1.0f,
+        1.0f, WaveDistribution.SEQUENTIAL, 1,
         TravelMode.CHASE, 1.5f, 3, 0.2f,
         FlickerMode.NONE, 0f, 5f
     );
     
     /** Scrolling energy flow. */
     public static final RayFlowConfig SCROLL = new RayFlowConfig(
-        LengthMode.NONE, 0f, 0.3f,
+        LengthMode.NONE, 0f, 1.0f,
+        1.0f, WaveDistribution.SEQUENTIAL, 1,
         TravelMode.SCROLL, 1f, 1, 0.3f,
         FlickerMode.NONE, 0f, 5f
     );
     
     /** Twinkling stars effect. */
     public static final RayFlowConfig SCINTILLATE = new RayFlowConfig(
-        LengthMode.NONE, 0f, 0.3f,
+        LengthMode.NONE, 0f, 1.0f,
+        1.0f, WaveDistribution.SEQUENTIAL, 1,
         TravelMode.NONE, 0f, 1, 0.3f,
         FlickerMode.SCINTILLATION, 0.5f, 8f
     );
@@ -131,6 +134,16 @@ public record RayFlowConfig(
         return flicker != null && flicker != FlickerMode.NONE;
     }
     
+    /** Gets effective wave arc, defaulting to 1.0 if not set. */
+    public float effectiveWaveArc() {
+        return waveArc <= 0 ? 1.0f : waveArc;
+    }
+    
+    /** Gets effective wave distribution, defaulting to SEQUENTIAL if not set. */
+    public WaveDistribution effectiveWaveDistribution() {
+        return waveDistribution != null ? waveDistribution : WaveDistribution.SEQUENTIAL;
+    }
+    
     // =========================================================================
     // JSON Parsing
     // =========================================================================
@@ -146,7 +159,15 @@ public record RayFlowConfig(
             length = LengthMode.fromString(json.get("length").getAsString());
         }
         float lengthSpeed = json.has("lengthSpeed") ? json.get("lengthSpeed").getAsFloat() : 1f;
-        float segmentLength = json.has("segmentLength") ? json.get("segmentLength").getAsFloat() : 0.3f;
+        float segmentLength = json.has("segmentLength") ? json.get("segmentLength").getAsFloat() : 1.0f;
+        
+        // Wave configuration
+        float waveArc = json.has("waveArc") ? json.get("waveArc").getAsFloat() : 1.0f;
+        WaveDistribution waveDistribution = WaveDistribution.SEQUENTIAL;
+        if (json.has("waveDistribution")) {
+            waveDistribution = WaveDistribution.fromString(json.get("waveDistribution").getAsString());
+        }
+        int waveCount = json.has("waveCount") ? json.get("waveCount").getAsInt() : 1;
         
         TravelMode travel = TravelMode.NONE;
         if (json.has("travel")) {
@@ -165,6 +186,7 @@ public record RayFlowConfig(
         
         return new RayFlowConfig(
             length, lengthSpeed, segmentLength,
+            waveArc, waveDistribution, waveCount,
             travel, travelSpeed, chaseCount, chaseWidth,
             flicker, flickerIntensity, flickerFrequency
         );
@@ -186,6 +208,7 @@ public record RayFlowConfig(
     public Builder toBuilder() {
         return new Builder()
             .length(length).lengthSpeed(lengthSpeed).segmentLength(segmentLength)
+            .waveArc(waveArc).waveDistribution(waveDistribution).waveCount(waveCount)
             .travel(travel).travelSpeed(travelSpeed).chaseCount(chaseCount).chaseWidth(chaseWidth)
             .flicker(flicker).flickerIntensity(flickerIntensity).flickerFrequency(flickerFrequency);
     }
@@ -193,7 +216,10 @@ public record RayFlowConfig(
     public static class Builder {
         private LengthMode length = LengthMode.NONE;
         private float lengthSpeed = 1f;
-        private float segmentLength = 0.3f;
+        private float segmentLength = 1.0f;
+        private float waveArc = 1.0f;
+        private WaveDistribution waveDistribution = WaveDistribution.SEQUENTIAL;
+        private int waveCount = 1;
         private TravelMode travel = TravelMode.NONE;
         private float travelSpeed = 1f;
         private int chaseCount = 1;
@@ -205,6 +231,9 @@ public record RayFlowConfig(
         public Builder length(LengthMode m) { this.length = m; return this; }
         public Builder lengthSpeed(float s) { this.lengthSpeed = s; return this; }
         public Builder segmentLength(float s) { this.segmentLength = s; return this; }
+        public Builder waveArc(float a) { this.waveArc = a; return this; }
+        public Builder waveDistribution(WaveDistribution d) { this.waveDistribution = d; return this; }
+        public Builder waveCount(int c) { this.waveCount = c; return this; }
         public Builder travel(TravelMode m) { this.travel = m; return this; }
         public Builder travelSpeed(float s) { this.travelSpeed = s; return this; }
         public Builder chaseCount(int c) { this.chaseCount = c; return this; }
@@ -216,6 +245,7 @@ public record RayFlowConfig(
         public RayFlowConfig build() {
             return new RayFlowConfig(
                 length, lengthSpeed, segmentLength,
+                waveArc, waveDistribution, waveCount,
                 travel, travelSpeed, chaseCount, chaseWidth,
                 flicker, flickerIntensity, flickerFrequency
             );

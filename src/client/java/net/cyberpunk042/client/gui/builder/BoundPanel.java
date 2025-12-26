@@ -51,6 +51,9 @@ public abstract class BoundPanel extends AbstractPanel implements StateChangeLis
     protected final List<Bound<?, ?, ?>> bindings = new ArrayList<>();
     protected final List<Vec3Binding> vec3Bindings = new ArrayList<>();
     
+    // The current ContentBuilder (for rendering labels)
+    protected ContentBuilder contentBuilder;
+    
     private boolean attached = false;
     
     public BoundPanel(Screen parent, FieldEditState state) {
@@ -70,6 +73,7 @@ public abstract class BoundPanel extends AbstractPanel implements StateChangeLis
         bindings.clear();
         vec3Bindings.clear();
         widgets.clear();
+        contentBuilder = null;
         scrollOffset = 0;  // Reset scroll when rebuilding
         
         // Build content using fluent API (subclass implements this)
@@ -101,12 +105,14 @@ public abstract class BoundPanel extends AbstractPanel implements StateChangeLis
     
     /**
      * Creates a ContentBuilder for fluent widget creation.
+     * Also stores reference for label rendering.
      * 
      * @param startY Starting Y position for content
      * @return A new ContentBuilder
      */
     protected ContentBuilder content(int startY) {
-        return new ContentBuilder(state, bindings, widgets, startY, panelWidth);
+        contentBuilder = new ContentBuilder(state, bindings, widgets, startY, panelWidth);
+        return contentBuilder;
     }
     
     /**
@@ -275,6 +281,11 @@ public abstract class BoundPanel extends AbstractPanel implements StateChangeLis
         // Render all widgets (already at visual positions)
         for (var widget : widgets) {
             widget.render(context, mouseX, mouseY, delta);
+        }
+        
+        // Render labels (section headers, info text) from ContentBuilder
+        if (contentBuilder != null) {
+            contentBuilder.renderLabels(context, scrollOffset, bounds.x(), bounds.y());
         }
         
         context.disableScissor();
