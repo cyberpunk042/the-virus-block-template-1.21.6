@@ -368,72 +368,47 @@ public final class ShapeWidgetSpec {
     );
     
     // ───────────────────────────────────────────────────────────────────────────
-    // RAYS (Line Segments)
+    // RAYS (Common controls for ALL ray types)
+    // Note: LINE-only and 3D-only controls are added conditionally in ShapeSubPanel
     // ───────────────────────────────────────────────────────────────────────────
     
     private static final List<Object> RAYS_SPECS = List.of(
-        // === GEOMETRY ===
+        // === GEOMETRY (ALL ray types) ===
         new SectionHeader("Ray Geometry"),
         
-        // Row 1: Ray Length + Ray Width
-        SliderSpec.half("Ray Len", "rays.rayLength", 0.1f, 10f, "%.2f"),
-        SliderSpec.half("Ray Width", "rays.rayWidth", 0.01f, 10f, "%.2f"),
+        // Row: Ray Length (ALL ray types use this)
+        SliderSpec.full("Ray Len", "rays.rayLength", 0.1f, 10f, "%.2f"),
         
-        // === DISTRIBUTION ===
+        // === DISTRIBUTION (ALL ray types) ===
         new SectionHeader("Distribution"),
         
-        // Row 2: Count + Arrangement
+        // Row: Count + Arrangement
         SliderSpec.halfInt("Count", "rays.count", 1, 1000),
         EnumDropdownSpec.half("Arrange", "rays.arrangement", 
             net.cyberpunk042.visual.shape.RayArrangement.class, 
             net.cyberpunk042.visual.shape.RayArrangement.RADIAL),
         
-        // Row 3: Distribution mode + Inner Radius
+        // Row: Distribution mode + Inner Radius
         EnumDropdownSpec.half("Distrib", "rays.distribution",
             net.cyberpunk042.visual.shape.RayDistribution.class,
             net.cyberpunk042.visual.shape.RayDistribution.UNIFORM),
         SliderSpec.half("Inner R", "rays.innerRadius", 0f, 10f, "%.2f"),
         
-        // Row 4: Outer Radius + Layers
+        // Row: Outer Radius + Layers
         SliderSpec.half("Outer R", "rays.outerRadius", 0.1f, 20f, "%.2f"),
         SliderSpec.halfInt("Layers", "rays.layers", 1, 16),
         
-        // Row 5: Layer Spacing + Randomness
+        // Row: Layer Spacing + Randomness
         SliderSpec.half("Layer Sp", "rays.layerSpacing", 0.1f, 2f, "%.2f"),
         SliderSpec.half("Random", "rays.randomness", 0f, 1f, "%.2f"),
         
-        // Row 6: Length Variation (full width)
-        SliderSpec.full("Len Variation", "rays.lengthVariation", 0f, 1f, "%.2f"),
+        // Row: Length Variation (full width)
+        SliderSpec.full("Len Variation", "rays.lengthVariation", 0f, 1f, "%.2f")
         
-        // === FADING (Alpha Gradient) ===
-        new SectionHeader("Fading"),
-        
-        // Row 7: Fade Start + Fade End
-        SliderSpec.half("Fade Start", "rays.fadeStart", 0f, 1f, "%.2f"),
-        SliderSpec.half("Fade End", "rays.fadeEnd", 0f, 1f, "%.2f"),
-        
-        // === SEGMENTATION (Dashed Effects) ===
-        new SectionHeader("Segmentation"),
-        
-        // Row 8: Segments + Segment Gap
-        SliderSpec.halfInt("Segments", "rays.segments", 1, 10),
-        SliderSpec.half("Seg Gap", "rays.segmentGap", 0f, 0.5f, "%.2f"),
-        
-        // NOTE: Ray Type and Orientation are NOT in specs - they are added manually
-        // in ShapeSubPanel with special conditional visibility handling (only show
-        // Orientation for 3D ray types, trigger rebuild on change, etc.)
-        
-        // === 3D SHAPE PARAMETERS ===
-        new SectionHeader("3D Shape"),
-        
-        // Line Segments (for 3D types)
-        SliderSpec.halfInt("Line Segments", "rays.shapeSegments", 48, 128),
-        
-        // Row 11: Shape Intensity + Shape Length (for 3D types like droplet)
-        SliderSpec.half("Intensity", "rays.shapeIntensity", 0f, 1f, "%.2f"),
-        SliderSpec.half("Length", "rays.shapeLength", 0.2f, 3f, "%.2f")
-        
-        // NOTE: Line Shape and Field Curvature are handled manually in ShapeSubPanel
-        // because they have CONDITIONAL visibility based on enum selection
+        // NOTE: The following are added CONDITIONALLY in ShapeSubPanel:
+        // 
+        // LINE-ONLY: Ray Width, Fade Start/End, Segments/Seg Gap, Line Shape, Amplitude/Frequency
+        // 3D-ONLY: Orientation, Intensity, Shape Length, Quad Pattern
+        // ALL TYPES: Ray Type dropdown, Field Curvature (both at bottom of panel)
     );
 }
