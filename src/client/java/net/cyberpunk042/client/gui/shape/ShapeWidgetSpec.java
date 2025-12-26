@@ -180,7 +180,14 @@ public final class ShapeWidgetSpec {
         
         // Row 3: Lat Start + End (fraction 0-1)
         SliderSpec.half("Start", "sphere.latStart", 0f, 1f, "%.2f"),
-        SliderSpec.half("End", "sphere.latEnd", 0f, 1f, "%.2f")
+        SliderSpec.half("End", "sphere.latEnd", 0f, 1f, "%.2f"),
+        
+        // Row 4: Deformation (droplet, egg, etc.)
+        new SectionHeader("Deformation"),
+        EnumDropdownSpec.half("Shape", "sphere.deformation", 
+            net.cyberpunk042.visual.shape.SphereDeformation.class, 
+            net.cyberpunk042.visual.shape.SphereDeformation.NONE),
+        SliderSpec.half("Intensity", "sphere.deformationIntensity", 0f, 1f, "%.2f")
         
         // Note: QuadPattern dropdown is added separately in ShapeSubPanel
     );

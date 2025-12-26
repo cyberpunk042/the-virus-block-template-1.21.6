@@ -90,6 +90,10 @@ public final class RayPositioner {
             shapeSegments = 16;
         }
         
+        // Compute orientation for 3D ray types
+        net.cyberpunk042.visual.shape.RayOrientation orientation = shape.effectiveRayOrientation();
+        float[] orientationVector = computeOrientationVector(orientation, start, direction);
+        
         return RayContext.builder()
             .start(start)
             .end(end)
@@ -108,10 +112,64 @@ public final class RayPositioner {
             .curvature(curvature)
             .curvatureIntensity(shape.curvatureIntensity())
             .shapeSegments(shapeSegments)
+            .orientation(orientation)
+            .orientationVector(orientationVector)
             .wave(wave)
             .time(time)
             .hasWave(hasWave)
             .build();
+    }
+    
+    /**
+     * Computes the orientation vector based on the orientation mode.
+     * 
+     * @param orientation Orientation mode
+     * @param start Ray start position (used for OUTWARD/INWARD/TANGENT)
+     * @param direction Ray direction (used for ALONG_RAY/AGAINST_RAY)
+     * @return Normalized orientation direction [x, y, z]
+     */
+    private static float[] computeOrientationVector(
+            net.cyberpunk042.visual.shape.RayOrientation orientation, 
+            float[] start, 
+            float[] direction) {
+        
+        return switch (orientation) {
+            case ALONG_RAY -> new float[] { direction[0], direction[1], direction[2] };
+            
+            case AGAINST_RAY -> new float[] { -direction[0], -direction[1], -direction[2] };
+            
+            case UPWARD -> new float[] { 0, 1, 0 };
+            
+            case DOWNWARD -> new float[] { 0, -1, 0 };
+            
+            case OUTWARD -> {
+                // Direction from center (0,0,0) to ray start
+                float len = (float) Math.sqrt(start[0]*start[0] + start[1]*start[1] + start[2]*start[2]);
+                if (len > 0.0001f) {
+                    yield new float[] { start[0]/len, start[1]/len, start[2]/len };
+                }
+                yield new float[] { 0, 1, 0 }; // Fallback if at center
+            }
+            
+            case INWARD -> {
+                // Direction from ray start to center (0,0,0)
+                float len = (float) Math.sqrt(start[0]*start[0] + start[1]*start[1] + start[2]*start[2]);
+                if (len > 0.0001f) {
+                    yield new float[] { -start[0]/len, -start[1]/len, -start[2]/len };
+                }
+                yield new float[] { 0, -1, 0 }; // Fallback if at center
+            }
+            
+            case TANGENT -> {
+                // Perpendicular to radial direction in XZ plane (for circular motion effect)
+                float len = (float) Math.sqrt(start[0]*start[0] + start[2]*start[2]);
+                if (len > 0.0001f) {
+                    // Tangent is perpendicular to radial: (-z, 0, x) normalized
+                    yield new float[] { -start[2]/len, 0, start[0]/len };
+                }
+                yield new float[] { 1, 0, 0 }; // Fallback if on Y axis
+            }
+        };
     }
     
     // ═══════════════════════════════════════════════════════════════════════════

@@ -85,6 +85,16 @@ public record RayContext(
     int shapeSegments,
     
     // ═══════════════════════════════════════════════════════════════════════════
+    // Orientation (for 3D ray types)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /** Orientation mode for 3D ray types. */
+    net.cyberpunk042.visual.shape.RayOrientation orientation,
+    
+    /** Computed orientation direction vector [x, y, z] based on orientation mode. */
+    float[] orientationVector,
+    
+    // ═══════════════════════════════════════════════════════════════════════════
     // Animation
     // ═══════════════════════════════════════════════════════════════════════════
     
@@ -191,6 +201,8 @@ public record RayContext(
         private RayCurvature curvature = RayCurvature.NONE;
         private float curvatureIntensity = 0.0f;
         private int shapeSegments = 1;
+        private net.cyberpunk042.visual.shape.RayOrientation orientation = net.cyberpunk042.visual.shape.RayOrientation.ALONG_RAY;
+        private float[] orientationVector = new float[] { 0, 0, 1 };
         private WaveConfig wave = null;
         private float time = 0.0f;
         private boolean hasWave = false;
@@ -235,6 +247,14 @@ public record RayContext(
         }
         public Builder curvatureIntensity(float v) { this.curvatureIntensity = v; return this; }
         public Builder shapeSegments(int v) { this.shapeSegments = v; return this; }
+        public Builder orientation(net.cyberpunk042.visual.shape.RayOrientation v) { 
+            this.orientation = v != null ? v : net.cyberpunk042.visual.shape.RayOrientation.ALONG_RAY; 
+            return this; 
+        }
+        public Builder orientationVector(float[] v) { 
+            this.orientationVector = v != null ? v : new float[] { 0, 0, 1 }; 
+            return this; 
+        }
         public Builder wave(WaveConfig v) { this.wave = v; return this; }
         public Builder time(float v) { this.time = v; return this; }
         public Builder hasWave(boolean v) { this.hasWave = v; return this; }
@@ -263,6 +283,7 @@ public record RayContext(
                 width, fadeStart, fadeEnd,
                 lineShape, lineShapeAmplitude, lineShapeFrequency,
                 curvature, curvatureIntensity, shapeSegments,
+                orientation, orientationVector,
                 wave, time, hasWave
             );
         }

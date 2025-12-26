@@ -29,6 +29,9 @@ public final class RayTypeTessellatorRegistry {
         // Register default tessellators
         register(RayType.LINE, RayLineTessellator.INSTANCE);
         
+        // 3D Ray Types (Basic Geometry Category)
+        register(RayType.DROPLET, RayDropletTessellator.INSTANCE);
+        
         // All other types default to LINE until implemented
         for (RayType type : RayType.values()) {
             if (!TESSELLATORS.containsKey(type)) {

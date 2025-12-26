@@ -321,10 +321,62 @@ public class ShapeSubPanel extends AbstractPanel {
         }
         
         // ═══════════════════════════════════════════════════════════════════════
-        // SPECIAL: Rays Line Shape + Curvature (Conditional Controls)
+        // SPECIAL: Rays Type, Orientation, Line Shape + Curvature
         // ═══════════════════════════════════════════════════════════════════════
         
         if (shapeType.equalsIgnoreCase("rays")) {
+            // === RAY TYPE SECTION ===
+            // Get current ray type
+            String rayTypeStr = state.getString("rays.rayType");
+            net.cyberpunk042.visual.shape.RayType rayType;
+            try {
+                rayType = net.cyberpunk042.visual.shape.RayType.valueOf(
+                    rayTypeStr != null ? rayTypeStr : "LINE");
+            } catch (IllegalArgumentException e) {
+                rayType = net.cyberpunk042.visual.shape.RayType.LINE;
+            }
+            
+            // Ray Type dropdown (full width) - this is the main control!
+            var rayTypeDropdown = GuiWidgets.enumDropdown(
+                x, y, w, GuiConstants.COMPACT_HEIGHT, "Ray Type",
+                net.cyberpunk042.visual.shape.RayType.class,
+                rayType, "Visual appearance of each ray (LINE, DROPLET, etc.)",
+                v -> {
+                    state.set("rays.rayType", v.name());
+                    rebuildForCurrentShape();
+                    if (shapeChangedCallback != null) {
+                        shapeChangedCallback.run();
+                    }
+                });
+            widgets.add(rayTypeDropdown);
+            y += step;
+            
+            // === RAY ORIENTATION (only for 3D types) ===
+            if (rayType.is3D()) {
+                String orientStr = state.getString("rays.rayOrientation");
+                net.cyberpunk042.visual.shape.RayOrientation orientation;
+                try {
+                    orientation = net.cyberpunk042.visual.shape.RayOrientation.valueOf(
+                        orientStr != null ? orientStr : "ALONG_RAY");
+                } catch (IllegalArgumentException e) {
+                    orientation = net.cyberpunk042.visual.shape.RayOrientation.ALONG_RAY;
+                }
+                
+                var orientDropdown = GuiWidgets.enumDropdown(
+                    x, y, w, GuiConstants.COMPACT_HEIGHT, "Orientation",
+                    net.cyberpunk042.visual.shape.RayOrientation.class,
+                    orientation, "Direction the 3D shape points (tip direction)",
+                    v -> {
+                        state.set("rays.rayOrientation", v.name());
+                        rebuildForCurrentShape();
+                        if (shapeChangedCallback != null) {
+                            shapeChangedCallback.run();
+                        }
+                    });
+                widgets.add(orientDropdown);
+                y += step;
+            }
+            
             // Get current line shape and curvature values
             String lineShapeStr = state.getString("rays.lineShape");
             net.cyberpunk042.visual.shape.RayLineShape lineShape;

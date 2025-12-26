@@ -55,34 +55,42 @@ public record SphereShape(
     @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "1") float latEnd,
     @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true) float lonStart,
     @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "1") float lonEnd,
-    @JsonField(skipIfEqualsConstant = "LAT_LON") SphereAlgorithm algorithm
+    @JsonField(skipIfEqualsConstant = "LAT_LON") SphereAlgorithm algorithm,
+    // === Deformation (transform sphere into droplet, egg, etc.) ===
+    @JsonField(skipIfDefault = true) SphereDeformation deformation,
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true) float deformationIntensity
 )implements Shape {
     public static final String DEFAULT_ALGORITHM = "uv";
 
     
     /** Default sphere (1.0 radius, medium detail, full sphere). */
     public static SphereShape of(float radius) { 
-        return new SphereShape(radius, 16, 32, 0f, 1f, 0f, 1f, SphereAlgorithm.values()[0]); 
+        return new SphereShape(radius, 16, 32, 0f, 1f, 0f, 1f, SphereAlgorithm.values()[0], 
+            SphereDeformation.NONE, 0f); 
     }
     public static SphereShape defaults() { return DEFAULT; }
     
     public static final SphereShape DEFAULT = new SphereShape(
-        1.0f, 32, 64, 0.0f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON);
+        1.0f, 32, 64, 0.0f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON,
+        SphereDeformation.NONE, 0f);
     
     /** Low-poly sphere for performance. */
     public static final SphereShape LOW_POLY = new SphereShape(
-        1.0f, 8, 16, 0.0f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON);
+        1.0f, 8, 16, 0.0f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON,
+        SphereDeformation.NONE, 0f);
     
     /** High-detail sphere. */
     public static final SphereShape HIGH_DETAIL = new SphereShape(
-        1.0f, 64, 128, 0.0f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON);
+        1.0f, 64, 128, 0.0f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON,
+        SphereDeformation.NONE, 0f);
     
     /**
      * Creates a simple sphere with default tessellation.
      * @param radius Sphere radius
      */
     public static SphereShape ofRadius(@Range(ValueRange.RADIUS) float radius) {
-        return new SphereShape(radius, 32, 64, 0.0f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON);
+        return new SphereShape(radius, 32, 64, 0.0f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON,
+            SphereDeformation.NONE, 0f);
     }
     
     /**
@@ -90,7 +98,8 @@ public record SphereShape(
      * @param radius Sphere radius
      */
     public static SphereShape hemisphereTop(@Range(ValueRange.RADIUS) float radius) {
-        return new SphereShape(radius, 16, 64, 0.0f, 0.5f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON);
+        return new SphereShape(radius, 16, 64, 0.0f, 0.5f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON,
+            SphereDeformation.NONE, 0f);
     }
     
     /**
@@ -98,7 +107,8 @@ public record SphereShape(
      * @param radius Sphere radius
      */
     public static SphereShape hemisphereBottom(@Range(ValueRange.RADIUS) float radius) {
-        return new SphereShape(radius, 16, 64, 0.5f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON);
+        return new SphereShape(radius, 16, 64, 0.5f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON,
+            SphereDeformation.NONE, 0f);
     }
     
     @Override
@@ -169,7 +179,7 @@ public record SphereShape(
             }
         }
         
-        SphereShape result = new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm);
+        SphereShape result = new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm, SphereDeformation.NONE, 0f);
         Logging.FIELD.topic("parse").trace("Parsed SphereShape: radius={}, latSteps={}, lonSteps={}, algorithm={}", 
             radius, latSteps, lonSteps, algorithm);
         return result;
@@ -195,7 +205,19 @@ public record SphereShape(
             .latEnd(latEnd)
             .lonStart(lonStart)
             .lonEnd(lonEnd)
-            .algorithm(algorithm);
+            .algorithm(algorithm)
+            .deformation(deformation)
+            .deformationIntensity(deformationIntensity);
+    }
+    
+    /** Returns effective deformation, defaulting to NONE if null. */
+    public SphereDeformation effectiveDeformation() {
+        return deformation != null ? deformation : SphereDeformation.NONE;
+    }
+    
+    /** Whether deformation is active. */
+    public boolean hasDeformation() {
+        return deformation != null && deformation != SphereDeformation.NONE && deformationIntensity > 0;
     }
     
     public static class Builder {
@@ -207,6 +229,8 @@ public record SphereShape(
         private @Range(ValueRange.NORMALIZED) float lonStart = 0.0f;
         private @Range(ValueRange.NORMALIZED) float lonEnd = 1.0f;
         private SphereAlgorithm algorithm = SphereAlgorithm.LAT_LON;
+        private SphereDeformation deformation = SphereDeformation.NONE;
+        private float deformationIntensity = 0f;
         
         public Builder radius(float r) { this.radius = r; return this; }
         public Builder latSteps(int s) { this.latSteps = s; return this; }
@@ -215,10 +239,13 @@ public record SphereShape(
         public Builder latEnd(float l) { this.latEnd = l; return this; }
         public Builder lonStart(float l) { this.lonStart = l; return this; }
         public Builder lonEnd(float l) { this.lonEnd = l; return this; }
-        public Builder algorithm(SphereAlgorithm a) { this.algorithm = a; return this; }
+        public Builder algorithm(SphereAlgorithm a) { this.algorithm = a != null ? a : SphereAlgorithm.LAT_LON; return this; }
+        public Builder deformation(SphereDeformation d) { this.deformation = d != null ? d : SphereDeformation.NONE; return this; }
+        public Builder deformationIntensity(float i) { this.deformationIntensity = i; return this; }
         
         public SphereShape build() {
-            return new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm);
+            return new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm,
+                deformation, deformationIntensity);
         }
     }
 }

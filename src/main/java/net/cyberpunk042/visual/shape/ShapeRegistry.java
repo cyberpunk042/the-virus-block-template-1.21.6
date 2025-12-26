@@ -149,7 +149,7 @@ public final class ShapeRegistry {
             float lonStart = getFloat(params, "lonStart", 0.0f);
             float lonEnd = getFloat(params, "lonEnd", 1.0f);
             SphereAlgorithm algorithm = SphereAlgorithm.values()[0];
-            return new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm);
+            return new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm, SphereDeformation.NONE, 0f);
         });
         
         // Ring
@@ -298,9 +298,10 @@ public final class ShapeRegistry {
             RayCurvature curvature = RayCurvature.NONE;
             float curvatureIntensity = getFloat(params, "curvatureIntensity", 0f);
             RayType rayType = RayType.LINE;
+            RayOrientation rayOrientation = RayOrientation.ALONG_RAY;
             return new RaysShape(rayLength, rayWidth, count, arrangement, distribution, innerRadius, outerRadius,
                 layers, layerSpacing, randomness, lengthVariation, fadeStart, fadeEnd, segments, segmentGap,
-                lineShape, lineShapeAmplitude, lineShapeFrequency, shapeSegments, curvature, curvatureIntensity, rayType);
+                lineShape, lineShapeAmplitude, lineShapeFrequency, shapeSegments, curvature, curvatureIntensity, rayType, rayOrientation);
         });
         
         Logging.REGISTRY.topic("shape").info(

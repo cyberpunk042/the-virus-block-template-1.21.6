@@ -5,7 +5,9 @@ import net.cyberpunk042.visual.animation.WaveConfig;
 import net.cyberpunk042.visual.pattern.VertexPattern;
 import net.cyberpunk042.visual.pattern.QuadPattern;
 import net.cyberpunk042.visual.pattern.TrianglePattern;
+import net.cyberpunk042.visual.shape.ShapeMath;
 import net.cyberpunk042.visual.shape.SphereAlgorithm;
+import net.cyberpunk042.visual.shape.SphereDeformation;
 import net.cyberpunk042.visual.shape.SphereShape;
 import net.cyberpunk042.visual.visibility.VisibilityMask;
 import net.cyberpunk042.client.visual.animation.WaveDeformer;
@@ -139,8 +141,8 @@ public final class SphereTessellator {
     
     /**
      * Tessellates using latitude/longitude grid.
-     * Best for patterns, partial spheres, and visibility masks.
-     * Has pole singularities (vertices cluster at poles).
+     * 
+     * <p><b>Delegates to {@link VectorMath#generateLatLonGrid}</b> for all features.</p>
      */
     private static Mesh tessellateLatLon(SphereShape shape, VertexPattern pattern,
                                           VisibilityMask visibility, WaveConfig wave, float time) {
@@ -154,74 +156,35 @@ public final class SphereTessellator {
         float lonStart = shape.lonStart();
         float lonEnd = shape.lonEnd();
         
-        float latRange = latEnd - latStart;
-        float lonRange = lonEnd - lonStart;
+        // Get deformation settings
+        boolean applyDeformation = shape.hasDeformation();
+        SphereDeformation deformation = shape.effectiveDeformation();
+        float deformIntensity = shape.deformationIntensity();
         
-        // Check if wave deformation should be applied
+        // Build the radius function for deformation
+        VectorMath.RadiusFunction radiusFunc = applyDeformation 
+            ? theta -> deformation.computeRadiusFactor(theta, deformIntensity)
+            : null;
+        
+        // Generate the entire surface using the shared algorithm
+        VectorMath.generateLatLonGrid(
+            builder, radius, latSteps, lonSteps,
+            latStart, latEnd, lonStart, lonEnd,
+            radiusFunc, pattern, visibility, wave, time
+        );
+        
         boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();
-        
-        // Generate vertex grid
-        int[][] vertexIndices = new int[latSteps + 1][lonSteps + 1];
-        
-        for (int lat = 0; lat <= latSteps; lat++) {
-            float latNorm = latStart + (lat / (float) latSteps) * latRange;
-            float theta = latNorm * GeometryMath.PI;  // 0 to PI (top to bottom)
-            
-            for (int lon = 0; lon <= lonSteps; lon++) {
-                float lonNorm = lonStart + (lon / (float) lonSteps) * lonRange;
-                float phi = lonNorm * GeometryMath.TWO_PI;  // 0 to 2PI (around)
-                
-                Vertex v = Vertex.spherical(theta, phi, radius);
-                
-                // Apply wave deformation if active
-                if (applyWave) {
-                    v = WaveDeformer.applyToVertex(v, wave, time);
-                }
-                
-                vertexIndices[lat][lon] = builder.addVertex(v);
-            }
-        }
-        
-        // Generate triangles for each quad cell
-        for (int lat = 0; lat < latSteps; lat++) {
-            float latFrac = lat / (float) latSteps;
-            
-            for (int lon = 0; lon < lonSteps; lon++) {
-                float lonFrac = lon / (float) lonSteps;
-                
-                // Check visibility mask
-                // isVisible(u, v) where u=horizontal (longitude), v=vertical (latitude)
-                if (visibility != null && !visibility.isVisible(lonFrac, latFrac)) {
-                    continue;
-                }
-                
-                // Check pattern
-                if (!pattern.shouldRender(lat * lonSteps + lon, latSteps * lonSteps)) {
-                    continue;
-                }
-                
-                // Get quad corner indices
-                int topLeft = vertexIndices[lat][lon];
-                int topRight = vertexIndices[lat][lon + 1];
-                int bottomLeft = vertexIndices[lat + 1][lon];
-                int bottomRight = vertexIndices[lat + 1][lon + 1];
-                
-                // Use quadAsTrianglesFromPattern which works with any VertexPattern
-                // (QuadPattern, ShufflePattern, etc.)
-                builder.quadAsTrianglesFromPattern(topLeft, topRight, bottomRight, bottomLeft, pattern);
-            }
-        }
-        
-        return logAndBuild(builder, applyWave ? "LAT_LON+WAVE" : "LAT_LON");
+        return logAndBuild(builder, applyWave ? "LAT_LON+WAVE" : (applyDeformation ? "LAT_LON+DEFORM" : "LAT_LON"));
     }
     
     // =========================================================================
-    // UV_SPHERE Algorithm
+    // UV_SPHERE Algorithm (Delegates to VectorMath.generatePolarSurface)
     // =========================================================================
     
     /**
      * Tessellates using UV sphere with shared pole vertices.
-     * Similar to LAT_LON but with proper pole handling.
+     * 
+     * <p><b>Delegates to {@link VectorMath#generatePolarSurface}</b> for all features.</p>
      */
     private static Mesh tessellateUvSphere(SphereShape shape, VertexPattern pattern,
                                             VisibilityMask visibility, WaveConfig wave, float time) {
@@ -231,80 +194,28 @@ public final class SphereTessellator {
         int segments = shape.lonSteps();
         float radius = shape.radius();
         
-        // Check if wave deformation should be applied
+        // Get deformation settings
+        boolean applyDeformation = shape.hasDeformation();
+        SphereDeformation deformation = shape.effectiveDeformation();
+        float deformIntensity = shape.deformationIntensity();
+        
+        // Build the radius function for deformation
+        VectorMath.RadiusFunction radiusFunc = applyDeformation 
+            ? theta -> deformation.computeRadiusFactor(theta, deformIntensity)
+            : null;
+        
+        // Use Y-up direction for standard sphere, centered at origin
+        float[] direction = new float[] { 0, 1, 0 };
+        float[] center = new float[] { 0, 0, 0 };
+        
+        // Generate the entire surface using the shared algorithm
+        VectorMath.generatePolarSurface(
+            builder, center, direction, radius, rings, segments,
+            radiusFunc, pattern, visibility, wave, time
+        );
+        
         boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();
-        
-        // Top pole vertex (single shared vertex)
-        Vertex topPoleV = Vertex.pos(0, radius, 0).withNormal(0, 1, 0);
-        if (applyWave) topPoleV = WaveDeformer.applyToVertex(topPoleV, wave, time);
-        int topPole = builder.addVertex(topPoleV);
-        
-        // Ring vertices (excluding poles)
-        int[] ringStartIndices = new int[rings - 1];
-        for (int ring = 1; ring < rings; ring++) {
-            float theta = GeometryMath.PI * ring / rings;
-            float y = (float) Math.cos(theta) * radius;
-            float ringRadius = (float) Math.sin(theta) * radius;
-            
-            ringStartIndices[ring - 1] = builder.vertexCount();
-            
-            for (int seg = 0; seg < segments; seg++) {
-                float phi = GeometryMath.TWO_PI * seg / segments;
-                float x = ringRadius * (float) Math.cos(phi);
-                float z = ringRadius * (float) Math.sin(phi);
-                
-                // Normal = normalized position
-                float nx = (float) Math.sin(theta) * (float) Math.cos(phi);
-                float ny = (float) Math.cos(theta);
-                float nz = (float) Math.sin(theta) * (float) Math.sin(phi);
-                
-                Vertex v = Vertex.pos(x, y, z).withNormal(nx, ny, nz);
-                if (applyWave) v = WaveDeformer.applyToVertex(v, wave, time);
-                builder.addVertex(v);
-            }
-        }
-        
-        // Bottom pole vertex
-        Vertex bottomPoleV = Vertex.pos(0, -radius, 0).withNormal(0, -1, 0);
-        if (applyWave) bottomPoleV = WaveDeformer.applyToVertex(bottomPoleV, wave, time);
-        int bottomPole = builder.addVertex(bottomPoleV);
-        
-        // Top cap triangles (pole to first ring)
-        int firstRing = ringStartIndices[0];
-        for (int seg = 0; seg < segments; seg++) {
-            int nextSeg = (seg + 1) % segments;
-            builder.triangle(topPole, firstRing + nextSeg, firstRing + seg);
-        }
-        
-        // Middle quads (between rings)
-        for (int ringIdx = 0; ringIdx < ringStartIndices.length - 1; ringIdx++) {
-            int ringA = ringStartIndices[ringIdx];
-            int ringB = ringStartIndices[ringIdx + 1];
-            
-            for (int seg = 0; seg < segments; seg++) {
-                int nextSeg = (seg + 1) % segments;
-                
-                // Check pattern
-                int cellIdx = ringIdx * segments + seg;
-                if (!pattern.shouldRender(cellIdx, (rings - 2) * segments)) {
-                    continue;
-                }
-                
-                // Quad as two triangles
-                builder.triangle(ringA + seg, ringA + nextSeg, ringB + nextSeg);
-                builder.triangle(ringA + seg, ringB + nextSeg, ringB + seg);
-            }
-        }
-        
-        // Bottom cap triangles (last ring to pole) - CCW when viewed from below
-        int lastRing = ringStartIndices[ringStartIndices.length - 1];
-        for (int seg = 0; seg < segments; seg++) {
-            int nextSeg = (seg + 1) % segments;
-            // From below, we need: ring[nextSeg] → ring[seg] → pole
-            builder.triangle(lastRing + nextSeg, lastRing + seg, bottomPole);
-        }
-        
-        return logAndBuild(builder, applyWave ? "UV_SPHERE+WAVE" : "UV_SPHERE");
+        return logAndBuild(builder, applyWave ? "UV_SPHERE+WAVE" : (applyDeformation ? "UV_SPHERE+DEFORM" : "UV_SPHERE"));
     }
     
     // =========================================================================
