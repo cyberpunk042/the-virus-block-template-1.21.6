@@ -157,6 +157,17 @@ public class ContentBuilder {
     }
     
     /**
+     * Offsets all label positions by dx, dy.
+     * Call this when widgets are offset (e.g., in applyBoundsOffset).
+     */
+    public void offsetLabels(int dx, int dy) {
+        for (int i = 0; i < labels.size(); i++) {
+            LabelEntry old = labels.get(i);
+            labels.set(i, new LabelEntry(old.x + dx, old.y + dy, old.text, old.color, old.small));
+        }
+    }
+    
+    /**
      * Renders all labels. Call this from the panel's render() method.
      * 
      * @param context The draw context
@@ -170,8 +181,9 @@ public class ContentBuilder {
         // Debug: log first label details
         if (!labels.isEmpty()) {
             LabelEntry first = labels.get(0);
-            int firstRenderX = boundsX + first.x;
-            int firstRenderY = boundsY + first.y - scrollOffset;
+            // Labels are now pre-offset like widgets, so use coords directly (just apply scroll)
+            int firstRenderX = first.x;
+            int firstRenderY = first.y - scrollOffset;
             net.cyberpunk042.log.Logging.GUI.topic("labels").info(
                 "First label '{}' at screen ({}, {}), entry.y={}, color=0x{}", 
                 first.text.substring(0, Math.min(20, first.text.length())),
@@ -179,10 +191,10 @@ public class ContentBuilder {
         }
         
         for (LabelEntry entry : labels) {
-            // entry.x and entry.y are in content coordinates (local)
-            // Add bounds offset to get screen coordinates
-            int renderX = boundsX + entry.x;
-            int renderY = boundsY + entry.y - scrollOffset;
+            // Labels are already at absolute screen coordinates (offset applied via offsetLabels)
+            // Just apply scroll offset for Y
+            int renderX = entry.x;
+            int renderY = entry.y - scrollOffset;
             context.drawTextWithShadow(textRenderer, entry.text, renderX, renderY, entry.color);
         }
     }

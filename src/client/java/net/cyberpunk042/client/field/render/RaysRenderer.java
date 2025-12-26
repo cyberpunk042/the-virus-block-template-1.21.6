@@ -200,31 +200,67 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
             
             // Calculate per-ray phase for RADIATE/ABSORB (staggered for continuous flow)
             float rayLengthPhase;
+            boolean rayVisible = true; // Can be set to false by TRIM mode
+            
             if (staggerPhase) {
-                // Calculate ray phase offset based on distribution mode
-                float rayOffset;
+                // Ray's angular position around circle (0 to 1 = 0° to 360°)
+                float rayAngle;
                 if (waveDist == WaveDistribution.RANDOM) {
-                    // Use a hash function to get consistent random offset per ray
-                    // Golden ratio-based hash for good distribution
-                    rayOffset = (idx * 0.618033988749895f) % 1.0f;
+                    rayAngle = (idx * 0.618033988749895f) % 1.0f;
                 } else {
-                    // SEQUENTIAL: evenly distributed by index
-                    rayOffset = (float) idx / rayCount;
+                    rayAngle = (float) idx / rayCount;
                 }
                 
-                // Apply wave scale (compression/frequency)
-                float scaledOffset = rayOffset * waveArc;
+                // === SWEEP COPIES SYSTEM ===
+                // sweepCopies < 1: TRIM - reduce angular coverage of sweep
+                // sweepCopies = 1: Normal - single full sweep
+                // sweepCopies > 1: DUPLICATE - create N identical visibility windows
                 
-                // Apply sweep copies - trim below 1, duplicate above 1
-                // For TRIM (< 1): compress the ray distribution
-                // For DUPLICATE (> 1): we handle this below by checking multiple windows
+                // The "sweep" is a visible angular wedge that rotates.
+                // sweepArcWidth controls how wide each wedge is (in angular terms)
+                // For now, use waveArc to control the wedge width
+                float sweepArcWidth = waveArc;  // Angular width of one sweep (0.25 = 90°)
+                
+                // For TRIM: reduce the arc width further
                 if (sweepCopies < 1.0f) {
-                    // Trim mode: compress visible region
-                    // sweepCopies=0.5 means rays are spread over only half the circle
-                    scaledOffset = rayOffset * sweepCopies * waveArc;
+                    sweepArcWidth = sweepArcWidth * sweepCopies;
                 }
                 
-                float phase = (baseLengthPhase + scaledOffset) % 1.0f;
+                // Number of visibility windows
+                int numCopies = sweepCopies >= 1.0f ? (int) Math.ceil(sweepCopies) : 1;
+                
+                // Check if this ray falls within ANY of the N visibility windows
+                boolean inAnyWindow = false;
+                float positionInWindow = 0f;  // -1 to +1, 0 = center of window
+                
+                for (int c = 0; c < numCopies; c++) {
+                    // Center of this copy's sweep (evenly distributed around circle)
+                    float windowCenter = (baseLengthPhase + (float)c / numCopies) % 1.0f;
+                    
+                    // Circular distance from ray to window center
+                    float angularDist = rayAngle - windowCenter;
+                    // Wrap to [-0.5, 0.5] range (shortest path around circle)
+                    if (angularDist < -0.5f) angularDist += 1.0f;
+                    if (angularDist > 0.5f) angularDist -= 1.0f;
+                    
+                    // Is ray within this window's angular width?
+                    if (Math.abs(angularDist) <= sweepArcWidth / 2.0f) {
+                        inAnyWindow = true;
+                        // Position within window: -1 at leading edge, 0 at center, +1 at trailing
+                        positionInWindow = angularDist / (sweepArcWidth / 2.0f);
+                        break;
+                    }
+                }
+                
+                if (!inAnyWindow) {
+                    rayVisible = false;
+                }
+                
+                // Convert position within window to rayLengthPhase
+                // positionInWindow: -1 (leading) to +1 (trailing)
+                // rayLengthPhase: 0 (segment at inner) to 1 (segment at outer)
+                // Map so center of window = center of animation cycle
+                float phase = (positionInWindow + 1.0f) / 2.0f;  // 0 to 1
                 rayLengthPhase = phase;
             } else {
                 rayLengthPhase = baseLengthPhase;
@@ -232,6 +268,11 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
             
             // === Handle LengthMode animations ===
             // All modes use t-based geometry clipping for proper continuous flow
+            // Skip rays hidden by TRIM mode
+            if (!rayVisible) {
+                return; // Skip this ray entirely in trim mode
+            }
+            
             if (flowConfig != null && flowConfig.hasLength()) {
                 LengthMode lengthMode = flowConfig.length();
                 
@@ -254,38 +295,7 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
                         float windowCenter = rayLengthPhase * travelRange;
                         windowStart = windowCenter - segmentLength * 0.5f;
                         windowEnd = windowCenter + segmentLength * 0.5f;
-                        
-                        // SWEEP DUPLICATION: create multiple visibility windows
-                        // sweepCopies=2 means 2 full-size windows 180° apart
-                        // sweepCopies=3 means 3 full-size windows 120° apart
-                        if (sweepCopies > 1.0f) {
-                            int copies = (int) Math.ceil(sweepCopies);
-                            // Check if ray falls in ANY of the duplicated windows
-                            // We iterate through each copy position and check visibility
-                            boolean inAnyWindow = false;
-                            for (int c = 0; c < copies; c++) {
-                                float copyOffset = (float) c / copies;
-                                float copyPhase = (rayLengthPhase + copyOffset) % 1.0f;
-                                float copyCenter = copyPhase * travelRange;
-                                float copyStart = copyCenter - segmentLength * 0.5f;
-                                float copyEnd = copyCenter + segmentLength * 0.5f;
-                                // Check if ANY point of the ray (t from 0 to 1) is in this window
-                                if (copyEnd >= 0 && copyStart <= 1) {
-                                    inAnyWindow = true;
-                                    // Use the best matching window
-                                    if (copyStart <= t0 && t1 <= copyEnd) {
-                                        windowStart = copyStart;
-                                        windowEnd = copyEnd;
-                                        break;
-                                    }
-                                }
-                            }
-                            if (!inAnyWindow) {
-                                // Ray is not in any window - hide it
-                                windowStart = -1;
-                                windowEnd = -1;
-                            }
-                        }
+                        // Note: Duplication is now handled in phase calculation above
                     }
                     case ABSORB -> {
                         // Ray flows INWARD: visible window starts at outer, moves toward inner
@@ -293,31 +303,7 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
                         float windowCenter = 1.0f - (rayLengthPhase * travelRange);
                         windowStart = windowCenter - segmentLength * 0.5f;
                         windowEnd = windowCenter + segmentLength * 0.5f;
-                        
-                        // SWEEP DUPLICATION: create multiple visibility windows
-                        if (sweepCopies > 1.0f) {
-                            int copies = (int) Math.ceil(sweepCopies);
-                            boolean inAnyWindow = false;
-                            for (int c = 0; c < copies; c++) {
-                                float copyOffset = (float) c / copies;
-                                float copyPhase = (rayLengthPhase + copyOffset) % 1.0f;
-                                float copyCenter = 1.0f - (copyPhase * travelRange);
-                                float copyStart = copyCenter - segmentLength * 0.5f;
-                                float copyEnd = copyCenter + segmentLength * 0.5f;
-                                if (copyEnd >= 0 && copyStart <= 1) {
-                                    inAnyWindow = true;
-                                    if (copyStart <= t0 && t1 <= copyEnd) {
-                                        windowStart = copyStart;
-                                        windowEnd = copyEnd;
-                                        break;
-                                    }
-                                }
-                            }
-                            if (!inAnyWindow) {
-                                windowStart = -1;
-                                windowEnd = -1;
-                            }
-                        }
+                        // Note: Duplication is now handled in phase calculation above
                     }
                     case SEGMENT -> {
                         // SEGMENT: sliding window (original behavior)

@@ -213,6 +213,18 @@ public abstract class BoundPanel extends AbstractPanel implements StateChangeLis
     }
     
     /**
+     * Overrides to also offset labels when widgets are offset.
+     */
+    @Override
+    public void applyBoundsOffset() {
+        super.applyBoundsOffset();
+        // Also offset labels to match widget positions
+        if (contentBuilder != null) {
+            contentBuilder.offsetLabels(bounds.x(), bounds.y());
+        }
+    }
+    
+    /**
      * Override in panels that need rebuild when a fragment is applied.
      * 
      * <p>Examples:</p>
