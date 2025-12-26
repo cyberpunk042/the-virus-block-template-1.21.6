@@ -398,12 +398,15 @@ public final class ShapeWidgetSpec {
         SliderSpec.half("Outer R", "rays.outerRadius", 0.1f, 20f, "%.2f"),
         SliderSpec.halfInt("Layers", "rays.layers", 1, 16),
         
-        // Row: Layer Spacing + Randomness
+        // Row: Layer Spacing + Layer Mode
         SliderSpec.half("Layer Sp", "rays.layerSpacing", 0.1f, 2f, "%.2f"),
-        SliderSpec.half("Random", "rays.randomness", 0f, 1f, "%.2f"),
+        EnumDropdownSpec.half("Layer Mode", "rays.layerMode",
+            net.cyberpunk042.visual.shape.RayLayerMode.class,
+            net.cyberpunk042.visual.shape.RayLayerMode.VERTICAL),
         
-        // Row: Length Variation (full width)
-        SliderSpec.full("Len Variation", "rays.lengthVariation", 0f, 1f, "%.2f")
+        // Row: Randomness + Length Variation
+        SliderSpec.half("Random", "rays.randomness", 0f, 1f, "%.2f"),
+        SliderSpec.half("Len Var", "rays.lengthVariation", 0f, 1f, "%.2f")
         
         // NOTE: The following are added CONDITIONALLY in ShapeSubPanel:
         // 

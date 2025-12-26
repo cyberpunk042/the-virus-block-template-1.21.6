@@ -573,6 +573,41 @@ public class ShapeSubPanel extends AbstractPanel {
                 widgets.add(curveIntensitySlider);
                 y += step;
             }
+            
+            // === Field Deformation (gravitational distortion) ===
+            String deformStr = state.getString("rays.fieldDeformation");
+            net.cyberpunk042.visual.shape.FieldDeformationMode deformation;
+            try {
+                deformation = net.cyberpunk042.visual.shape.FieldDeformationMode.valueOf(
+                    deformStr != null ? deformStr : "NONE");
+            } catch (IllegalArgumentException e) {
+                deformation = net.cyberpunk042.visual.shape.FieldDeformationMode.NONE;
+            }
+            
+            var deformDropdown = GuiWidgets.enumDropdown(
+                x, y, w, GuiConstants.COMPACT_HEIGHT, "Field Deform",
+                net.cyberpunk042.visual.shape.FieldDeformationMode.class,
+                deformation, "Gravitational distortion based on distance from center",
+                v -> {
+                    state.set("rays.fieldDeformation", v.name());
+                    rebuildForCurrentShape();
+                    if (shapeChangedCallback != null) {
+                        shapeChangedCallback.run();
+                    }
+                });
+            widgets.add(deformDropdown);
+            y += step;
+            
+            // Conditional: Show intensity only when deformation != NONE
+            if (deformation != net.cyberpunk042.visual.shape.FieldDeformationMode.NONE) {
+                float deformIntensity = state.getFloat("rays.fieldDeformationIntensity");
+                var deformIntensitySlider = GuiWidgets.slider(x, y, w,
+                    "Deform Int", 0f, 2f, deformIntensity, "%.2f", 
+                    "Strength of gravitational stretch (0 = none, 1 = strong)",
+                    v -> onUserChange(() -> state.set("rays.fieldDeformationIntensity", v)));
+                widgets.add(deformIntensitySlider);
+                y += step;
+            }
         }
         
         // Track content height

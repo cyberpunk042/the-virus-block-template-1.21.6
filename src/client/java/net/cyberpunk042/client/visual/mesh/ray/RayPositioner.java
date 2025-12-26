@@ -4,6 +4,7 @@ import net.cyberpunk042.visual.animation.WaveConfig;
 import net.cyberpunk042.visual.shape.RayArrangement;
 import net.cyberpunk042.visual.shape.RayCurvature;
 import net.cyberpunk042.visual.shape.RayDistribution;
+import net.cyberpunk042.visual.shape.RayLayerMode;
 import net.cyberpunk042.visual.shape.RayLineShape;
 import net.cyberpunk042.visual.shape.RaysShape;
 
@@ -54,6 +55,88 @@ public final class RayPositioner {
             Random rng,
             WaveConfig wave,
             float time) {
+        return computeContext(shape, index, layerIndex, rng, wave, time, null);
+    }
+    
+    /**
+     * Computes contexts for a single ray, returning MULTIPLE when in edge transition.
+     * 
+     * <p>During RADIATE/ABSORB edge transitions, we need TWO separate shapes:
+     * <ul>
+     *   <li>The "outgoing" shape at the far edge (despawning)</li>
+     *   <li>The "incoming" shape at the near edge (spawning)</li>
+     * </ul>
+     * This prevents vertex sharing artifacts between the two.</p>
+     * 
+     * @param shape The rays shape configuration
+     * @param index Ray index (0 to count-1)
+     * @param layerIndex Layer index (0 to layers-1)
+     * @param rng Random number generator for distribution randomness
+     * @param wave Optional wave configuration (null if no wave)
+     * @param time Current animation time
+     * @param flowConfig Optional flow animation config (null if no flow)
+     * @return List of RayContexts (1 normally, 2 during edge transitions)
+     */
+    public static java.util.List<RayContext> computeContexts(
+            RaysShape shape, 
+            int index, 
+            int layerIndex, 
+            Random rng,
+            WaveConfig wave,
+            float time,
+            net.cyberpunk042.visual.animation.RayFlowConfig flowConfig) {
+        
+        java.util.List<RayContext> result = new java.util.ArrayList<>(2);
+        
+        // Check if we're in edge transition (need two shapes)
+        if (flowConfig != null && flowConfig.isActive()) {
+            net.cyberpunk042.visual.animation.LengthMode lengthMode = flowConfig.length();
+            if (lengthMode == net.cyberpunk042.visual.animation.LengthMode.RADIATE ||
+                lengthMode == net.cyberpunk042.visual.animation.LengthMode.ABSORB) {
+                
+                // Compute the phase for this ray
+                float rayPhase = computeRayPhase(flowConfig, index, shape.count(), time);
+                
+                // During edge transitions (0-0.1 or 0.9-1.0), generate two shapes
+                if (rayPhase < 0.1f || rayPhase > 0.9f) {
+                    // Generate both the main shape AND the wrapped shape
+                    RayContext primaryContext = computeContextWithPhase(
+                        shape, index, layerIndex, rng, wave, time, flowConfig, rayPhase, false);
+                    RayContext wrappedContext = computeContextWithPhase(
+                        shape, index, layerIndex, rng, wave, time, flowConfig, rayPhase, true);
+                    
+                    result.add(primaryContext);
+                    result.add(wrappedContext);
+                    return result;
+                }
+            }
+        }
+        
+        // Normal case: single context
+        result.add(computeContext(shape, index, layerIndex, rng, wave, time, flowConfig));
+        return result;
+    }
+    
+    /**
+     * Computes the context for a single ray with flow animation support.
+     * 
+     * @param shape The rays shape configuration
+     * @param index Ray index (0 to count-1)
+     * @param layerIndex Layer index (0 to layers-1)
+     * @param rng Random number generator for distribution randomness
+     * @param wave Optional wave configuration (null if no wave)
+     * @param time Current animation time
+     * @param flowConfig Optional flow animation config (null if no flow)
+     * @return Computed RayContext with position, shape, and animation data
+     */
+    public static RayContext computeContext(
+            RaysShape shape, 
+            int index, 
+            int layerIndex, 
+            Random rng,
+            WaveConfig wave,
+            float time,
+            net.cyberpunk042.visual.animation.RayFlowConfig flowConfig) {
         
         int count = shape.count();
         float layerSpacing = shape.layerSpacing();
@@ -94,6 +177,57 @@ public final class RayPositioner {
         net.cyberpunk042.visual.shape.RayOrientation orientation = shape.effectiveRayOrientation();
         float[] orientationVector = computeOrientationVector(orientation, start, direction);
         
+        // === Compute flow animation values ===
+        float flowPositionOffset = 0.0f;
+        float flowScale = 1.0f;
+        float visibleTStart = 0.0f;
+        float visibleTEnd = 1.0f;
+        float flowAlpha = 1.0f;
+        
+        if (flowConfig != null && flowConfig.isActive()) {
+            FlowAnimationResult flowResult = computeFlowAnimation(
+                flowConfig, index, count, time, shape.innerRadius(), shape.outerRadius());
+            flowPositionOffset = flowResult.positionOffset;
+            flowScale = flowResult.scale;
+            visibleTStart = flowResult.visibleTStart;
+            visibleTEnd = flowResult.visibleTEnd;
+            flowAlpha = flowResult.alpha;
+            
+            // Apply position offset to start/end positions
+            if (Math.abs(flowPositionOffset) > 0.001f) {
+                start[0] += direction[0] * flowPositionOffset;
+                start[1] += direction[1] * flowPositionOffset;
+                start[2] += direction[2] * flowPositionOffset;
+                end[0] += direction[0] * flowPositionOffset;
+                end[1] += direction[1] * flowPositionOffset;
+                end[2] += direction[2] * flowPositionOffset;
+            }
+        }
+        
+        // === Compute field deformation values ===
+        net.cyberpunk042.visual.shape.FieldDeformationMode fieldDeformation = shape.effectiveFieldDeformation();
+        float fieldDeformationIntensity = shape.fieldDeformationIntensity();
+        float normalizedDistance = 0.5f; // Default to middle if can't compute
+        float fieldStretch = 1.0f;
+        
+        if (fieldDeformation.isActive()) {
+            // Compute distance from center based on the ray's position
+            // Use start position to determine how far from center this ray is
+            float distFromCenter = (float) Math.sqrt(
+                start[0] * start[0] + start[1] * start[1] + start[2] * start[2]);
+            
+            // Normalize based on inner/outer radius
+            float innerR = shape.innerRadius();
+            float outerR = shape.outerRadius();
+            if (outerR > innerR) {
+                normalizedDistance = Math.max(0.01f, Math.min(1.0f, 
+                    (distFromCenter - innerR) / (outerR - innerR)));
+            }
+            
+            // Compute stretch based on deformation mode and distance
+            fieldStretch = fieldDeformation.computeStretch(normalizedDistance, fieldDeformationIntensity);
+        }
+        
         return RayContext.builder()
             .start(start)
             .end(end)
@@ -119,7 +253,437 @@ public final class RayPositioner {
             .wave(wave)
             .time(time)
             .hasWave(hasWave)
+            .flowConfig(flowConfig)
+            .flowPositionOffset(flowPositionOffset)
+            .flowScale(flowScale)
+            .visibleTStart(visibleTStart)
+            .visibleTEnd(visibleTEnd)
+            .flowAlpha(flowAlpha)
+            .fieldDeformation(fieldDeformation)
+            .fieldDeformationIntensity(fieldDeformationIntensity)
+            .normalizedDistance(normalizedDistance)
+            .fieldStretch(fieldStretch)
             .build();
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Flow Animation Computation
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /** Result of flow animation computation. */
+    private record FlowAnimationResult(
+        float positionOffset,
+        float scale,
+        float visibleTStart,
+        float visibleTEnd,
+        float alpha
+    ) {}
+    
+    /**
+     * Computes the phase for a ray in flow animation.
+     */
+    private static float computeRayPhase(
+            net.cyberpunk042.visual.animation.RayFlowConfig flow,
+            int rayIndex, int rayCount, float time) {
+        
+        // Compute per-ray phase offset based on wave distribution
+        float rayPhaseOffset;
+        net.cyberpunk042.visual.animation.WaveDistribution waveDist = flow.effectiveWaveDistribution();
+        if (waveDist == net.cyberpunk042.visual.animation.WaveDistribution.RANDOM) {
+            rayPhaseOffset = (rayIndex * GOLDEN_RATIO) % 1.0f;
+        } else {
+            rayPhaseOffset = rayCount > 1 ? (float) rayIndex / rayCount : 0f;
+        }
+        
+        // Apply wave scale
+        rayPhaseOffset *= flow.effectiveWaveArc();
+        
+        // Combine with time-based phase
+        float basePhase = (time * flow.lengthSpeed()) % 1.0f;
+        return (basePhase + rayPhaseOffset) % 1.0f;
+    }
+    
+    /**
+     * Computes context for a ray at a specific phase, with optional wrapping.
+     * 
+     * @param wrapped If true, compute the "wrapped" shape (at the opposite edge)
+     */
+    private static RayContext computeContextWithPhase(
+            RaysShape shape,
+            int index,
+            int layerIndex,
+            Random rng,
+            WaveConfig wave,
+            float time,
+            net.cyberpunk042.visual.animation.RayFlowConfig flowConfig,
+            float phase,
+            boolean wrapped) {
+        
+        int count = shape.count();
+        float layerSpacing = shape.layerSpacing();
+        
+        // Compute distribution offsets
+        DistributionResult dist = computeDistribution(shape, index, count, rng);
+        
+        // Compute positions based on arrangement
+        float[] start = new float[3];
+        float[] end = new float[3];
+        computePosition(shape, index, count, layerIndex, layerSpacing, dist, start, end);
+        
+        // Compute direction and length
+        float dx = end[0] - start[0];
+        float dy = end[1] - start[1];
+        float dz = end[2] - start[2];
+        float length = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+        float[] direction = new float[3];
+        if (length > 0.0001f) {
+            direction[0] = dx / length;
+            direction[1] = dy / length;
+            direction[2] = dz / length;
+        } else {
+            direction[1] = 1.0f;
+        }
+        
+        // Determine line shape and curvature
+        net.cyberpunk042.visual.shape.RayLineShape lineShape = shape.effectiveLineShape();
+        net.cyberpunk042.visual.shape.RayCurvature curvature = shape.effectiveCurvature();
+        int shapeSegments = shape.shapeSegments();
+        
+        // Check for wave animation
+        boolean hasWave = wave != null && wave.isActive() && wave.isCpuMode();
+        
+        // Compute orientation
+        net.cyberpunk042.visual.shape.RayOrientation orientation = shape.effectiveRayOrientation();
+        float[] orientationVector = computeOrientationVector(orientation, start, direction);
+        
+        // Compute flow animation for this specific phase
+        float rayLength = shape.outerRadius() - shape.innerRadius();
+        float posOffset = 0.0f;
+        float scale = 1.0f;
+        float visibleTStart = 0.0f;
+        float visibleTEnd = 1.0f;
+        float flowAlpha = 1.0f;
+        
+        net.cyberpunk042.visual.animation.LengthMode lengthMode = flowConfig.length();
+        net.cyberpunk042.visual.animation.EdgeTransitionMode edgeMode = flowConfig.effectiveEdgeTransition();
+        
+        if (wrapped) {
+            // WRAPPED shape: this is the one at the opposite edge
+            if (phase < 0.1f) {
+                // Primary is spawning at start -> wrapped is despawning at end (phase ~1.0)
+                float wrappedPhase = phase + 1.0f; // Treat as phase ~1.0
+                float edgeFactor = phase / 0.1f; // 0 to 1 as phase goes 0 to 0.1
+                
+                if (lengthMode == net.cyberpunk042.visual.animation.LengthMode.RADIATE) {
+                    posOffset = rayLength; // At outer edge
+                    if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
+                        scale = 1.0f - edgeFactor; // Shrinking
+                    } else {
+                        visibleTEnd = 1.0f - edgeFactor; // Clip from end
+                    }
+                } else { // ABSORB
+                    posOffset = 0.0f; // At inner edge
+                    if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
+                        scale = 1.0f - edgeFactor;
+                    } else {
+                        visibleTStart = edgeFactor;
+                    }
+                }
+            } else { // phase > 0.9f
+                // Primary is despawning at end -> wrapped is spawning at start (phase ~0.0)
+                float edgeFactor = (1.0f - phase) / 0.1f; // 1 to 0 as phase goes 0.9 to 1.0
+                
+                if (lengthMode == net.cyberpunk042.visual.animation.LengthMode.RADIATE) {
+                    posOffset = 0.0f; // At inner edge (spawning)
+                    if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
+                        scale = 1.0f - edgeFactor; // Growing (inverse)
+                    } else {
+                        visibleTStart = edgeFactor; // Reveal from tip
+                    }
+                } else { // ABSORB
+                    posOffset = rayLength; // At outer edge (spawning)
+                    if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
+                        scale = 1.0f - edgeFactor;
+                    } else {
+                        visibleTEnd = 1.0f - edgeFactor;
+                    }
+                }
+            }
+        } else {
+            // PRIMARY shape: compute normally for this phase
+            if (lengthMode == net.cyberpunk042.visual.animation.LengthMode.RADIATE) {
+                posOffset = phase * rayLength;
+                
+                if (phase < 0.1f) {
+                    float edgeFactor = phase / 0.1f;
+                    if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
+                        scale = edgeFactor;
+                    } else {
+                        visibleTStart = 1.0f - edgeFactor;
+                    }
+                } else if (phase > 0.9f) {
+                    float edgeFactor = (1.0f - phase) / 0.1f;
+                    if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
+                        scale = edgeFactor;
+                    } else {
+                        visibleTEnd = edgeFactor;
+                    }
+                }
+            } else { // ABSORB
+                float reversed = 1.0f - phase;
+                posOffset = reversed * rayLength;
+                
+                if (phase < 0.1f) {
+                    float edgeFactor = phase / 0.1f;
+                    if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
+                        scale = edgeFactor;
+                    } else {
+                        visibleTEnd = edgeFactor;
+                    }
+                } else if (phase > 0.9f) {
+                    float edgeFactor = (1.0f - phase) / 0.1f;
+                    if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
+                        scale = edgeFactor;
+                    } else {
+                        visibleTStart = 1.0f - edgeFactor;
+                    }
+                }
+            }
+        }
+        
+        // Apply position offset
+        if (Math.abs(posOffset) > 0.001f) {
+            start[0] += direction[0] * posOffset;
+            start[1] += direction[1] * posOffset;
+            start[2] += direction[2] * posOffset;
+            end[0] += direction[0] * posOffset;
+            end[1] += direction[1] * posOffset;
+            end[2] += direction[2] * posOffset;
+        }
+        
+        // Compute field deformation
+        net.cyberpunk042.visual.shape.FieldDeformationMode fieldDeformation = shape.effectiveFieldDeformation();
+        float fieldDeformationIntensity = shape.fieldDeformationIntensity();
+        float normalizedDistance = 0.5f;
+        float fieldStretch = 1.0f;
+        
+        if (fieldDeformation.isActive()) {
+            float distFromCenter = (float) Math.sqrt(
+                start[0] * start[0] + start[1] * start[1] + start[2] * start[2]);
+            float innerR = shape.innerRadius();
+            float outerR = shape.outerRadius();
+            if (outerR > innerR) {
+                normalizedDistance = Math.max(0.01f, Math.min(1.0f, 
+                    (distFromCenter - innerR) / (outerR - innerR)));
+            }
+            fieldStretch = fieldDeformation.computeStretch(normalizedDistance, fieldDeformationIntensity);
+        }
+        
+        return RayContext.builder()
+            .start(start)
+            .end(end)
+            .direction(direction)
+            .length(length)
+            .index(index)
+            .count(count)
+            .layerIndex(layerIndex)
+            .t(count > 1 ? (float) index / (count - 1) : 0f)
+            .width(shape.rayWidth())
+            .fadeStart(shape.fadeStart())
+            .fadeEnd(shape.fadeEnd())
+            .lineShape(lineShape)
+            .lineShapeAmplitude(shape.lineShapeAmplitude())
+            .lineShapeFrequency(shape.lineShapeFrequency())
+            .curvature(curvature)
+            .curvatureIntensity(shape.curvatureIntensity())
+            .shapeSegments(shapeSegments)
+            .orientation(orientation)
+            .orientationVector(orientationVector)
+            .shapeIntensity(shape.shapeIntensity())
+            .shapeLength(shape.shapeLength())
+            .wave(wave)
+            .time(time)
+            .hasWave(hasWave)
+            .flowConfig(flowConfig)
+            .flowPositionOffset(posOffset)
+            .flowScale(scale)
+            .visibleTStart(visibleTStart)
+            .visibleTEnd(visibleTEnd)
+            .flowAlpha(flowAlpha)
+            .fieldDeformation(fieldDeformation)
+            .fieldDeformationIntensity(fieldDeformationIntensity)
+            .normalizedDistance(normalizedDistance)
+            .fieldStretch(fieldStretch)
+            .build();
+    }
+    
+    /**
+     * Computes flow animation values for a single ray.
+     */
+    private static FlowAnimationResult computeFlowAnimation(
+            net.cyberpunk042.visual.animation.RayFlowConfig flow,
+            int rayIndex, int rayCount, float time,
+            float innerRadius, float outerRadius) {
+        
+        float posOffset = 0.0f;
+        float scale = 1.0f;
+        float tStart = 0.0f;
+        float tEnd = 1.0f;
+        float alpha = 1.0f;
+        
+        float rayLength = outerRadius - innerRadius;
+        
+        // Compute per-ray phase based on wave distribution
+        float rayPhase;
+        net.cyberpunk042.visual.animation.WaveDistribution waveDist = flow.effectiveWaveDistribution();
+        if (waveDist == net.cyberpunk042.visual.animation.WaveDistribution.RANDOM) {
+            // Golden ratio for even-ish random distribution
+            rayPhase = (rayIndex * 0.618033988749895f) % 1.0f;
+        } else {
+            rayPhase = rayCount > 1 ? (float) rayIndex / rayCount : 0f;
+        }
+        
+        // Apply wave scale
+        float waveArc = flow.effectiveWaveArc();
+        rayPhase *= waveArc;
+        
+        // === Length Mode Animation ===
+        net.cyberpunk042.visual.animation.LengthMode lengthMode = flow.length();
+        if (lengthMode != null && lengthMode != net.cyberpunk042.visual.animation.LengthMode.NONE) {
+            float basePhase = (time * flow.lengthSpeed()) % 1.0f;
+            float phase = (basePhase + rayPhase) % 1.0f;
+            
+            switch (lengthMode) {
+                case RADIATE -> {
+                    // Ray travels outward: starts at inner, moves to outer
+                    // phase 0: at inner (spawning), phase 0.5: middle (full size), phase 1: at outer (despawning)
+                    posOffset = phase * rayLength;
+                    
+                    // Apply edge transition based on mode
+                    net.cyberpunk042.visual.animation.EdgeTransitionMode edgeMode = flow.effectiveEdgeTransition();
+                    
+                    if (phase < 0.1f) {
+                        // Spawning at inner edge
+                        float edgeFactor = phase / 0.1f;
+                        if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
+                            scale = edgeFactor;
+                        } else {
+                            // CLIP mode - reveal from tip to base
+                            tStart = 1.0f - edgeFactor;
+                        }
+                    } else if (phase > 0.9f) {
+                        // Despawning at outer edge
+                        float edgeFactor = (1.0f - phase) / 0.1f;
+                        if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
+                            scale = edgeFactor;
+                        } else {
+                            // CLIP mode - hide from base to tip
+                            tEnd = edgeFactor;
+                        }
+                    }
+                }
+                case ABSORB -> {
+                    // Ray travels inward: starts at outer, moves to inner
+                    float reversed = 1.0f - phase;
+                    posOffset = reversed * rayLength;
+                    
+                    // Apply edge transition based on mode
+                    net.cyberpunk042.visual.animation.EdgeTransitionMode edgeMode = flow.effectiveEdgeTransition();
+                    
+                    if (phase < 0.1f) {
+                        // Spawning at outer edge
+                        float edgeFactor = phase / 0.1f;
+                        if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
+                            scale = edgeFactor;
+                        } else {
+                            // CLIP mode - reveal from base toward tip
+                            tEnd = edgeFactor;
+                        }
+                    } else if (phase > 0.9f) {
+                        // Despawning at inner edge
+                        float edgeFactor = (1.0f - phase) / 0.1f;
+                        if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
+                            scale = edgeFactor;
+                        } else {
+                            // CLIP mode - hide from tip down
+                            tStart = 1.0f - edgeFactor;
+                        }
+                    }
+                }
+                case PULSE -> {
+                    // Breathing effect - scale oscillates
+                    scale = 0.5f + 0.5f * (float) Math.sin(phase * Math.PI * 2);
+                }
+                case SEGMENT -> {
+                    // Fixed segment visible
+                    float segLen = flow.segmentLength();
+                    tStart = phase;
+                    tEnd = phase + segLen;
+                    if (tEnd > 1.0f) {
+                        // Wrap around
+                        tEnd = tEnd - 1.0f;
+                    }
+                }
+                case GROW_SHRINK -> {
+                    // Grows then shrinks
+                    if (phase < 0.5f) {
+                        scale = phase * 2.0f;
+                    } else {
+                        scale = (1.0f - phase) * 2.0f;
+                    }
+                }
+                default -> {}
+            }
+        }
+        
+        // === Flicker Mode Animation ===
+        net.cyberpunk042.visual.animation.FlickerMode flickerMode = flow.flicker();
+        if (flickerMode != null && flickerMode != net.cyberpunk042.visual.animation.FlickerMode.NONE) {
+            float intensity = flow.flickerIntensity();
+            float freq = flow.flickerFrequency();
+            float flickerPhase = time * freq + rayIndex * 1.618033988749895f;
+            
+            switch (flickerMode) {
+                case SCINTILLATION -> {
+                    // Random twinkling
+                    float noise = (float) Math.sin(flickerPhase * 7.3) * 
+                                  (float) Math.sin(flickerPhase * 13.7) * 
+                                  (float) Math.sin(flickerPhase * 23.1);
+                    alpha = 1.0f - intensity * (0.5f + 0.5f * noise);
+                }
+                case STROBE -> {
+                    // On/off blinking
+                    alpha = ((flickerPhase % 1.0f) < 0.5f) ? 1.0f : 1.0f - intensity;
+                }
+                case FADE_PULSE -> {
+                    // Sine wave alpha (breathing)
+                    alpha = 1.0f - intensity * (0.5f + 0.5f * (float) Math.sin(flickerPhase * Math.PI * 2));
+                }
+                case FLICKER -> {
+                    // Candlelight-style random flickering
+                    int seed = (int)(flickerPhase * 1000) + rayIndex * 12345;
+                    java.util.Random flickerRng = new java.util.Random(seed);
+                    alpha = 1.0f - intensity * flickerRng.nextFloat();
+                }
+                case LIGHTNING -> {
+                    // Flash bright then fade
+                    float flashPhase = flickerPhase % 1.0f;
+                    alpha = 1.0f - intensity * Math.min(1.0f, flashPhase * 3.0f);
+                }
+                case HEARTBEAT -> {
+                    // Double-pulse rhythm
+                    float beatPhase = flickerPhase % 1.0f;
+                    float pulse = beatPhase < 0.15f ? beatPhase / 0.15f :
+                                  beatPhase < 0.3f ? (0.3f - beatPhase) / 0.15f :
+                                  beatPhase < 0.4f ? (beatPhase - 0.3f) / 0.1f :
+                                  beatPhase < 0.5f ? (0.5f - beatPhase) / 0.1f : 0f;
+                    alpha = 1.0f - intensity * (1.0f - pulse);
+                }
+                default -> {}
+            }
+        }
+        
+        return new FlowAnimationResult(posOffset, scale, tStart, tEnd, alpha);
     }
     
     /**
@@ -280,13 +844,45 @@ public final class RayPositioner {
         
         float innerRadius = shape.innerRadius();
         float rayLength = shape.rayLength();
+        RayLayerMode layerMode = shape.effectiveLayerMode();
         
         float angle = (index * TWO_PI / count) + dist.angleJitter();
         float cos = (float) Math.cos(angle);
         float sin = (float) Math.sin(angle);
-        float layerY = (layerIndex - (shape.layers() - 1) / 2.0f) * layerSpacing;
         
-        float innerR = innerRadius + dist.startOffset();
+        // Compute layer offset based on layer mode
+        float layerY = 0;
+        float layerRadiusOffset = 0;
+        float layerAngleOffset = 0;
+        
+        switch (layerMode) {
+            case VERTICAL -> {
+                // Stack layers vertically
+                layerY = (layerIndex - (shape.layers() - 1) / 2.0f) * layerSpacing;
+            }
+            case RADIAL -> {
+                // Layers extend radially outward (each layer starts where previous ends)
+                layerRadiusOffset = layerIndex * rayLength;
+            }
+            case SHELL -> {
+                // Concentric shells (same as RADIAL but adds to inner radius)
+                layerRadiusOffset = layerIndex * layerSpacing;
+            }
+            case SPIRAL -> {
+                // Spiral: both angular and radial offset
+                layerAngleOffset = layerIndex * TWO_PI / 8; // 45° between layers
+                layerRadiusOffset = layerIndex * layerSpacing;
+            }
+        }
+        
+        // Apply angular offset for spiral mode
+        if (layerMode == RayLayerMode.SPIRAL) {
+            float newAngle = angle + layerAngleOffset;
+            cos = (float) Math.cos(newAngle);
+            sin = (float) Math.sin(newAngle);
+        }
+        
+        float innerR = innerRadius + layerRadiusOffset + dist.startOffset();
         float outerR = innerR + rayLength * dist.lengthMod();
         innerR *= (1 + dist.radiusJitter());
         outerR *= (1 + dist.radiusJitter());
@@ -307,8 +903,27 @@ public final class RayPositioner {
         float innerRadius = shape.innerRadius();
         float outerRadius = shape.outerRadius();
         float rayLength = shape.rayLength();
+        RayLayerMode layerMode = shape.effectiveLayerMode();
         
-        float shellOffset = layerIndex * layerSpacing;
+        // Compute layer offset based on layer mode
+        float shellOffset = 0;
+        float layerRadiusExt = 0;
+        
+        switch (layerMode) {
+            case SHELL -> {
+                // Concentric shells at increasing radii
+                shellOffset = layerIndex * layerSpacing;
+            }
+            case RADIAL -> {
+                // Rays extend further outward (each layer continues where previous ended)
+                layerRadiusExt = layerIndex * rayLength;
+            }
+            case VERTICAL, SPIRAL -> {
+                // For spherical, VERTICAL and SPIRAL don't make as much sense
+                // Fall back to SHELL behavior
+                shellOffset = layerIndex * layerSpacing;
+            }
+        }
         
         float phi = (float) Math.acos(1 - 2 * (index + 0.5f) / count);
         float theta = TWO_PI * index / GOLDEN_RATIO + dist.angleJitter();
@@ -323,7 +938,7 @@ public final class RayPositioner {
         float dz = sinPhi * sinTheta;
         
         if (converging) {
-            float outerR = (outerRadius + shellOffset) * (1 + dist.radiusJitter());
+            float outerR = (outerRadius + shellOffset + layerRadiusExt) * (1 + dist.radiusJitter());
             float innerR = outerR - rayLength * dist.lengthMod();
             outerR += dist.startOffset();
             innerR += dist.startOffset();
@@ -337,7 +952,7 @@ public final class RayPositioner {
             end[1] = dy * innerR;
             end[2] = dz * innerR;
         } else {
-            float innerR = (innerRadius + shellOffset + dist.startOffset()) * (1 + dist.radiusJitter());
+            float innerR = (innerRadius + shellOffset + layerRadiusExt + dist.startOffset()) * (1 + dist.radiusJitter());
             float outerR = innerR + rayLength * dist.lengthMod();
             
             start[0] = dx * innerR;

@@ -258,6 +258,46 @@ public final class RayGeometryUtils {
     }
     
     /**
+     * Computes the tangent direction at a point on a curved path.
+     * 
+     * <p>The tangent is computed by sampling two nearby points on the curve
+     * and computing the normalized direction between them.</p>
+     * 
+     * @param start Ray start position
+     * @param end Ray end position
+     * @param t Parametric value (0-1)
+     * @param curvature Curvature mode
+     * @param intensity Curvature intensity
+     * @return Tangent direction [x, y, z] (normalized)
+     */
+    public static float[] computeCurvedTangent(float[] start, float[] end, float t,
+                                               RayCurvature curvature, float intensity) {
+        if (curvature == null || curvature == RayCurvature.NONE || intensity < 0.001f) {
+            // Straight line - tangent is just the direction
+            float[] dir = computeDirectionAndLength(start, end);
+            return new float[] { dir[0], dir[1], dir[2] };
+        }
+        
+        // Sample two nearby points to compute tangent
+        float dt = 0.02f;
+        float t1 = Math.max(0, t - dt);
+        float t2 = Math.min(1, t + dt);
+        
+        float[] p1 = computeCurvedPosition(start, end, t1, curvature, intensity);
+        float[] p2 = computeCurvedPosition(start, end, t2, curvature, intensity);
+        
+        // Direction from p1 to p2
+        float[] tangent = new float[] {
+            p2[0] - p1[0],
+            p2[1] - p1[1],
+            p2[2] - p1[2]
+        };
+        normalize(tangent);
+        
+        return tangent;
+    }
+    
+    /**
      * Computes the base angle offset for a given curvature mode.
      */
     public static float computeCurvatureAngle(RayCurvature curvature, float t) {

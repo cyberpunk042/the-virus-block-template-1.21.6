@@ -80,7 +80,7 @@ public final class RaysTessellator {
      */
     public static Mesh tessellate(RaysShape shape, net.cyberpunk042.visual.pattern.VertexPattern pattern, 
                                    WaveConfig wave, float time) {
-        return tessellate(shape, pattern, null, wave, time);
+        return tessellate(shape, pattern, null, wave, time, null);
     }
     
     /**
@@ -89,6 +89,28 @@ public final class RaysTessellator {
     public static Mesh tessellate(RaysShape shape, net.cyberpunk042.visual.pattern.VertexPattern pattern, 
                                    net.cyberpunk042.visual.visibility.VisibilityMask visibility,
                                    WaveConfig wave, float time) {
+        return tessellate(shape, pattern, visibility, wave, time, null);
+    }
+    
+    /**
+     * Tessellates rays shape with full pattern, visibility, wave, and flow animation support.
+     * 
+     * <p>This is the main entry point for 3D ray tessellation with animations.
+     * The flow config enables RADIATE/ABSORB/CHASE position animations and
+     * SCALE/CLIP edge transitions for 3D ray types.</p>
+     * 
+     * @param shape The rays shape definition
+     * @param pattern Pattern for tessellation (or null for filled)
+     * @param visibility Visibility mask (or null for all visible)
+     * @param wave Wave configuration (or null for no wave)
+     * @param time Current time for animation
+     * @param flowConfig Flow animation config (or null for no flow)
+     * @return Mesh containing the ray geometry
+     */
+    public static Mesh tessellate(RaysShape shape, net.cyberpunk042.visual.pattern.VertexPattern pattern, 
+                                   net.cyberpunk042.visual.visibility.VisibilityMask visibility,
+                                   WaveConfig wave, float time,
+                                   net.cyberpunk042.visual.animation.RayFlowConfig flowConfig) {
         RayType rayType = shape.effectiveRayType();
         
         // Get the tessellator for this ray type
@@ -108,22 +130,27 @@ public final class RaysTessellator {
         Random rng = new Random(42); // Deterministic random for stable results
         
         Logging.FIELD.topic("tessellation").debug(
-            "Tessellating rays: count={}, layers={}, arrangement={}, rayType={}, tessellator={}, meshType={}, pattern={}", 
+            "Tessellating rays: count={}, layers={}, arrangement={}, rayType={}, tessellator={}, meshType={}, pattern={}, hasFlow={}", 
             count, layers, shape.arrangement(), rayType, tessellator.name(),
             is3DWithProperTessellator ? "TRIANGLES" : "LINES",
-            pattern != null ? pattern.getClass().getSimpleName() : "null");
+            pattern != null ? pattern.getClass().getSimpleName() : "null",
+            flowConfig != null && flowConfig.isActive());
         
         // Generate rays for each layer
         for (int layer = 0; layer < layers; layer++) {
             for (int i = 0; i < count; i++) {
-                // Compute context for this ray
-                RayContext context = RayPositioner.computeContext(shape, i, layer, rng, wave, time);
+                // Compute contexts for this ray (may return multiple during edge transitions)
+                java.util.List<RayContext> contexts = RayPositioner.computeContexts(
+                    shape, i, layer, rng, wave, time, flowConfig);
                 
-                // Delegate to type-specific tessellator with pattern and visibility
-                tessellator.tessellate(builder, shape, context, pattern, visibility);
+                // Tessellate each context (normally 1, but 2 during edge transitions)
+                for (RayContext context : contexts) {
+                    tessellator.tessellate(builder, shape, context, pattern, visibility);
+                }
             }
         }
         
         return builder.build();
     }
 }
+

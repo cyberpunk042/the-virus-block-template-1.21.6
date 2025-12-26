@@ -435,31 +435,85 @@ public final class VertexEmitter {
         if (primType == PrimitiveType.QUADS) {
             // For quads, draw only the 4 edges (not the internal diagonal)
             mesh.forEachQuad((v0, v1, v2, v3) -> {
-                emitLineVertex(v0, v1);
-                emitLineVertex(v1, v0);
-                
-                emitLineVertex(v1, v2);
-                emitLineVertex(v2, v1);
-                
-                emitLineVertex(v2, v3);
-                emitLineVertex(v3, v2);
-                
-                emitLineVertex(v3, v0);
-                emitLineVertex(v0, v3);
+                emitEdge(v0, v1);
+                emitEdge(v1, v2);
+                emitEdge(v2, v3);
+                emitEdge(v3, v0);
             });
         } else {
             // For triangles, draw all 3 edges per triangle
             mesh.forEachTriangle((v0, v1, v2) -> {
-                emitLineVertex(v0, v1);
-                emitLineVertex(v1, v0);
-                
-                emitLineVertex(v1, v2);
-                emitLineVertex(v2, v1);
-                
-                emitLineVertex(v2, v0);
-                emitLineVertex(v0, v2);
+                emitEdge(v0, v1);
+                emitEdge(v1, v2);
+                emitEdge(v2, v0);
             });
         }
+    }
+    
+    /**
+     * Emits a single edge (2 vertices = 1 line) with consistent normals.
+     * Both vertices use the same normal direction (v0 toward v1).
+     */
+    private void emitEdge(Vertex v0, Vertex v1) {
+        // Direction from v0 to v1 - CONSISTENT for both vertices
+        float dx = v1.x() - v0.x();
+        float dy = v1.y() - v0.y();
+        float dz = v1.z() - v0.z();
+        float len = (float)Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (len > 0) {
+            dx /= len;
+            dy /= len;
+            dz /= len;
+        }
+        
+        // Transform normal through matrix
+        Vector3f dir = new Vector3f(dx, dy, dz);
+        dir.mul(normalMatrix);
+        
+        // Calculate color
+        int vertexColor;
+        if (colorContext != null && colorContext.isPerVertex()) {
+            // Use midpoint for consistent color on both ends
+            float midX = (v0.x() + v1.x()) * 0.5f;
+            float midY = (v0.y() + v1.y()) * 0.5f;
+            float midZ = (v0.z() + v1.z()) * 0.5f;
+            vertexColor = colorContext.calculateColor(midX, midY, midZ, cellIndex);
+        } else {
+            vertexColor = this.color;
+        }
+        
+        int a = (vertexColor >> 24) & 0xFF;
+        int r = (vertexColor >> 16) & 0xFF;
+        int g = (vertexColor >> 8) & 0xFF;
+        int b = vertexColor & 0xFF;
+        
+        // Emit first vertex (v0)
+        float x0 = v0.x(), y0 = v0.y(), z0 = v0.z();
+        if (waveConfig != null && waveConfig.isActive()) {
+            float[] displaced = AnimationApplier.applyWaveToVertex(waveConfig, x0, y0, z0, waveTime);
+            x0 = displaced[0];
+            y0 = displaced[1];
+            z0 = displaced[2];
+        }
+        Vector4f pos0 = new Vector4f(x0, y0, z0, 1.0f);
+        pos0.mul(positionMatrix);
+        consumer.vertex(pos0.x(), pos0.y(), pos0.z())
+            .color(r, g, b, a)
+            .normal(dir.x(), dir.y(), dir.z());
+        
+        // Emit second vertex (v1)
+        float x1 = v1.x(), y1 = v1.y(), z1 = v1.z();
+        if (waveConfig != null && waveConfig.isActive()) {
+            float[] displaced = AnimationApplier.applyWaveToVertex(waveConfig, x1, y1, z1, waveTime);
+            x1 = displaced[0];
+            y1 = displaced[1];
+            z1 = displaced[2];
+        }
+        Vector4f pos1 = new Vector4f(x1, y1, z1, 1.0f);
+        pos1.mul(positionMatrix);
+        consumer.vertex(pos1.x(), pos1.y(), pos1.z())
+            .color(r, g, b, a)
+            .normal(dir.x(), dir.y(), dir.z());
     }
     
     

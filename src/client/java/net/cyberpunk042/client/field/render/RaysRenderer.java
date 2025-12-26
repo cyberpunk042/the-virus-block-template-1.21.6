@@ -13,6 +13,7 @@ import net.cyberpunk042.visual.appearance.ColorContext;
 import net.cyberpunk042.visual.color.ColorResolver;
 import net.cyberpunk042.visual.fill.FillConfig;
 import net.cyberpunk042.visual.shape.RaysShape;
+import net.cyberpunk042.visual.shape.RayType;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix3f;
@@ -76,7 +77,11 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
         // Get visibility mask (same as SphereRenderer)
         net.cyberpunk042.visual.visibility.VisibilityMask visibility = primitive.visibility();
         
-        return RaysTessellator.tessellate(shape, pattern, visibility, wave, time);
+        // Get flow config for 3D ray animations
+        Animation anim = primitive.animation();
+        RayFlowConfig flowConfig = anim != null ? anim.rayFlow() : null;
+        
+        return RaysTessellator.tessellate(shape, pattern, visibility, wave, time, flowConfig);
     }
     
     /**
@@ -170,40 +175,11 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
             net.cyberpunk042.visual.fill.FillConfig fill = primitive.fill();
             net.cyberpunk042.visual.fill.FillMode mode = fill != null ? fill.mode() : net.cyberpunk042.visual.fill.FillMode.SOLID;
             
-            Logging.FIELD.topic("render").info("[RAYS_3D] Rendering mode={}, meshType={}, vertexCount={}, indexCount={}",
-                mode, mesh.primitiveType(), mesh.vertexCount(), mesh.indexCount());
-            
-            try {
-                switch (mode) {
-                    case SOLID -> emitRayTriangles(matrices, consumer, mesh, color, baseAlpha, light, colorCtx);
-                    case WIREFRAME, CAGE -> {
-                        Logging.FIELD.topic("render").info("[RAYS_3D] Emitting wireframe manually...");
-                        // Emit triangles as lines directly, using same pattern as LINE rays
-                        MatrixStack.Entry entry = matrices.peek();
-                        org.joml.Matrix4f positionMatrix = entry.getPositionMatrix();
-                        org.joml.Matrix3f normalMatrix = entry.getNormalMatrix();
-                        
-                        int a = (color >> 24) & 0xFF;
-                        int r = (color >> 16) & 0xFF;
-                        int g = (color >> 8) & 0xFF;
-                        int b = color & 0xFF;
-                        
-                        // Iterate through triangles and emit each edge as a line
-                        mesh.forEachTriangle((v0, v1, v2) -> {
-                            // Edge 0-1
-                            emitEdge(consumer, positionMatrix, normalMatrix, v0, v1, r, g, b, a);
-                            // Edge 1-2
-                            emitEdge(consumer, positionMatrix, normalMatrix, v1, v2, r, g, b, a);
-                            // Edge 2-0
-                            emitEdge(consumer, positionMatrix, normalMatrix, v2, v0, r, g, b, a);
-                        });
-                        Logging.FIELD.topic("render").info("[RAYS_3D] Wireframe DONE");
-                    }
-                    case POINTS -> emitPoints(matrices, consumer, mesh, color, light, fill, waveConfig, time);
-                }
-            } catch (Exception e) {
-                Logging.FIELD.topic("render").error("[RAYS_3D] EXCEPTION in fill mode {}: {}", mode, e.getMessage());
-                e.printStackTrace();
+            switch (mode) {
+                case SOLID -> emitRayTriangles(matrices, consumer, mesh, color, baseAlpha, light, colorCtx);
+                case WIREFRAME -> emitWireframe(matrices, consumer, mesh, color, light, fill, waveConfig, time);
+                case CAGE -> emitCage(matrices, consumer, mesh, color, light, fill, primitive, waveConfig, time);
+                case POINTS -> emitPoints(matrices, consumer, mesh, color, light, fill, waveConfig, time);
             }
             
             Logging.FIELD.topic("render").trace("[RAYS] DONE 3D: {} vertices, mode={}", mesh.vertexCount(), mode);
@@ -249,6 +225,213 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
             .overlay(net.minecraft.client.render.OverlayTexture.DEFAULT_UV)
             .light(light)
             .normal(nx, ny, nz);
+    }
+    
+    /**
+     * Override emitCage to generate lat/lon grid lines for 3D ray shapes.
+     * 
+     * <p>For 3D rays (droplets, eggs, etc.), cage mode draws latitude rings and
+     * longitude meridians around each shape, providing a cleaner grid than
+     * full triangle wireframe.</p>
+     */
+    @Override
+    protected void emitCage(
+            MatrixStack matrices,
+            VertexConsumer consumer,
+            Mesh mesh,
+            int color,
+            int light,
+            net.cyberpunk042.visual.fill.FillConfig fill,
+            Primitive primitive,
+            net.cyberpunk042.visual.animation.WaveConfig waveConfig,
+            float time) {
+        
+        if (!(primitive.shape() instanceof RaysShape shape)) {
+            // Fallback to wireframe if not rays
+            emitWireframe(matrices, consumer, mesh, color, light, fill, waveConfig, time);
+            return;
+        }
+        
+        // Only use custom cage for 3D ray types
+        RayType rayType = shape.effectiveRayType();
+        if (!rayType.is3D() || !net.cyberpunk042.client.visual.mesh.ray.RayTypeTessellatorRegistry.isImplemented(rayType)) {
+            // 2D rays just use wireframe
+            emitWireframe(matrices, consumer, mesh, color, light, fill, waveConfig, time);
+            return;
+        }
+        
+        // Get cage configuration from fill config, with reasonable defaults
+        int latCount = 6;  // Default horizontal rings
+        int lonCount = 8;  // Default vertical meridians
+        
+        if (fill != null && fill.cage() instanceof net.cyberpunk042.visual.fill.SphereCageOptions sphereCage) {
+            latCount = sphereCage.latitudeCount();
+            lonCount = sphereCage.longitudeCount();
+        }
+        
+        // Build cage mesh with lines
+        net.cyberpunk042.client.visual.mesh.MeshBuilder builder = net.cyberpunk042.client.visual.mesh.MeshBuilder.lines();
+        
+        // Generate cage lines for each ray
+        int count = shape.count();
+        int layers = Math.max(1, shape.layers());
+        java.util.Random rng = new java.util.Random(42);
+        
+        for (int layer = 0; layer < layers; layer++) {
+            for (int i = 0; i < count; i++) {
+                // Compute context for this ray
+                net.cyberpunk042.client.visual.mesh.ray.RayContext context = 
+                    net.cyberpunk042.client.visual.mesh.ray.RayPositioner.computeContext(shape, i, layer, rng, waveConfig, time);
+                
+                // Generate cage for this droplet
+                generateDropletCage(builder, context, latCount, lonCount);
+            }
+        }
+        
+        // Emit the cage mesh
+        Mesh cageMesh = builder.build();
+        net.cyberpunk042.client.visual.render.VertexEmitter emitter = 
+            new net.cyberpunk042.client.visual.render.VertexEmitter(matrices, consumer);
+        emitter.color(color).light(light);
+        emitter.emit(cageMesh);
+    }
+    
+    /**
+     * Generates cage (lat/lon grid) for a single droplet shape.
+     */
+    private void generateDropletCage(
+            net.cyberpunk042.client.visual.mesh.MeshBuilder builder,
+            net.cyberpunk042.client.visual.mesh.ray.RayContext context,
+            int latCount, int lonCount) {
+        
+        // Get droplet parameters
+        float length = context.length();
+        float radius = length * 0.5f;  // Base radius
+        float intensity = context.shapeIntensity();
+        float axialLength = context.shapeLength();
+        
+        // Get ray endpoints
+        float[] start = context.start();
+        float[] end = context.end();
+        
+        // === APPLY CURVATURE TO POSITION ===
+        // Curvature affects WHERE the cage is placed (center position)
+        // Orientation is ALWAYS respected for which way the tip points
+        net.cyberpunk042.visual.shape.RayCurvature curvature = context.curvature();
+        float curvatureIntensity = context.curvatureIntensity();
+        
+        float[] center;
+        
+        if (curvature != null && curvature != net.cyberpunk042.visual.shape.RayCurvature.NONE 
+            && curvatureIntensity > 0.001f) {
+            // Place center at curved midpoint
+            center = net.cyberpunk042.client.visual.mesh.ray.RayGeometryUtils.computeCurvedPosition(
+                start, end, 0.5f, curvature, curvatureIntensity);
+        } else {
+            // No curvature
+            center = new float[] {
+                (start[0] + end[0]) * 0.5f,
+                (start[1] + end[1]) * 0.5f,
+                (start[2] + end[2]) * 0.5f
+            };
+        }
+        
+        // Orientation always comes from context (respects user's RayOrientation setting)
+        float[] direction = context.orientationVector();
+        
+        // Build basis vectors for the droplet orientation
+        float[] up = new float[] { 0, 1, 0 };
+        if (Math.abs(direction[0] * up[0] + direction[1] * up[1] + direction[2] * up[2]) > 0.99f) {
+            up = new float[] { 1, 0, 0 };
+        }
+        // Cross products to get orthonormal basis
+        float[] u = normalize(cross(up, direction));
+        float[] v = normalize(cross(direction, u));
+        
+        // Use SphereDeformation.DROPLET to get accurate radii
+        net.cyberpunk042.visual.shape.SphereDeformation deformation = net.cyberpunk042.visual.shape.SphereDeformation.DROPLET;
+        
+        // === LATITUDE LINES (horizontal rings) ===
+        for (int lat = 1; lat < latCount; lat++) {
+            float theta = (float)(Math.PI * lat / latCount);
+            
+            // Get radius at this latitude from deformation
+            float[] deformed = deformation.computeFullVertex(theta, 0, radius, intensity, axialLength);
+            float ringRadius = (float)Math.sqrt(deformed[0] * deformed[0] + deformed[2] * deformed[2]);
+            float axialPos = deformed[1];
+            
+            // Draw ring as line segments
+            int segments = Math.max(lonCount * 2, 12);
+            for (int i = 0; i < segments; i++) {
+                float phi1 = (float)(2 * Math.PI * i / segments);
+                float phi2 = (float)(2 * Math.PI * (i + 1) / segments);
+                
+                // Local coords (ring in XZ plane at height axialPos)
+                float lx1 = (float)Math.cos(phi1) * ringRadius;
+                float lz1 = (float)Math.sin(phi1) * ringRadius;
+                float lx2 = (float)Math.cos(phi2) * ringRadius;
+                float lz2 = (float)Math.sin(phi2) * ringRadius;
+                
+                // Transform to world coords using basis
+                float[] p1 = transformToWorld(center, u, direction, v, lx1, axialPos, lz1);
+                float[] p2 = transformToWorld(center, u, direction, v, lx2, axialPos, lz2);
+                
+                int idx1 = builder.addVertex(net.cyberpunk042.client.visual.mesh.Vertex.pos(p1[0], p1[1], p1[2]));
+                int idx2 = builder.addVertex(net.cyberpunk042.client.visual.mesh.Vertex.pos(p2[0], p2[1], p2[2]));
+                builder.line(idx1, idx2);
+            }
+        }
+        
+        // === LONGITUDE LINES (vertical meridians) ===
+        for (int lon = 0; lon < lonCount; lon++) {
+            float phi = (float)(2 * Math.PI * lon / lonCount);
+            
+            // Draw meridian from pole to pole
+            int segments = Math.max(latCount * 2, 12);
+            for (int i = 0; i < segments; i++) {
+                float theta1 = (float)(Math.PI * i / segments);
+                float theta2 = (float)(Math.PI * (i + 1) / segments);
+                
+                // Get deformed positions
+                float[] d1 = deformation.computeFullVertex(theta1, phi, radius, intensity, axialLength);
+                float[] d2 = deformation.computeFullVertex(theta2, phi, radius, intensity, axialLength);
+                
+                // Transform to world coords
+                float[] p1 = transformToWorld(center, u, direction, v, d1[0], d1[1], d1[2]);
+                float[] p2 = transformToWorld(center, u, direction, v, d2[0], d2[1], d2[2]);
+                
+                int idx1 = builder.addVertex(net.cyberpunk042.client.visual.mesh.Vertex.pos(p1[0], p1[1], p1[2]));
+                int idx2 = builder.addVertex(net.cyberpunk042.client.visual.mesh.Vertex.pos(p2[0], p2[1], p2[2]));
+                builder.line(idx1, idx2);
+            }
+        }
+    }
+    
+    // Helper: transform local coords to world using basis vectors
+    private float[] transformToWorld(float[] center, float[] u, float[] dir, float[] v, float lx, float ly, float lz) {
+        return new float[] {
+            center[0] + u[0] * lx + dir[0] * ly + v[0] * lz,
+            center[1] + u[1] * lx + dir[1] * ly + v[1] * lz,
+            center[2] + u[2] * lx + dir[2] * ly + v[2] * lz
+        };
+    }
+    
+    // Helper: cross product
+    private float[] cross(float[] a, float[] b) {
+        return new float[] {
+            a[1] * b[2] - a[2] * b[1],
+            a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0]
+        };
+    }
+    
+    // Helper: normalize vector
+    private float[] normalize(float[] v) {
+        float len = (float)Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+        if (len > 0.0001f) {
+            return new float[] { v[0] / len, v[1] / len, v[2] / len };
+        }
+        return new float[] { 0, 1, 0 };
     }
     
     /**
@@ -1339,26 +1522,5 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
         }
         
         return new float[]{px, py, pz, ux, uy, uz};
-    }
-    /**
-     * Empty implementation - RaysRenderer overrides render() completely,
-     * so this method is never called by the parent class.
-     */
-    @Override
-    protected void emitCage(MatrixStack matrices, VertexConsumer consumer,
-                            Mesh mesh, int color, int light, FillConfig fill,
-                            Primitive primitive, WaveConfig waveConfig, float time) {
-        // Not used - see render() override
-    }
-    
-    /**
-     * Empty implementation - RaysRenderer overrides render() completely,
-     * so this method is never called by the parent class.
-     */
-    @Override
-    protected void emitWireframe(MatrixStack matrices, VertexConsumer consumer,
-                                  Mesh mesh, int color, int light, FillConfig fill,
-                                  WaveConfig waveConfig, float time) {
-        // Not used - see render() override
     }
 }

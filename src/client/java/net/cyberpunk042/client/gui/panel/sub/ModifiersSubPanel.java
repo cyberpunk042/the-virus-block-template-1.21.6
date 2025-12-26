@@ -343,6 +343,22 @@ public class ModifiersSubPanel extends BoundPanel {
         // 1.0 = full ray visible, lower values = particle-like effect
         c.slider("Seg Len", "rayFlow.segmentLength").range(0.1f, 1.0f).format("%.2f").add();
         
+        // Edge Transition (for 3D rays): SCALE vs CLIP at spawn/despawn edges
+        net.cyberpunk042.visual.animation.EdgeTransitionMode curEdge = 
+            flow != null && flow.edgeTransition() != null 
+                ? flow.edgeTransition() 
+                : net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE;
+        CyclingButtonWidget<net.cyberpunk042.visual.animation.EdgeTransitionMode> edgeDropdown = 
+            CyclingButtonWidget.<net.cyberpunk042.visual.animation.EdgeTransitionMode>builder(
+                    m -> Text.literal("Edge: " + m.displayName()))
+                .values(net.cyberpunk042.visual.animation.EdgeTransitionMode.values())
+                .initially(curEdge)
+                .omitKeyText()
+                .build(x, c.getCurrentY(), w, COMPACT_H, Text.literal(""),
+                    (btn, val) -> state.set("rayFlow.edgeTransition", val));
+        widgets.add(edgeDropdown);
+        c.advanceRow();
+        
         // Wave Scale: controls visibility wave pattern (speed/frequency)
         // < 1.0: compression (rays grouped tighter)
         // = 1.0: normal

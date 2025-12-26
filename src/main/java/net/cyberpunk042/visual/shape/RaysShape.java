@@ -73,6 +73,7 @@ public record RaysShape(
     // === Multi-Layer Support ===
     @Range(ValueRange.STEPS) @JsonField(skipIfDefault = true, defaultValue = "1") int layers,
     @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true) float layerSpacing,
+    @JsonField(skipIfDefault = true) RayLayerMode layerMode,
     
     // === Randomness ===
     @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true) float randomness,
@@ -106,7 +107,11 @@ public record RaysShape(
     @Range(ValueRange.POSITIVE_NONZERO) @JsonField(skipIfDefault = true, defaultValue = "1.0") float shapeLength,
     
     // === Ray Orientation (direction for 3D ray types) ===
-    @JsonField(skipIfDefault = true) RayOrientation rayOrientation
+    @JsonField(skipIfDefault = true) RayOrientation rayOrientation,
+    
+    // === Field Deformation (gravitational distortion based on distance) ===
+    @JsonField(skipIfDefault = true) FieldDeformationMode fieldDeformation,
+    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true) float fieldDeformationIntensity
 ) implements Shape {
     
     // =========================================================================
@@ -124,6 +129,7 @@ public record RaysShape(
         3.0f,           // outerRadius
         1,              // layers
         0.5f,           // layerSpacing
+        RayLayerMode.VERTICAL, // layerMode
         0.0f,           // randomness
         0.0f,           // lengthVariation
         1.0f,           // fadeStart
@@ -140,50 +146,59 @@ public record RaysShape(
         RayType.LINE,   // rayType
         1.0f,           // shapeIntensity
         1.0f,           // shapeLength
-        RayOrientation.ALONG_RAY  // rayOrientation
+        RayOrientation.ALONG_RAY,  // rayOrientation
+        FieldDeformationMode.NONE, // fieldDeformation
+        0.0f            // fieldDeformationIntensity
     );
     
     /** Spherical absorption rays (converging to center). */
     public static final RaysShape ABSORPTION = new RaysShape(
         2.0f, 1.0f, 48, RayArrangement.CONVERGING, RayDistribution.RANDOM, 0.5f, 3.5f,
-        8, 0.3f, 0.1f, 0.1f, 1.0f, 0.2f, 1, 0.0f,
-        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY);
+        8, 0.3f, RayLayerMode.SHELL, 0.1f, 0.1f, 1.0f, 0.2f, 1, 0.0f,
+        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
+        FieldDeformationMode.NONE, 0.0f);
     
     /** Spherical emission rays (diverging from center). */
     public static final RaysShape EMISSION = new RaysShape(
         2.0f, 1.0f, 48, RayArrangement.DIVERGING, RayDistribution.RANDOM, 0.5f, 3.5f,
-        8, 0.3f, 0.1f, 0.1f, 0.2f, 1.0f, 1, 0.0f,
-        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY);
+        8, 0.3f, RayLayerMode.SHELL, 0.1f, 0.1f, 0.2f, 1.0f, 1, 0.0f,
+        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
+        FieldDeformationMode.NONE, 0.0f);
     
     /** Parallel laser grid. */
     public static final RaysShape LASER_GRID = new RaysShape(
         5.0f, 1.5f, 16, RayArrangement.PARALLEL, RayDistribution.UNIFORM, 0.0f, 2.0f,
-        4, 0.3f, 0.0f, 0.0f, 1.0f, 1.0f, 1, 0.0f,
-        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY);
+        4, 0.3f, RayLayerMode.VERTICAL, 0.0f, 0.0f, 1.0f, 1.0f, 1, 0.0f,
+        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
+        FieldDeformationMode.NONE, 0.0f);
     
     /** Dashed pulse rays. */
     public static final RaysShape PULSE = new RaysShape(
         3.0f, 1.0f, 8, RayArrangement.RADIAL, RayDistribution.UNIFORM, 0.3f, 2.5f,
-        1, 0.5f, 0.0f, 0.0f, 1.0f, 0.5f, 4, 0.2f,
-        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY);
+        1, 0.5f, RayLayerMode.VERTICAL, 0.0f, 0.0f, 1.0f, 0.5f, 4, 0.2f,
+        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
+        FieldDeformationMode.NONE, 0.0f);
     
     /** Sparse random stars. */
     public static final RaysShape STARS = new RaysShape(
         1.5f, 0.5f, 24, RayArrangement.SPHERICAL, RayDistribution.STOCHASTIC, 0.8f, 2.0f,
-        1, 0.5f, 0.3f, 0.3f, 0.8f, 0.3f, 1, 0.0f,
-        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY);
+        1, 0.5f, RayLayerMode.SHELL, 0.3f, 0.3f, 0.8f, 0.3f, 1, 0.0f,
+        RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
+        FieldDeformationMode.NONE, 0.0f);
     
     /** Vortex rays (spiraling into center). */
     public static final RaysShape VORTEX = new RaysShape(
         2.5f, 1.0f, 24, RayArrangement.RADIAL, RayDistribution.UNIFORM, 0.3f, 3.0f,
-        1, 0.5f, 0.0f, 0.0f, 1.0f, 0.8f, 1, 0.0f,
-        RayLineShape.STRAIGHT, 0.1f, 2.0f, 32, RayCurvature.VORTEX, 0.5f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY);
+        1, 0.5f, RayLayerMode.VERTICAL, 0.0f, 0.0f, 1.0f, 0.8f, 1, 0.0f,
+        RayLineShape.STRAIGHT, 0.1f, 2.0f, 32, RayCurvature.VORTEX, 0.5f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
+        FieldDeformationMode.NONE, 0.0f);
     
     /** Corkscrew rays (helical shape). */
     public static final RaysShape CORKSCREW = new RaysShape(
         2.0f, 1.0f, 12, RayArrangement.RADIAL, RayDistribution.UNIFORM, 0.5f, 2.5f,
-        1, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1, 0.0f,
-        RayLineShape.CORKSCREW, 0.15f, 3.0f, 32, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY);
+        1, 0.5f, RayLayerMode.VERTICAL, 0.0f, 0.0f, 1.0f, 1.0f, 1, 0.0f,
+        RayLineShape.CORKSCREW, 0.15f, 3.0f, 32, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
+        FieldDeformationMode.NONE, 0.0f);
     
     public static RaysShape defaults() { return DEFAULT; }
     
@@ -303,6 +318,11 @@ public record RaysShape(
         return rayOrientation != null ? rayOrientation : RayOrientation.ALONG_RAY;
     }
     
+    /** Returns the layer mode, defaulting to VERTICAL if null. */
+    public RayLayerMode effectiveLayerMode() {
+        return layerMode != null ? layerMode : RayLayerMode.VERTICAL;
+    }
+    
     /** Number of segments needed to render this ray shape properly. */
     public int effectiveShapeSegments() {
         if (hasLineShape()) {
@@ -315,6 +335,17 @@ public record RaysShape(
         // For straight rays, respect user's shapeSegments setting
         // (needed for travel animations like CHASE/SCROLL to work smoothly)
         return Math.max(1, shapeSegments);
+    }
+    
+    /** Returns the field deformation mode, defaulting to NONE if null. */
+    public FieldDeformationMode effectiveFieldDeformation() {
+        return fieldDeformation != null ? fieldDeformation : FieldDeformationMode.NONE;
+    }
+    
+    /** Whether field deformation is active. */
+    public boolean hasFieldDeformation() {
+        return fieldDeformation != null && fieldDeformation != FieldDeformationMode.NONE 
+               && fieldDeformationIntensity > 0;
     }
     
     @Override
@@ -339,6 +370,7 @@ public record RaysShape(
             .outerRadius(outerRadius)
             .layers(layers)
             .layerSpacing(layerSpacing)
+            .layerMode(layerMode)
             .randomness(randomness)
             .lengthVariation(lengthVariation)
             .fadeStart(fadeStart)
@@ -355,7 +387,10 @@ public record RaysShape(
             .rayType(rayType)
             .shapeIntensity(shapeIntensity)
             .shapeLength(shapeLength)
-            .rayOrientation(rayOrientation);
+            .rayOrientation(rayOrientation)
+            // Field deformation
+            .fieldDeformation(fieldDeformation)
+            .fieldDeformationIntensity(fieldDeformationIntensity);
     }
     
     public static class Builder {
@@ -368,6 +403,7 @@ public record RaysShape(
         private float outerRadius = 3.0f;
         private int layers = 1;
         private float layerSpacing = 0.5f;
+        private RayLayerMode layerMode = RayLayerMode.VERTICAL;
         private float randomness = 0.0f;
         private float lengthVariation = 0.0f;
         private float fadeStart = 1.0f;
@@ -385,6 +421,8 @@ public record RaysShape(
         private float shapeIntensity = 1.0f;
         private float shapeLength = 1.0f;
         private RayOrientation rayOrientation = RayOrientation.ALONG_RAY;
+        private FieldDeformationMode fieldDeformation = FieldDeformationMode.NONE;
+        private float fieldDeformationIntensity = 0.0f;
         
         public Builder rayLength(float v) { this.rayLength = v; return this; }
         public Builder rayWidth(float v) { this.rayWidth = v; return this; }
@@ -395,6 +433,7 @@ public record RaysShape(
         public Builder outerRadius(float v) { this.outerRadius = v; return this; }
         public Builder layers(int v) { this.layers = v; return this; }
         public Builder layerSpacing(float v) { this.layerSpacing = v; return this; }
+        public Builder layerMode(RayLayerMode v) { this.layerMode = v != null ? v : RayLayerMode.VERTICAL; return this; }
         public Builder randomness(float v) { this.randomness = v; return this; }
         public Builder lengthVariation(float v) { this.lengthVariation = v; return this; }
         public Builder fadeStart(float v) { this.fadeStart = v; return this; }
@@ -412,14 +451,17 @@ public record RaysShape(
         public Builder shapeIntensity(float v) { this.shapeIntensity = v; return this; }
         public Builder shapeLength(float v) { this.shapeLength = v; return this; }
         public Builder rayOrientation(RayOrientation v) { this.rayOrientation = v != null ? v : RayOrientation.ALONG_RAY; return this; }
+        public Builder fieldDeformation(FieldDeformationMode v) { this.fieldDeformation = v != null ? v : FieldDeformationMode.NONE; return this; }
+        public Builder fieldDeformationIntensity(float v) { this.fieldDeformationIntensity = v; return this; }
         
         public RaysShape build() {
             return new RaysShape(
                 rayLength, rayWidth, count, arrangement, distribution, innerRadius, outerRadius,
-                layers, layerSpacing, randomness, lengthVariation,
+                layers, layerSpacing, layerMode, randomness, lengthVariation,
                 fadeStart, fadeEnd, segments, segmentGap,
                 lineShape, lineShapeAmplitude, lineShapeFrequency, shapeSegments,
-                curvature, curvatureIntensity, rayType, shapeIntensity, shapeLength, rayOrientation
+                curvature, curvatureIntensity, rayType, shapeIntensity, shapeLength, rayOrientation,
+                fieldDeformation, fieldDeformationIntensity
             );
         }
     }

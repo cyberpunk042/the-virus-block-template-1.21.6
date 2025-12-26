@@ -127,7 +127,7 @@ public interface CageOptionsAdapter {
                 current instanceof ConeCageOptions c ? c : ConeCageOptions.DEFAULT);
             case "torus" -> new TorusCageAdapter(
                 current instanceof TorusCageOptions t ? t : TorusCageOptions.DEFAULT);
-            case "capsule" -> new SphereCageAdapter(  // Capsule uses sphere-like controls
+            case "capsule", "rays" -> new SphereCageAdapter(  // Capsule and Rays use sphere-like controls
                 current instanceof SphereCageOptions s ? s : SphereCageOptions.DEFAULT);
             default -> new SphereCageAdapter(SphereCageOptions.DEFAULT);
         };

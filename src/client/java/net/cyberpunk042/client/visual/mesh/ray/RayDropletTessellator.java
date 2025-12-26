@@ -52,16 +52,41 @@ public class RayDropletTessellator implements RayTypeTessellator {
         float length = context.length();
         float baseRadius = length * 0.5f;  // Radius = half the ray length for an inscribed droplet
         
-        // Compute center position (midpoint of ray)
+        // === APPLY FLOW SCALE ===
+        // flowScale modifies the droplet size for SCALE edge transition mode
+        float flowScale = context.flowScale();
+        if (flowScale < 0.01f) {
+            // Too small to render - skip this droplet entirely
+            return;
+        }
+        baseRadius *= flowScale;
+        
+        // Get ray endpoints
         float[] start = context.start();
         float[] end = context.end();
-        float[] center = new float[] {
-            (start[0] + end[0]) * 0.5f,
-            (start[1] + end[1]) * 0.5f,
-            (start[2] + end[2]) * 0.5f
-        };
         
-        // Get orientation (tip direction)
+        // === APPLY CURVATURE TO POSITION ===
+        // Curvature affects WHERE the droplet is placed (center position)
+        // Orientation is ALWAYS respected for which way the tip points
+        net.cyberpunk042.visual.shape.RayCurvature curvature = context.curvature();
+        float curvatureIntensity = context.curvatureIntensity();
+        
+        float[] center;
+        
+        if (curvature != null && curvature != net.cyberpunk042.visual.shape.RayCurvature.NONE 
+            && curvatureIntensity > 0.001f) {
+            // Place center at curved midpoint (t=0.5)
+            center = RayGeometryUtils.computeCurvedPosition(start, end, 0.5f, curvature, curvatureIntensity);
+        } else {
+            // No curvature - use simple midpoint
+            center = new float[] {
+                (start[0] + end[0]) * 0.5f,
+                (start[1] + end[1]) * 0.5f,
+                (start[2] + end[2]) * 0.5f
+            };
+        }
+        
+        // Orientation always comes from context (respects user's RayOrientation setting)
         float[] direction = context.orientationVector();
         
         // Determine mesh resolution from shapeSegments
@@ -70,14 +95,40 @@ public class RayDropletTessellator implements RayTypeTessellator {
         int segments = Math.max(MIN_SEGMENTS, totalSegs / 2);
         
         // shapeIntensity controls blend: 0=sphere, 1=full droplet
-        // shapeLength controls axial stretch
+        // shapeLength controls axial stretch (also scaled by flowScale)
         float intensity = context.shapeIntensity();
-        float axialLength = context.shapeLength();
+        float axialLength = context.shapeLength() * flowScale;
         
-        // Generate the droplet using SphereDeformation with pattern and visibility support
-        Ray3DGeometryUtils.generateDroplet(
-            builder, center, direction, baseRadius,
-            intensity, axialLength, rings, segments, pattern, visibility
-        );
+        // Get visibility range for CLIP mode
+        float visibleTStart = context.visibleTStart();
+        float visibleTEnd = context.visibleTEnd();
+        float flowAlpha = context.flowAlpha();
+        
+        // Check for field deformation (gravitational spaghettification)
+        net.cyberpunk042.visual.shape.FieldDeformationMode gravityMode = context.fieldDeformation();
+        float gravityIntensity = context.fieldDeformationIntensity();
+        
+        if (gravityMode != null && gravityMode.isActive() && gravityIntensity > 0.001f) {
+            // Use the new per-vertex gravity deformation
+            // Field center is at origin (0,0,0) for radial arrangements
+            float[] fieldCenter = new float[] {0, 0, 0};
+            
+            // Get outer radius from shape or use a reasonable default
+            float outerRadius = shape != null ? shape.outerRadius() : 3.0f;
+            
+            Ray3DGeometryUtils.generateDropletWithGravity(
+                builder, center, direction, baseRadius,
+                intensity, axialLength, rings, segments, pattern, visibility,
+                visibleTStart, visibleTEnd, flowAlpha,
+                fieldCenter, gravityIntensity, outerRadius, gravityMode
+            );
+        } else {
+            // No gravity - use standard droplet generation
+            Ray3DGeometryUtils.generateDroplet(
+                builder, center, direction, baseRadius,
+                intensity, axialLength, rings, segments, pattern, visibility,
+                visibleTStart, visibleTEnd, flowAlpha
+            );
+        }
     }
 }

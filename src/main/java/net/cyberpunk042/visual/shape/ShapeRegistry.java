@@ -301,10 +301,13 @@ public final class ShapeRegistry {
             float shapeIntensity = getFloat(params, "shapeIntensity", 1.0f);
             float shapeLength = getFloat(params, "shapeLength", 1.0f);
             RayOrientation rayOrientation = RayOrientation.ALONG_RAY;
+            RayLayerMode layerMode = RayLayerMode.VERTICAL;
+            FieldDeformationMode fieldDeformation = FieldDeformationMode.NONE;
+            float fieldDeformationIntensity = getFloat(params, "fieldDeformationIntensity", 0.0f);
             return new RaysShape(rayLength, rayWidth, count, arrangement, distribution, innerRadius, outerRadius,
-                layers, layerSpacing, randomness, lengthVariation, fadeStart, fadeEnd, segments, segmentGap,
+                layers, layerSpacing, layerMode, randomness, lengthVariation, fadeStart, fadeEnd, segments, segmentGap,
                 lineShape, lineShapeAmplitude, lineShapeFrequency, shapeSegments, curvature, curvatureIntensity, 
-                rayType, shapeIntensity, shapeLength, rayOrientation);
+                rayType, shapeIntensity, shapeLength, rayOrientation, fieldDeformation, fieldDeformationIntensity);
         });
         
         Logging.REGISTRY.topic("shape").info(

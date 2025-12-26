@@ -1,5 +1,6 @@
 package net.cyberpunk042.client.visual.mesh.ray;
 
+import net.cyberpunk042.visual.animation.RayFlowConfig;
 import net.cyberpunk042.visual.animation.WaveConfig;
 import net.cyberpunk042.visual.shape.RayCurvature;
 import net.cyberpunk042.visual.shape.RayLineShape;
@@ -115,7 +116,45 @@ public record RayContext(
     float time,
     
     /** Whether wave deformation is active. */
-    boolean hasWave
+    boolean hasWave,
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Flow Animation (for 3D rays)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /** Flow animation config (or null if no flow). */
+    RayFlowConfig flowConfig,
+    
+    /** Animated position offset along ray axis (from flow animation). */
+    float flowPositionOffset,
+    
+    /** Animated scale factor (for SCALE edge transition). */
+    float flowScale,
+    
+    /** Visibility range start (for CLIP edge transition, 0-1). */
+    float visibleTStart,
+    
+    /** Visibility range end (for CLIP edge transition, 0-1). */
+    float visibleTEnd,
+    
+    /** Base alpha from flow animation (flicker, etc.). */
+    float flowAlpha,
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Field Deformation (gravitational distortion)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /** Field deformation mode (NONE, GRAVITATIONAL, REPULSION, TIDAL). */
+    net.cyberpunk042.visual.shape.FieldDeformationMode fieldDeformation,
+    
+    /** Field deformation intensity. */
+    float fieldDeformationIntensity,
+    
+    /** Normalized distance from field center (0=at center, 1=at outer edge). */
+    float normalizedDistance,
+    
+    /** Computed axial stretch from field deformation. */
+    float fieldStretch
 ) {
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -218,6 +257,16 @@ public record RayContext(
         private WaveConfig wave = null;
         private float time = 0.0f;
         private boolean hasWave = false;
+        private RayFlowConfig flowConfig = null;
+        private float flowPositionOffset = 0.0f;
+        private float flowScale = 1.0f;
+        private float visibleTStart = 0.0f;
+        private float visibleTEnd = 1.0f;
+        private float flowAlpha = 1.0f;
+        private net.cyberpunk042.visual.shape.FieldDeformationMode fieldDeformation = net.cyberpunk042.visual.shape.FieldDeformationMode.NONE;
+        private float fieldDeformationIntensity = 0.0f;
+        private float normalizedDistance = 0.0f;
+        private float fieldStretch = 1.0f;
         
         public Builder start(float[] v) { 
             this.start = v != null ? v : new float[3]; 
@@ -272,6 +321,16 @@ public record RayContext(
         public Builder wave(WaveConfig v) { this.wave = v; return this; }
         public Builder time(float v) { this.time = v; return this; }
         public Builder hasWave(boolean v) { this.hasWave = v; return this; }
+        public Builder flowConfig(RayFlowConfig v) { this.flowConfig = v; return this; }
+        public Builder flowPositionOffset(float v) { this.flowPositionOffset = v; return this; }
+        public Builder flowScale(float v) { this.flowScale = v; return this; }
+        public Builder visibleTStart(float v) { this.visibleTStart = v; return this; }
+        public Builder visibleTEnd(float v) { this.visibleTEnd = v; return this; }
+        public Builder flowAlpha(float v) { this.flowAlpha = v; return this; }
+        public Builder fieldDeformation(net.cyberpunk042.visual.shape.FieldDeformationMode v) { this.fieldDeformation = v != null ? v : net.cyberpunk042.visual.shape.FieldDeformationMode.NONE; return this; }
+        public Builder fieldDeformationIntensity(float v) { this.fieldDeformationIntensity = v; return this; }
+        public Builder normalizedDistance(float v) { this.normalizedDistance = v; return this; }
+        public Builder fieldStretch(float v) { this.fieldStretch = v; return this; }
         
         /**
          * Computes direction from start and end, and sets length.
@@ -299,7 +358,10 @@ public record RayContext(
                 curvature, curvatureIntensity, shapeSegments,
                 orientation, orientationVector,
                 shapeIntensity, shapeLength,
-                wave, time, hasWave
+                wave, time, hasWave,
+                flowConfig, flowPositionOffset, flowScale,
+                visibleTStart, visibleTEnd, flowAlpha,
+                fieldDeformation, fieldDeformationIntensity, normalizedDistance, fieldStretch
             );
         }
     }

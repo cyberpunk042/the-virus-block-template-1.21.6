@@ -56,7 +56,10 @@ public record RayFlowConfig(
     // === Flicker Axis ===
     @JsonField(skipIfDefault = true) FlickerMode flicker,
     @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true) float flickerIntensity,
-    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "5.0") float flickerFrequency
+    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "5.0") float flickerFrequency,
+    
+    // === 3D Ray Edge Transition ===
+    @JsonField(skipIfDefault = true) EdgeTransitionMode edgeTransition
 ) {
     // =========================================================================
     // Static Constants
@@ -67,7 +70,8 @@ public record RayFlowConfig(
         LengthMode.NONE, 0f, 1.0f,
         1.0f, WaveDistribution.SEQUENTIAL, 1.0f,
         TravelMode.NONE, 0f, 1, 0.3f,
-        FlickerMode.NONE, 0f, 5f
+        FlickerMode.NONE, 0f, 5f,
+        EdgeTransitionMode.SCALE
     );
     
     /** Default radiate effect (rays grow outward). */
@@ -75,7 +79,8 @@ public record RayFlowConfig(
         LengthMode.RADIATE, 1f, 1.0f,
         1.0f, WaveDistribution.SEQUENTIAL, 1.0f,
         TravelMode.NONE, 0f, 1, 0.3f,
-        FlickerMode.NONE, 0f, 5f
+        FlickerMode.NONE, 0f, 5f,
+        EdgeTransitionMode.SCALE
     );
     
     /** Default absorb effect (rays shrink inward). */
@@ -83,7 +88,8 @@ public record RayFlowConfig(
         LengthMode.ABSORB, 1f, 1.0f,
         1.0f, WaveDistribution.SEQUENTIAL, 1.0f,
         TravelMode.NONE, 0f, 1, 0.3f,
-        FlickerMode.NONE, 0f, 5f
+        FlickerMode.NONE, 0f, 5f,
+        EdgeTransitionMode.SCALE
     );
     
     /** Chase particles flowing along rays. */
@@ -91,7 +97,8 @@ public record RayFlowConfig(
         LengthMode.NONE, 0f, 1.0f,
         1.0f, WaveDistribution.SEQUENTIAL, 1.0f,
         TravelMode.CHASE, 1.5f, 3, 0.2f,
-        FlickerMode.NONE, 0f, 5f
+        FlickerMode.NONE, 0f, 5f,
+        EdgeTransitionMode.SCALE
     );
     
     /** Scrolling energy flow. */
@@ -99,7 +106,8 @@ public record RayFlowConfig(
         LengthMode.NONE, 0f, 1.0f,
         1.0f, WaveDistribution.SEQUENTIAL, 1.0f,
         TravelMode.SCROLL, 1f, 1, 0.3f,
-        FlickerMode.NONE, 0f, 5f
+        FlickerMode.NONE, 0f, 5f,
+        EdgeTransitionMode.SCALE
     );
     
     /** Twinkling stars effect. */
@@ -107,7 +115,8 @@ public record RayFlowConfig(
         LengthMode.NONE, 0f, 1.0f,
         1.0f, WaveDistribution.SEQUENTIAL, 1.0f,
         TravelMode.NONE, 0f, 1, 0.3f,
-        FlickerMode.SCINTILLATION, 0.5f, 8f
+        FlickerMode.SCINTILLATION, 0.5f, 8f,
+        EdgeTransitionMode.SCALE
     );
     
     // =========================================================================
@@ -144,6 +153,11 @@ public record RayFlowConfig(
     /** Gets effective wave distribution, defaulting to SEQUENTIAL if not set. */
     public WaveDistribution effectiveWaveDistribution() {
         return waveDistribution != null ? waveDistribution : WaveDistribution.SEQUENTIAL;
+    }
+    
+    /** Gets effective edge transition mode, defaulting to SCALE if not set. */
+    public EdgeTransitionMode effectiveEdgeTransition() {
+        return edgeTransition != null ? edgeTransition : EdgeTransitionMode.SCALE;
     }
     
     // =========================================================================
@@ -186,11 +200,17 @@ public record RayFlowConfig(
         float flickerIntensity = json.has("flickerIntensity") ? json.get("flickerIntensity").getAsFloat() : 0.3f;
         float flickerFrequency = json.has("flickerFrequency") ? json.get("flickerFrequency").getAsFloat() : 5f;
         
+        EdgeTransitionMode edgeTransition = EdgeTransitionMode.SCALE;
+        if (json.has("edgeTransition")) {
+            edgeTransition = EdgeTransitionMode.fromString(json.get("edgeTransition").getAsString());
+        }
+        
         return new RayFlowConfig(
             length, lengthSpeed, segmentLength,
             waveArc, waveDistribution, waveCount,
             travel, travelSpeed, chaseCount, chaseWidth,
-            flicker, flickerIntensity, flickerFrequency
+            flicker, flickerIntensity, flickerFrequency,
+            edgeTransition
         );
     }
     
@@ -212,7 +232,8 @@ public record RayFlowConfig(
             .length(length).lengthSpeed(lengthSpeed).segmentLength(segmentLength)
             .waveArc(waveArc).waveDistribution(waveDistribution).waveCount(waveCount)
             .travel(travel).travelSpeed(travelSpeed).chaseCount(chaseCount).chaseWidth(chaseWidth)
-            .flicker(flicker).flickerIntensity(flickerIntensity).flickerFrequency(flickerFrequency);
+            .flicker(flicker).flickerIntensity(flickerIntensity).flickerFrequency(flickerFrequency)
+            .edgeTransition(edgeTransition);
     }
     
     public static class Builder {
@@ -229,6 +250,7 @@ public record RayFlowConfig(
         private FlickerMode flicker = FlickerMode.NONE;
         private float flickerIntensity = 0.3f;
         private float flickerFrequency = 5f;
+        private EdgeTransitionMode edgeTransition = EdgeTransitionMode.SCALE;
         
         public Builder length(LengthMode m) { this.length = m; return this; }
         public Builder lengthSpeed(float s) { this.lengthSpeed = s; return this; }
@@ -243,13 +265,15 @@ public record RayFlowConfig(
         public Builder flicker(FlickerMode m) { this.flicker = m; return this; }
         public Builder flickerIntensity(float i) { this.flickerIntensity = i; return this; }
         public Builder flickerFrequency(float f) { this.flickerFrequency = f; return this; }
+        public Builder edgeTransition(EdgeTransitionMode m) { this.edgeTransition = m != null ? m : EdgeTransitionMode.SCALE; return this; }
         
         public RayFlowConfig build() {
             return new RayFlowConfig(
                 length, lengthSpeed, segmentLength,
                 waveArc, waveDistribution, waveCount,
                 travel, travelSpeed, chaseCount, chaseWidth,
-                flicker, flickerIntensity, flickerFrequency
+                flicker, flickerIntensity, flickerFrequency,
+                edgeTransition
             );
         }
     }

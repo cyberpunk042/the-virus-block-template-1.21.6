@@ -61,6 +61,16 @@ public final class VectorMath {
     }
     
     /**
+     * Functional interface for computing position, normal, AND alpha.
+     * Used for 3D ray flow animation (CLIP mode per-vertex visibility).
+     */
+    @FunctionalInterface
+    public interface FullVertexWithAlphaFunction {
+        /** Returns {x, y, z, nx, ny, nz, alpha} position + normal + alpha for given spherical coordinates. */
+        float[] apply(float theta, float phi, float radius);
+    }
+    
+    /**
      * Generates a polar surface with FULL feature support.
      * 
      * <p><b>Core algorithm extracted from SphereTessellator.tessellateUvSphere().</b></p>
@@ -567,6 +577,110 @@ public final class VectorMath {
                 
                 // Check pattern
                 if (pattern != null && !pattern.shouldRender(lat * lonSteps + lon, totalCells)) {
+                    continue;
+                }
+                
+                int topLeft = vertexIndices[lat][lon];
+                int topRight = vertexIndices[lat][lon + 1];
+                int bottomLeft = vertexIndices[lat + 1][lon];
+                int bottomRight = vertexIndices[lat + 1][lon + 1];
+                
+                // Use pattern-aware quad emission if it's a QuadPattern
+                if (pattern instanceof net.cyberpunk042.visual.pattern.QuadPattern quadPattern) {
+                    builder.quadAsTrianglesFromPattern(topLeft, topRight, bottomRight, bottomLeft, quadPattern);
+                } else {
+                    builder.triangle(topLeft, topRight, bottomRight);
+                    builder.triangle(topLeft, bottomRight, bottomLeft);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Generates a lat/lon grid with arbitrary orientation, pattern, visibility, AND per-vertex alpha.
+     * 
+     * <p>Used for 3D ray flow animations where vertices have flow-based alpha (CLIP mode).</p>
+     */
+    public static void generateLatLonGridFullOrientedWithAlpha(
+            MeshBuilder builder,
+            float[] center,
+            float[] direction,
+            float radius,
+            int latSteps,
+            int lonSteps,
+            FullVertexWithAlphaFunction fullVertexFunc,
+            net.cyberpunk042.visual.pattern.VertexPattern pattern,
+            net.cyberpunk042.visual.visibility.VisibilityMask visibility) {
+        
+        // Build basis vectors (u, v perpendicular to direction)
+        // Use right-handed coordinate system for correct winding
+        float[] up = new float[] { 0, 1, 0 };
+        if (Math.abs(dot(direction, up)) > 0.99f) {
+            up = new float[] { 1, 0, 0 };
+        }
+        float[] u = normalize(cross(up, direction));  // Right-handed
+        float[] v = normalize(cross(direction, u));   // Right-handed
+        
+        int[][] vertexIndices = new int[latSteps + 1][lonSteps + 1];
+        float[][] vertexAlphas = new float[latSteps + 1][lonSteps + 1];
+        
+        for (int lat = 0; lat <= latSteps; lat++) {
+            float theta = lat / (float) latSteps * PI;
+            
+            for (int lon = 0; lon <= lonSteps; lon++) {
+                float phi = lon / (float) lonSteps * TWO_PI;
+                
+                // Get position + normal + alpha from vertex function (in local coords)
+                float[] full = fullVertexFunc.apply(theta, phi, radius);
+                float lx = full[0], ly = full[1], lz = full[2];
+                float lnx = full[3], lny = full[4], lnz = full[5];
+                float alpha = full.length > 6 ? full[6] : 1.0f;
+                
+                // Transform local coords to world coords using basis
+                // Local Y = direction, Local X = u, Local Z = v
+                float[] pos = add(center, 
+                    add(scale(u, lx),
+                        add(scale(direction, ly),
+                            scale(v, lz))));
+                            
+                float[] normal = add(scale(u, lnx),
+                    add(scale(direction, lny),
+                        scale(v, lnz)));
+                normal = normalize(normal);
+                
+                // Store alpha for later use in triangle emission
+                vertexAlphas[lat][lon] = alpha;
+                
+                vertexIndices[lat][lon] = builder.addVertex(
+                    Vertex.pos(pos[0], pos[1], pos[2])
+                        .withNormal(normal[0], normal[1], normal[2]));
+            }
+        }
+        
+        // Generate triangles with pattern and visibility
+        int totalCells = latSteps * lonSteps;
+        for (int lat = 0; lat < latSteps; lat++) {
+            float latFrac = lat / (float) latSteps;
+            
+            for (int lon = 0; lon < lonSteps; lon++) {
+                float lonFrac = lon / (float) lonSteps;
+                
+                // Check visibility mask
+                if (visibility != null && !visibility.isVisible(lonFrac, latFrac)) {
+                    continue;
+                }
+                
+                // Check pattern
+                if (pattern != null && !pattern.shouldRender(lat * lonSteps + lon, totalCells)) {
+                    continue;
+                }
+                
+                // Check if all quad vertices have alpha > 0 (for CLIP mode efficiency)
+                float minAlpha = Math.min(
+                    Math.min(vertexAlphas[lat][lon], vertexAlphas[lat][lon + 1]),
+                    Math.min(vertexAlphas[lat + 1][lon], vertexAlphas[lat + 1][lon + 1]));
+                if (minAlpha <= 0.01f) {
+                    // All vertices are hidden - skip this quad
                     continue;
                 }
                 
