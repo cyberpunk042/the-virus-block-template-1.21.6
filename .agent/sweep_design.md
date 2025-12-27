@@ -157,3 +157,24 @@ If visible at copy c, use the window calculated for the ray at angle (rayAngle -
    a) The same segment position as the original ray at (rayAngle - c/N), OR
    b) A segment position based on this ray's own phase?
 
+---
+
+## Implementation Status: ✅ COMPLETE
+
+**Implemented in `RayPositioner.computeFlowAnimation()`:**
+
+### TRIM (sweep < 1):
+- Scales down the visible window proportionally
+- `effectiveWindowHalf = (segmentLength / 2) * sweepCopies`
+- Results in smaller visible wedge at any instant
+
+### DUPLICATE (sweep > 1):
+- Checks N copies (where N = floor(sweepCopies))
+- Each copy is offset by (c/N) around the circle
+- If ANY copy would be visible, the ray is shown
+- Uses the first matching copy's window for position calculation
+
+### Visibility:
+- Rays outside all visible windows get `alpha = 0`
+- `RayDropletTessellator` early-exits when `flowAlpha < 0.001`
+

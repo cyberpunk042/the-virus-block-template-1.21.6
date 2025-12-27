@@ -61,33 +61,68 @@ public class RayDropletTessellator implements RayTypeTessellator {
         }
         baseRadius *= flowScale;
         
-        // Get ray endpoints
+        // Get ray endpoints (these may have been translated by flowPositionOffset in RayPositioner)
         float[] start = context.start();
         float[] end = context.end();
         
-        // === APPLY CURVATURE TO POSITION ===
-        // Curvature affects WHERE the droplet is placed (center position)
-        // Orientation is ALWAYS respected for which way the tip points
+        // === APPLY CURVATURE TO POSITION AND ORIENTATION ===
         net.cyberpunk042.visual.shape.RayCurvature curvature = context.curvature();
         float curvatureIntensity = context.curvatureIntensity();
         
         float[] center;
+        float[] direction;
         
-        if (curvature != null && curvature != net.cyberpunk042.visual.shape.RayCurvature.NONE 
-            && curvatureIntensity > 0.001f) {
-            // Place center at curved midpoint (t=0.5)
-            center = RayGeometryUtils.computeCurvedPosition(start, end, 0.5f, curvature, curvatureIntensity);
+        // Check if we have curvature AND flow animation
+        boolean hasCurvature = curvature != null 
+            && curvature != net.cyberpunk042.visual.shape.RayCurvature.NONE 
+            && curvatureIntensity > 0.001f;
+        
+        if (hasCurvature) {
+            // With curvature, we need to:
+            // 1. Compute where along the curve the droplet should be (based on flow offset)
+            // 2. Position the droplet ON the curved path
+            // 3. Orient the droplet ALONG the curve's tangent
+            
+            // Get the flow position offset (how far along the travel axis the droplet has moved)
+            float flowPositionOffset = context.flowPositionOffset();
+            // Use travelRange (outerRadius - innerRadius) for computing t, NOT geometric length
+            // This ensures t = phase regardless of individual ray length variations
+            float travelRange = context.travelRange();
+            
+            // Compute the t parameter (0 = start of curve, 1 = end of curve)
+            // flowPositionOffset is in world units, convert to normalized t
+            float t;
+            if (travelRange > 0.01f) {
+                // Flow determines position: offset=0 → t=0, offset=travelRange → t=1
+                t = flowPositionOffset / travelRange;
+            } else {
+                // Degenerate case (zero-length travel)
+                t = 0.5f;
+            }
+            
+            // Clamp t to valid range
+            t = Math.max(0.0f, Math.min(1.0f, t));
+            
+            // Compute position ON the curved path at t
+            center = RayGeometryUtils.computeCurvedPosition(start, end, t, curvature, curvatureIntensity);
+            
+            // Compute tangent direction at t (this is how the droplet should orient)
+            direction = RayGeometryUtils.computeCurvedTangent(start, end, t, curvature, curvatureIntensity);
+            
+            // The tangent gives the most natural "following the curve" appearance
+            // This overrides the context's orientation when curvature is active
         } else {
-            // No curvature - use simple midpoint
+            // No curvature - use midpoint of the (already translated) start/end segment
+            // The translation was applied in RayPositioner based on flowPositionOffset
             center = new float[] {
                 (start[0] + end[0]) * 0.5f,
                 (start[1] + end[1]) * 0.5f,
                 (start[2] + end[2]) * 0.5f
             };
+            
+            // Use orientation from context for non-curved rays
+            direction = context.orientationVector();
         }
-        
-        // Orientation always comes from context (respects user's RayOrientation setting)
-        float[] direction = context.orientationVector();
         
         // Determine mesh resolution from shapeSegments
         int totalSegs = Math.max(12, context.shapeSegments());
@@ -104,16 +139,21 @@ public class RayDropletTessellator implements RayTypeTessellator {
         float visibleTEnd = context.visibleTEnd();
         float flowAlpha = context.flowAlpha();
         
+        // Early exit if ray is completely hidden (e.g., due to sweep visibility)
+        if (flowAlpha < 0.001f) {
+            return;
+        }
+        
         // Check for field deformation (gravitational spaghettification)
         net.cyberpunk042.visual.shape.FieldDeformationMode gravityMode = context.fieldDeformation();
         float gravityIntensity = context.fieldDeformationIntensity();
         
         if (gravityMode != null && gravityMode.isActive() && gravityIntensity > 0.001f) {
-            // Use the new per-vertex gravity deformation
+            // Use proper per-vertex gravitational deformation
             // Field center is at origin (0,0,0) for radial arrangements
             float[] fieldCenter = new float[] {0, 0, 0};
             
-            // Get outer radius from shape or use a reasonable default
+            // Get outer radius from shape for scaling the effect
             float outerRadius = shape != null ? shape.outerRadius() : 3.0f;
             
             Ray3DGeometryUtils.generateDropletWithGravity(
@@ -123,12 +163,29 @@ public class RayDropletTessellator implements RayTypeTessellator {
                 fieldCenter, gravityIntensity, outerRadius, gravityMode
             );
         } else {
-            // No gravity - use standard droplet generation
-            Ray3DGeometryUtils.generateDroplet(
-                builder, center, direction, baseRadius,
-                intensity, axialLength, rings, segments, pattern, visibility,
-                visibleTStart, visibleTEnd, flowAlpha
-            );
+            // Check for TravelMode
+            net.cyberpunk042.visual.animation.RayFlowConfig flowConfig = context.flowConfig();
+            if (flowConfig != null && flowConfig.hasTravel()) {
+                // Compute travel phase based on time
+                float time = context.time();
+                float travelSpeed = flowConfig.travelSpeed();
+                float travelPhase = (time * travelSpeed) % 1.0f;
+                
+                Ray3DGeometryUtils.generateDropletWithTravel(
+                    builder, center, direction, baseRadius,
+                    intensity, axialLength, rings, segments, pattern, visibility,
+                    visibleTStart, visibleTEnd, flowAlpha,
+                    flowConfig.travel(), travelPhase, travelSpeed,
+                    flowConfig.chaseCount(), flowConfig.chaseWidth()
+                );
+            } else {
+                // No gravity or travel - use standard droplet generation
+                Ray3DGeometryUtils.generateDroplet(
+                    builder, center, direction, baseRadius,
+                    intensity, axialLength, rings, segments, pattern, visibility,
+                    visibleTStart, visibleTEnd, flowAlpha
+                );
+            }
         }
     }
 }

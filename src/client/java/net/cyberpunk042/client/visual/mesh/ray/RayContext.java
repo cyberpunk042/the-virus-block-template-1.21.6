@@ -128,6 +128,15 @@ public record RayContext(
     /** Animated position offset along ray axis (from flow animation). */
     float flowPositionOffset,
     
+    /** Travel range for flow animation (outerRadius - innerRadius). */
+    float travelRange,
+    
+    /** Inner radius of the field (for geometric edge clipping). */
+    float innerRadius,
+    
+    /** Outer radius of the field (for geometric edge clipping). */
+    float outerRadius,
+    
     /** Animated scale factor (for SCALE edge transition). */
     float flowScale,
     
@@ -259,6 +268,9 @@ public record RayContext(
         private boolean hasWave = false;
         private RayFlowConfig flowConfig = null;
         private float flowPositionOffset = 0.0f;
+        private float travelRange = 1.0f;
+        private float innerRadius = 0.0f;
+        private float outerRadius = 1.0f;
         private float flowScale = 1.0f;
         private float visibleTStart = 0.0f;
         private float visibleTEnd = 1.0f;
@@ -323,6 +335,9 @@ public record RayContext(
         public Builder hasWave(boolean v) { this.hasWave = v; return this; }
         public Builder flowConfig(RayFlowConfig v) { this.flowConfig = v; return this; }
         public Builder flowPositionOffset(float v) { this.flowPositionOffset = v; return this; }
+        public Builder travelRange(float v) { this.travelRange = v; return this; }
+        public Builder innerRadius(float v) { this.innerRadius = v; return this; }
+        public Builder outerRadius(float v) { this.outerRadius = v; return this; }
         public Builder flowScale(float v) { this.flowScale = v; return this; }
         public Builder visibleTStart(float v) { this.visibleTStart = v; return this; }
         public Builder visibleTEnd(float v) { this.visibleTEnd = v; return this; }
@@ -359,7 +374,7 @@ public record RayContext(
                 orientation, orientationVector,
                 shapeIntensity, shapeLength,
                 wave, time, hasWave,
-                flowConfig, flowPositionOffset, flowScale,
+                flowConfig, flowPositionOffset, travelRange, innerRadius, outerRadius, flowScale,
                 visibleTStart, visibleTEnd, flowAlpha,
                 fieldDeformation, fieldDeformationIntensity, normalizedDistance, fieldStretch
             );

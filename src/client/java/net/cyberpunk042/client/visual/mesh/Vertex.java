@@ -10,6 +10,7 @@ import org.joml.Vector3f;
  *   <li><b>Position</b> (x, y, z): World-space coordinates</li>
  *   <li><b>Normal</b> (nx, ny, nz): Surface direction for lighting</li>
  *   <li><b>UV</b> (u, v): Texture coordinates (0-1 range)</li>
+ *   <li><b>Alpha</b> (alpha): Per-vertex transparency (0=invisible, 1=opaque)</li>
  * </ul>
  * 
  * <h2>Factory Methods</h2>
@@ -38,7 +39,8 @@ import org.joml.Vector3f;
 public record Vertex(
         float x, float y, float z,      // Position in local space
         float nx, float ny, float nz,   // Normal vector (should be normalized)
-        float u, float v                // Texture coordinates (0-1)
+        float u, float v,               // Texture coordinates (0-1)
+        float alpha                     // Per-vertex alpha (0=invisible, 1=opaque)
 ) {
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -47,24 +49,24 @@ public record Vertex(
     
     /**
      * Creates a vertex with position only.
-     * <p>Normal and UV are zeroed. Use for wireframe or when lighting is not needed.
+     * <p>Normal and UV are zeroed. Alpha is 1.0 (opaque). Use for wireframe or when lighting is not needed.
      */
     public static Vertex pos(float x, float y, float z) {
-        return new Vertex(x, y, z, 0, 0, 0, 0, 0);
+        return new Vertex(x, y, z, 0, 0, 0, 0, 0, 1.0f);
     }
     
     /**
      * Creates a vertex with position and normal.
-     * <p>UV is zeroed. Use for lit geometry without textures.
+     * <p>UV is zeroed. Alpha is 1.0 (opaque). Use for lit geometry without textures.
      */
     public static Vertex posNormal(float x, float y, float z, float nx, float ny, float nz) {
-        return new Vertex(x, y, z, nx, ny, nz, 0, 0);
+        return new Vertex(x, y, z, nx, ny, nz, 0, 0, 1.0f);
     }
     
     /**
      * Creates a vertex with position and UV, auto-calculating normal from position.
      * <p>Assumes vertex is on a sphere centered at origin - normal = normalized position.
-     * Falls back to (0,1,0) if position is at origin.
+     * Alpha is 1.0 (opaque). Falls back to (0,1,0) if position is at origin.
      */
     public static Vertex posUV(float x, float y, float z, float u, float v) {
         // Calculate length for normalization
@@ -72,9 +74,9 @@ public record Vertex(
         
         // Avoid division by zero - use up vector as fallback
         if (len > 0.0001f) {
-            return new Vertex(x, y, z, x / len, y / len, z / len, u, v);
+            return new Vertex(x, y, z, x / len, y / len, z / len, u, v, 1.0f);
         }
-        return new Vertex(x, y, z, 0, 1, 0, u, v);
+        return new Vertex(x, y, z, 0, 1, 0, u, v, 1.0f);
     }
     
     /**
@@ -111,7 +113,7 @@ public record Vertex(
         float u = phi / (float) (2 * Math.PI);   // 0-1 around
         float v = theta / (float) Math.PI;        // 0-1 top to bottom
         
-        return new Vertex(x, y, z, x, y, z, u, v);
+        return new Vertex(x, y, z, x, y, z, u, v, 1.0f);
     }
     
     /**

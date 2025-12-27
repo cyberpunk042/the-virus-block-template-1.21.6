@@ -119,14 +119,65 @@ public final class Ray3DGeometryUtils {
             float visibleTStart,
             float visibleTEnd,
             float flowAlpha) {
+        // Call with no travel animation
+        generateDropletWithTravel(builder, center, direction, radius, intensity, length,
+            rings, segments, pattern, visibility, visibleTStart, visibleTEnd, flowAlpha,
+            net.cyberpunk042.visual.animation.TravelMode.NONE, 0f, 0f, 0, 0.3f);
+    }
+    
+    /**
+     * Generates a droplet with flow animation and TravelMode support.
+     * 
+     * <p>TravelMode controls per-vertex alpha gradients that animate along the droplet.</p>
+     * 
+     * @param builder MeshBuilder to add geometry to
+     * @param center Center position
+     * @param direction Direction the tip points (normalized)
+     * @param radius Radius at the fattest point
+     * @param intensity Blend amount: 0=sphere, 1=full droplet
+     * @param length Axial stretch
+     * @param rings Number of latitude rings
+     * @param segments Number of longitude segments
+     * @param pattern Pattern for cell rendering
+     * @param visibility Visibility mask
+     * @param visibleTStart Start of visible range on axis
+     * @param visibleTEnd End of visible range on axis
+     * @param flowAlpha Base alpha from flow animation
+     * @param travelMode TravelMode type
+     * @param travelPhase Current phase of travel animation (0-1)
+     * @param travelSpeed Speed multiplier
+     * @param chaseCount Number of chase particles
+     * @param chaseWidth Width of each particle (0-1)
+     */
+    public static void generateDropletWithTravel(
+            MeshBuilder builder,
+            float[] center,
+            float[] direction,
+            float radius,
+            float intensity,
+            float length,
+            int rings,
+            int segments,
+            net.cyberpunk042.visual.pattern.VertexPattern pattern,
+            net.cyberpunk042.visual.visibility.VisibilityMask visibility,
+            float visibleTStart,
+            float visibleTEnd,
+            float flowAlpha,
+            net.cyberpunk042.visual.animation.TravelMode travelMode,
+            float travelPhase,
+            float travelSpeed,
+            int chaseCount,
+            float chaseWidth) {
         
         // Use SphereDeformation.DROPLET - it handles intensity and length correctly!
         SphereDeformation deformation = SphereDeformation.DROPLET;
         
-        // Wrap the vertex function to compute per-vertex alpha based on visibility range
+        // Capture finals for lambda
         final float finalVisibleTStart = visibleTStart;
         final float finalVisibleTEnd = visibleTEnd;
         final float finalFlowAlpha = flowAlpha;
+        final float finalChaseWidth = Math.max(0.05f, chaseWidth);
+        final int finalChaseCount = Math.max(1, chaseCount);
         
         VectorMath.FullVertexWithAlphaFunction vertexFunc = (theta, phi, r) -> {
             // Base vertex from deformation
@@ -136,20 +187,19 @@ public final class Ray3DGeometryUtils {
             // theta goes from 0 (top) to PI (bottom), so invert for t
             float t = 1.0f - (theta / (float)Math.PI);
             
-            // Apply visibility clipping for CLIP mode
+            // Start with base alpha
             float alpha = finalFlowAlpha;
+            
+            // === Apply visibility clipping for CLIP mode ===
             if (finalVisibleTStart > 0.0f || finalVisibleTEnd < 1.0f) {
-                // Check if this vertex is in the visible range
                 if (t < finalVisibleTStart) {
-                    // Below visible range - fade out
-                    float fadeRange = 0.1f; // 10% fade zone
+                    float fadeRange = 0.1f;
                     if (t < finalVisibleTStart - fadeRange) {
                         alpha = 0.0f;
                     } else {
                         alpha *= (t - (finalVisibleTStart - fadeRange)) / fadeRange;
                     }
                 } else if (t > finalVisibleTEnd) {
-                    // Above visible range - fade out
                     float fadeRange = 0.1f;
                     if (t > finalVisibleTEnd + fadeRange) {
                         alpha = 0.0f;
@@ -157,6 +207,12 @@ public final class Ray3DGeometryUtils {
                         alpha *= 1.0f - (t - finalVisibleTEnd) / fadeRange;
                     }
                 }
+            }
+            
+            // === Apply TravelMode alpha modulation ===
+            if (travelMode != null && travelMode.isActive() && alpha > 0.001f) {
+                float travelAlpha = computeTravelAlpha(t, travelMode, travelPhase, finalChaseCount, finalChaseWidth);
+                alpha *= travelAlpha;
             }
             
             // Return vertex with alpha
@@ -169,17 +225,92 @@ public final class Ray3DGeometryUtils {
     }
     
     /**
+     * Computes the alpha value for a vertex based on TravelMode.
+     * 
+     * @param t Vertex position along axis (0 = base, 1 = tip)
+     * @param mode TravelMode type
+     * @param phase Current animation phase (0-1)
+     * @param chaseCount Number of chase particles
+     * @param chaseWidth Width of each particle
+     * @return Alpha multiplier (0-1)
+     */
+    private static float computeTravelAlpha(float t, net.cyberpunk042.visual.animation.TravelMode mode, 
+            float phase, int chaseCount, float chaseWidth) {
+        switch (mode) {
+            case CHASE -> {
+                // Multiple particles evenly spaced
+                float particleSpacing = 1.0f / chaseCount;
+                for (int i = 0; i < chaseCount; i++) {
+                    float particlePos = (phase + i * particleSpacing) % 1.0f;
+                    float dist = Math.min(Math.abs(t - particlePos), 
+                                         Math.min(Math.abs(t - particlePos + 1.0f), 
+                                                  Math.abs(t - particlePos - 1.0f)));
+                    if (dist < chaseWidth / 2) {
+                        // Smooth falloff from center of particle
+                        return 1.0f - (dist / (chaseWidth / 2));
+                    }
+                }
+                return 0.0f;
+            }
+            case REVERSE_CHASE -> {
+                // Same as CHASE but reversed direction
+                float reverseT = 1.0f - t;
+                float particleSpacing = 1.0f / chaseCount;
+                for (int i = 0; i < chaseCount; i++) {
+                    float particlePos = (phase + i * particleSpacing) % 1.0f;
+                    float dist = Math.min(Math.abs(reverseT - particlePos),
+                                         Math.min(Math.abs(reverseT - particlePos + 1.0f),
+                                                  Math.abs(reverseT - particlePos - 1.0f)));
+                    if (dist < chaseWidth / 2) {
+                        return 1.0f - (dist / (chaseWidth / 2));
+                    }
+                }
+                return 0.0f;
+            }
+            case SCROLL -> {
+                // Continuous gradient sliding along
+                float offset = (t + phase) % 1.0f;
+                return 0.5f + 0.5f * (float) Math.cos(offset * Math.PI * 2);
+            }
+            case COMET -> {
+                // Bright head with fading tail
+                float head = phase;
+                float dist = t - head;
+                if (dist < 0) dist += 1.0f; // Wrap around
+                // Exponential decay behind head
+                return (float) Math.exp(-dist * 5.0f);
+            }
+            case SPARK -> {
+                // Random bright flashes (based on position and phase)
+                float spark = (float) Math.sin(t * 17.3f + phase * 31.7f) *
+                              (float) Math.sin(t * 23.1f + phase * 47.9f);
+                return spark > 0.7f ? 1.0f : 0.1f;
+            }
+            case PULSE_WAVE -> {
+                // Traveling sine wave
+                float wave = (float) Math.sin((t - phase) * Math.PI * 4);
+                return 0.5f + 0.5f * wave;
+            }
+            default -> {
+                return 1.0f;
+            }
+        }
+    }
+    
+    /**
      * Generates a droplet with proper gravitational spaghettification.
      * 
-     * <p>Applies per-vertex deformation based on each vertex's distance from the field center:
-     * <ul>
-     *   <li><b>Radial stretch:</b> Vertices are pulled toward/away from center (∝ 1/r³)</li>
-     *   <li><b>Perpendicular compression:</b> Vertices are compressed perpendicular to radial axis</li>
-     * </ul>
-     * This creates the authentic "spaghettification" effect of matter near a black hole.</p>
+     * <p>Applies per-vertex deformation based on tidal forces, following the physics formula:
+     * <ol>
+     *   <li>Compute direction from field center (black hole) to each vertex</li>
+     *   <li>Compute tidal influence factor: K / distance³</li>
+     *   <li>Separate vertex offset into radial and lateral components</li>
+     *   <li>Stretch radial, compress lateral: displacement = radial*tidal - lateral*tidal</li>
+     * </ol>
+     * This creates authentic "spaghettification" - stretching toward center, thinning perpendicular.</p>
      * 
      * @param builder MeshBuilder to add geometry to
-     * @param center Center position of droplet (in world space)
+     * @param dropletCenter Center position of droplet (in world space)
      * @param direction Direction the tip points (normalized)
      * @param radius Radius at the fattest point
      * @param intensity Blend amount: 0=sphere, 1=full droplet
@@ -191,14 +322,14 @@ public final class Ray3DGeometryUtils {
      * @param visibleTStart Start of visible range on axis (0-1, for CLIP mode)
      * @param visibleTEnd End of visible range on axis (0-1, for CLIP mode)
      * @param flowAlpha Base alpha from flow animation (flicker, etc.)
-     * @param fieldCenter Center of gravity (origin of gravitational pull)
-     * @param gravityIntensity Strength of gravitational deformation (0 = none, 1 = strong)
-     * @param fieldOuterRadius Outer radius of field (for normalizing distances)
+     * @param fieldCenter Center of gravity (the "black hole" position)
+     * @param gravityIntensity Strength of gravitational deformation (0 = none, 1+ = strong)
+     * @param fieldOuterRadius Outer radius of field (for scaling the effect)
      * @param gravityMode Type of deformation: GRAVITATIONAL, REPULSION, or TIDAL
      */
     public static void generateDropletWithGravity(
             MeshBuilder builder,
-            float[] center,
+            float[] dropletCenter,
             float[] direction,
             float radius,
             float intensity,
@@ -217,115 +348,168 @@ public final class Ray3DGeometryUtils {
         
         // Skip if no gravity effect
         if (gravityMode == null || !gravityMode.isActive() || gravityIntensity <= 0.001f) {
-            generateDroplet(builder, center, direction, radius, intensity, length,
+            generateDroplet(builder, dropletCenter, direction, radius, intensity, length,
                 rings, segments, pattern, visibility, visibleTStart, visibleTEnd, flowAlpha);
             return;
         }
         
         SphereDeformation deformation = SphereDeformation.DROPLET;
         
+        // Final copies for lambda
+        final float[] finalFieldCenter = fieldCenter != null ? fieldCenter : new float[] {0, 0, 0};
+        final float[] finalDropletCenter = dropletCenter;
+        final float finalOuterRadius = Math.max(0.1f, fieldOuterRadius);
+        final float finalGravityIntensity = gravityIntensity;
         final float finalVisibleTStart = visibleTStart;
         final float finalVisibleTEnd = visibleTEnd;
         final float finalFlowAlpha = flowAlpha;
-        final float[] finalFieldCenter = fieldCenter != null ? fieldCenter : new float[] {0, 0, 0};
-        final float finalOuterRadius = Math.max(0.1f, fieldOuterRadius);
+        final float finalRadius = radius;
+        final float[] finalDirection = direction;
+        
+        // Pre-compute droplet center's distance and direction from field center
+        float dcX = finalDropletCenter[0] - finalFieldCenter[0];
+        float dcY = finalDropletCenter[1] - finalFieldCenter[1];
+        float dcZ = finalDropletCenter[2] - finalFieldCenter[2];
+        float dcDist = (float) Math.sqrt(dcX * dcX + dcY * dcY + dcZ * dcZ);
+        
+        // Direction FROM field center TO droplet center (normalized)
+        final float[] dirFieldToDroplet = new float[3];
+        if (dcDist > 0.001f) {
+            dirFieldToDroplet[0] = dcX / dcDist;
+            dirFieldToDroplet[1] = dcY / dcDist;
+            dirFieldToDroplet[2] = dcZ / dcDist;
+        } else {
+            // If at center, default to up
+            dirFieldToDroplet[0] = 0;
+            dirFieldToDroplet[1] = 1;
+            dirFieldToDroplet[2] = 0;
+        }
+        
+        // Minimum distance to prevent division by zero
+        final float minDist = finalOuterRadius * 0.05f;
         
         VectorMath.FullVertexWithAlphaFunction vertexFunc = (theta, phi, r) -> {
-            // Get base vertex from deformation
+            // 1. Get base vertex from droplet deformation (local space)
+            //    vertex = [x, y, z, nx, ny, nz] in LOCAL coordinates
             float[] vertex = deformation.computeFullVertex(theta, phi, r, intensity, length);
             
-            // The vertex is in local (shape) space - need to convert to consider world position
-            // vertex[0,1,2] = local position, vertex[3,4,5] = normal
-            float localX = vertex[0];
-            float localY = vertex[1];
-            float localZ = vertex[2];
+            float localX = vertex[0];  // Along droplet axis
+            float localY = vertex[1];  // Perpendicular
+            float localZ = vertex[2];  // Perpendicular
             
-            // Transform local position to world space (add droplet center)
-            float worldX = center[0] + localX * direction[0] + localY * radius;
-            float worldY = center[1] + localX * direction[1] + localY * radius;
-            float worldZ = center[2] + localX * direction[2] + localY * radius;
-            
-            // Actually, for simpler math, let's work in droplet-local space but consider
-            // the droplet's position relative to field center
-            
-            // Compute vector from field center to this vertex's world position
-            // Approximate: the droplet center is at 'center', and vertices are offset from there
-            float toCenterX = center[0] - finalFieldCenter[0];
-            float toCenterY = center[1] - finalFieldCenter[1];
-            float toCenterZ = center[2] - finalFieldCenter[2];
-            
-            // Distance from field center to droplet center
-            float distToCenter = (float) Math.sqrt(
-                toCenterX * toCenterX + toCenterY * toCenterY + toCenterZ * toCenterZ);
-            
-            // Normalized radial direction (toward field center)
-            float radialX = 0, radialY = 0, radialZ = 0;
-            if (distToCenter > 0.001f) {
-                radialX = -toCenterX / distToCenter;
-                radialY = -toCenterY / distToCenter;
-                radialZ = -toCenterZ / distToCenter;
+            // 2. Transform local vertex to world position
+            //    We need a proper orientation frame. The droplet's direction vector is
+            //    the primary axis. We need two perpendicular vectors.
+            float[] up = {0, 1, 0};
+            if (Math.abs(finalDirection[1]) > 0.99f) {
+                up = new float[] {1, 0, 0}; // Avoid singularity
             }
             
-            // Compute normalized distance (0 = at center, 1 = at outer radius)
-            float normalizedDist = Math.max(0.01f, Math.min(1.0f, distToCenter / finalOuterRadius));
+            // Compute perpendicular vectors (tangent and bitangent)
+            float[] tangent = new float[3];
+            // tangent = cross(direction, up)
+            tangent[0] = finalDirection[1] * up[2] - finalDirection[2] * up[1];
+            tangent[1] = finalDirection[2] * up[0] - finalDirection[0] * up[2];
+            tangent[2] = finalDirection[0] * up[1] - finalDirection[1] * up[0];
+            float tangentLen = (float) Math.sqrt(tangent[0]*tangent[0] + tangent[1]*tangent[1] + tangent[2]*tangent[2]);
+            if (tangentLen > 0.001f) {
+                tangent[0] /= tangentLen;
+                tangent[1] /= tangentLen;
+                tangent[2] /= tangentLen;
+            }
             
-            // === Tidal force calculation ===
-            // Tidal force ∝ 1/r³, but we use 1/r² for visual effect (less extreme)
-            // The deformation gets stronger as we get closer to center
-            float tidalStrength = 1.0f / (normalizedDist * normalizedDist);
-            tidalStrength = (tidalStrength - 1.0f) * gravityIntensity;  // Scale by intensity
-            tidalStrength = Math.min(tidalStrength, 10.0f);  // Clamp to prevent extreme values
+            // bitangent = cross(direction, tangent)
+            float[] bitangent = new float[3];
+            bitangent[0] = finalDirection[1] * tangent[2] - finalDirection[2] * tangent[1];
+            bitangent[1] = finalDirection[2] * tangent[0] - finalDirection[0] * tangent[2];
+            bitangent[2] = finalDirection[0] * tangent[1] - finalDirection[1] * tangent[0];
             
-            // Compute how much this specific vertex should be stretched
-            // Project vertex local position onto radial direction
-            float dotRadial = localX * radialX + localY * radialY + localZ * radialZ;
+            // Transform local to world: worldPos = center + localX*direction + localY*tangent + localZ*bitangent
+            float worldX = finalDropletCenter[0] + localX * finalDirection[0] + localY * tangent[0] + localZ * bitangent[0];
+            float worldY = finalDropletCenter[1] + localX * finalDirection[1] + localY * tangent[1] + localZ * bitangent[1];
+            float worldZ = finalDropletCenter[2] + localX * finalDirection[2] + localY * tangent[2] + localZ * bitangent[2];
             
-            // === Apply gravitational deformation ===
-            float stretchFactor = 1.0f;
-            float compressFactor = 1.0f;
+            // 3. Compute vector FROM field center TO this vertex's world position
+            float vfX = worldX - finalFieldCenter[0];
+            float vfY = worldY - finalFieldCenter[1];
+            float vfZ = worldZ - finalFieldCenter[2];
+            float vfDist = (float) Math.sqrt(vfX * vfX + vfY * vfY + vfZ * vfZ);
+            float effectiveDist = Math.max(vfDist, minDist);
+            
+            // Direction from field center to vertex (normalized)
+            float dirX = vfX / effectiveDist;
+            float dirY = vfY / effectiveDist;
+            float dirZ = vfZ / effectiveDist;
+            
+            // 4. Compute tidal influence factor: K / dist³
+            //    Scale K so that the effect is reasonable at the field's outer radius
+            float kTidal = finalGravityIntensity * finalOuterRadius * finalOuterRadius * finalOuterRadius;
+            float tidalFactor = kTidal / (effectiveDist * effectiveDist * effectiveDist);
+            tidalFactor = Math.min(tidalFactor, 2.0f);  // Cap to prevent extreme distortion
+            
+            // 5. Compute vertex position RELATIVE to droplet center
+            float relX = worldX - finalDropletCenter[0];
+            float relY = worldY - finalDropletCenter[1];
+            float relZ = worldZ - finalDropletCenter[2];
+            
+            // 6. Separate into radial and lateral components
+            //    Radial = projection onto dirFieldToDroplet (toward center from droplet)
+            float radialMag = relX * dirFieldToDroplet[0] + relY * dirFieldToDroplet[1] + relZ * dirFieldToDroplet[2];
+            float radialX = radialMag * dirFieldToDroplet[0];
+            float radialY = radialMag * dirFieldToDroplet[1];
+            float radialZ = radialMag * dirFieldToDroplet[2];
+            
+            //    Lateral = perpendicular component
+            float lateralX = relX - radialX;
+            float lateralY = relY - radialY;
+            float lateralZ = relZ - radialZ;
+            
+            // 7. Apply spaghettification: stretch radial, compress lateral
+            //    displacement = radial * tidalFactor - lateral * tidalFactor
+            float dispX, dispY, dispZ;
             
             switch (gravityMode) {
                 case GRAVITATIONAL -> {
-                    // Stretch toward center, compress perpendicular
-                    stretchFactor = 1.0f + tidalStrength * 0.5f;
-                    compressFactor = 1.0f / (float) Math.sqrt(stretchFactor); // conserve volume-ish
+                    // Stretch toward center (radial), compress lateral
+                    dispX = radialX * tidalFactor - lateralX * tidalFactor * 0.5f;
+                    dispY = radialY * tidalFactor - lateralY * tidalFactor * 0.5f;
+                    dispZ = radialZ * tidalFactor - lateralZ * tidalFactor * 0.5f;
                 }
                 case REPULSION -> {
-                    // Stretch away from center
-                    stretchFactor = 1.0f + tidalStrength * 0.5f;
-                    compressFactor = 1.0f / (float) Math.sqrt(stretchFactor);
-                    // Invert the radial displacement
-                    dotRadial = -dotRadial;
+                    // Stretch away from center (invert radial effect)
+                    dispX = -radialX * tidalFactor - lateralX * tidalFactor * 0.5f;
+                    dispY = -radialY * tidalFactor - lateralY * tidalFactor * 0.5f;
+                    dispZ = -radialZ * tidalFactor - lateralZ * tidalFactor * 0.5f;
                 }
                 case TIDAL -> {
-                    // Both stretch and compress (true tidal effect)
-                    stretchFactor = 1.0f + tidalStrength * 0.3f;
-                    compressFactor = 1.0f - tidalStrength * 0.2f;
-                    compressFactor = Math.max(0.3f, compressFactor);
+                    // Pure tidal: both stretch and compress more equally
+                    dispX = radialX * tidalFactor * 0.8f - lateralX * tidalFactor * 0.8f;
+                    dispY = radialY * tidalFactor * 0.8f - lateralY * tidalFactor * 0.8f;
+                    dispZ = radialZ * tidalFactor * 0.8f - lateralZ * tidalFactor * 0.8f;
                 }
-                default -> {}
+                default -> {
+                    dispX = 0; dispY = 0; dispZ = 0;
+                }
             }
             
-            // Apply radial stretch: displace vertex along radial direction
-            float radialDisplacement = dotRadial * (stretchFactor - 1.0f);
+            // 8. New world position = original + displacement
+            float newWorldX = worldX + dispX;
+            float newWorldY = worldY + dispY;
+            float newWorldZ = worldZ + dispZ;
             
-            // Compute perpendicular component for compression
-            float perpX = localX - dotRadial * radialX;
-            float perpY = localY - dotRadial * radialY;
-            float perpZ = localZ - dotRadial * radialZ;
+            // 9. Transform back to local space for output
+            //    localPos = worldPos - center, then inverse transform
+            //    For simplicity, just output the displacement in local coordinates
+            float newRelX = newWorldX - finalDropletCenter[0];
+            float newRelY = newWorldY - finalDropletCenter[1];
+            float newRelZ = newWorldZ - finalDropletCenter[2];
             
-            // Final deformed position
-            float deformedX = dotRadial * radialX * stretchFactor + perpX * compressFactor;
-            float deformedY = dotRadial * radialY * stretchFactor + perpY * compressFactor;
-            float deformedZ = dotRadial * radialZ * stretchFactor + perpZ * compressFactor;
+            // Inverse transform: project onto local axes
+            float newLocalX = newRelX * finalDirection[0] + newRelY * finalDirection[1] + newRelZ * finalDirection[2];
+            float newLocalY = newRelX * tangent[0] + newRelY * tangent[1] + newRelZ * tangent[2];
+            float newLocalZ = newRelX * bitangent[0] + newRelY * bitangent[1] + newRelZ * bitangent[2];
             
-            // Blend between original and deformed based on intensity
-            float blend = Math.min(1.0f, gravityIntensity);
-            float finalX = localX * (1.0f - blend) + deformedX * blend;
-            float finalY = localY * (1.0f - blend) + deformedY * blend;
-            float finalZ = localZ * (1.0f - blend) + deformedZ * blend;
-            
-            // Compute t-value for visibility clipping
+            // 10. Compute t-value for visibility clipping
             float t = 1.0f - (theta / (float)Math.PI);
             
             // Apply visibility clipping for CLIP mode
@@ -348,12 +532,12 @@ public final class Ray3DGeometryUtils {
                 }
             }
             
-            // Return deformed vertex (keep original normal for now - could also deform normal)
-            return new float[] { finalX, finalY, finalZ, vertex[3], vertex[4], vertex[5], alpha };
+            // Return deformed vertex with original normal (could also transform normal)
+            return new float[] { newLocalX, newLocalY, newLocalZ, vertex[3], vertex[4], vertex[5], alpha };
         };
         
         VectorMath.generateLatLonGridFullOrientedWithAlpha(
-            builder, center, direction, radius, rings, segments, vertexFunc, pattern, visibility);
+            builder, dropletCenter, direction, radius, rings, segments, vertexFunc, pattern, visibility);
     }
     
     /**

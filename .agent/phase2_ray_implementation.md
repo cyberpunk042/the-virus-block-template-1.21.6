@@ -272,6 +272,7 @@ For each vertex at parameter `t`:
 - [ ] 2B.5: SPARK works
 - [ ] 2B.5: PULSE_WAVE works
 - [ ] 2B.5: REVERSE_CHASE works
+**NOTE:** TravelMode implementation complete in `Ray3DGeometryUtils.computeTravelAlpha()` - needs testing
 - [ ] 2B.6: STROBE works
 - [ ] 2B.6: SCINTILLATION works
 - [ ] 2B.6: FADE_PULSE works

@@ -11,6 +11,7 @@ package net.cyberpunk042.visual.animation;
  * <ul>
  *   <li><b>SCALE</b>: Entire shape scales up/down uniformly</li>
  *   <li><b>CLIP</b>: Shape is progressively "eaten" from one end (like trimming geometry)</li>
+ *   <li><b>FADE</b>: Shape fades in/out via alpha without changing geometry</li>
  * </ul>
  * 
  * <h2>How CLIP Works</h2>
@@ -26,7 +27,10 @@ public enum EdgeTransitionMode {
     SCALE("Scale"),
     
     /** Shape is progressively clipped/eaten from edge. */
-    CLIP("Clip");
+    CLIP("Clip"),
+    
+    /** Shape fades in/out via alpha without changing geometry. */
+    FADE("Fade");
     
     private final String displayName;
     

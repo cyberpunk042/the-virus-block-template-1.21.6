@@ -88,17 +88,25 @@ public final class RayPositioner {
         
         java.util.List<RayContext> result = new java.util.ArrayList<>(2);
         
-        // Check if we're in edge transition (need two shapes)
-        if (flowConfig != null && flowConfig.isActive()) {
+        // Check if we're in edge transition (need two shapes) - only for 3D ray types
+        // LINE rays don't need the dual-context pattern since they don't have linking artifacts
+        boolean is3DRayType = shape.effectiveRayType().is3D();
+        
+        if (is3DRayType && flowConfig != null && flowConfig.isActive()) {
             net.cyberpunk042.visual.animation.LengthMode lengthMode = flowConfig.length();
             if (lengthMode == net.cyberpunk042.visual.animation.LengthMode.RADIATE ||
                 lengthMode == net.cyberpunk042.visual.animation.LengthMode.ABSORB) {
                 
+                // Compute edge width based on sweepCopies (same logic as computeFlowAnimation)
+                float sweepCopies = Math.max(0.1f, flowConfig.waveCount());
+                float edgeWidth = 0.1f / sweepCopies;
+                edgeWidth = Math.max(0.01f, Math.min(0.1f, edgeWidth));
+                
                 // Compute the phase for this ray
                 float rayPhase = computeRayPhase(flowConfig, index, shape.count(), time);
                 
-                // During edge transitions (0-0.1 or 0.9-1.0), generate two shapes
-                if (rayPhase < 0.1f || rayPhase > 0.9f) {
+                // During edge transitions, generate two shapes to prevent linking artifacts
+                if (rayPhase < edgeWidth || rayPhase > (1.0f - edgeWidth)) {
                     // Generate both the main shape AND the wrapped shape
                     RayContext primaryContext = computeContextWithPhase(
                         shape, index, layerIndex, rng, wave, time, flowConfig, rayPhase, false);
@@ -194,7 +202,13 @@ public final class RayPositioner {
             flowAlpha = flowResult.alpha;
             
             // Apply position offset to start/end positions
-            if (Math.abs(flowPositionOffset) > 0.001f) {
+            // This TRANSLATES the ray segment along the Travel Axis (innerRadius to outerRadius)
+            // BUT: When curvature is active, the tessellator handles curved path positioning
+            boolean hasCurvature = curvature != null 
+                && curvature != RayCurvature.NONE 
+                && shape.curvatureIntensity() > 0.001f;
+            
+            if (!hasCurvature && Math.abs(flowPositionOffset) > 0.001f) {
                 start[0] += direction[0] * flowPositionOffset;
                 start[1] += direction[1] * flowPositionOffset;
                 start[2] += direction[2] * flowPositionOffset;
@@ -255,6 +269,9 @@ public final class RayPositioner {
             .hasWave(hasWave)
             .flowConfig(flowConfig)
             .flowPositionOffset(flowPositionOffset)
+            .travelRange(shape.outerRadius() - shape.innerRadius())
+            .innerRadius(shape.innerRadius())
+            .outerRadius(shape.outerRadius())
             .flowScale(flowScale)
             .visibleTStart(visibleTStart)
             .visibleTEnd(visibleTEnd)
@@ -357,6 +374,7 @@ public final class RayPositioner {
         float[] orientationVector = computeOrientationVector(orientation, start, direction);
         
         // Compute flow animation for this specific phase
+        // Travel range is from innerRadius to outerRadius (the field span)
         float rayLength = shape.outerRadius() - shape.innerRadius();
         float posOffset = 0.0f;
         float scale = 1.0f;
@@ -367,92 +385,126 @@ public final class RayPositioner {
         net.cyberpunk042.visual.animation.LengthMode lengthMode = flowConfig.length();
         net.cyberpunk042.visual.animation.EdgeTransitionMode edgeMode = flowConfig.effectiveEdgeTransition();
         
+        // Compute edge width based on sweepCopies (same logic as computeFlowAnimation)
+        float sweepCopies = Math.max(0.1f, flowConfig.waveCount());
+        float edgeWidth = 0.1f / sweepCopies;
+        edgeWidth = Math.max(0.01f, Math.min(0.1f, edgeWidth));
+        
         if (wrapped) {
             // WRAPPED shape: this is the one at the opposite edge
-            if (phase < 0.1f) {
-                // Primary is spawning at start -> wrapped is despawning at end (phase ~1.0)
-                float wrappedPhase = phase + 1.0f; // Treat as phase ~1.0
-                float edgeFactor = phase / 0.1f; // 0 to 1 as phase goes 0 to 0.1
+            if (phase < edgeWidth) {
+                // Primary is spawning at start -> wrapped is FINISHING its despawn at the opposite edge
+                // At phase=0, wrapped continues from primary's state at phase=1.0 (scale was nearly 0)
+                // At phase=edgeWidth, wrapped is completely gone
+                // edgeFactor: 0→1 as phase goes 0→edgeWidth
+                float edgeFactor = phase / edgeWidth;
+                // Wrapped is finishing despawn: scale goes from nearly 0 to 0
+                // At phase=0: edgeFactor=0, we need scale to be small (matching primary at phase≈1.0)
+                // At phase=edgeWidth: edgeFactor=1, scale=0
+                // Use inverse mapping: at phase=0, wrapped is like primary at phase=1.0
+                // Primary at phase=(1-edgeWidth) has scale=1, at phase=1.0 has scale=0
+                // So wrapped at phase=0 should have scale≈0, at phase=edgeWidth scale=0
+                float wrappedScale = edgeFactor; // No wait, this gives 0 at phase=0 which is correct!
                 
                 if (lengthMode == net.cyberpunk042.visual.animation.LengthMode.RADIATE) {
                     posOffset = rayLength; // At outer edge
-                    if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
-                        scale = 1.0f - edgeFactor; // Shrinking
-                    } else {
-                        visibleTEnd = 1.0f - edgeFactor; // Clip from end
+                    switch (edgeMode) {
+                        case SCALE -> scale = 0.0f; // Despawn already completed
+                        case CLIP -> visibleTEnd = 1.0f - edgeFactor;
+                        case FADE -> flowAlpha = 0.0f; // Already faded out
                     }
                 } else { // ABSORB
                     posOffset = 0.0f; // At inner edge
-                    if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
-                        scale = 1.0f - edgeFactor;
-                    } else {
-                        visibleTStart = edgeFactor;
+                    switch (edgeMode) {
+                        case SCALE -> scale = 0.0f;
+                        case CLIP -> visibleTStart = edgeFactor;
+                        case FADE -> flowAlpha = 0.0f;
                     }
                 }
-            } else { // phase > 0.9f
+            } else { // phase > (1 - edgeWidth)
                 // Primary is despawning at end -> wrapped is spawning at start (phase ~0.0)
-                float edgeFactor = (1.0f - phase) / 0.1f; // 1 to 0 as phase goes 0.9 to 1.0
+                // The wrapped phase maps to the START of the next cycle
+                // wrappedPhase = phase - (1 - edgeWidth) maps to [0, edgeWidth)
+                float wrappedPhase = phase - (1.0f - edgeWidth);
+                // Use the SAME scale formula as primary spawning would use
+                float edgeFactor = wrappedPhase / edgeWidth; // 0 to 1 as wrappedPhase goes 0 to edgeWidth
                 
                 if (lengthMode == net.cyberpunk042.visual.animation.LengthMode.RADIATE) {
                     posOffset = 0.0f; // At inner edge (spawning)
-                    if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
-                        scale = 1.0f - edgeFactor; // Growing (inverse)
-                    } else {
-                        visibleTStart = edgeFactor; // Reveal from tip
+                    switch (edgeMode) {
+                        case SCALE -> scale = edgeFactor;
+                        case CLIP -> visibleTStart = 1.0f - edgeFactor;
+                        case FADE -> flowAlpha = edgeFactor;
                     }
                 } else { // ABSORB
                     posOffset = rayLength; // At outer edge (spawning)
-                    if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
-                        scale = 1.0f - edgeFactor;
-                    } else {
-                        visibleTEnd = 1.0f - edgeFactor;
+                    switch (edgeMode) {
+                        case SCALE -> scale = edgeFactor;
+                        case CLIP -> visibleTEnd = edgeFactor;
+                        case FADE -> flowAlpha = edgeFactor;
                     }
                 }
             }
         } else {
             // PRIMARY shape: compute normally for this phase
             if (lengthMode == net.cyberpunk042.visual.animation.LengthMode.RADIATE) {
+                // RADIATE: phase 0 = inner, phase 1 = outer
+                // Position ALWAYS animates continuously based on phase
                 posOffset = phase * rayLength;
                 
-                if (phase < 0.1f) {
-                    float edgeFactor = phase / 0.1f;
-                    if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
-                        scale = edgeFactor;
-                    } else {
-                        visibleTStart = 1.0f - edgeFactor;
+                // Apply edge transition
+                if (phase < edgeWidth) {
+                    // Spawning at inner edge
+                    float edgeFactor = phase / edgeWidth;
+                    switch (edgeMode) {
+                        case SCALE -> scale = edgeFactor;
+                        case CLIP -> visibleTStart = 1.0f - edgeFactor;
+                        case FADE -> flowAlpha = edgeFactor;
                     }
-                } else if (phase > 0.9f) {
-                    float edgeFactor = (1.0f - phase) / 0.1f;
-                    if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
-                        scale = edgeFactor;
-                    } else {
-                        visibleTEnd = edgeFactor;
+                } else if (phase > (1.0f - edgeWidth)) {
+                    // Despawning at outer edge
+                    float edgeFactor = (1.0f - phase) / edgeWidth;
+                    switch (edgeMode) {
+                        case SCALE -> scale = edgeFactor;
+                        case CLIP -> visibleTEnd = edgeFactor;
+                        case FADE -> flowAlpha = edgeFactor;
                     }
                 }
             } else { // ABSORB
+                // ABSORB: phase 0 = outer, phase 1 = inner
+                // Position ALWAYS animates continuously based on phase
                 float reversed = 1.0f - phase;
                 posOffset = reversed * rayLength;
                 
-                if (phase < 0.1f) {
-                    float edgeFactor = phase / 0.1f;
-                    if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
-                        scale = edgeFactor;
-                    } else {
-                        visibleTEnd = edgeFactor;
+                // Apply edge transition
+                if (phase < edgeWidth) {
+                    // Spawning at outer edge
+                    float edgeFactor = phase / edgeWidth;
+                    switch (edgeMode) {
+                        case SCALE -> scale = edgeFactor;
+                        case CLIP -> visibleTEnd = edgeFactor;
+                        case FADE -> flowAlpha = edgeFactor;
                     }
-                } else if (phase > 0.9f) {
-                    float edgeFactor = (1.0f - phase) / 0.1f;
-                    if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
-                        scale = edgeFactor;
-                    } else {
-                        visibleTStart = 1.0f - edgeFactor;
+                } else if (phase > (1.0f - edgeWidth)) {
+                    // Despawning at inner edge
+                    float edgeFactor = (1.0f - phase) / edgeWidth;
+                    switch (edgeMode) {
+                        case SCALE -> scale = edgeFactor;
+                        case CLIP -> visibleTStart = 1.0f - edgeFactor;
+                        case FADE -> flowAlpha = edgeFactor;
                     }
                 }
             }
         }
         
-        // Apply position offset
-        if (Math.abs(posOffset) > 0.001f) {
+        // Apply position offset to start/end positions
+        // This TRANSLATES the ray segment along the Travel Axis
+        // BUT: When curvature is active, the tessellator handles curved path positioning
+        boolean hasCurvature = curvature != null 
+            && curvature != net.cyberpunk042.visual.shape.RayCurvature.NONE 
+            && shape.curvatureIntensity() > 0.001f;
+        
+        if (!hasCurvature && Math.abs(posOffset) > 0.001f) {
             start[0] += direction[0] * posOffset;
             start[1] += direction[1] * posOffset;
             start[2] += direction[2] * posOffset;
@@ -506,6 +558,9 @@ public final class RayPositioner {
             .hasWave(hasWave)
             .flowConfig(flowConfig)
             .flowPositionOffset(posOffset)
+            .travelRange(shape.outerRadius() - shape.innerRadius())
+            .innerRadius(shape.innerRadius())
+            .outerRadius(shape.outerRadius())
             .flowScale(scale)
             .visibleTStart(visibleTStart)
             .visibleTEnd(visibleTEnd)
@@ -519,6 +574,8 @@ public final class RayPositioner {
     
     /**
      * Computes flow animation values for a single ray.
+     * 
+     * The travel range is from innerRadius to outerRadius (the field span).
      */
     private static FlowAnimationResult computeFlowAnimation(
             net.cyberpunk042.visual.animation.RayFlowConfig flow,
@@ -531,82 +588,95 @@ public final class RayPositioner {
         float tEnd = 1.0f;
         float alpha = 1.0f;
         
+        // Travel range is from innerRadius to outerRadius
         float rayLength = outerRadius - innerRadius;
         
-        // Compute per-ray phase based on wave distribution
-        float rayPhase;
+        // Compute per-ray angular position (0-1 = 0°-360°)
+        float rayAngle;
         net.cyberpunk042.visual.animation.WaveDistribution waveDist = flow.effectiveWaveDistribution();
         if (waveDist == net.cyberpunk042.visual.animation.WaveDistribution.RANDOM) {
             // Golden ratio for even-ish random distribution
-            rayPhase = (rayIndex * 0.618033988749895f) % 1.0f;
+            rayAngle = (rayIndex * 0.618033988749895f) % 1.0f;
         } else {
-            rayPhase = rayCount > 1 ? (float) rayIndex / rayCount : 0f;
+            rayAngle = rayCount > 1 ? (float) rayIndex / rayCount : 0f;
         }
         
-        // Apply wave scale
+        // Apply wave arc scaling
         float waveArc = flow.effectiveWaveArc();
-        rayPhase *= waveArc;
+        float scaledAngle = rayAngle * waveArc;
+        
+        // === Sweep Copies (waveCount) ===
+        // < 1: TRIM - reduces the visible wedge size (fewer rays visible at once)
+        // = 1: Normal sweep behavior
+        // > 1: DUPLICATE - creates N copies of the sweep wedge around the circle
+        float sweepCopies = Math.max(0.1f, flow.waveCount());
         
         // === Length Mode Animation ===
         net.cyberpunk042.visual.animation.LengthMode lengthMode = flow.length();
         if (lengthMode != null && lengthMode != net.cyberpunk042.visual.animation.LengthMode.NONE) {
             float basePhase = (time * flow.lengthSpeed()) % 1.0f;
-            float phase = (basePhase + rayPhase) % 1.0f;
+            
+            // Compute the animation phase for this ray (0-1)
+            float phase = (basePhase + scaledAngle) % 1.0f;
+            
+            // Edge width for spawn/despawn transitions
+            // sweepCopies affects edge width: higher = narrower transitions = more rays visible at full size
+            float edgeWidth = 0.1f / sweepCopies;
+            edgeWidth = Math.max(0.01f, Math.min(0.1f, edgeWidth));
             
             switch (lengthMode) {
                 case RADIATE -> {
                     // Ray travels outward: starts at inner, moves to outer
-                    // phase 0: at inner (spawning), phase 0.5: middle (full size), phase 1: at outer (despawning)
+                    // phase 0: at inner (spawning), phase 1: at outer (despawning)
+                    // Position ALWAYS animates continuously based on phase
                     posOffset = phase * rayLength;
                     
                     // Apply edge transition based on mode
                     net.cyberpunk042.visual.animation.EdgeTransitionMode edgeMode = flow.effectiveEdgeTransition();
                     
-                    if (phase < 0.1f) {
+                    if (phase < edgeWidth) {
                         // Spawning at inner edge
-                        float edgeFactor = phase / 0.1f;
-                        if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
-                            scale = edgeFactor;
-                        } else {
-                            // CLIP mode - reveal from tip to base
-                            tStart = 1.0f - edgeFactor;
+                        float edgeFactor = phase / edgeWidth;
+                        switch (edgeMode) {
+                            case SCALE -> scale = edgeFactor;
+                            case CLIP -> tStart = 1.0f - edgeFactor;
+                            case FADE -> alpha = edgeFactor;
                         }
-                    } else if (phase > 0.9f) {
+                    } else if (phase > (1.0f - edgeWidth)) {
                         // Despawning at outer edge
-                        float edgeFactor = (1.0f - phase) / 0.1f;
-                        if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
-                            scale = edgeFactor;
-                        } else {
-                            // CLIP mode - hide from base to tip
-                            tEnd = edgeFactor;
+                        float edgeFactor = (1.0f - phase) / edgeWidth;
+                        switch (edgeMode) {
+                            case SCALE -> scale = edgeFactor;
+                            case CLIP -> tEnd = edgeFactor;
+                            case FADE -> alpha = edgeFactor;
                         }
                     }
                 }
                 case ABSORB -> {
                     // Ray travels inward: starts at outer, moves to inner
+                    // phase 0: at outer (spawning), phase 1: at inner (despawning)
+                    // Position ALWAYS animates continuously based on phase
                     float reversed = 1.0f - phase;
                     posOffset = reversed * rayLength;
                     
                     // Apply edge transition based on mode
                     net.cyberpunk042.visual.animation.EdgeTransitionMode edgeMode = flow.effectiveEdgeTransition();
                     
-                    if (phase < 0.1f) {
+                    if (phase < edgeWidth) {
                         // Spawning at outer edge
-                        float edgeFactor = phase / 0.1f;
-                        if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
-                            scale = edgeFactor;
-                        } else {
-                            // CLIP mode - reveal from base toward tip
-                            tEnd = edgeFactor;
+                        float edgeFactor = phase / edgeWidth;
+                        switch (edgeMode) {
+                            case SCALE -> scale = edgeFactor;
+                            case CLIP -> tEnd = edgeFactor;
+                            case FADE -> alpha = edgeFactor;
                         }
-                    } else if (phase > 0.9f) {
+                    } else if (phase > (1.0f - edgeWidth)) {
                         // Despawning at inner edge
-                        float edgeFactor = (1.0f - phase) / 0.1f;
-                        if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE) {
-                            scale = edgeFactor;
-                        } else {
-                            // CLIP mode - hide from tip down
-                            tStart = 1.0f - edgeFactor;
+                        float edgeFactor = (1.0f - phase) / edgeWidth;
+                        switch (edgeMode) {
+                            case SCALE -> scale = edgeFactor;
+                            case CLIP -> tStart = 1.0f - edgeFactor;
+                            case FADE -> alpha = edgeFactor;
                         }
                     }
                 }
@@ -882,6 +952,7 @@ public final class RayPositioner {
             sin = (float) Math.sin(newAngle);
         }
         
+        // rayLength defines how long each ray is
         float innerR = innerRadius + layerRadiusOffset + dist.startOffset();
         float outerR = innerR + rayLength * dist.lengthMod();
         innerR *= (1 + dist.radiusJitter());
