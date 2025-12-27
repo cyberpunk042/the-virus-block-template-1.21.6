@@ -51,61 +51,83 @@ public class RayLineTessellator implements RayTypeTessellator {
     
     /**
      * Tessellates a simple 2-vertex line.
+     * 
+     * <p>Supports three edge transition modes:
+     * <ul>
+     *   <li>CLIP: Geometric clipping at field boundaries (one-sided, position-based)</li>
+     *   <li>FADE: Alpha modulation based on edge proximity</li>
+     *   <li>SCALE: Symmetric shrinking from both ends toward center</li>
+     * </ul>
      */
     private void tessellateSimpleLine(MeshBuilder builder, RayContext context) {
         float[] start = context.start();
         float[] end = context.end();
         float[] dir = context.direction();
         float rayLength = context.length();
+        float flowAlpha = context.flowAlpha();
+        float flowScale = context.flowScale();
         
-        // Get field boundaries for geometric clipping
+        // Skip if fully invisible (FADE mode) or fully scaled down (SCALE mode)
+        if (flowAlpha < 0.001f || flowScale < 0.001f) {
+            return;
+        }
+        
+        // Get field boundaries for geometric clipping (CLIP mode)
         float innerRadius = context.innerRadius();
         float outerRadius = context.outerRadius();
         
         // Compute radial distances of start and end from center (0,0,0)
-        // For RADIAL arrangement, the ray direction points outward from center
         float startDist = (float) Math.sqrt(start[0]*start[0] + start[1]*start[1] + start[2]*start[2]);
         float endDist = (float) Math.sqrt(end[0]*end[0] + end[1]*end[1] + end[2]*end[2]);
         
         // Determine which direction the ray points (inward or outward)
         boolean rayPointsOutward = endDist > startDist;
         
-        // Compute geometric clipping based on actual positions vs boundaries
+        // Start with full t-range
         float tStart = 0.0f;
         float tEnd = 1.0f;
         
+        // ========== SCALE MODE: Symmetric shrinking from center ==========
+        // When flowScale < 1.0, shrink the line symmetrically from both ends
+        if (flowScale < 0.999f) {
+            float shrinkAmount = (1.0f - flowScale) / 2.0f;
+            tStart = shrinkAmount;
+            tEnd = 1.0f - shrinkAmount;
+        }
+        
+        // ========== CLIP MODE: Geometric clipping at field boundaries ==========
+        // Always apply geometric clipping on top of any SCALE shrinking
         if (rayLength > 0.001f) {
             if (rayPointsOutward) {
                 // Ray points outward: clip END if it extends past outerRadius
                 if (endDist > outerRadius) {
-                    // How much of the ray extends past the boundary?
                     float overshoot = endDist - outerRadius;
                     float clipAmount = overshoot / rayLength;
-                    tEnd = Math.max(0.0f, 1.0f - clipAmount);
+                    tEnd = Math.min(tEnd, Math.max(0.0f, 1.0f - clipAmount));
                 }
                 // Clip START if it's below innerRadius
                 if (startDist < innerRadius) {
                     float undershoot = innerRadius - startDist;
                     float clipAmount = undershoot / rayLength;
-                    tStart = Math.min(1.0f, clipAmount);
+                    tStart = Math.max(tStart, Math.min(1.0f, clipAmount));
                 }
             } else {
                 // Ray points inward: clip START if it extends past outerRadius
                 if (startDist > outerRadius) {
                     float overshoot = startDist - outerRadius;
                     float clipAmount = overshoot / rayLength;
-                    tStart = Math.min(1.0f, clipAmount);
+                    tStart = Math.max(tStart, Math.min(1.0f, clipAmount));
                 }
                 // Clip END if it's below innerRadius
                 if (endDist < innerRadius) {
                     float undershoot = innerRadius - endDist;
                     float clipAmount = undershoot / rayLength;
-                    tEnd = Math.max(0.0f, 1.0f - clipAmount);
+                    tEnd = Math.min(tEnd, Math.max(0.0f, 1.0f - clipAmount));
                 }
             }
         }
         
-        // Skip if line is completely clipped
+        // Skip if line is completely clipped/scaled down
         if (tStart >= tEnd) {
             return;
         }
@@ -115,19 +137,19 @@ public class RayLineTessellator implements RayTypeTessellator {
         float[] actualEnd;
         
         if (tStart > 0.001f || tEnd < 0.999f) {
-            // Clipping active - interpolate positions
+            // Clipping/scaling active - interpolate positions
             actualStart = RayGeometryUtils.interpolate(start, end, tStart);
             actualEnd = RayGeometryUtils.interpolate(start, end, tEnd);
         } else {
-            // No clipping - use originals
+            // No clipping/scaling - use originals
             actualStart = start;
             actualEnd = end;
         }
         
-        // u = t value (0 at start, 1 at end) for alpha interpolation
-        // Normal stores the ray axis direction for Twist animation
-        int v0 = builder.vertex(actualStart[0], actualStart[1], actualStart[2], dir[0], dir[1], dir[2], tStart, 0);
-        int v1 = builder.vertex(actualEnd[0], actualEnd[1], actualEnd[2], dir[0], dir[1], dir[2], tEnd, 0);
+        // u = t value for shader-based effects
+        // Alpha is set from flowAlpha for FADE edge transition
+        int v0 = builder.vertex(actualStart[0], actualStart[1], actualStart[2], dir[0], dir[1], dir[2], tStart, 0, flowAlpha);
+        int v1 = builder.vertex(actualEnd[0], actualEnd[1], actualEnd[2], dir[0], dir[1], dir[2], tEnd, 0, flowAlpha);
         builder.line(v0, v1);
     }
     
@@ -137,12 +159,20 @@ public class RayLineTessellator implements RayTypeTessellator {
     
     /**
      * Tessellates a segmented (dashed) ray.
+     * <p>Supports all three edge transition modes.
      */
     private void tessellateSegmentedRay(MeshBuilder builder, RayContext context, 
                                         int segments, float segmentGap) {
         float[] start = context.start();
         float[] end = context.end();
         float[] dir = context.direction();
+        float flowAlpha = context.flowAlpha();
+        float flowScale = context.flowScale();
+        
+        // Skip entirely if invisible (FADE mode) or scaled to zero (SCALE mode)
+        if (flowAlpha < 0.001f || flowScale < 0.001f) {
+            return;
+        }
         
         // Get field boundaries for geometric clipping
         float innerRadius = context.innerRadius();
@@ -153,20 +183,39 @@ public class RayLineTessellator implements RayTypeTessellator {
         float segmentLength = 1.0f / totalParts;
         float gapLength = segmentLength * segmentGap;
         
+        // SCALE mode: compute global t-range shrinkage
+        float globalTStart = 0.0f;
+        float globalTEnd = 1.0f;
+        if (flowScale < 0.999f) {
+            float shrinkAmount = (1.0f - flowScale) / 2.0f;
+            globalTStart = shrinkAmount;
+            globalTEnd = 1.0f - shrinkAmount;
+        }
+        
         float t = 0;
         for (int seg = 0; seg < segments; seg++) {
             float tStart = t;
             float tEnd = t + segmentLength;
             
+            // Skip segments completely outside the SCALE range
+            if (tEnd < globalTStart || tStart > globalTEnd) {
+                t = tEnd + gapLength;
+                continue;
+            }
+            
+            // Clip segment to SCALE range
+            float effectiveTStart = Math.max(tStart, globalTStart);
+            float effectiveTEnd = Math.min(tEnd, globalTEnd);
+            
             // Interpolate positions for this segment
-            float[] segStart = RayGeometryUtils.interpolate(start, end, tStart);
-            float[] segEnd = RayGeometryUtils.interpolate(start, end, tEnd);
+            float[] segStart = RayGeometryUtils.interpolate(start, end, effectiveTStart);
+            float[] segEnd = RayGeometryUtils.interpolate(start, end, effectiveTEnd);
             
             // Compute radial distances
             float segStartDist = (float) Math.sqrt(segStart[0]*segStart[0] + segStart[1]*segStart[1] + segStart[2]*segStart[2]);
             float segEndDist = (float) Math.sqrt(segEnd[0]*segEnd[0] + segEnd[1]*segEnd[1] + segEnd[2]*segEnd[2]);
             
-            // Skip segments completely outside the boundaries
+            // Skip segments completely outside the CLIP boundaries
             float minDist = Math.min(segStartDist, segEndDist);
             float maxDist = Math.max(segStartDist, segEndDist);
             if (maxDist < innerRadius || minDist > outerRadius) {
@@ -174,11 +223,11 @@ public class RayLineTessellator implements RayTypeTessellator {
                 continue;
             }
             
-            // Clip segment ends to boundaries
+            // Clip segment ends to CLIP boundaries
             float[] clippedStart = segStart;
             float[] clippedEnd = segEnd;
-            float clippedTStart = tStart;
-            float clippedTEnd = tEnd;
+            float clippedTStart = effectiveTStart;
+            float clippedTEnd = effectiveTEnd;
             
             float segLen = (float) Math.sqrt(
                 (segEnd[0]-segStart[0])*(segEnd[0]-segStart[0]) +
@@ -190,19 +239,19 @@ public class RayLineTessellator implements RayTypeTessellator {
                 if (segStartDist < innerRadius && segEndDist > segStartDist) {
                     float clipT = (innerRadius - segStartDist) / (segEndDist - segStartDist);
                     clippedStart = RayGeometryUtils.interpolate(segStart, segEnd, clipT);
-                    clippedTStart = tStart + clipT * (tEnd - tStart);
+                    clippedTStart = effectiveTStart + clipT * (effectiveTEnd - effectiveTStart);
                 }
                 // Clip end if above outer radius
                 if (segEndDist > outerRadius && segEndDist > segStartDist) {
                     float clipT = (outerRadius - segStartDist) / (segEndDist - segStartDist);
                     clippedEnd = RayGeometryUtils.interpolate(segStart, segEnd, clipT);
-                    clippedTEnd = tStart + clipT * (tEnd - tStart);
+                    clippedTEnd = effectiveTStart + clipT * (effectiveTEnd - effectiveTStart);
                 }
             }
             
-            // Emit line segment
-            int v0 = builder.vertex(clippedStart[0], clippedStart[1], clippedStart[2], dir[0], dir[1], dir[2], clippedTStart, 0);
-            int v1 = builder.vertex(clippedEnd[0], clippedEnd[1], clippedEnd[2], dir[0], dir[1], dir[2], clippedTEnd, 0);
+            // Emit line segment with per-vertex alpha (FADE mode)
+            int v0 = builder.vertex(clippedStart[0], clippedStart[1], clippedStart[2], dir[0], dir[1], dir[2], clippedTStart, 0, flowAlpha);
+            int v1 = builder.vertex(clippedEnd[0], clippedEnd[1], clippedEnd[2], dir[0], dir[1], dir[2], clippedTEnd, 0, flowAlpha);
             builder.line(v0, v1);
             
             t = tEnd + gapLength;
@@ -215,22 +264,39 @@ public class RayLineTessellator implements RayTypeTessellator {
     
     /**
      * Tessellates a ray with multiple segments for complex shapes and curvature.
+     * <p>Supports all three edge transition modes.
      */
     private void tessellateShapedRay(MeshBuilder builder, RaysShape shape, RayContext context) {
         float[] start = context.start();
         float[] end = context.end();
         float[] dir = context.direction();
         int segments = context.shapeSegments();
+        float flowAlpha = context.flowAlpha();
+        float flowScale = context.flowScale();
         
         if (context.length() < 0.0001f) {
             // Degenerate ray
-            builder.vertex(start[0], start[1], start[2], 0, 0, 0, 0.0f, 0);
+            builder.vertex(start[0], start[1], start[2], 0, 0, 0, 0.0f, 0, flowAlpha);
+            return;
+        }
+        
+        // Skip entirely if invisible (FADE mode) or scaled to zero (SCALE mode)
+        if (flowAlpha < 0.001f || flowScale < 0.001f) {
             return;
         }
         
         // Get field boundaries for geometric clipping
         float innerRadius = context.innerRadius();
         float outerRadius = context.outerRadius();
+        
+        // SCALE mode: compute t-range shrinkage
+        float globalTStart = 0.0f;
+        float globalTEnd = 1.0f;
+        if (flowScale < 0.999f) {
+            float shrinkAmount = (1.0f - flowScale) / 2.0f;
+            globalTStart = shrinkAmount;
+            globalTEnd = 1.0f - shrinkAmount;
+        }
         
         // Compute perpendicular frame using shared utility
         float[] right = new float[3];
@@ -250,9 +316,11 @@ public class RayLineTessellator implements RayTypeTessellator {
             
             int[] vertexIndices = new int[segments + 1];
             float[] radialDists = new float[segments + 1];
+            float[] tValues = new float[segments + 1];
             
             for (int i = 0; i <= segments; i++) {
                 float t = (float) i / segments;
+                tValues[i] = t;
                 
                 // Apply curvature using shared utility
                 float[] curvedPos = RayGeometryUtils.computeCurvedPosition(
@@ -281,15 +349,23 @@ public class RayLineTessellator implements RayTypeTessellator {
                 // Store radial distance for geometric clipping
                 radialDists[i] = (float) Math.sqrt(px*px + py*py + pz*pz);
                 
-                vertexIndices[i] = builder.vertex(px, py, pz, dir[0], dir[1], dir[2], t, 0);
+                // Create vertex with per-vertex alpha for FADE mode
+                vertexIndices[i] = builder.vertex(px, py, pz, dir[0], dir[1], dir[2], t, 0, flowAlpha);
             }
             
-            // Connect with lines (only emit segments within field boundaries)
+            // Connect with lines (only emit segments within boundaries)
             for (int i = 0; i < segments; i++) {
+                float segT = tValues[i];
+                float segTNext = tValues[i + 1];
+                
+                // SCALE mode: Skip segments outside the scaled range
+                if (segTNext < globalTStart || segT > globalTEnd) {
+                    continue;
+                }
+                
+                // CLIP mode: Skip segments completely outside the radial boundaries
                 float segStartDist = radialDists[i];
                 float segEndDist = radialDists[i + 1];
-                
-                // Skip segments completely outside the boundaries
                 float minDist = Math.min(segStartDist, segEndDist);
                 float maxDist = Math.max(segStartDist, segEndDist);
                 if (maxDist < innerRadius || minDist > outerRadius) {

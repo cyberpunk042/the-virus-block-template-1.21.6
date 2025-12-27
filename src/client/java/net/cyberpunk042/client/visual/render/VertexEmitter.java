@@ -281,7 +281,7 @@ public final class VertexEmitter {
     
     /**
      * Emits a line vertex (for LINES render layer).
-     * <p>Supports ColorContext for per-vertex coloring and wave animation.
+     * <p>Supports ColorContext for per-vertex coloring, wave animation, and per-vertex alpha.
      */
     private void emitLineVertex(Vertex v, Vertex other) {
         float vx = v.x();
@@ -319,13 +319,16 @@ public final class VertexEmitter {
             vertexColor = this.color;
         }
         
-        int a = (vertexColor >> 24) & 0xFF;
+        // Apply per-vertex alpha from vertex (for FADE edge transition)
+        int baseAlpha = (vertexColor >> 24) & 0xFF;
+        int finalAlpha = (int) (baseAlpha * v.alpha()) & 0xFF;
+        
         int r = (vertexColor >> 16) & 0xFF;
         int g = (vertexColor >> 8) & 0xFF;
         int b = vertexColor & 0xFF;
         
         consumer.vertex(pos.x(), pos.y(), pos.z())
-            .color(r, g, b, a)
+            .color(r, g, b, finalAlpha)
             .normal(dir.x(), dir.y(), dir.z());
     }
     
@@ -335,9 +338,10 @@ public final class VertexEmitter {
     
     /**
      * Emits a single vertex at the given position with current settings.
+     * <p>Alpha defaults to 1.0 (fully opaque).
      */
     public void vertex(float x, float y, float z, float nx, float ny, float nz, float u, float v) {
-        emitVertex(new Vertex(x, y, z, nx, ny, nz, u, v));
+        emitVertex(new Vertex(x, y, z, nx, ny, nz, u, v, 1.0f));
     }
     
     /**

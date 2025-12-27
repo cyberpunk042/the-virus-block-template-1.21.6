@@ -72,7 +72,7 @@ public final class CapsuleTessellator {
         // =================================================================
         // Top Hemisphere
         // =================================================================
-        Vertex topPoleV = new Vertex(0, topCapCenter + radius, 0, 0, 1, 0, 0.5f, 0);
+        Vertex topPoleV = new Vertex(0, topCapCenter + radius, 0, 0, 1, 0, 0.5f, 0, 1.0f);
         if (applyWave) {
             topPoleV = WaveDeformer.applyToVertex(topPoleV, wave, time);
         }
@@ -99,7 +99,7 @@ public final class CapsuleTessellator {
                 float u = seg / (float) segments;
                 float v = (ring + 1) / (float) (rings * 2 + (cylinderHeight > 0 ? 2 : 0));
                 
-                Vertex vertex = new Vertex(x, y, z, nx, ny, nz, u, v);
+                Vertex vertex = new Vertex(x, y, z, nx, ny, nz, u, v, 1.0f);
                 if (applyWave) {
                     vertex = WaveDeformer.applyToVertex(vertex, wave, time);
                 }
@@ -158,7 +158,7 @@ public final class CapsuleTessellator {
                 float u = seg / (float) segments;
                 float v = 0.5f;
                 
-                Vertex vertex = new Vertex(x, bottomCapCenter, z, nx, 0, nz, u, v);
+                Vertex vertex = new Vertex(x, bottomCapCenter, z, nx, 0, nz, u, v, 1.0f);
                 if (applyWave) {
                     vertex = WaveDeformer.applyToVertex(vertex, wave, time);
                 }
@@ -206,7 +206,7 @@ public final class CapsuleTessellator {
                 float u = seg / (float) segments;
                 float v = 0.5f + (ring + 1) / (float) (rings * 2);
                 
-                Vertex vertex = new Vertex(x, y, z, nx, ny, nz, u, v);
+                Vertex vertex = new Vertex(x, y, z, nx, ny, nz, u, v, 1.0f);
                 if (applyWave) {
                     vertex = WaveDeformer.applyToVertex(vertex, wave, time);
                 }
@@ -250,7 +250,7 @@ public final class CapsuleTessellator {
         }
         
         // Bottom pole triangles
-        Vertex bottomPoleV = new Vertex(0, bottomCapCenter - radius, 0, 0, -1, 0, 0.5f, 1);
+        Vertex bottomPoleV = new Vertex(0, bottomCapCenter - radius, 0, 0, -1, 0, 0.5f, 1, 1.0f);
         if (applyWave) {
             bottomPoleV = WaveDeformer.applyToVertex(bottomPoleV, wave, time);
         }

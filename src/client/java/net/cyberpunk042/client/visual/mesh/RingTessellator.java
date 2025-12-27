@@ -365,7 +365,7 @@ public final class RingTessellator {
         float z = (float) Math.sin(angle) * radius;
         float u = angle / GeometryMath.TWO_PI;
         float v = (ny > 0) ? 1 : 0;  // Top = 1, bottom = 0, walls use angle
-        return new Vertex(x, y, z, nx, ny, nz, u, v);
+        return new Vertex(x, y, z, nx, ny, nz, u, v, 1.0f);
     }
     
     /**
@@ -393,10 +393,10 @@ public final class RingTessellator {
         float cosA = (float) Math.cos(angle);
         float sinA = (float) Math.sin(angle);
         
-        Vertex innerBottom = new Vertex(cosA * innerR, yBottom, sinA * innerR, nx, 0, nz, 0, 0);
-        Vertex outerBottom = new Vertex(cosA * outerR, yBottom, sinA * outerR, nx, 0, nz, 1, 0);
-        Vertex innerTop = new Vertex(cosA * innerR, yTop, sinA * innerR, nx, 0, nz, 0, 1);
-        Vertex outerTop = new Vertex(cosA * outerR, yTop, sinA * outerR, nx, 0, nz, 1, 1);
+        Vertex innerBottom = new Vertex(cosA * innerR, yBottom, sinA * innerR, nx, 0, nz, 0, 0, 1.0f);
+        Vertex outerBottom = new Vertex(cosA * outerR, yBottom, sinA * outerR, nx, 0, nz, 1, 0, 1.0f);
+        Vertex innerTop = new Vertex(cosA * innerR, yTop, sinA * innerR, nx, 0, nz, 0, 1, 1.0f);
+        Vertex outerTop = new Vertex(cosA * outerR, yTop, sinA * outerR, nx, 0, nz, 1, 1, 1.0f);
         
         int iIB = builder.addVertex(innerBottom);
         int iOB = builder.addVertex(outerBottom);

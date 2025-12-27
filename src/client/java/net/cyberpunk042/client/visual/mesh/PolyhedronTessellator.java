@@ -240,7 +240,7 @@ public final class PolyhedronTessellator implements Tessellator {
     // =========================================================================
     
     private int emitVertex(MeshBuilder builder, float[] pos, float[] normal, float u, float v) {
-        Vertex vertex = new Vertex(pos[0], pos[1], pos[2], normal[0], normal[1], normal[2], u, v);
+        Vertex vertex = new Vertex(pos[0], pos[1], pos[2], normal[0], normal[1], normal[2], u, v, 1.0f);
         if (wave != null && wave.isActive() && wave.isCpuMode()) {
             vertex = WaveDeformer.applyToVertex(vertex, wave, waveTime);
         }
@@ -372,7 +372,8 @@ public final class PolyhedronTessellator implements Tessellator {
             return new Vertex(
                 (a.x() + b.x()) / 2, (a.y() + b.y()) / 2, (a.z() + b.z()) / 2,
                 0, 0, 0,  // Normal recalculated when projected
-                (a.u() + b.u()) / 2, (a.v() + b.v()) / 2
+                (a.u() + b.u()) / 2, (a.v() + b.v()) / 2,
+                1.0f
             );
         }
         
@@ -390,7 +391,7 @@ public final class PolyhedronTessellator implements Tessellator {
             float ny = v.y() / length;
             float nz = v.z() / length;
             
-            return new Vertex(px, py, pz, nx, ny, nz, v.u(), v.v());
+            return new Vertex(px, py, pz, nx, ny, nz, v.u(), v.v(), 1.0f);
         }
     }
     

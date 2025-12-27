@@ -186,7 +186,7 @@ public final class PrismTessellator {
         
         // Center vertex
         Vertex center = GeometryMath.prismFaceCenter(sides, y, radius);
-        center = new Vertex(center.x(), center.y(), center.z(), 0, ny, 0, 0.5f, 0.5f);
+        center = new Vertex(center.x(), center.y(), center.z(), 0, ny, 0, 0.5f, 0.5f, 1.0f);
         if (applyWave) {
             center = WaveDeformer.applyToVertex(center, wave, time);
         }
@@ -196,7 +196,7 @@ public final class PrismTessellator {
         int[] edgeIndices = new int[sides];
         for (int s = 0; s < sides; s++) {
             Vertex v = GeometryMath.prismCorner(s, sides, y, radius, twist, height, yBase);
-            v = new Vertex(v.x(), v.y(), v.z(), 0, ny, 0, v.u(), v.v());
+            v = new Vertex(v.x(), v.y(), v.z(), 0, ny, 0, v.u(), v.v(), 1.0f);
             if (applyWave) {
                 v = WaveDeformer.applyToVertex(v, wave, time);
             }

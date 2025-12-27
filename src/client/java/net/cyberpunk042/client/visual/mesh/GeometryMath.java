@@ -76,7 +76,7 @@ public final class GeometryMath {
         float u = angle / TWO_PI;
         float v = t;
         
-        return new Vertex(x, y, z, nx, ny, nz, u, v);
+        return new Vertex(x, y, z, nx, ny, nz, u, v, 1.0f);
     }
     
     /**
@@ -118,14 +118,14 @@ public final class GeometryMath {
         float u = 0.5f + (float) Math.cos(angle) * 0.5f;
         float v = 0.5f + (float) Math.sin(angle) * 0.5f;
         
-        return new Vertex(x, y, z, nx, ny, nz, u, v);
+        return new Vertex(x, y, z, nx, ny, nz, u, v, 1.0f);
     }
     
     /**
      * Generates the center vertex of a disc.
      */
     public static Vertex discCenter(float y) {
-        return new Vertex(0, y, 0, 0, 1, 0, 0.5f, 0.5f);
+        return new Vertex(0, y, 0, 0, 1, 0, 0.5f, 0.5f, 1.0f);
     }
     
     // =========================================================================
@@ -156,7 +156,7 @@ public final class GeometryMath {
         float u = angle / TWO_PI;
         float v = (y - yOffset) / height;
         
-        return new Vertex(x, y, z, nx, ny, nz, u, v);
+        return new Vertex(x, y, z, nx, ny, nz, u, v, 1.0f);
     }
     
     /**
@@ -195,7 +195,7 @@ public final class GeometryMath {
         float u = angle / TWO_PI;
         float v = t;
         
-        return new Vertex(x, y, z, nx, ny, nz, u, v);
+        return new Vertex(x, y, z, nx, ny, nz, u, v, 1.0f);
     }
     
     // =========================================================================
@@ -238,7 +238,7 @@ public final class GeometryMath {
         float u = side / (float) totalSides;
         float v = heightFrac;
         
-        return new Vertex(x, y, z, nx, ny, nz, u, v);
+        return new Vertex(x, y, z, nx, ny, nz, u, v, 1.0f);
     }
     
     /**
@@ -246,7 +246,7 @@ public final class GeometryMath {
      */
     public static Vertex prismFaceCenter(int totalSides, float y, float radius) {
         // Center is at origin X/Z
-        return new Vertex(0, y, 0, 0, y > 0 ? 1 : -1, 0, 0.5f, 0.5f);
+        return new Vertex(0, y, 0, 0, y > 0 ? 1 : -1, 0, 0.5f, 0.5f, 1.0f);
     }
     
     // =========================================================================

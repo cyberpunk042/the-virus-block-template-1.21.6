@@ -135,8 +135,7 @@ public record Vertex(
     
     /**
      * Returns a new vertex with position scaled by the given factor.
-     * <p>Normal is preserved (still points same direction).
-     * UV is preserved.
+     * <p>Normal, UV, and alpha are preserved.
      * 
      * @param scale multiplier for position
      * @return new scaled vertex
@@ -145,13 +144,14 @@ public record Vertex(
         return new Vertex(
             x * scale, y * scale, z * scale,
             nx, ny, nz,  // Normal unchanged
-            u, v         // UV unchanged
+            u, v,        // UV unchanged
+            alpha        // Alpha unchanged
         );
     }
     
     /**
      * Returns a new vertex with position offset by the given delta.
-     * <p>Normal is preserved. UV is preserved.
+     * <p>Normal, UV, and alpha are preserved.
      * 
      * @param dx X offset
      * @param dy Y offset
@@ -162,24 +162,33 @@ public record Vertex(
         return new Vertex(
             x + dx, y + dy, z + dz,
             nx, ny, nz,  // Normal unchanged
-            u, v         // UV unchanged
+            u, v,        // UV unchanged
+            alpha        // Alpha unchanged
         );
     }
     
     /**
      * Returns a new vertex with a different normal.
-     * <p>Position and UV are preserved.
+     * <p>Position, UV, and alpha are preserved.
      */
     public Vertex withNormal(float nx, float ny, float nz) {
-        return new Vertex(x, y, z, nx, ny, nz, u, v);
+        return new Vertex(x, y, z, nx, ny, nz, u, v, alpha);
     }
     
     /**
      * Returns a new vertex with different UV coordinates.
-     * <p>Position and normal are preserved.
+     * <p>Position, normal, and alpha are preserved.
      */
     public Vertex withUV(float u, float v) {
-        return new Vertex(x, y, z, nx, ny, nz, u, v);
+        return new Vertex(x, y, z, nx, ny, nz, u, v, alpha);
+    }
+    
+    /**
+     * Returns a new vertex with different alpha.
+     * <p>Position, normal, and UV are preserved.
+     */
+    public Vertex withAlpha(float alpha) {
+        return new Vertex(x, y, z, nx, ny, nz, u, v, alpha);
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -208,7 +217,7 @@ public record Vertex(
     
     /**
      * Linearly interpolates between this vertex and another.
-     * <p>All components are interpolated: position, normal, UV.
+     * <p>All components are interpolated: position, normal, UV, alpha.
      * 
      * <p>Note: Normal interpolation may produce non-unit normals.
      * Renormalize if needed for lighting.
@@ -226,7 +235,8 @@ public record Vertex(
             ny + (other.ny - ny) * t,
             nz + (other.nz - nz) * t,
             u + (other.u - u) * t,
-            v + (other.v - v) * t
+            v + (other.v - v) * t,
+            alpha + (other.alpha - alpha) * t
         );
     }
 }

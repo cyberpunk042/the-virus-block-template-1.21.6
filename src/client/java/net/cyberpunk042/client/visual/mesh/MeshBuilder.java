@@ -140,11 +140,30 @@ public final class MeshBuilder {
     
     /**
      * Adds a complete vertex with position, normal, and UV.
+     * <p>Alpha defaults to 1.0 (fully opaque).
      * 
      * @return index of the added vertex
      */
     public int vertex(float x, float y, float z, float nx, float ny, float nz, float u, float v) {
-        return addVertex(new Vertex(x, y, z, nx, ny, nz, u, v));
+        return addVertex(new Vertex(x, y, z, nx, ny, nz, u, v, 1.0f));
+    }
+    
+    /**
+     * Adds a complete vertex with position, normal, UV, and alpha.
+     * 
+     * @param x X position
+     * @param y Y position
+     * @param z Z position
+     * @param nx Normal X
+     * @param ny Normal Y
+     * @param nz Normal Z
+     * @param u Texture U
+     * @param v Texture V
+     * @param alpha Vertex alpha (0=invisible, 1=opaque)
+     * @return index of the added vertex
+     */
+    public int vertex(float x, float y, float z, float nx, float ny, float nz, float u, float v, float alpha) {
+        return addVertex(new Vertex(x, y, z, nx, ny, nz, u, v, alpha));
     }
     
     /**

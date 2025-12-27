@@ -90,7 +90,7 @@ public final class ConeTessellator {
             float nz = normalXZScale * (float) Math.sin(phi);
             
             float u = seg / (float) segments;
-            Vertex v = new Vertex(x, bottomY, z, nx, ny, nz, u, 1);
+            Vertex v = new Vertex(x, bottomY, z, nx, ny, nz, u, 1, 1.0f);
             if (applyWave) {
                 v = WaveDeformer.applyToVertex(v, wave, time);
             }
@@ -101,7 +101,7 @@ public final class ConeTessellator {
             // =============================================================
             // True Cone - triangles to apex
             // =============================================================
-            Vertex apexV = new Vertex(0, topY, 0, 0, 1, 0, 0.5f, 0);
+            Vertex apexV = new Vertex(0, topY, 0, 0, 1, 0, 0.5f, 0, 1.0f);
             if (applyWave) {
                 apexV = WaveDeformer.applyToVertex(apexV, wave, time);
             }
@@ -131,7 +131,7 @@ public final class ConeTessellator {
                 float nz = normalXZScale * (float) Math.sin(phi);
                 
                 float u = seg / (float) segments;
-                Vertex v = new Vertex(x, topY, z, nx, ny, nz, u, 0);
+                Vertex v = new Vertex(x, topY, z, nx, ny, nz, u, 0, 1.0f);
                 if (applyWave) {
                     v = WaveDeformer.applyToVertex(v, wave, time);
                 }
@@ -156,7 +156,7 @@ public final class ConeTessellator {
             
             // Top cap (if not open)
             if (!shape.openTop()) {
-                Vertex topCenterV = new Vertex(0, topY, 0, 0, 1, 0, 0.5f, 0.5f);
+                Vertex topCenterV = new Vertex(0, topY, 0, 0, 1, 0, 0.5f, 0.5f, 1.0f);
                 if (applyWave) {
                     topCenterV = WaveDeformer.applyToVertex(topCenterV, wave, time);
                 }
@@ -177,7 +177,7 @@ public final class ConeTessellator {
         // Bottom cap (if not open)
         // =================================================================
         if (!shape.openBottom()) {
-            Vertex bottomCenterV = new Vertex(0, bottomY, 0, 0, -1, 0, 0.5f, 0.5f);
+            Vertex bottomCenterV = new Vertex(0, bottomY, 0, 0, -1, 0, 0.5f, 0.5f, 1.0f);
             if (applyWave) {
                 bottomCenterV = WaveDeformer.applyToVertex(bottomCenterV, wave, time);
             }

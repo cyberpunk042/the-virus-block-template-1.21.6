@@ -241,7 +241,7 @@ public final class JetTessellator {
                 float u = s / (float) segments;
                 float v = t;
                 
-                Vertex vert = new Vertex(x, y, z, nx, ny, nz, u, v);
+                Vertex vert = new Vertex(x, y, z, nx, ny, nz, u, v, 1.0f);
                 if (applyWave) {
                     vert = WaveDeformer.applyToVertex(vert, wave, time);
                 }
@@ -357,7 +357,7 @@ public final class JetTessellator {
         float z = (float) Math.sin(angle) * radius;
         float u = angle / GeometryMath.TWO_PI;
         float v = (ny > 0) ? 1 : 0;  // Top = 1, bottom = 0
-        return new Vertex(x, y, z, nx, ny, nz, u, v);
+        return new Vertex(x, y, z, nx, ny, nz, u, v, 1.0f);
     }
     
     // =========================================================================

@@ -102,7 +102,7 @@ public final class TorusTessellator {
                 float texU = i / (float) majorSegs;
                 float texV = j / (float) minorSegs;
                 
-                Vertex vtx = new Vertex(x, y, z, nx, ny, nz, texU, texV);
+                Vertex vtx = new Vertex(x, y, z, nx, ny, nz, texU, texV, 1.0f);
                 
                 // Apply wave deformation
                 if (applyWave) {
