@@ -225,7 +225,11 @@ public final class RayPositioner {
             // Now that the ray is at its final position, compute edge transitions
             // based on where the ray ACTUALLY IS relative to field boundaries.
             // NOTE: Skip for curvature - tessellator handles edge detection using actual curved positions
-            if (!hasCurvature) {
+            // NOTE: Skip for CONTINUOUS mode - all rays should be visible for 360° coverage
+            net.cyberpunk042.visual.animation.WaveDistribution waveDist = flowConfig.effectiveWaveDistribution();
+            boolean isContinuous = waveDist == net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS;
+            
+            if (!hasCurvature && !isContinuous) {
                 float innerRadius = shape.innerRadius();
                 float outerRadius = shape.outerRadius();
                 float edgeWidth = length * 0.5f; // Transition zone is half the actual ray length
@@ -728,19 +732,63 @@ public final class RayPositioner {
             float edgeWidth = 0.1f / sweepCopies;
             edgeWidth = Math.max(0.01f, Math.min(0.1f, edgeWidth));
             
+            // Progressive spawn: when startFullLength=false, rays grow progressively
+            // Uses EdgeTransitionMode to determine HOW: SCALE=thickness, CLIP=length, FADE=alpha
+            boolean progressiveSpawn = !flow.startFullLength();
+            net.cyberpunk042.visual.animation.EdgeTransitionMode edgeMode = flow.effectiveEdgeTransition();
+            
             switch (lengthMode) {
                 case RADIATE -> {
                     // Ray travels outward: starts at inner, moves to outer
                     // Position offset is based on phase (0 = inner, 1 = outer)
-                    // Edge transitions are computed in computeContext based on actual position
                     posOffset = phase * rayLength;
+                    
+                    // Progressive spawn: ray appears during spawn phase, disappears during despawn
+                    if (progressiveSpawn) {
+                        float progress = 1.0f; // Default: fully visible
+                        
+                        // Spawn phase: 0 to edgeWidth → ray appears from 0 to full
+                        if (phase < edgeWidth) {
+                            progress = phase / edgeWidth;
+                        }
+                        // Despawn phase: (1-edgeWidth) to 1 → ray disappears from full to 0
+                        else if (phase > 1.0f - edgeWidth) {
+                            progress = (1.0f - phase) / edgeWidth;
+                        }
+                        
+                        // Apply based on edge mode
+                        switch (edgeMode) {
+                            case SCALE -> scale = progress;
+                            case CLIP -> tEnd = progress;
+                            case FADE -> alpha = progress;
+                        }
+                    }
                 }
                 case ABSORB -> {
                     // Ray travels inward: starts at outer, moves to inner
-                    // Position offset is based on reversed phase (0 = outer, 1 = inner)
-                    // Edge transitions are computed in computeContext based on actual position
                     float reversed = 1.0f - phase;
                     posOffset = reversed * rayLength;
+                    
+                    // Progressive spawn: ray appears during spawn phase, disappears during despawn
+                    if (progressiveSpawn) {
+                        float progress = 1.0f; // Default: fully visible
+                        
+                        // Spawn phase: 0 to edgeWidth → ray appears from 0 to full
+                        if (phase < edgeWidth) {
+                            progress = phase / edgeWidth;
+                        }
+                        // Despawn phase: (1-edgeWidth) to 1 → ray disappears from full to 0
+                        else if (phase > 1.0f - edgeWidth) {
+                            progress = (1.0f - phase) / edgeWidth;
+                        }
+                        
+                        // Apply based on edge mode
+                        switch (edgeMode) {
+                            case SCALE -> scale = progress;
+                            case CLIP -> tStart = 1.0f - progress;
+                            case FADE -> alpha = progress;
+                        }
+                    }
                 }
                 case PULSE -> {
                     // Breathing effect - scale oscillates

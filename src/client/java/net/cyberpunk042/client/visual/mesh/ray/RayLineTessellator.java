@@ -317,9 +317,16 @@ public class RayLineTessellator implements RayTypeTessellator {
         edgeWidth = Math.max(0.1f, Math.min(edgeWidth, (outerRadius - innerRadius) * 0.15f));
         
         // Check if we need position-based edge detection (curvature active)
+        // Skip for CONTINUOUS mode - all rays should be visible for 360° coverage
         boolean hasCurvature = context.curvature() != null 
             && context.curvature() != net.cyberpunk042.visual.shape.RayCurvature.NONE 
             && context.curvatureIntensity() > 0.001f;
+        
+        boolean isContinuous = context.flowConfig() != null 
+            && context.flowConfig().effectiveWaveDistribution() == net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS;
+        
+        // For CONTINUOUS, we skip the edge filtering to maintain 360° coverage
+        boolean doEdgeFiltering = hasCurvature && !isContinuous;
         
         // Compute perpendicular frame using shared utility
         float[] right = new float[3];
@@ -380,7 +387,7 @@ public class RayLineTessellator implements RayTypeTessellator {
                 float vertexAlpha = contextFlowAlpha;
                 boolean visible = true;
                 
-                if (hasCurvature && lengthMode != null) {
+                if (doEdgeFiltering && lengthMode != null) {
                     // Position-based edge detection for curved rays
                     float edgeFactor = 1.0f; // Default: fully visible
                     

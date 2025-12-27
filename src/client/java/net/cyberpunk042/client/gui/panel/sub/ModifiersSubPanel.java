@@ -371,7 +371,7 @@ public class ModifiersSubPanel extends BoundPanel {
         // > 1.0: duplicates the sweep (2 = two sweeps 180° apart, 3 = three at 120°)
         c.slider("Sweep #", "rayFlow.waveCount").range(0.1f, 5.0f).format("%.1f").add();
         
-        // Wave Distribution: SEQUENTIAL (coherent wave) vs RANDOM (scattered)
+        // Wave Distribution: SEQUENTIAL (coherent wave) vs RANDOM (scattered) vs CONTINUOUS (360° coverage)
         WaveDistribution curWaveDist = flow != null && flow.waveDistribution() != null 
             ? flow.waveDistribution() : WaveDistribution.SEQUENTIAL;
         CyclingButtonWidget<WaveDistribution> waveDistDropdown = CyclingButtonWidget.<WaveDistribution>builder(
@@ -379,9 +379,17 @@ public class ModifiersSubPanel extends BoundPanel {
             .values(WaveDistribution.values())
             .initially(curWaveDist)
             .omitKeyText()
-            .build(x, c.getCurrentY(), w, COMPACT_H, Text.literal(""),
+            .build(x, c.getCurrentY(), halfW, COMPACT_H, Text.literal(""),
                 (btn, val) -> state.set("rayFlow.waveDistribution", val));
         widgets.add(waveDistDropdown);
+        
+        // Start Full Length toggle: ON = rays appear at full length, OFF = rays grow progressively
+        boolean curStartFull = flow == null || flow.startFullLength();
+        CyclingButtonWidget<Boolean> startFullToggle = GuiWidgets.toggle(
+            x + halfW + GuiConstants.PADDING, c.getCurrentY(), halfW, "Full Len",
+            curStartFull, "OFF = rays spawn progressively",
+            v -> state.set("rayFlow.startFullLength", v));
+        widgets.add(startFullToggle);
         c.advanceRow();
         
         // Travel dropdown + Speed

@@ -59,7 +59,12 @@ public record RayFlowConfig(
     @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "5.0") float flickerFrequency,
     
     // === 3D Ray Edge Transition ===
-    @JsonField(skipIfDefault = true) EdgeTransitionMode edgeTransition
+    @JsonField(skipIfDefault = true) EdgeTransitionMode edgeTransition,
+    
+    // === Progressive Spawn ===
+    // When true (default): rays appear at full length instantly
+    // When false: rays spawn progressively (grow from 0 to full length)
+    @JsonField(skipIfDefault = true, defaultValue = "true") boolean startFullLength
 ) {
     // =========================================================================
     // Static Constants
@@ -71,7 +76,7 @@ public record RayFlowConfig(
         1.0f, WaveDistribution.SEQUENTIAL, 2.0f,
         TravelMode.NONE, 0f, 1, 0.3f,
         FlickerMode.NONE, 0f, 5f,
-        EdgeTransitionMode.CLIP
+        EdgeTransitionMode.CLIP, true
     );
     
     /** Default radiate effect (rays grow outward). */
@@ -80,7 +85,7 @@ public record RayFlowConfig(
         1.0f, WaveDistribution.SEQUENTIAL, 2.0f,
         TravelMode.NONE, 0f, 1, 0.3f,
         FlickerMode.NONE, 0f, 5f,
-        EdgeTransitionMode.CLIP
+        EdgeTransitionMode.CLIP, true
     );
     
     /** Default absorb effect (rays shrink inward). */
@@ -89,7 +94,7 @@ public record RayFlowConfig(
         1.0f, WaveDistribution.SEQUENTIAL, 2.0f,
         TravelMode.NONE, 0f, 1, 0.3f,
         FlickerMode.NONE, 0f, 5f,
-        EdgeTransitionMode.CLIP
+        EdgeTransitionMode.CLIP, true
     );
     
     /** Chase particles flowing along rays. */
@@ -98,7 +103,7 @@ public record RayFlowConfig(
         1.0f, WaveDistribution.SEQUENTIAL, 2.0f,
         TravelMode.CHASE, 1.5f, 3, 0.2f,
         FlickerMode.NONE, 0f, 5f,
-        EdgeTransitionMode.CLIP
+        EdgeTransitionMode.CLIP, true
     );
     
     /** Scrolling energy flow. */
@@ -107,7 +112,7 @@ public record RayFlowConfig(
         1.0f, WaveDistribution.SEQUENTIAL, 2.0f,
         TravelMode.SCROLL, 1f, 1, 0.3f,
         FlickerMode.NONE, 0f, 5f,
-        EdgeTransitionMode.CLIP
+        EdgeTransitionMode.CLIP, true
     );
     
     /** Twinkling stars effect. */
@@ -116,7 +121,7 @@ public record RayFlowConfig(
         1.0f, WaveDistribution.SEQUENTIAL, 2.0f,
         TravelMode.NONE, 0f, 1, 0.3f,
         FlickerMode.SCINTILLATION, 0.5f, 8f,
-        EdgeTransitionMode.CLIP
+        EdgeTransitionMode.CLIP, true
     );
     
     // =========================================================================
@@ -205,12 +210,14 @@ public record RayFlowConfig(
             edgeTransition = EdgeTransitionMode.fromString(json.get("edgeTransition").getAsString());
         }
         
+        boolean startFullLength = json.has("startFullLength") ? json.get("startFullLength").getAsBoolean() : true;
+        
         return new RayFlowConfig(
             length, lengthSpeed, segmentLength,
             waveArc, waveDistribution, waveCount,
             travel, travelSpeed, chaseCount, chaseWidth,
             flicker, flickerIntensity, flickerFrequency,
-            edgeTransition
+            edgeTransition, startFullLength
         );
     }
     
@@ -233,7 +240,7 @@ public record RayFlowConfig(
             .waveArc(waveArc).waveDistribution(waveDistribution).waveCount(waveCount)
             .travel(travel).travelSpeed(travelSpeed).chaseCount(chaseCount).chaseWidth(chaseWidth)
             .flicker(flicker).flickerIntensity(flickerIntensity).flickerFrequency(flickerFrequency)
-            .edgeTransition(edgeTransition);
+            .edgeTransition(edgeTransition).startFullLength(startFullLength);
     }
     
     public static class Builder {
@@ -251,6 +258,7 @@ public record RayFlowConfig(
         private float flickerIntensity = 0.3f;
         private float flickerFrequency = 5f;
         private EdgeTransitionMode edgeTransition = EdgeTransitionMode.CLIP;
+        private boolean startFullLength = true;
         
         public Builder length(LengthMode m) { this.length = m; return this; }
         public Builder lengthSpeed(float s) { this.lengthSpeed = s; return this; }
@@ -266,6 +274,7 @@ public record RayFlowConfig(
         public Builder flickerIntensity(float i) { this.flickerIntensity = i; return this; }
         public Builder flickerFrequency(float f) { this.flickerFrequency = f; return this; }
         public Builder edgeTransition(EdgeTransitionMode m) { this.edgeTransition = m != null ? m : EdgeTransitionMode.CLIP; return this; }
+        public Builder startFullLength(boolean b) { this.startFullLength = b; return this; }
         
         public RayFlowConfig build() {
             return new RayFlowConfig(
@@ -273,7 +282,7 @@ public record RayFlowConfig(
                 waveArc, waveDistribution, waveCount,
                 travel, travelSpeed, chaseCount, chaseWidth,
                 flicker, flickerIntensity, flickerFrequency,
-                edgeTransition
+                edgeTransition, startFullLength
             );
         }
     }
