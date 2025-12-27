@@ -723,10 +723,9 @@ public final class RayPositioner {
             
             float phase;
             if (waveDist == net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS) {
-                // CONTINUOUS: All rays use the SAME phase - they animate together uniformly
-                // 360° coverage is achieved by skipping edge filtering (done elsewhere), not by phase scrambling
-                // Distribution (stochastic, radial, etc.) only affects ANGULAR placement
-                phase = basePhase;
+                // CONTINUOUS: Phase is scrambled by golden ratio, no sweep multiplication
+                // Each ray has a unique phase offset that doesn't correlate with angle
+                phase = (basePhase + rayAngle) % 1.0f;
             } else {
                 // SEQUENTIAL/RANDOM: Apply sweepCopies for sweep effect
                 phase = (basePhase + scaledAngle * sweepCopies) % 1.0f;
@@ -750,13 +749,15 @@ public final class RayPositioner {
             switch (lengthMode) {
                 case RADIATE -> {
                     if (followCurve) {
-                        // FOLLOW CURVE: Animation slides a segment along the fixed curve
-                        // Scale phase by rayLength to match translate mode's visual speed
-                        // Then mod 1.0 to wrap around the curve
-                        float scaledPhase = (phase * rayLength) % 1.0f;
-                        tStart = scaledPhase * (1.0f - segLen);
-                        tEnd = tStart + segLen;
-                        // posOffset stays 0 (endpoints don't move)
+                        // FOLLOW CURVE: Ray body travels along fixed curved path (no drift)
+                        if (segLen < 0.99f) {
+                            // Partial segment slides along curve
+                            // phase 0 = segment at inner edge, phase 1 = segment at outer edge
+                            tStart = phase * (1.0f - segLen);
+                            tEnd = tStart + segLen;
+                        }
+                        // segLen >= 1.0: full ray visible (tStart=0, tEnd=1 default)
+                        // posOffset stays 0 - curve shape is fixed, no drift
                     } else {
                         // TRANSLATE: Endpoints move, curve drifts with them
                         posOffset = phase * rayLength;
@@ -793,13 +794,15 @@ public final class RayPositioner {
                 }
                 case ABSORB -> {
                     if (followCurve) {
-                        // FOLLOW CURVE: Animation slides a segment along the fixed curve (reversed)
-                        // Scale phase by rayLength to match translate mode's visual speed
-                        float reversed = 1.0f - phase;
-                        float scaledPhase = (reversed * rayLength) % 1.0f;
-                        tStart = scaledPhase * (1.0f - segLen);
-                        tEnd = tStart + segLen;
-                        // posOffset stays 0 (endpoints don't move)
+                        // FOLLOW CURVE: Ray body travels inward along fixed curved path (no drift)
+                        if (segLen < 0.99f) {
+                            // Partial segment slides along curve (reversed direction)
+                            float reversed = 1.0f - phase;
+                            tStart = reversed * (1.0f - segLen);
+                            tEnd = tStart + segLen;
+                        }
+                        // segLen >= 1.0: full ray visible (tStart=0, tEnd=1 default)
+                        // posOffset stays 0 - curve shape is fixed, no drift
                     } else {
                         // TRANSLATE: Endpoints move, curve drifts with them
                         float reversed = 1.0f - phase;
