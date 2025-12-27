@@ -196,16 +196,23 @@ public final class RayPositioner {
             FlowAnimationResult flowResult = computeFlowAnimation(
                 flowConfig, index, count, time, shape.innerRadius(), shape.outerRadius());
             flowPositionOffset = flowResult.positionOffset;
-            // Note: We will recompute scale/alpha/clip based on ACTUAL position below
+            // Use ALL values from flow animation (PULSE, SEGMENT, GROW_SHRINK use these)
+            flowScale = flowResult.scale;
+            visibleTStart = flowResult.visibleTStart;
+            visibleTEnd = flowResult.visibleTEnd;
+            flowAlpha = flowResult.alpha;
+            // Note: For RADIATE/ABSORB, position-based edge detection below will OVERRIDE
+            // scale/alpha/clip values based on actual position
             
             // Apply position offset to start/end positions
             // This TRANSLATES the ray segment along the Travel Axis (innerRadius to outerRadius)
-            // BUT: When curvature is active, the tessellator handles curved path positioning
+            // For curved rays: the curve will be computed from these translated endpoints,
+            // so the entire curved shape moves through the field correctly.
             boolean hasCurvature = curvature != null 
                 && curvature != RayCurvature.NONE 
                 && shape.curvatureIntensity() > 0.001f;
             
-            if (!hasCurvature && Math.abs(flowPositionOffset) > 0.001f) {
+            if (Math.abs(flowPositionOffset) > 0.001f) {
                 start[0] += direction[0] * flowPositionOffset;
                 start[1] += direction[1] * flowPositionOffset;
                 start[2] += direction[2] * flowPositionOffset;
@@ -221,7 +228,7 @@ public final class RayPositioner {
             if (!hasCurvature) {
                 float innerRadius = shape.innerRadius();
                 float outerRadius = shape.outerRadius();
-                float edgeWidth = shape.rayLength() * 0.5f; // Transition zone is half the ray length
+                float edgeWidth = length * 0.5f; // Transition zone is half the actual ray length
                 edgeWidth = Math.max(0.1f, Math.min(edgeWidth, (outerRadius - innerRadius) * 0.15f));
                 
                 // Compute radial distances of start and end from center
@@ -257,6 +264,15 @@ public final class RayPositioner {
                             case FADE -> flowAlpha = edgeFactor;
                         }
                     }
+                    // FADE only: Start fading BEFORE reaching the boundary for smoother transition
+                    else if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.FADE) {
+                        // Check proximity to outer boundary (approaching despawn)
+                        float distToOuter = outerRadius - leadingEdge;
+                        if (distToOuter < edgeWidth && distToOuter >= 0) {
+                            // Approaching outer: fade as we get closer
+                            flowAlpha = distToOuter / edgeWidth;
+                        }
+                    }
                 } else if (lengthMode == net.cyberpunk042.visual.animation.LengthMode.ABSORB) {
                     // ABSORB: ray moves inward, leading edge is START, trailing edge is END
                     float leadingEdge = startDist;
@@ -280,6 +296,15 @@ public final class RayPositioner {
                             case SCALE -> flowScale = edgeFactor;
                             case CLIP -> visibleTStart = 1.0f - edgeFactor;
                             case FADE -> flowAlpha = edgeFactor;
+                        }
+                    }
+                    // FADE only: Start fading BEFORE reaching the boundary for smoother transition
+                    else if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.FADE) {
+                        // Check proximity to inner boundary (approaching despawn)
+                        float distToInner = leadingEdge - innerRadius;
+                        if (distToInner < edgeWidth && distToInner >= 0) {
+                            // Approaching inner: fade as we get closer
+                            flowAlpha = distToInner / edgeWidth;
                         }
                     }
                 }
@@ -375,14 +400,23 @@ public final class RayPositioner {
         // Compute per-ray phase offset based on wave distribution
         float rayPhaseOffset;
         net.cyberpunk042.visual.animation.WaveDistribution waveDist = flow.effectiveWaveDistribution();
-        if (waveDist == net.cyberpunk042.visual.animation.WaveDistribution.RANDOM) {
+        if (waveDist == net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS) {
+            // CONTINUOUS: Phases scrambled by golden ratio → no sweep pattern, 360° coverage
             rayPhaseOffset = (rayIndex * GOLDEN_RATIO) % 1.0f;
+        } else if (waveDist == net.cyberpunk042.visual.animation.WaveDistribution.RANDOM) {
+            // Use a hash function for consistent but random-looking phase per ray
+            // This creates scattered spawn/despawn instead of uniform distribution
+            int hash = (int)(rayIndex * 2654435761L); // Knuth multiplicative hash
+            rayPhaseOffset = (hash & 0x7FFFFFFF) / (float) Integer.MAX_VALUE;
         } else {
+            // SEQUENTIAL: Rays are phased based on angular position
             rayPhaseOffset = rayCount > 1 ? (float) rayIndex / rayCount : 0f;
         }
         
-        // Apply wave scale
-        rayPhaseOffset *= flow.effectiveWaveArc();
+        // Apply wave scale (not for CONTINUOUS - it doesn't use sweep)
+        if (waveDist != net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS) {
+            rayPhaseOffset *= flow.effectiveWaveArc();
+        }
         
         // Combine with time-based phase
         float basePhase = (time * flow.lengthSpeed()) % 1.0f;
@@ -490,11 +524,13 @@ public final class RayPositioner {
         }
         
         // === STEP 2: Apply position offset to start/end positions ===
+        // For curved rays: the curve will be computed from these translated endpoints,
+        // so the entire curved shape moves through the field correctly.
         boolean hasCurvature = curvature != null 
             && curvature != net.cyberpunk042.visual.shape.RayCurvature.NONE 
             && shape.curvatureIntensity() > 0.001f;
         
-        if (!hasCurvature && Math.abs(posOffset) > 0.001f) {
+        if (Math.abs(posOffset) > 0.001f) {
             start[0] += direction[0] * posOffset;
             start[1] += direction[1] * posOffset;
             start[2] += direction[2] * posOffset;
@@ -507,7 +543,7 @@ public final class RayPositioner {
         // Now compute edge transitions based on ACTUAL position
         float innerRadius = shape.innerRadius();
         float outerRadius = shape.outerRadius();
-        float edgeWidth = shape.rayLength() * 0.5f; // Transition zone is half the ray length
+        float edgeWidth = length * 0.5f; // Transition zone is half the actual ray length
         edgeWidth = Math.max(0.1f, Math.min(edgeWidth, (outerRadius - innerRadius) * 0.15f));
         
         // Compute radial distances of start and end from center
@@ -647,10 +683,16 @@ public final class RayPositioner {
         // Compute per-ray angular position (0-1 = 0°-360°)
         float rayAngle;
         net.cyberpunk042.visual.animation.WaveDistribution waveDist = flow.effectiveWaveDistribution();
-        if (waveDist == net.cyberpunk042.visual.animation.WaveDistribution.RANDOM) {
-            // Golden ratio for even-ish random distribution
-            rayAngle = (rayIndex * 0.618033988749895f) % 1.0f;
+        if (waveDist == net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS) {
+            // CONTINUOUS: Phases scrambled relative to angle → no sweep pattern
+            // Use golden ratio to maximally spread phases regardless of ray order
+            rayAngle = (rayIndex * GOLDEN_RATIO) % 1.0f;
+        } else if (waveDist == net.cyberpunk042.visual.animation.WaveDistribution.RANDOM) {
+            // Use hash for consistent but random-looking distribution
+            int hash = (int)(rayIndex * 2654435761L); // Knuth multiplicative hash
+            rayAngle = (hash & 0x7FFFFFFF) / (float) Integer.MAX_VALUE;
         } else {
+            // SEQUENTIAL: Rays are phased based on angular position
             rayAngle = rayCount > 1 ? (float) rayIndex / rayCount : 0f;
         }
         
@@ -662,6 +704,7 @@ public final class RayPositioner {
         // < 1: TRIM - reduces the visible wedge size (fewer rays visible at once)
         // = 1: Normal sweep behavior
         // > 1: DUPLICATE - creates N copies of the sweep wedge around the circle
+        // NOTE: For CONTINUOUS mode, sweepCopies is ignored (no sweep)
         float sweepCopies = Math.max(0.1f, flow.waveCount());
         
         // === Length Mode Animation ===
@@ -669,11 +712,19 @@ public final class RayPositioner {
         if (lengthMode != null && lengthMode != net.cyberpunk042.visual.animation.LengthMode.NONE) {
             float basePhase = (time * flow.lengthSpeed()) % 1.0f;
             
-            // Compute the animation phase for this ray (0-1)
-            float phase = (basePhase + scaledAngle) % 1.0f;
+            float phase;
+            if (waveDist == net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS) {
+                // CONTINUOUS: Phase is scrambled by golden ratio, no sweep multiplication
+                // Each ray has a unique phase offset that doesn't correlate with angle
+                phase = (basePhase + rayAngle) % 1.0f;
+            } else {
+                // SEQUENTIAL/RANDOM: Apply sweepCopies for sweep effect
+                phase = (basePhase + scaledAngle * sweepCopies) % 1.0f;
+            }
             
             // Edge width for spawn/despawn transitions
             // sweepCopies affects edge width: higher = narrower transitions = more rays visible at full size
+            // For CONTINUOUS: edgeWidth still applies for position-based transitions
             float edgeWidth = 0.1f / sweepCopies;
             edgeWidth = Math.max(0.01f, Math.min(0.1f, edgeWidth));
             

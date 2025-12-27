@@ -312,8 +312,8 @@ public class RayLineTessellator implements RayTypeTessellator {
         float innerRadius = context.innerRadius();
         float outerRadius = context.outerRadius();
         
-        // Edge width for position-based transitions (half ray length, clamped)
-        float edgeWidth = shape.rayLength() * 0.5f;
+        // Edge width for position-based transitions (half actual ray length, clamped)
+        float edgeWidth = context.length() * 0.5f;
         edgeWidth = Math.max(0.1f, Math.min(edgeWidth, (outerRadius - innerRadius) * 0.15f));
         
         // Check if we need position-based edge detection (curvature active)
@@ -348,6 +348,7 @@ public class RayLineTessellator implements RayTypeTessellator {
                 tValues[i] = t;
                 
                 // Apply curvature using shared utility
+                // Note: start/end are already translated by flowPositionOffset in RayPositioner
                 float[] curvedPos = RayGeometryUtils.computeCurvedPosition(
                     start, end, t, context.curvature(), curvatureIntensity);
                 float px = curvedPos[0];
@@ -371,7 +372,7 @@ public class RayLineTessellator implements RayTypeTessellator {
                     pz = deformed[2];
                 }
                 
-                // Store radial distance
+                // Store radial distance (after all transformations for proper edge detection)
                 float radialDist = (float) Math.sqrt(px*px + py*py + pz*pz);
                 radialDists[i] = radialDist;
                 

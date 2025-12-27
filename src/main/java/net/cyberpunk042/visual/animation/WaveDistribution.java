@@ -11,7 +11,10 @@ public enum WaveDistribution {
     SEQUENTIAL("Sequential"),
     
     /** Rays have randomized (but consistent) phase offsets - scattered pattern. */
-    RANDOM("Random");
+    RANDOM("Random"),
+    
+    /** All rays animate in parallel with the same phase - 360° simultaneous action. */
+    CONTINUOUS("Continuous");
     
     private final String displayName;
     

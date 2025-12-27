@@ -45,7 +45,7 @@ public record RayFlowConfig(
     @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "1.0") float waveArc,
     @JsonField(skipIfDefault = true) WaveDistribution waveDistribution,
     // waveCount (sweep copies): < 1.0 trims arc, = 1.0 normal, > 1.0 duplicates sweeps
-    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "1.0") float waveCount,
+    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "2.0") float waveCount,
     
     // === Travel Axis ===
     @JsonField(skipIfDefault = true) TravelMode travel,
@@ -68,55 +68,55 @@ public record RayFlowConfig(
     /** No flow animation. */
     public static final RayFlowConfig NONE = new RayFlowConfig(
         LengthMode.NONE, 0f, 1.0f,
-        1.0f, WaveDistribution.SEQUENTIAL, 1.0f,
+        1.0f, WaveDistribution.SEQUENTIAL, 2.0f,
         TravelMode.NONE, 0f, 1, 0.3f,
         FlickerMode.NONE, 0f, 5f,
-        EdgeTransitionMode.SCALE
+        EdgeTransitionMode.CLIP
     );
     
     /** Default radiate effect (rays grow outward). */
     public static final RayFlowConfig RADIATE = new RayFlowConfig(
         LengthMode.RADIATE, 1f, 1.0f,
-        1.0f, WaveDistribution.SEQUENTIAL, 1.0f,
+        1.0f, WaveDistribution.SEQUENTIAL, 2.0f,
         TravelMode.NONE, 0f, 1, 0.3f,
         FlickerMode.NONE, 0f, 5f,
-        EdgeTransitionMode.SCALE
+        EdgeTransitionMode.CLIP
     );
     
     /** Default absorb effect (rays shrink inward). */
     public static final RayFlowConfig ABSORB = new RayFlowConfig(
         LengthMode.ABSORB, 1f, 1.0f,
-        1.0f, WaveDistribution.SEQUENTIAL, 1.0f,
+        1.0f, WaveDistribution.SEQUENTIAL, 2.0f,
         TravelMode.NONE, 0f, 1, 0.3f,
         FlickerMode.NONE, 0f, 5f,
-        EdgeTransitionMode.SCALE
+        EdgeTransitionMode.CLIP
     );
     
     /** Chase particles flowing along rays. */
     public static final RayFlowConfig CHASE = new RayFlowConfig(
         LengthMode.NONE, 0f, 1.0f,
-        1.0f, WaveDistribution.SEQUENTIAL, 1.0f,
+        1.0f, WaveDistribution.SEQUENTIAL, 2.0f,
         TravelMode.CHASE, 1.5f, 3, 0.2f,
         FlickerMode.NONE, 0f, 5f,
-        EdgeTransitionMode.SCALE
+        EdgeTransitionMode.CLIP
     );
     
     /** Scrolling energy flow. */
     public static final RayFlowConfig SCROLL = new RayFlowConfig(
         LengthMode.NONE, 0f, 1.0f,
-        1.0f, WaveDistribution.SEQUENTIAL, 1.0f,
+        1.0f, WaveDistribution.SEQUENTIAL, 2.0f,
         TravelMode.SCROLL, 1f, 1, 0.3f,
         FlickerMode.NONE, 0f, 5f,
-        EdgeTransitionMode.SCALE
+        EdgeTransitionMode.CLIP
     );
     
     /** Twinkling stars effect. */
     public static final RayFlowConfig SCINTILLATE = new RayFlowConfig(
         LengthMode.NONE, 0f, 1.0f,
-        1.0f, WaveDistribution.SEQUENTIAL, 1.0f,
+        1.0f, WaveDistribution.SEQUENTIAL, 2.0f,
         TravelMode.NONE, 0f, 1, 0.3f,
         FlickerMode.SCINTILLATION, 0.5f, 8f,
-        EdgeTransitionMode.SCALE
+        EdgeTransitionMode.CLIP
     );
     
     // =========================================================================
@@ -157,7 +157,7 @@ public record RayFlowConfig(
     
     /** Gets effective edge transition mode, defaulting to SCALE if not set. */
     public EdgeTransitionMode effectiveEdgeTransition() {
-        return edgeTransition != null ? edgeTransition : EdgeTransitionMode.SCALE;
+        return edgeTransition != null ? edgeTransition : EdgeTransitionMode.CLIP;
     }
     
     // =========================================================================
@@ -183,7 +183,7 @@ public record RayFlowConfig(
         if (json.has("waveDistribution")) {
             waveDistribution = WaveDistribution.fromString(json.get("waveDistribution").getAsString());
         }
-        float waveCount = json.has("waveCount") ? json.get("waveCount").getAsFloat() : 1.0f;
+        float waveCount = json.has("waveCount") ? json.get("waveCount").getAsFloat() : 2.0f;
         
         TravelMode travel = TravelMode.NONE;
         if (json.has("travel")) {
@@ -200,7 +200,7 @@ public record RayFlowConfig(
         float flickerIntensity = json.has("flickerIntensity") ? json.get("flickerIntensity").getAsFloat() : 0.3f;
         float flickerFrequency = json.has("flickerFrequency") ? json.get("flickerFrequency").getAsFloat() : 5f;
         
-        EdgeTransitionMode edgeTransition = EdgeTransitionMode.SCALE;
+        EdgeTransitionMode edgeTransition = EdgeTransitionMode.CLIP;
         if (json.has("edgeTransition")) {
             edgeTransition = EdgeTransitionMode.fromString(json.get("edgeTransition").getAsString());
         }
@@ -242,7 +242,7 @@ public record RayFlowConfig(
         private float segmentLength = 1.0f;
         private float waveArc = 1.0f;
         private WaveDistribution waveDistribution = WaveDistribution.SEQUENTIAL;
-        private float waveCount = 1.0f;
+        private float waveCount = 2.0f;
         private TravelMode travel = TravelMode.NONE;
         private float travelSpeed = 1f;
         private int chaseCount = 1;
@@ -250,7 +250,7 @@ public record RayFlowConfig(
         private FlickerMode flicker = FlickerMode.NONE;
         private float flickerIntensity = 0.3f;
         private float flickerFrequency = 5f;
-        private EdgeTransitionMode edgeTransition = EdgeTransitionMode.SCALE;
+        private EdgeTransitionMode edgeTransition = EdgeTransitionMode.CLIP;
         
         public Builder length(LengthMode m) { this.length = m; return this; }
         public Builder lengthSpeed(float s) { this.lengthSpeed = s; return this; }
@@ -265,7 +265,7 @@ public record RayFlowConfig(
         public Builder flicker(FlickerMode m) { this.flicker = m; return this; }
         public Builder flickerIntensity(float i) { this.flickerIntensity = i; return this; }
         public Builder flickerFrequency(float f) { this.flickerFrequency = f; return this; }
-        public Builder edgeTransition(EdgeTransitionMode m) { this.edgeTransition = m != null ? m : EdgeTransitionMode.SCALE; return this; }
+        public Builder edgeTransition(EdgeTransitionMode m) { this.edgeTransition = m != null ? m : EdgeTransitionMode.CLIP; return this; }
         
         public RayFlowConfig build() {
             return new RayFlowConfig(

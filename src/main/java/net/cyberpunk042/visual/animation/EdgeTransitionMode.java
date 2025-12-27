@@ -45,14 +45,14 @@ public enum EdgeTransitionMode {
     /**
      * Parses from string, case-insensitive.
      * @param value String to parse
-     * @return Matching mode or SCALE if not found
+     * @return Matching mode or CLIP if not found
      */
     public static EdgeTransitionMode fromString(String value) {
-        if (value == null) return SCALE;
+        if (value == null) return CLIP;
         try {
             return valueOf(value.toUpperCase());
         } catch (IllegalArgumentException e) {
-            return SCALE;
+            return CLIP;
         }
     }
 }
