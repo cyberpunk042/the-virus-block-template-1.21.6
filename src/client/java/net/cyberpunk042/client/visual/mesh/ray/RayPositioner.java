@@ -208,11 +208,16 @@ public final class RayPositioner {
             // This TRANSLATES the ray segment along the Travel Axis (innerRadius to outerRadius)
             // For curved rays: the curve will be computed from these translated endpoints,
             // so the entire curved shape moves through the field correctly.
+            // 
+            // EXCEPTION: If followCurve=true, we DON'T translate endpoints.
+            // Instead, the curve stays fixed and visibleTStart/visibleTEnd slide the visible segment.
             boolean hasCurvature = curvature != null 
                 && curvature != RayCurvature.NONE 
                 && shape.curvatureIntensity() > 0.001f;
             
-            if (Math.abs(flowPositionOffset) > 0.001f) {
+            boolean shouldTranslate = Math.abs(flowPositionOffset) > 0.001f && !flowConfig.followCurve();
+            
+            if (shouldTranslate) {
                 start[0] += direction[0] * flowPositionOffset;
                 start[1] += direction[1] * flowPositionOffset;
                 start[2] += direction[2] * flowPositionOffset;
@@ -718,9 +723,10 @@ public final class RayPositioner {
             
             float phase;
             if (waveDist == net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS) {
-                // CONTINUOUS: Phase is scrambled by golden ratio, no sweep multiplication
-                // Each ray has a unique phase offset that doesn't correlate with angle
-                phase = (basePhase + rayAngle) % 1.0f;
+                // CONTINUOUS: All rays use the SAME phase - they animate together uniformly
+                // 360° coverage is achieved by skipping edge filtering (done elsewhere), not by phase scrambling
+                // Distribution (stochastic, radial, etc.) only affects ANGULAR placement
+                phase = basePhase;
             } else {
                 // SEQUENTIAL/RANDOM: Apply sweepCopies for sweep effect
                 phase = (basePhase + scaledAngle * sweepCopies) % 1.0f;
@@ -737,11 +743,24 @@ public final class RayPositioner {
             boolean progressiveSpawn = !flow.startFullLength();
             net.cyberpunk042.visual.animation.EdgeTransitionMode edgeMode = flow.effectiveEdgeTransition();
             
+            // Check if we're using follow-curve mode (slide segment along fixed curve)
+            boolean followCurve = flow.followCurve();
+            float segLen = flow.segmentLength();
+            
             switch (lengthMode) {
                 case RADIATE -> {
-                    // Ray travels outward: starts at inner, moves to outer
-                    // Position offset is based on phase (0 = inner, 1 = outer)
-                    posOffset = phase * rayLength;
+                    if (followCurve) {
+                        // FOLLOW CURVE: Animation slides a segment along the fixed curve
+                        // Scale phase by rayLength to match translate mode's visual speed
+                        // Then mod 1.0 to wrap around the curve
+                        float scaledPhase = (phase * rayLength) % 1.0f;
+                        tStart = scaledPhase * (1.0f - segLen);
+                        tEnd = tStart + segLen;
+                        // posOffset stays 0 (endpoints don't move)
+                    } else {
+                        // TRANSLATE: Endpoints move, curve drifts with them
+                        posOffset = phase * rayLength;
+                    }
                     
                     // Progressive spawn: ray appears during spawn phase, disappears during despawn
                     if (progressiveSpawn) {
@@ -759,15 +778,33 @@ public final class RayPositioner {
                         // Apply based on edge mode
                         switch (edgeMode) {
                             case SCALE -> scale = progress;
-                            case CLIP -> tEnd = progress;
+                            case CLIP -> {
+                                if (followCurve) {
+                                    // For followCurve, shrink the segment proportionally
+                                    float visibleLen = (tEnd - tStart) * progress;
+                                    tEnd = tStart + visibleLen;
+                                } else {
+                                    tEnd = progress;
+                                }
+                            }
                             case FADE -> alpha = progress;
                         }
                     }
                 }
                 case ABSORB -> {
-                    // Ray travels inward: starts at outer, moves to inner
-                    float reversed = 1.0f - phase;
-                    posOffset = reversed * rayLength;
+                    if (followCurve) {
+                        // FOLLOW CURVE: Animation slides a segment along the fixed curve (reversed)
+                        // Scale phase by rayLength to match translate mode's visual speed
+                        float reversed = 1.0f - phase;
+                        float scaledPhase = (reversed * rayLength) % 1.0f;
+                        tStart = scaledPhase * (1.0f - segLen);
+                        tEnd = tStart + segLen;
+                        // posOffset stays 0 (endpoints don't move)
+                    } else {
+                        // TRANSLATE: Endpoints move, curve drifts with them
+                        float reversed = 1.0f - phase;
+                        posOffset = reversed * rayLength;
+                    }
                     
                     // Progressive spawn: ray appears during spawn phase, disappears during despawn
                     if (progressiveSpawn) {
@@ -785,7 +822,15 @@ public final class RayPositioner {
                         // Apply based on edge mode
                         switch (edgeMode) {
                             case SCALE -> scale = progress;
-                            case CLIP -> tStart = 1.0f - progress;
+                            case CLIP -> {
+                                if (followCurve) {
+                                    // For followCurve, shrink the segment proportionally from start
+                                    float visibleLen = (tEnd - tStart) * progress;
+                                    tStart = tEnd - visibleLen;
+                                } else {
+                                    tStart = 1.0f - progress;
+                                }
+                            }
                             case FADE -> alpha = progress;
                         }
                     }
@@ -795,8 +840,7 @@ public final class RayPositioner {
                     scale = 0.5f + 0.5f * (float) Math.sin(phase * Math.PI * 2);
                 }
                 case SEGMENT -> {
-                    // Fixed segment visible
-                    float segLen = flow.segmentLength();
+                    // Fixed segment visible (uses segLen from above)
                     tStart = phase;
                     tEnd = phase + segLen;
                     if (tEnd > 1.0f) {

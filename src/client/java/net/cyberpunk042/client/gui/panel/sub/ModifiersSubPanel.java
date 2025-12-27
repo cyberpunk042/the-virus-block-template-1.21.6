@@ -392,6 +392,15 @@ public class ModifiersSubPanel extends BoundPanel {
         widgets.add(startFullToggle);
         c.advanceRow();
         
+        // Follow Curve toggle: ON = segment slides along fixed curve, OFF = curve drifts with animation
+        boolean curFollowCurve = flow != null && flow.followCurve();
+        CyclingButtonWidget<Boolean> followCurveToggle = GuiWidgets.toggle(
+            x, c.getCurrentY(), halfW, "Curve",
+            curFollowCurve, "ON = follow curve path",
+            v -> state.set("rayFlow.followCurve", v));
+        widgets.add(followCurveToggle);
+        c.advanceRow();
+        
         // Travel dropdown + Speed
         CyclingButtonWidget<TravelMode> travelDropdown = CyclingButtonWidget.<TravelMode>builder(
                 m -> Text.literal("Trav: " + m.displayName()))

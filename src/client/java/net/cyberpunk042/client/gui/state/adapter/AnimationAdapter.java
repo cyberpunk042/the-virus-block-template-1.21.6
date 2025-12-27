@@ -376,6 +376,7 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             case "flickerFrequency" -> rayFlow.flickerFrequency();
             case "edgeTransition" -> rayFlow.edgeTransition();
             case "startFullLength" -> rayFlow.startFullLength();
+            case "followCurve" -> rayFlow.followCurve();
             default -> null;
         };
     }
@@ -398,6 +399,7 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             case "flickerFrequency" -> b.flickerFrequency(toFloat(value));
             case "edgeTransition" -> b.edgeTransition(value instanceof EdgeTransitionMode em ? em : EdgeTransitionMode.fromString(value.toString()));
             case "startFullLength" -> b.startFullLength(toBool(value));
+            case "followCurve" -> b.followCurve(toBool(value));
         }
         this.rayFlow = b.build();
     }

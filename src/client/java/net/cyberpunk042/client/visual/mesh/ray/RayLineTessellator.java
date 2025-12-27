@@ -90,9 +90,9 @@ public class RayLineTessellator implements RayTypeTessellator {
         // Determine which direction the ray points (inward or outward)
         boolean rayPointsOutward = endDist > startDist;
         
-        // Start with full t-range
-        float tStart = 0.0f;
-        float tEnd = 1.0f;
+        // Start with t-range from context (may be modified by progressive spawn / startFullLength)
+        float tStart = context.visibleTStart();
+        float tEnd = context.visibleTEnd();
         
         // ========== SCALE MODE: Symmetric shrinking from center ==========
         // When flowScale < 1.0, shrink the line symmetrically from both ends
@@ -338,6 +338,10 @@ public class RayLineTessellator implements RayTypeTessellator {
         float shapeFrequency = context.lineShapeFrequency();
         float curvatureIntensity = context.curvatureIntensity();
         
+        // Get t-range from context (may be modified by progressive spawn / startFullLength)
+        float visibleTStart = context.visibleTStart();
+        float visibleTEnd = context.visibleTEnd();
+        
         // DOUBLE_HELIX: emit TWO intertwined helixes
         int helixCount = (lineShape == RayLineShape.DOUBLE_HELIX) ? 2 : 1;
         
@@ -387,7 +391,12 @@ public class RayLineTessellator implements RayTypeTessellator {
                 float vertexAlpha = contextFlowAlpha;
                 boolean visible = true;
                 
-                if (doEdgeFiltering && lengthMode != null) {
+                // Progressive spawn: check if t is within visible range (startFullLength=false clips here)
+                if (t < visibleTStart || t > visibleTEnd) {
+                    visible = false;
+                }
+                
+                if (visible && doEdgeFiltering && lengthMode != null) {
                     // Position-based edge detection for curved rays
                     float edgeFactor = 1.0f; // Default: fully visible
                     
