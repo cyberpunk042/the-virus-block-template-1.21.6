@@ -399,7 +399,7 @@ public final class ShapeWidgetSpec {
         SliderSpec.halfInt("Layers", "rays.layers", 1, 16),
         
         // Row: Layer Spacing + Layer Mode
-        SliderSpec.half("Layer Sp", "rays.layerSpacing", 0.1f, 2f, "%.2f"),
+        SliderSpec.half("Layer Sp", "rays.layerSpacing", 0.1f, 10f, "%.2f"),
         EnumDropdownSpec.half("Layer Mode", "rays.layerMode",
             net.cyberpunk042.visual.shape.RayLayerMode.class,
             net.cyberpunk042.visual.shape.RayLayerMode.VERTICAL),

@@ -140,14 +140,21 @@ public class RayLineTessellator implements RayTypeTessellator {
             baseLengthPhase = userPhase;
         }
         
-        // Add wave distribution offset for this ray
-        float waveOffset = net.cyberpunk042.client.visual.mesh.ray.flow.FlowPhaseStage.computeRayPhaseOffset(
-            shape, context.index(), context.count());
+        // Add wave distribution offset for this ray (ONLY during animation)
+        // In manual mode, all rays should have the same phase for consistent user control
+        float waveOffset = 0f;
+        if (animationPlaying) {
+            waveOffset = net.cyberpunk042.client.visual.mesh.ray.flow.FlowPhaseStage.computeRayPhaseOffset(
+                shape, context.index(), context.count());
+        }
         
-        // Add layer-based phase offset - layers are always staggered in phase
+        // Add layer-based phase offset (ONLY during animation)
+        // In manual mode: all layers have SAME phase (user controls visibility uniformly)
+        // In animated mode: layers are staggered to create cascading wave effect
         int layerCount = shape != null ? Math.max(1, shape.layers()) : 1;
         float layerOffset = 0f;
-        if (layerCount > 1) {
+        if (layerCount > 1 && animationPlaying) {
+            // During animation, spread layers evenly across the phase cycle
             layerOffset = (float) context.layerIndex() / layerCount;
         }
         
