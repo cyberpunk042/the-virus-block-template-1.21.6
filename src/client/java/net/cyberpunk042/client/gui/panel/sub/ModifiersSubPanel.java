@@ -319,7 +319,7 @@ public class ModifiersSubPanel extends BoundPanel {
         RayFlowConfig flow = state.rayFlow();
         
         // === RADIATIVE ANIMATION (enable/speed only - mode is in Shape) ===
-        boolean radiativeEnabled = flow == null || flow.radiativeEnabled();
+        boolean radiativeEnabled = flow != null && flow.radiativeEnabled();
         CyclingButtonWidget<Boolean> radiativeToggle = GuiWidgets.toggle(
             x, c.getCurrentY(), halfW, "Radiative",
             radiativeEnabled, "Enable radiative animation",

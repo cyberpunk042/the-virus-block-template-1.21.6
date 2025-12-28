@@ -217,7 +217,7 @@ public record RayFlowConfig(
     }
     
     public static class Builder {
-        private boolean radiativeEnabled = true;
+        private boolean radiativeEnabled = false;
         private float radiativeSpeed = 1f;
         private EnergyTravel travel = EnergyTravel.NONE;
         private boolean travelEnabled = false;

@@ -191,7 +191,7 @@ public class RaySphericalTessellator implements RayTypeTessellator {
         
         if (flowConfig != null && flowConfig.hasTravel()) {
             travelMode = flowConfig.effectiveTravel();
-            travelPhase = (context.time() * flowConfig.travelSpeed()) % 1.0f;
+            travelPhase = (context.time() * flowConfig.travelSpeed() * 0.3f) % 1.0f;
             chaseCount = flowConfig.chaseCount();
             chaseWidth = flowConfig.chaseWidth();
         }
