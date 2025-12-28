@@ -190,10 +190,10 @@ public final class RaysLineEmitter {
             
             // Emit both vertices of the line
             emitLineVertex(consumer, x0, y0, z0, x1, y1, z1, positionMatrix, normalMatrix,
-                          baseColor, baseAlpha, light, colorCtx, v0, flowConfig, time, segIdx, 
+                          baseColor, baseAlpha, light, colorCtx, v0, flowConfig, time, actualRayIndex, rayCount,
                           travelOffset, rayLengthPhase, fadeStart, fadeEnd, hasFade);
             emitLineVertex(consumer, x1, y1, z1, x0, y0, z0, positionMatrix, normalMatrix,
-                          baseColor, baseAlpha, light, colorCtx, v1, flowConfig, time, segIdx, 
+                          baseColor, baseAlpha, light, colorCtx, v1, flowConfig, time, actualRayIndex, rayCount,
                           travelOffset, rayLengthPhase, fadeStart, fadeEnd, hasFade);
         });
     }
@@ -207,7 +207,7 @@ public final class RaysLineEmitter {
                                  Matrix4f positionMatrix, Matrix3f normalMatrix,
                                  int baseColor, float baseAlpha, int light,
                                  ColorContext colorCtx, Vertex originalVertex,
-                                 RayFlowConfig flowConfig, float time, int rayIndex, 
+                                 RayFlowConfig flowConfig, float time, int rayIndex, int rayCount,
                                  float travelOffset, float lengthPhase,
                                  float fadeStart, float fadeEnd, boolean hasFade) {
         
@@ -228,10 +228,20 @@ public final class RaysLineEmitter {
         int vertexColor;
         if (colorCtx != null && colorCtx.isPerVertex()) {
             float rayT = originalVertex.u();
-            float centeredY = rayT - 0.5f;
+            
+            // For GRADIENT distribution, use normalized ray position across the whole mesh
+            // This makes the gradient span all rays, not repeat per-ray
+            // For INDEXED/RANDOM, cellIndex (rayIndex) handles it
+            float normalizedRayPos = rayCount > 1 ? (float) rayIndex / (rayCount - 1) : 0.5f;
+            
+            // Combine ray position with vertex t-position for 2D gradient
+            // Y axis: normalized ray position (0=first ray, 1=last ray)
+            // Vertex t: position along the ray (0=start, 1=end)
+            float gradientY = normalizedRayPos - 0.5f;  // Center around 0 for height normalization
+            
             vertexColor = colorCtx.calculateColor(
                 originalVertex.x(), 
-                centeredY,
+                gradientY,
                 originalVertex.z(), 
                 rayIndex
             );

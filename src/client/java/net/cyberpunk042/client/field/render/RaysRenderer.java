@@ -183,7 +183,7 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
             net.cyberpunk042.visual.fill.FillMode mode = fill != null ? fill.mode() : net.cyberpunk042.visual.fill.FillMode.SOLID;
             
             switch (mode) {
-                case SOLID -> emitRayTriangles(matrices, consumer, mesh, color, baseAlpha, light, colorCtx, 
+                case SOLID -> emitRayTriangles(matrices, consumer, mesh, shape, color, baseAlpha, light, colorCtx, 
                     waveConfig, time, flowConfig, motionConfig, wiggleConfig, twistConfig);
                 case WIREFRAME -> emitWireframe(matrices, consumer, mesh, color, light, fill, waveConfig, time);
                 case CAGE -> emitCage(matrices, consumer, mesh, color, light, fill, primitive, waveConfig, time);
@@ -199,13 +199,20 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
      * Supports Wave, Motion, Wiggle, Twist, and Flicker effects.
      */
     private void emitRayTriangles(MatrixStack matrices, VertexConsumer consumer,
-                                   Mesh mesh, int baseColor, float baseAlpha, int light,
+                                   Mesh mesh, RaysShape shape, int baseColor, float baseAlpha, int light,
                                    ColorContext colorCtx, WaveConfig waveConfig, float time,
                                    RayFlowConfig flowConfig, RayMotionConfig motionConfig,
                                    RayWiggleConfig wiggleConfig, RayTwistConfig twistConfig) {
         MatrixStack.Entry entry = matrices.peek();
         Matrix4f positionMatrix = entry.getPositionMatrix();
         Matrix3f normalMatrix = entry.getNormalMatrix();
+        
+        // Calculate ray count and triangles per ray for INDEXED/RANDOM distribution
+        int rayCount = shape != null ? Math.max(1, shape.count()) : 1;
+        int layerCount = shape != null ? Math.max(1, shape.layers()) : 1;
+        int totalRays = rayCount * layerCount;
+        int triangleCount = mesh.primitiveCount();
+        int trianglesPerRay = totalRays > 0 ? Math.max(1, triangleCount / totalRays) : 1;
         
         // Check if wave deformation should be applied
         boolean applyWave = waveConfig != null && waveConfig.isActive() && waveConfig.isCpuMode();
@@ -229,8 +236,10 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
         final int[] triIndex = {0};
         
         // Triangle rendering with optional effects
-        mesh.forEachTriangle((v0, v1, v2) -\u003e {
+        final int trisPerRay = trianglesPerRay;  // Capture for lambda
+        mesh.forEachTriangle((v0, v1, v2) -> {
             int idx = triIndex[0]++;
+            int rayIndex = idx / trisPerRay;  // Which ray this triangle belongs to
             
             Vertex w0 = v0, w1 = v1, w2 = v2;
             
@@ -248,11 +257,11 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
                 w2 = applyEffectChain(w2, effectChain, idx);
             }
             
-            // Emit vertices with flicker alpha
+            // Emit vertices with flicker alpha and ray index for INDEXED/RANDOM distribution
             float finalAlpha = baseAlpha * flickerAlpha;
-            emitVertex(consumer, positionMatrix, normalMatrix, w0, baseColor, finalAlpha, light, colorCtx);
-            emitVertex(consumer, positionMatrix, normalMatrix, w1, baseColor, finalAlpha, light, colorCtx);
-            emitVertex(consumer, positionMatrix, normalMatrix, w2, baseColor, finalAlpha, light, colorCtx);
+            emitVertex(consumer, positionMatrix, normalMatrix, w0, baseColor, finalAlpha, light, colorCtx, rayIndex);
+            emitVertex(consumer, positionMatrix, normalMatrix, w1, baseColor, finalAlpha, light, colorCtx, rayIndex);
+            emitVertex(consumer, positionMatrix, normalMatrix, w2, baseColor, finalAlpha, light, colorCtx, rayIndex);
         });
     }
     
@@ -291,14 +300,14 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
     }
     
     private void emitVertex(VertexConsumer consumer, Matrix4f positionMatrix, Matrix3f normalMatrix,
-                            Vertex v, int color, float alpha, int light, ColorContext colorCtx) {
+                            Vertex v, int color, float alpha, int light, ColorContext colorCtx, int cellIndex) {
         float x = v.x(), y = v.y(), z = v.z();
         float nx = v.nx(), ny = v.ny(), nz = v.nz();
         
-        // Apply color context if available
+        // Apply color context if available - pass cellIndex for INDEXED/RANDOM distribution
         int finalColor = color;
         if (colorCtx != null) {
-            finalColor = colorCtx.calculateColor(x, y, z, 0);
+            finalColor = colorCtx.calculateColor(x, y, z, cellIndex);
         }
         
         // Apply alpha (base alpha * vertex alpha from tessellation)
