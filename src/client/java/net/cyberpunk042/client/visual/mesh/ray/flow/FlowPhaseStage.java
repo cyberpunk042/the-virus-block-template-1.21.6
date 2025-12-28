@@ -91,7 +91,7 @@ public final class FlowPhaseStage implements FlowStage {
         }
         
         // Get wave config from shape
-        WaveDistribution waveDist = shape != null ? shape.effectiveWaveDistribution() : WaveDistribution.SEQUENTIAL;
+        WaveDistribution waveDist = shape != null ? shape.effectiveWaveDistribution() : WaveDistribution.CONTINUOUS;
         float waveArc = shape != null ? shape.effectiveWaveArc() : 1.0f;
         float waveCount = shape != null ? shape.effectiveWaveCount() : 2.0f;
         

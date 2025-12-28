@@ -597,9 +597,9 @@ public class ShapeSubPanel extends AbstractPanel {
                 net.cyberpunk042.visual.animation.WaveDistribution waveDist;
                 try {
                     waveDist = net.cyberpunk042.visual.animation.WaveDistribution.fromString(
-                        waveDistStr != null ? waveDistStr : "SEQUENTIAL");
+                        waveDistStr != null ? waveDistStr : "CONTINUOUS");
                 } catch (IllegalArgumentException e) {
-                    waveDist = net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL;
+                    waveDist = net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS;
                 }
                 
                 var waveDistDropdown = GuiWidgets.enumDropdown(

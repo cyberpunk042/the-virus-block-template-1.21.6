@@ -30,11 +30,11 @@ public enum WaveDistribution {
     }
     
     public static WaveDistribution fromString(String value) {
-        if (value == null || value.isEmpty()) return SEQUENTIAL;
+        if (value == null || value.isEmpty()) return CONTINUOUS;
         try {
             return valueOf(value.toUpperCase());
         } catch (IllegalArgumentException e) {
-            return SEQUENTIAL;
+            return CONTINUOUS;
         }
     }
 }

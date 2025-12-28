@@ -41,7 +41,7 @@ public record FlowContext(
     public FlowContext(RayFlowConfig config, int rayIndex, int rayCount, 
                        float time, float innerRadius, float outerRadius) {
         this(config, rayIndex, rayCount, time, innerRadius, outerRadius,
-             1.0f, WaveDistribution.SEQUENTIAL, 2.0f);
+             1.0f, WaveDistribution.CONTINUOUS, 2.0f);
     }
     
     /**
@@ -68,7 +68,7 @@ public record FlowContext(
             float time, float innerRadius, float outerRadius) {
         
         float waveArc = shape != null ? shape.effectiveWaveArc() : 1.0f;
-        WaveDistribution waveDist = shape != null ? shape.effectiveWaveDistribution() : WaveDistribution.SEQUENTIAL;
+        WaveDistribution waveDist = shape != null ? shape.effectiveWaveDistribution() : WaveDistribution.CONTINUOUS;
         float waveCount = shape != null ? shape.effectiveWaveCount() : 2.0f;
         
         return new FlowContext(config, rayIndex, rayCount, time, innerRadius, outerRadius,
