@@ -121,27 +121,40 @@ public class RayLineTessellator implements RayTypeTessellator {
         // Get flow config
         var flowConfig = context.flowConfig();
         
-        // Compute phase
+        // Get radiative mode first (needed to determine if animation should play)
+        var radiativeMode = shape != null ? shape.effectiveRadiativeInteraction() 
+            : net.cyberpunk042.visual.energy.RadiativeInteraction.NONE;
+        
+        // Compute phase - animation only plays when BOTH radiativeEnabled AND radiativeMode is active
         float userPhase = context.effectiveShapeState().phase();
-        boolean animationPlaying = flowConfig != null && flowConfig.hasRadiative();
+        boolean animationPlaying = flowConfig != null 
+            && flowConfig.hasRadiative() 
+            && radiativeMode.isActive();
+        
         float baseLengthPhase;
         if (animationPlaying) {
             float timeOffset = (context.time() * flowConfig.radiativeSpeed()) % 1.0f;
             if (timeOffset < 0) timeOffset += 1.0f;
-            baseLengthPhase = (userPhase + timeOffset) % 1.0f;
+            baseLengthPhase = timeOffset;  // Don't add userPhase here - let it control position offset
         } else {
             baseLengthPhase = userPhase;
         }
         
-        // Add wave distribution offset
+        // Add wave distribution offset for this ray
         float waveOffset = net.cyberpunk042.client.visual.mesh.ray.flow.FlowPhaseStage.computeRayPhaseOffset(
             shape, context.index(), context.count());
-        float rayPhase = (baseLengthPhase + waveOffset) % 1.0f;
+        
+        // Add layer-based phase offset - layers are always staggered in phase
+        int layerCount = shape != null ? Math.max(1, shape.layers()) : 1;
+        float layerOffset = 0f;
+        if (layerCount > 1) {
+            layerOffset = (float) context.layerIndex() / layerCount;
+        }
+        
+        float rayPhase = (baseLengthPhase + waveOffset + layerOffset) % 1.0f;
         if (rayPhase < 0) rayPhase += 1.0f;
         
         // Get clipRange from RadiativeInteraction
-        var radiativeMode = shape != null ? shape.effectiveRadiativeInteraction() 
-            : net.cyberpunk042.visual.energy.RadiativeInteraction.NONE;
         float segmentLength = shape != null ? shape.effectiveSegmentLength() : 1.0f;
         boolean startFullLength = shape != null && shape.startFullLength();
         
