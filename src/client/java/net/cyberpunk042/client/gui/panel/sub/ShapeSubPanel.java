@@ -412,19 +412,19 @@ public class ShapeSubPanel extends AbstractPanel {
                 widgets.add(fadeEndSlider);
                 y += step;
                 
-                // === SEGMENTATION (LINE only) ===
-                // Segments + Segment Gap
+                // === DASHED LINES (LINE only) ===
+                // Dash Count + Dash Gap
                 int segs = state.getInt("rays.segments");
                 var segsSlider = GuiWidgets.slider(x, y, halfW,
-                    "Segments", 1, 10, segs, "%d", 
-                    "Number of dashed segments per ray",
+                    "Dash Count", 1, 10, segs, "%d", 
+                    "Number of dashed segments per ray (1 = solid)",
                     v -> onUserChange(() -> state.set("rays.segments", Math.round(v))));
                 widgets.add(segsSlider);
                 
                 float segGap = state.getFloat("rays.segmentGap");
                 var segGapSlider = GuiWidgets.slider(x + halfW + GuiConstants.PADDING, y, halfW,
-                    "Seg Gap", 0f, 0.5f, segGap, "%.2f", 
-                    "Gap between dashed segments",
+                    "Dash Gap", 0f, 0.5f, segGap, "%.2f", 
+                    "Gap between dashes (0 = no gap)",
                     v -> onUserChange(() -> state.set("rays.segmentGap", v)));
                 widgets.add(segGapSlider);
                 y += step;
@@ -471,11 +471,11 @@ public class ShapeSubPanel extends AbstractPanel {
                     y += step;
                 }
                 
-                // Line Segments (vertex count for travel animations)
+                // Curve Resolution (vertex count for curved/animated rays)
                 int lineSegs = state.getInt("rays.shapeSegments");
                 var lineSegsSlider = GuiWidgets.slider(x, y, w,
-                    "Line Segments", 1, 256, lineSegs, "%d", 
-                    "Vertex count per ray (more = smoother travel animations)",
+                    "Curve Res", 1, 256, lineSegs, "%d", 
+                    "Vertex count per ray (more = smoother curves)",
                     v -> onUserChange(() -> state.set("rays.shapeSegments", Math.round(v))));
                 widgets.add(lineSegsSlider);
                 y += step;
@@ -533,6 +533,155 @@ public class ShapeSubPanel extends AbstractPanel {
                     "Mesh resolution for 3D shapes (more = smoother)",
                     v -> onUserChange(() -> state.set("rays.shapeSegments", Math.round(v))));
                 widgets.add(segs3DSlider);
+                y += step;
+            }
+            
+            // ═══════════════════════════════════════════════════════════════════
+            // ENERGY INTERACTION (radiative mode - defines WHAT shape looks like)
+            // ═══════════════════════════════════════════════════════════════════
+            
+            // RadiativeInteraction dropdown
+            String radiativeStr = state.getString("rays.radiativeInteraction");
+            net.cyberpunk042.visual.energy.RadiativeInteraction radiative;
+            try {
+                radiative = net.cyberpunk042.visual.energy.RadiativeInteraction.fromString(
+                    radiativeStr != null ? radiativeStr : "NONE");
+            } catch (IllegalArgumentException e) {
+                radiative = net.cyberpunk042.visual.energy.RadiativeInteraction.NONE;
+            }
+            
+            var radiativeDropdown = GuiWidgets.enumDropdown(
+                x, y, w, GuiConstants.COMPACT_HEIGHT, "Energy Mode",
+                net.cyberpunk042.visual.energy.RadiativeInteraction.class,
+                radiative, "How energy interacts with rays (animates on Modifiers panel)",
+                v -> {
+                    state.set("rays.radiativeInteraction", v.name());
+                    rebuildForCurrentShape();
+                    if (shapeChangedCallback != null) {
+                        shapeChangedCallback.run();
+                    }
+                });
+            widgets.add(radiativeDropdown);
+            y += step;
+            
+            // Conditional: Show segment length + wave params when radiative != NONE
+            if (radiative.isActive()) {
+                
+                // Segment Length (visible portion)
+                float segLen = state.getFloat("rays.segmentLength");
+                var segLenSlider = GuiWidgets.slider(x, y, halfW,
+                    "Seg Len", 0.1f, 1f, segLen, "%.2f", 
+                    "Visible ray portion (1 = full ray)",
+                    v -> onUserChange(() -> state.set("rays.segmentLength", v)));
+                widgets.add(segLenSlider);
+                
+                // Wave Arc (phase scaling)
+                float waveArc = state.getFloat("rays.waveArc");
+                var waveArcSlider = GuiWidgets.slider(x + halfW + GuiConstants.PADDING, y, halfW,
+                    "Wave Arc", 0.1f, 10f, waveArc, "%.1f", 
+                    "Phase scale (higher = faster cycling)",
+                    v -> onUserChange(() -> state.set("rays.waveArc", v)));
+                widgets.add(waveArcSlider);
+                y += step;
+                
+                // Wave Count (sweep copies)
+                float waveCount = state.getFloat("rays.waveCount");
+                var waveCountSlider = GuiWidgets.slider(x, y, halfW,
+                    "Sweep #", 0.1f, 5f, waveCount, "%.1f", 
+                    "Arc copies (2 = two sweeps 180° apart)",
+                    v -> onUserChange(() -> state.set("rays.waveCount", v)));
+                widgets.add(waveCountSlider);
+                
+                // Wave Distribution dropdown (SEQUENTIAL vs RANDOM vs CONTINUOUS)
+                String waveDistStr = state.getString("rays.waveDistribution");
+                net.cyberpunk042.visual.animation.WaveDistribution waveDist;
+                try {
+                    waveDist = net.cyberpunk042.visual.animation.WaveDistribution.fromString(
+                        waveDistStr != null ? waveDistStr : "SEQUENTIAL");
+                } catch (IllegalArgumentException e) {
+                    waveDist = net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL;
+                }
+                
+                var waveDistDropdown = GuiWidgets.enumDropdown(
+                    x + halfW + GuiConstants.PADDING, y, halfW, GuiConstants.COMPACT_HEIGHT, "Wave",
+                    net.cyberpunk042.visual.animation.WaveDistribution.class,
+                    waveDist, "Wave pattern (sequential/random/continuous)",
+                    v -> onUserChange(() -> state.set("rays.waveDistribution", v.name())));
+                widgets.add(waveDistDropdown);
+                y += step;
+                
+                // Start Full Length + Follow Curve (side by side)
+                boolean startFull = state.getBool("rays.startFullLength");
+                var startFullToggle = GuiWidgets.toggle(
+                    x, y, halfW, "Full Length",
+                    startFull, "ON = rays spawn at full length",
+                    v -> onUserChange(() -> state.set("rays.startFullLength", v)));
+                widgets.add(startFullToggle);
+                
+                boolean followCurve = state.getBool("rays.followCurve");
+                var followCurveToggle = GuiWidgets.toggle(
+                    x + halfW + GuiConstants.PADDING, y, halfW, "Follow Curve",
+                    followCurve, "Segment follows the curve path",
+                    v -> onUserChange(() -> state.set("rays.followCurve", v)));
+                widgets.add(followCurveToggle);
+                y += step;
+                
+                // === STAGE/PHASE CONTROL ===
+                // Read current shapeState (or create default)
+                Object shapeStateObj = state.get("rays.shapeState");
+                net.cyberpunk042.visual.shape.ShapeState<net.cyberpunk042.visual.shape.RayFlowStage> currentShapeState;
+                if (shapeStateObj instanceof net.cyberpunk042.visual.shape.ShapeState<?>) {
+                    @SuppressWarnings("unchecked")
+                    var cast = (net.cyberpunk042.visual.shape.ShapeState<net.cyberpunk042.visual.shape.RayFlowStage>) shapeStateObj;
+                    currentShapeState = cast;
+                } else {
+                    // Default: ACTIVE stage, phase 1.0 (full visibility)
+                    currentShapeState = new net.cyberpunk042.visual.shape.ShapeState<>(
+                        net.cyberpunk042.visual.shape.RayFlowStage.ACTIVE,
+                        1.0f,
+                        net.cyberpunk042.visual.shape.EdgeTransitionMode.CLIP
+                    );
+                }
+                
+                boolean isStageActive = currentShapeState.stage() == net.cyberpunk042.visual.shape.RayFlowStage.ACTIVE;
+                float phase = currentShapeState.phase();
+                
+                var stageToggle = GuiWidgets.toggle(
+                    x, y, halfW, "Stage: Active",
+                    isStageActive, "ACTIVE = full shape, OFF = SPAWNING stage",
+                    v -> onUserChange(() -> {
+                        // Get current state, create new with modified stage
+                        Object curObj = state.get("rays.shapeState");
+                        net.cyberpunk042.visual.shape.RayFlowStage newStage = v 
+                            ? net.cyberpunk042.visual.shape.RayFlowStage.ACTIVE 
+                            : net.cyberpunk042.visual.shape.RayFlowStage.SPAWNING;
+                        float curPhase = 0.5f;
+                        net.cyberpunk042.visual.shape.EdgeTransitionMode curEdge = net.cyberpunk042.visual.shape.EdgeTransitionMode.CLIP;
+                        if (curObj instanceof net.cyberpunk042.visual.shape.ShapeState<?> ss) {
+                            curPhase = ss.phase();
+                            curEdge = ss.edgeMode();
+                        }
+                        state.set("rays.shapeState", new net.cyberpunk042.visual.shape.ShapeState<>(newStage, curPhase, curEdge));
+                    }));
+                widgets.add(stageToggle);
+                
+                var phaseSlider = GuiWidgets.slider(x + halfW + GuiConstants.PADDING, y, halfW,
+                    "Phase", 0f, 1f, phase, "%.2f", 
+                    "Animation phase (0=start, 1=end)",
+                    v -> onUserChange(() -> {
+                        // Get current state, create new with modified phase
+                        Object curObj = state.get("rays.shapeState");
+                        net.cyberpunk042.visual.shape.RayFlowStage curStage = net.cyberpunk042.visual.shape.RayFlowStage.ACTIVE;
+                        net.cyberpunk042.visual.shape.EdgeTransitionMode curEdge = net.cyberpunk042.visual.shape.EdgeTransitionMode.CLIP;
+                        if (curObj instanceof net.cyberpunk042.visual.shape.ShapeState<?> ss) {
+                            if (ss.stage() instanceof net.cyberpunk042.visual.shape.RayFlowStage rfs) {
+                                curStage = rfs;
+                            }
+                            curEdge = ss.edgeMode();
+                        }
+                        state.set("rays.shapeState", new net.cyberpunk042.visual.shape.ShapeState<>(curStage, v, curEdge));
+                    }));
+                widgets.add(phaseSlider);
                 y += step;
             }
             

@@ -1,5 +1,9 @@
 package net.cyberpunk042.client.visual.mesh.ray;
 
+import net.cyberpunk042.client.visual.mesh.ray.geometry.CurvatureFactory;
+import net.cyberpunk042.client.visual.mesh.ray.geometry.CurvatureStrategy;
+import net.cyberpunk042.client.visual.mesh.ray.geometry.LineShapeFactory;
+import net.cyberpunk042.client.visual.mesh.ray.geometry.LineShapeStrategy;
 import net.cyberpunk042.visual.shape.RayCurvature;
 import net.cyberpunk042.visual.shape.RayLineShape;
 
@@ -141,84 +145,32 @@ public final class RayGeometryUtils {
     
     /**
      * Computes line shape offset with an additional phase offset.
-     * Used for DOUBLE_HELIX to create the 180° apart second strand.
+     * <p>Delegates to {@link LineShapeFactory} for strategy-based computation.</p>
+     * 
+     * @param lineShape Line shape type
+     * @param t Parametric position (0 = start, 1 = end)
+     * @param amplitude How pronounced the shape is
+     * @param frequency Number of waves/coils along the ray
+     * @param right The "right" perpendicular vector
+     * @param up The "up" perpendicular vector
+     * @param phaseOffset Phase offset (e.g., for second strand in DOUBLE_HELIX)
+     * @return [x, y, z] offset to add to base position
      */
     public static float[] computeLineShapeOffsetWithPhase(RayLineShape lineShape, float t,
                                                            float amplitude, float frequency,
                                                            float[] right, float[] up, float phaseOffset) {
+        
+        // Use strategy pattern for line shape computation
+        LineShapeStrategy strategy = LineShapeFactory.get(lineShape);
+        
+        // Get frame-relative offset [right_amount, up_amount, 0]
+        float[] relativeOffset = strategy.computeOffset(t, amplitude, frequency, phaseOffset);
+        
+        // Transform to world space using perpendicular frame
         float[] offset = new float[3];
-        
-        if (lineShape == null || lineShape == RayLineShape.STRAIGHT) {
-            return offset;
-        }
-        
-        float theta = t * frequency * TWO_PI + phaseOffset;
-        
-        switch (lineShape) {
-            case SINE_WAVE -> {
-                float wave = amplitude * (float) Math.sin(theta);
-                offset[0] = right[0] * wave;
-                offset[1] = right[1] * wave;
-                offset[2] = right[2] * wave;
-            }
-            
-            case CORKSCREW, DOUBLE_HELIX -> {
-                float cos = (float) Math.cos(theta) * amplitude;
-                float sin = (float) Math.sin(theta) * amplitude;
-                offset[0] = right[0] * cos + up[0] * sin;
-                offset[1] = right[1] * cos + up[1] * sin;
-                offset[2] = right[2] * cos + up[2] * sin;
-            }
-            
-            case SPRING -> {
-                float springTheta = t * frequency * 0.5f * TWO_PI + phaseOffset;
-                float cos = (float) Math.cos(springTheta) * amplitude;
-                float sin = (float) Math.sin(springTheta) * amplitude * 0.8f;
-                offset[0] = right[0] * cos + up[0] * sin;
-                offset[1] = right[1] * cos + up[1] * sin;
-                offset[2] = right[2] * cos + up[2] * sin;
-            }
-            
-            case ZIGZAG -> {
-                float phase = (t * frequency) % 1.0f;
-                float triangle = phase < 0.5f ? (phase * 4 - 1) : (3 - phase * 4);
-                float wave = amplitude * triangle;
-                offset[0] = right[0] * wave;
-                offset[1] = right[1] * wave;
-                offset[2] = right[2] * wave;
-            }
-            
-            case SAWTOOTH -> {
-                float phase = (t * frequency) % 1.0f;
-                float wave = amplitude * (phase * 2 - 1);
-                offset[0] = right[0] * wave;
-                offset[1] = right[1] * wave;
-                offset[2] = right[2] * wave;
-            }
-            
-            case SQUARE_WAVE -> {
-                float wave = amplitude * (Math.sin(theta) > 0 ? 1f : -1f);
-                offset[0] = right[0] * wave;
-                offset[1] = right[1] * wave;
-                offset[2] = right[2] * wave;
-            }
-            
-            case ARC -> {
-                float curve = amplitude * (float) Math.sin(t * PI);
-                offset[0] = up[0] * curve;
-                offset[1] = up[1] * curve;
-                offset[2] = up[2] * curve;
-            }
-            
-            case S_CURVE -> {
-                float curve = amplitude * (float) Math.sin(t * TWO_PI);
-                offset[0] = right[0] * curve;
-                offset[1] = right[1] * curve;
-                offset[2] = right[2] * curve;
-            }
-            
-            default -> {} // STRAIGHT or unknown
-        }
+        offset[0] = right[0] * relativeOffset[0] + up[0] * relativeOffset[1];
+        offset[1] = right[1] * relativeOffset[0] + up[1] * relativeOffset[1];
+        offset[2] = right[2] * relativeOffset[0] + up[2] * relativeOffset[1];
         
         return offset;
     }
@@ -229,6 +181,7 @@ public final class RayGeometryUtils {
     
     /**
      * Computes a curved position along the ray based on curvature mode.
+     * <p>Delegates to {@link CurvatureFactory} for strategy-based computation.</p>
      * 
      * @param start Ray start position
      * @param end Ray end position
@@ -244,17 +197,8 @@ public final class RayGeometryUtils {
         }
         
         float[] pos = interpolate(start, end, t);
-        float angle = computeCurvatureAngle(curvature, t) * intensity;
-        
-        // Rotate around Y axis (simplified curvature)
-        float cos = (float) Math.cos(angle);
-        float sin = (float) Math.sin(angle);
-        float x = pos[0] * cos - pos[2] * sin;
-        float z = pos[0] * sin + pos[2] * cos;
-        pos[0] = x;
-        pos[2] = z;
-        
-        return pos;
+        CurvatureStrategy strategy = CurvatureFactory.get(curvature);
+        return strategy.apply(pos, t, intensity, start);
     }
     
     /**
@@ -295,23 +239,6 @@ public final class RayGeometryUtils {
         normalize(tangent);
         
         return tangent;
-    }
-    
-    /**
-     * Computes the base angle offset for a given curvature mode.
-     */
-    public static float computeCurvatureAngle(RayCurvature curvature, float t) {
-        if (curvature == null) return 0;
-        
-        return switch (curvature) {
-            case NONE -> 0;
-            case VORTEX -> t * PI * 0.5f;
-            case SPIRAL_ARM -> t * PI;
-            case TANGENTIAL -> PI * 0.5f; // Always 90 degrees
-            case LOGARITHMIC -> (float) Math.log(1 + t * 3) * PI * 0.5f;
-            case PINWHEEL -> t * PI * 0.75f;
-            case ORBITAL -> t * TWO_PI;
-        };
     }
     
     // ═══════════════════════════════════════════════════════════════════════════

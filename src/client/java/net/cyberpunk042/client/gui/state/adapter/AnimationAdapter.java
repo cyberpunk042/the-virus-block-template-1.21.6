@@ -361,22 +361,19 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
     private Object getRayFlowProperty(String prop) {
         if (rayFlow == null) return null;
         return switch (prop) {
-            case "length" -> rayFlow.length();
-            case "lengthSpeed" -> rayFlow.lengthSpeed();
-            case "segmentLength" -> rayFlow.segmentLength();
-            case "waveArc" -> rayFlow.waveArc();
-            case "waveDistribution" -> rayFlow.waveDistribution();
-            case "waveCount" -> rayFlow.waveCount();
+            case "radiativeEnabled" -> rayFlow.radiativeEnabled();
+            case "radiativeSpeed" -> rayFlow.radiativeSpeed();
             case "travel" -> rayFlow.travel();
+            case "travelEnabled" -> rayFlow.travelEnabled();
             case "travelSpeed" -> rayFlow.travelSpeed();
             case "chaseCount" -> rayFlow.chaseCount();
             case "chaseWidth" -> rayFlow.chaseWidth();
             case "flicker" -> rayFlow.flicker();
+            case "flickerEnabled" -> rayFlow.flickerEnabled();
             case "flickerIntensity" -> rayFlow.flickerIntensity();
             case "flickerFrequency" -> rayFlow.flickerFrequency();
-            case "edgeTransition" -> rayFlow.edgeTransition();
-            case "startFullLength" -> rayFlow.startFullLength();
-            case "followCurve" -> rayFlow.followCurve();
+            case "skipSpawnTransition" -> rayFlow.skipSpawnTransition();
+            case "pathFollowing" -> rayFlow.pathFollowing();
             default -> null;
         };
     }
@@ -384,22 +381,21 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
     private void setRayFlowProperty(String prop, Object value) {
         RayFlowConfig.Builder b = rayFlow != null ? rayFlow.toBuilder() : RayFlowConfig.builder();
         switch (prop) {
-            case "length" -> b.length(value instanceof LengthMode lm ? lm : LengthMode.fromString(value.toString()));
-            case "lengthSpeed" -> b.lengthSpeed(toFloat(value));
-            case "segmentLength" -> b.segmentLength(toFloat(value));
-            case "waveArc" -> b.waveArc(toFloat(value));
-            case "waveDistribution" -> b.waveDistribution(value instanceof WaveDistribution wd ? wd : WaveDistribution.fromString(value.toString()));
-            case "waveCount" -> b.waveCount(toFloat(value));
-            case "travel" -> b.travel(value instanceof TravelMode tm ? tm : TravelMode.fromString(value.toString()));
+            case "radiativeEnabled" -> b.radiativeEnabled(toBool(value));
+            case "radiativeSpeed" -> b.radiativeSpeed(toFloat(value));
+            case "travel" -> b.travel(value instanceof net.cyberpunk042.visual.energy.EnergyTravel et 
+                ? et : net.cyberpunk042.visual.energy.EnergyTravel.fromString(value.toString()));
+            case "travelEnabled" -> b.travelEnabled(toBool(value));
             case "travelSpeed" -> b.travelSpeed(toFloat(value));
             case "chaseCount" -> b.chaseCount(toInt(value));
             case "chaseWidth" -> b.chaseWidth(toFloat(value));
-            case "flicker" -> b.flicker(value instanceof FlickerMode fm ? fm : FlickerMode.fromString(value.toString()));
+            case "flicker" -> b.flicker(value instanceof net.cyberpunk042.visual.energy.EnergyFlicker ef 
+                ? ef : net.cyberpunk042.visual.energy.EnergyFlicker.fromString(value.toString()));
+            case "flickerEnabled" -> b.flickerEnabled(toBool(value));
             case "flickerIntensity" -> b.flickerIntensity(toFloat(value));
             case "flickerFrequency" -> b.flickerFrequency(toFloat(value));
-            case "edgeTransition" -> b.edgeTransition(value instanceof EdgeTransitionMode em ? em : EdgeTransitionMode.fromString(value.toString()));
-            case "startFullLength" -> b.startFullLength(toBool(value));
-            case "followCurve" -> b.followCurve(toBool(value));
+            case "skipSpawnTransition" -> b.skipSpawnTransition(toBool(value));
+            case "pathFollowing" -> b.pathFollowing(toBool(value));
         }
         this.rayFlow = b.build();
     }

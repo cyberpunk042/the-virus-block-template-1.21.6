@@ -329,6 +329,11 @@ public class FieldEditState {
         return v instanceof Number ? ((Number) v).floatValue() : 0f;
     }
     
+    public float getFloatOr(String path, float defaultValue) {
+        Object v = get(path);
+        return v instanceof Number ? ((Number) v).floatValue() : defaultValue;
+    }
+    
     public boolean getBool(String path) {
         Object v = get(path);
         return v instanceof Boolean && (Boolean) v;

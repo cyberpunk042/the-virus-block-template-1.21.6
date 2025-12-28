@@ -3,7 +3,9 @@ package net.cyberpunk042.client.visual.mesh.ray;
 import net.cyberpunk042.visual.animation.RayFlowConfig;
 import net.cyberpunk042.visual.animation.WaveConfig;
 import net.cyberpunk042.visual.shape.RayCurvature;
+import net.cyberpunk042.visual.shape.RayFlowStage;
 import net.cyberpunk042.visual.shape.RayLineShape;
+import net.cyberpunk042.visual.shape.ShapeState;
 
 /**
  * Computed context for a single ray, containing all position and shape data.
@@ -137,17 +139,8 @@ public record RayContext(
     /** Outer radius of the field (for geometric edge clipping). */
     float outerRadius,
     
-    /** Animated scale factor (for SCALE edge transition). */
-    float flowScale,
-    
-    /** Visibility range start (for CLIP edge transition, 0-1). */
-    float visibleTStart,
-    
-    /** Visibility range end (for CLIP edge transition, 0-1). */
-    float visibleTEnd,
-    
-    /** Base alpha from flow animation (flicker, etc.). */
-    float flowAlpha,
+    // NOTE: flowScale, visibleTStart, visibleTEnd, flowAlpha REMOVED
+    // These are now computed by TessEdgeModeFactory via computeEdgeResult()
     
     // ═══════════════════════════════════════════════════════════════════════════
     // Field Deformation (gravitational distortion)
@@ -163,7 +156,14 @@ public record RayContext(
     float normalizedDistance,
     
     /** Computed axial stretch from field deformation. */
-    float fieldStretch
+    float fieldStretch,
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Shape State (Stage/Phase model)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /** Shape lifecycle state (stage, phase, edgeMode). */
+    ShapeState<RayFlowStage> shapeState
 ) {
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -232,6 +232,32 @@ public record RayContext(
         return fadeStart != fadeEnd || fadeStart < 1.0f || fadeEnd < 1.0f;
     }
     
+    /**
+     * Returns the shape state, defaulting to ACTIVE at full phase.
+     */
+    public ShapeState<RayFlowStage> effectiveShapeState() {
+        if (shapeState != null) {
+            return shapeState;
+        }
+        // Default: fully active state
+        return new ShapeState<>(RayFlowStage.ACTIVE, 1.0f, net.cyberpunk042.visual.shape.EdgeTransitionMode.CLIP);
+    }
+    
+    /**
+     * Computes edge result from shapeState using TessEdgeModeFactory.
+     * 
+     * <p>This provides stage/phase-based edge transitions:
+     * <ul>
+     *   <li>DORMANT → hidden</li>
+     *   <li>SPAWNING → partial visibility based on phase</li>
+     *   <li>ACTIVE → fully visible</li>
+     *   <li>DESPAWNING → partial visibility based on phase</li>
+     * </ul>
+     */
+    public net.cyberpunk042.client.visual.mesh.ray.tessellation.TessEdgeResult computeEdgeResult() {
+        return net.cyberpunk042.client.visual.mesh.ray.tessellation.TessEdgeModeFactory.compute(effectiveShapeState());
+    }
+    
     // ═══════════════════════════════════════════════════════════════════════════
     // Builder
     // ═══════════════════════════════════════════════════════════════════════════
@@ -271,14 +297,12 @@ public record RayContext(
         private float travelRange = 1.0f;
         private float innerRadius = 0.0f;
         private float outerRadius = 1.0f;
-        private float flowScale = 1.0f;
-        private float visibleTStart = 0.0f;
-        private float visibleTEnd = 1.0f;
-        private float flowAlpha = 1.0f;
+        // NOTE: flowScale, visibleTStart, visibleTEnd, flowAlpha REMOVED from Builder
         private net.cyberpunk042.visual.shape.FieldDeformationMode fieldDeformation = net.cyberpunk042.visual.shape.FieldDeformationMode.NONE;
         private float fieldDeformationIntensity = 0.0f;
         private float normalizedDistance = 0.0f;
         private float fieldStretch = 1.0f;
+        private ShapeState<RayFlowStage> shapeState = null;
         
         public Builder start(float[] v) { 
             this.start = v != null ? v : new float[3]; 
@@ -338,14 +362,11 @@ public record RayContext(
         public Builder travelRange(float v) { this.travelRange = v; return this; }
         public Builder innerRadius(float v) { this.innerRadius = v; return this; }
         public Builder outerRadius(float v) { this.outerRadius = v; return this; }
-        public Builder flowScale(float v) { this.flowScale = v; return this; }
-        public Builder visibleTStart(float v) { this.visibleTStart = v; return this; }
-        public Builder visibleTEnd(float v) { this.visibleTEnd = v; return this; }
-        public Builder flowAlpha(float v) { this.flowAlpha = v; return this; }
         public Builder fieldDeformation(net.cyberpunk042.visual.shape.FieldDeformationMode v) { this.fieldDeformation = v != null ? v : net.cyberpunk042.visual.shape.FieldDeformationMode.NONE; return this; }
         public Builder fieldDeformationIntensity(float v) { this.fieldDeformationIntensity = v; return this; }
         public Builder normalizedDistance(float v) { this.normalizedDistance = v; return this; }
         public Builder fieldStretch(float v) { this.fieldStretch = v; return this; }
+        public Builder shapeState(ShapeState<RayFlowStage> v) { this.shapeState = v; return this; }
         
         /**
          * Computes direction from start and end, and sets length.
@@ -374,9 +395,9 @@ public record RayContext(
                 orientation, orientationVector,
                 shapeIntensity, shapeLength,
                 wave, time, hasWave,
-                flowConfig, flowPositionOffset, travelRange, innerRadius, outerRadius, flowScale,
-                visibleTStart, visibleTEnd, flowAlpha,
-                fieldDeformation, fieldDeformationIntensity, normalizedDistance, fieldStretch
+                flowConfig, flowPositionOffset, travelRange, innerRadius, outerRadius,
+                fieldDeformation, fieldDeformationIntensity, normalizedDistance, fieldStretch,
+                shapeState
             );
         }
     }

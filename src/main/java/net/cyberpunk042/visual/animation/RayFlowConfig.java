@@ -3,73 +3,59 @@ package net.cyberpunk042.visual.animation;
 import com.google.gson.JsonObject;
 import net.cyberpunk042.util.json.JsonField;
 import net.cyberpunk042.util.json.JsonSerializer;
+import net.cyberpunk042.visual.energy.EnergyFlicker;
+import net.cyberpunk042.visual.energy.EnergyTravel;
 import net.cyberpunk042.visual.validation.Range;
 import net.cyberpunk042.visual.validation.ValueRange;
 
 /**
- * Configuration for ray FLOW animation (alpha/visibility effects).
+ * Configuration for ray FLOW animation timing and controls.
  * 
- * <p>Flow animation controls how visibility is distributed and animated
- * along the ray's parametric length (t=0 to t=1). Unlike Motion which
- * transforms geometry, Flow only affects alpha/color.</p>
+ * <p>This config controls WHEN and HOW FAST animations run,
+ * NOT what they look like. Visual appearance is controlled by
+ * {@code RadiativeInteraction} in {@code RaysShape}.</p>
  * 
- * <h2>Three Composable Axes</h2>
+ * <h2>Architecture (Energy Interaction Model)</h2>
  * <ul>
- *   <li><b>Length</b>: How much of the ray is visible (RADIATE, ABSORB, PULSE)</li>
- *   <li><b>Travel</b>: Where visibility window is positioned (CHASE, SCROLL)</li>
- *   <li><b>Flicker</b>: Random/rhythmic alpha overlay (SCINTILLATION, STROBE)</li>
+ *   <li><b>RaysShape.radiativeInteraction</b>: WHAT it looks like at phase X</li>
+ *   <li><b>RayFlowConfig</b>: Enable/speed controls for WHEN phase changes</li>
  * </ul>
  * 
- * <h2>Wave Configuration</h2>
+ * <h2>Animation Axes</h2>
  * <ul>
- *   <li><b>waveArc</b>: How much of the circle is lit at once (0.25=90°, 0.5=180°, 1.0=360°)</li>
- *   <li><b>waveDistribution</b>: SEQUENTIAL (rotating wedge) vs RANDOM (scattered)</li>
+ *   <li><b>Radiative</b>: Enable/speed for EMISSION/ABSORPTION animation</li>
+ *   <li><b>Travel</b>: Chase/scroll particles along the ray</li>
+ *   <li><b>Flicker</b>: Random/rhythmic alpha overlay</li>
  * </ul>
  * 
- * <p>All axes can be combined simultaneously for complex effects.</p>
- * 
- * @see LengthMode
- * @see TravelMode
- * @see FlickerMode
- * @see WaveDistribution
+ * @see net.cyberpunk042.visual.energy.RadiativeInteraction
+ * @see net.cyberpunk042.visual.energy.EnergyTravel
+ * @see net.cyberpunk042.visual.energy.EnergyFlicker
  * @see Animation
  */
 public record RayFlowConfig(
-    // === Length Axis ===
-    @JsonField(skipIfDefault = true) LengthMode length,
-    @Range(ValueRange.UNBOUNDED) @JsonField(skipIfDefault = true) float lengthSpeed,
-    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "1.0") float segmentLength,
+    // === Radiative Animation (enable/speed only - mode is in RaysShape) ===
+    @JsonField(skipIfDefault = true, defaultValue = "true") boolean radiativeEnabled,
+    @Range(ValueRange.UNBOUNDED) @JsonField(skipIfDefault = true, defaultValue = "1.0") float radiativeSpeed,
     
-    // === Wave Configuration (for RADIATE/ABSORB) ===
-    // waveArc: < 1.0 compression, = 1.0 normal, > 1.0 faster cycling
-    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "1.0") float waveArc,
-    @JsonField(skipIfDefault = true) WaveDistribution waveDistribution,
-    // waveCount (sweep copies): < 1.0 trims arc, = 1.0 normal, > 1.0 duplicates sweeps
-    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "2.0") float waveCount,
-    
-    // === Travel Axis ===
-    @JsonField(skipIfDefault = true) TravelMode travel,
-    @Range(ValueRange.UNBOUNDED) @JsonField(skipIfDefault = true) float travelSpeed,
+    // === Travel Animation ===
+    @JsonField(skipIfDefault = true) EnergyTravel travel,
+    @JsonField(skipIfDefault = true, defaultValue = "true") boolean travelEnabled,
+    @Range(ValueRange.UNBOUNDED) @JsonField(skipIfDefault = true, defaultValue = "1.0") float travelSpeed,
     @Range(ValueRange.STEPS) @JsonField(skipIfDefault = true, defaultValue = "1") int chaseCount,
     @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "0.3") float chaseWidth,
     
-    // === Flicker Axis ===
-    @JsonField(skipIfDefault = true) FlickerMode flicker,
+    // === Flicker Animation ===
+    @JsonField(skipIfDefault = true) EnergyFlicker flicker,
+    @JsonField(skipIfDefault = true, defaultValue = "true") boolean flickerEnabled,
     @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true) float flickerIntensity,
     @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "5.0") float flickerFrequency,
     
-    // === 3D Ray Edge Transition ===
-    @JsonField(skipIfDefault = true) EdgeTransitionMode edgeTransition,
+    // === Spawn Transition ===
+    @JsonField(skipIfDefault = true, defaultValue = "true") boolean skipSpawnTransition,
     
-    // === Progressive Spawn ===
-    // When true (default): rays appear at full length instantly
-    // When false: rays spawn progressively (grow from 0 to full length)
-    @JsonField(skipIfDefault = true, defaultValue = "true") boolean startFullLength,
-    
-    // === Curve Animation Mode ===
-    // When true: segment slides ALONG the fixed curved path
-    // When false (default): endpoints are translated, curve "drifts" with them
-    @JsonField(skipIfDefault = true, defaultValue = "false") boolean followCurve
+    // === Path Following ===
+    @JsonField(skipIfDefault = true, defaultValue = "false") boolean pathFollowing
 ) {
     // =========================================================================
     // Static Constants
@@ -77,56 +63,42 @@ public record RayFlowConfig(
     
     /** No flow animation. */
     public static final RayFlowConfig NONE = new RayFlowConfig(
-        LengthMode.NONE, 0f, 1.0f,
-        1.0f, WaveDistribution.SEQUENTIAL, 2.0f,
-        TravelMode.NONE, 0f, 1, 0.3f,
-        FlickerMode.NONE, 0f, 5f,
-        EdgeTransitionMode.CLIP, true, false
+        false, 0f,                              // radiative disabled
+        EnergyTravel.NONE, false, 0f, 1, 0.3f,  // travel disabled
+        EnergyFlicker.NONE, false, 0f, 5f,      // flicker disabled
+        true, false
     );
     
-    /** Default radiate effect (rays grow outward). */
-    public static final RayFlowConfig RADIATE = new RayFlowConfig(
-        LengthMode.RADIATE, 1f, 1.0f,
-        1.0f, WaveDistribution.SEQUENTIAL, 2.0f,
-        TravelMode.NONE, 0f, 1, 0.3f,
-        FlickerMode.NONE, 0f, 5f,
-        EdgeTransitionMode.CLIP, true, false
-    );
-    
-    /** Default absorb effect (rays shrink inward). */
-    public static final RayFlowConfig ABSORB = new RayFlowConfig(
-        LengthMode.ABSORB, 1f, 1.0f,
-        1.0f, WaveDistribution.SEQUENTIAL, 2.0f,
-        TravelMode.NONE, 0f, 1, 0.3f,
-        FlickerMode.NONE, 0f, 5f,
-        EdgeTransitionMode.CLIP, true, false
+    /** Default with radiative animation enabled. */
+    public static final RayFlowConfig DEFAULT = new RayFlowConfig(
+        true, 1f,                               // radiative enabled at speed 1
+        EnergyTravel.NONE, false, 1f, 1, 0.3f,  // travel disabled
+        EnergyFlicker.NONE, false, 0f, 5f,      // flicker disabled
+        true, false
     );
     
     /** Chase particles flowing along rays. */
     public static final RayFlowConfig CHASE = new RayFlowConfig(
-        LengthMode.NONE, 0f, 1.0f,
-        1.0f, WaveDistribution.SEQUENTIAL, 2.0f,
-        TravelMode.CHASE, 1.5f, 3, 0.2f,
-        FlickerMode.NONE, 0f, 5f,
-        EdgeTransitionMode.CLIP, true, false
+        false, 0f,                              // radiative disabled
+        EnergyTravel.CHASE, true, 1.5f, 3, 0.2f, // chase enabled
+        EnergyFlicker.NONE, false, 0f, 5f,
+        true, false
     );
     
     /** Scrolling energy flow. */
     public static final RayFlowConfig SCROLL = new RayFlowConfig(
-        LengthMode.NONE, 0f, 1.0f,
-        1.0f, WaveDistribution.SEQUENTIAL, 2.0f,
-        TravelMode.SCROLL, 1f, 1, 0.3f,
-        FlickerMode.NONE, 0f, 5f,
-        EdgeTransitionMode.CLIP, true, false
+        false, 0f,
+        EnergyTravel.SCROLL, true, 1f, 1, 0.3f,
+        EnergyFlicker.NONE, false, 0f, 5f,
+        true, false
     );
     
     /** Twinkling stars effect. */
     public static final RayFlowConfig SCINTILLATE = new RayFlowConfig(
-        LengthMode.NONE, 0f, 1.0f,
-        1.0f, WaveDistribution.SEQUENTIAL, 2.0f,
-        TravelMode.NONE, 0f, 1, 0.3f,
-        FlickerMode.SCINTILLATION, 0.5f, 8f,
-        EdgeTransitionMode.CLIP, true, false
+        false, 0f,
+        EnergyTravel.NONE, false, 0f, 1, 0.3f,
+        EnergyFlicker.SCINTILLATION, true, 0.5f, 8f,
+        true, false
     );
     
     // =========================================================================
@@ -135,39 +107,34 @@ public record RayFlowConfig(
     
     /** Whether any flow animation is active. */
     public boolean isActive() {
-        return length != LengthMode.NONE || 
-               travel != TravelMode.NONE || 
-               flicker != FlickerMode.NONE;
+        return (radiativeEnabled) || 
+               (travelEnabled && travel != EnergyTravel.NONE) || 
+               (flickerEnabled && flicker != EnergyFlicker.NONE);
     }
     
-    /** Whether length animation is active. */
-    public boolean hasLength() {
-        return length != null && length != LengthMode.NONE;
+    /** Whether radiative animation is active. */
+    public boolean hasRadiative() {
+        return radiativeEnabled;
     }
     
     /** Whether travel animation is active. */
     public boolean hasTravel() {
-        return travel != null && travel != TravelMode.NONE;
+        return travelEnabled && travel != null && travel != EnergyTravel.NONE;
     }
     
     /** Whether flicker animation is active. */
     public boolean hasFlicker() {
-        return flicker != null && flicker != FlickerMode.NONE;
+        return flickerEnabled && flicker != null && flicker != EnergyFlicker.NONE;
     }
     
-    /** Gets effective wave arc, defaulting to 1.0 if not set. */
-    public float effectiveWaveArc() {
-        return waveArc <= 0 ? 1.0f : waveArc;
+    /** Gets effective travel mode, defaulting to NONE if not set. */
+    public EnergyTravel effectiveTravel() {
+        return travel != null ? travel : EnergyTravel.NONE;
     }
     
-    /** Gets effective wave distribution, defaulting to SEQUENTIAL if not set. */
-    public WaveDistribution effectiveWaveDistribution() {
-        return waveDistribution != null ? waveDistribution : WaveDistribution.SEQUENTIAL;
-    }
-    
-    /** Gets effective edge transition mode, defaulting to SCALE if not set. */
-    public EdgeTransitionMode effectiveEdgeTransition() {
-        return edgeTransition != null ? edgeTransition : EdgeTransitionMode.CLIP;
+    /** Gets effective flicker mode, defaulting to NONE if not set. */
+    public EnergyFlicker effectiveFlicker() {
+        return flicker != null ? flicker : EnergyFlicker.NONE;
     }
     
     // =========================================================================
@@ -180,50 +147,49 @@ public record RayFlowConfig(
     public static RayFlowConfig fromJson(JsonObject json) {
         if (json == null) return NONE;
         
-        LengthMode length = LengthMode.NONE;
+        // Radiative animation
+        boolean radiativeEnabled = json.has("radiativeEnabled") ? json.get("radiativeEnabled").getAsBoolean() : true;
+        float radiativeSpeed = json.has("radiativeSpeed") ? json.get("radiativeSpeed").getAsFloat() : 1f;
+        
+        // Legacy support: map old "length" field to radiativeEnabled
         if (json.has("length")) {
-            length = LengthMode.fromString(json.get("length").getAsString());
+            String lengthMode = json.get("length").getAsString();
+            radiativeEnabled = !"NONE".equalsIgnoreCase(lengthMode);
         }
-        float lengthSpeed = json.has("lengthSpeed") ? json.get("lengthSpeed").getAsFloat() : 1f;
-        float segmentLength = json.has("segmentLength") ? json.get("segmentLength").getAsFloat() : 1.0f;
-        
-        // Wave configuration
-        float waveArc = json.has("waveArc") ? json.get("waveArc").getAsFloat() : 1.0f;
-        WaveDistribution waveDistribution = WaveDistribution.SEQUENTIAL;
-        if (json.has("waveDistribution")) {
-            waveDistribution = WaveDistribution.fromString(json.get("waveDistribution").getAsString());
+        if (json.has("lengthSpeed")) {
+            radiativeSpeed = json.get("lengthSpeed").getAsFloat();
         }
-        float waveCount = json.has("waveCount") ? json.get("waveCount").getAsFloat() : 2.0f;
         
-        TravelMode travel = TravelMode.NONE;
+        // Travel animation
+        EnergyTravel travel = EnergyTravel.NONE;
         if (json.has("travel")) {
-            travel = TravelMode.fromString(json.get("travel").getAsString());
+            travel = EnergyTravel.fromString(json.get("travel").getAsString());
         }
+        boolean travelEnabled = json.has("travelEnabled") ? json.get("travelEnabled").getAsBoolean() : travel.isActive();
         float travelSpeed = json.has("travelSpeed") ? json.get("travelSpeed").getAsFloat() : 1f;
         int chaseCount = json.has("chaseCount") ? json.get("chaseCount").getAsInt() : 1;
         float chaseWidth = json.has("chaseWidth") ? json.get("chaseWidth").getAsFloat() : 0.3f;
         
-        FlickerMode flicker = FlickerMode.NONE;
+        // Flicker animation
+        EnergyFlicker flicker = EnergyFlicker.NONE;
         if (json.has("flicker")) {
-            flicker = FlickerMode.fromString(json.get("flicker").getAsString());
+            flicker = EnergyFlicker.fromString(json.get("flicker").getAsString());
         }
+        boolean flickerEnabled = json.has("flickerEnabled") ? json.get("flickerEnabled").getAsBoolean() : flicker.isActive();
         float flickerIntensity = json.has("flickerIntensity") ? json.get("flickerIntensity").getAsFloat() : 0.3f;
         float flickerFrequency = json.has("flickerFrequency") ? json.get("flickerFrequency").getAsFloat() : 5f;
         
-        EdgeTransitionMode edgeTransition = EdgeTransitionMode.CLIP;
-        if (json.has("edgeTransition")) {
-            edgeTransition = EdgeTransitionMode.fromString(json.get("edgeTransition").getAsString());
-        }
-        
-        boolean startFullLength = json.has("startFullLength") ? json.get("startFullLength").getAsBoolean() : true;
-        boolean followCurve = json.has("followCurve") ? json.get("followCurve").getAsBoolean() : false;
+        // Spawn/path
+        boolean skipSpawnTransition = json.has("skipSpawnTransition") ? json.get("skipSpawnTransition").getAsBoolean() : 
+            (json.has("startFullLength") ? json.get("startFullLength").getAsBoolean() : true);
+        boolean pathFollowing = json.has("pathFollowing") ? json.get("pathFollowing").getAsBoolean() :
+            (json.has("followCurve") ? json.get("followCurve").getAsBoolean() : false);
         
         return new RayFlowConfig(
-            length, lengthSpeed, segmentLength,
-            waveArc, waveDistribution, waveCount,
-            travel, travelSpeed, chaseCount, chaseWidth,
-            flicker, flickerIntensity, flickerFrequency,
-            edgeTransition, startFullLength, followCurve
+            radiativeEnabled, radiativeSpeed,
+            travel, travelEnabled, travelSpeed, chaseCount, chaseWidth,
+            flicker, flickerEnabled, flickerIntensity, flickerFrequency,
+            skipSpawnTransition, pathFollowing
         );
     }
     
@@ -242,55 +208,49 @@ public record RayFlowConfig(
     
     public Builder toBuilder() {
         return new Builder()
-            .length(length).lengthSpeed(lengthSpeed).segmentLength(segmentLength)
-            .waveArc(waveArc).waveDistribution(waveDistribution).waveCount(waveCount)
-            .travel(travel).travelSpeed(travelSpeed).chaseCount(chaseCount).chaseWidth(chaseWidth)
-            .flicker(flicker).flickerIntensity(flickerIntensity).flickerFrequency(flickerFrequency)
-            .edgeTransition(edgeTransition).startFullLength(startFullLength).followCurve(followCurve);
+            .radiativeEnabled(radiativeEnabled).radiativeSpeed(radiativeSpeed)
+            .travel(travel).travelEnabled(travelEnabled).travelSpeed(travelSpeed)
+            .chaseCount(chaseCount).chaseWidth(chaseWidth)
+            .flicker(flicker).flickerEnabled(flickerEnabled)
+            .flickerIntensity(flickerIntensity).flickerFrequency(flickerFrequency)
+            .skipSpawnTransition(skipSpawnTransition).pathFollowing(pathFollowing);
     }
     
     public static class Builder {
-        private LengthMode length = LengthMode.NONE;
-        private float lengthSpeed = 1f;
-        private float segmentLength = 1.0f;
-        private float waveArc = 1.0f;
-        private WaveDistribution waveDistribution = WaveDistribution.SEQUENTIAL;
-        private float waveCount = 2.0f;
-        private TravelMode travel = TravelMode.NONE;
+        private boolean radiativeEnabled = true;
+        private float radiativeSpeed = 1f;
+        private EnergyTravel travel = EnergyTravel.NONE;
+        private boolean travelEnabled = false;
         private float travelSpeed = 1f;
         private int chaseCount = 1;
         private float chaseWidth = 0.3f;
-        private FlickerMode flicker = FlickerMode.NONE;
+        private EnergyFlicker flicker = EnergyFlicker.NONE;
+        private boolean flickerEnabled = false;
         private float flickerIntensity = 0.3f;
         private float flickerFrequency = 5f;
-        private EdgeTransitionMode edgeTransition = EdgeTransitionMode.CLIP;
-        private boolean startFullLength = true;
-        private boolean followCurve = false;
+        private boolean skipSpawnTransition = true;
+        private boolean pathFollowing = false;
         
-        public Builder length(LengthMode m) { this.length = m; return this; }
-        public Builder lengthSpeed(float s) { this.lengthSpeed = s; return this; }
-        public Builder segmentLength(float s) { this.segmentLength = s; return this; }
-        public Builder waveArc(float a) { this.waveArc = a; return this; }
-        public Builder waveDistribution(WaveDistribution d) { this.waveDistribution = d; return this; }
-        public Builder waveCount(float c) { this.waveCount = c; return this; }
-        public Builder travel(TravelMode m) { this.travel = m; return this; }
+        public Builder radiativeEnabled(boolean b) { this.radiativeEnabled = b; return this; }
+        public Builder radiativeSpeed(float s) { this.radiativeSpeed = s; return this; }
+        public Builder travel(EnergyTravel m) { this.travel = m != null ? m : EnergyTravel.NONE; return this; }
+        public Builder travelEnabled(boolean b) { this.travelEnabled = b; return this; }
         public Builder travelSpeed(float s) { this.travelSpeed = s; return this; }
         public Builder chaseCount(int c) { this.chaseCount = c; return this; }
         public Builder chaseWidth(float w) { this.chaseWidth = w; return this; }
-        public Builder flicker(FlickerMode m) { this.flicker = m; return this; }
+        public Builder flicker(EnergyFlicker m) { this.flicker = m != null ? m : EnergyFlicker.NONE; return this; }
+        public Builder flickerEnabled(boolean b) { this.flickerEnabled = b; return this; }
         public Builder flickerIntensity(float i) { this.flickerIntensity = i; return this; }
         public Builder flickerFrequency(float f) { this.flickerFrequency = f; return this; }
-        public Builder edgeTransition(EdgeTransitionMode m) { this.edgeTransition = m != null ? m : EdgeTransitionMode.CLIP; return this; }
-        public Builder startFullLength(boolean b) { this.startFullLength = b; return this; }
-        public Builder followCurve(boolean b) { this.followCurve = b; return this; }
+        public Builder skipSpawnTransition(boolean b) { this.skipSpawnTransition = b; return this; }
+        public Builder pathFollowing(boolean b) { this.pathFollowing = b; return this; }
         
         public RayFlowConfig build() {
             return new RayFlowConfig(
-                length, lengthSpeed, segmentLength,
-                waveArc, waveDistribution, waveCount,
-                travel, travelSpeed, chaseCount, chaseWidth,
-                flicker, flickerIntensity, flickerFrequency,
-                edgeTransition, startFullLength, followCurve
+                radiativeEnabled, radiativeSpeed,
+                travel, travelEnabled, travelSpeed, chaseCount, chaseWidth,
+                flicker, flickerEnabled, flickerIntensity, flickerFrequency,
+                skipSpawnTransition, pathFollowing
             );
         }
     }

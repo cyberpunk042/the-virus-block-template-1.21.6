@@ -314,106 +314,54 @@ public class ModifiersSubPanel extends BoundPanel {
         // Section header
         c.gap();
         c.sectionHeader("Ray Flow");
-        c.infoText("Length/alpha animations along rays");
+        c.infoText("Animation timing (mode is on Shape panel)");
         
         RayFlowConfig flow = state.rayFlow();
-        LengthMode curLength = flow != null ? flow.length() : LengthMode.NONE;
-        TravelMode curTravel = flow != null ? flow.travel() : TravelMode.NONE;
-        FlickerMode curFlicker = flow != null ? flow.flicker() : FlickerMode.NONE;
         
-        // Length dropdown + Speed (pair)
-        CyclingButtonWidget<LengthMode> lengthDropdown = CyclingButtonWidget.<LengthMode>builder(
-                m -> Text.literal("Len: " + m.displayName()))
-            .values(LengthMode.values())
-            .initially(curLength)
-            .omitKeyText()
-            .build(x, c.getCurrentY(), halfW, COMPACT_H, Text.literal(""),
-                (btn, val) -> state.set("rayFlow.length", val));
-        widgets.add(lengthDropdown);
+        // === RADIATIVE ANIMATION (enable/speed only - mode is in Shape) ===
+        boolean radiativeEnabled = flow == null || flow.radiativeEnabled();
+        CyclingButtonWidget<Boolean> radiativeToggle = GuiWidgets.toggle(
+            x, c.getCurrentY(), halfW, "Radiative",
+            radiativeEnabled, "Enable radiative animation",
+            v -> state.set("rayFlow.radiativeEnabled", v));
+        widgets.add(radiativeToggle);
         
-        LabeledSlider lenSpeedSlider = LabeledSlider.builder("LSpd")
+        LabeledSlider radiativeSpeedSlider = LabeledSlider.builder("Speed")
             .position(x + halfW + GuiConstants.PADDING, c.getCurrentY()).width(halfW)
-            .range(0.01f, 2f).initial(flow != null ? flow.lengthSpeed() : 0.5f).format("%.2f")
-            .onChange(v -> state.set("rayFlow.lengthSpeed", v))
+            .range(0.01f, 2f).initial(flow != null ? flow.radiativeSpeed() : 1f).format("%.2f")
+            .onChange(v -> state.set("rayFlow.radiativeSpeed", v))
             .build();
-        widgets.add(lenSpeedSlider);
+        widgets.add(radiativeSpeedSlider);
         c.advanceRow();
         
-        // Segment Length slider (visible ray portion for RADIATE/ABSORB/SEGMENT)
-        // 1.0 = full ray visible, lower values = particle-like effect
-        c.slider("Seg Len", "rayFlow.segmentLength").range(0.1f, 1.0f).format("%.2f").add();
+        // Skip Spawn Transition toggle (animation timing - stays here)
+        boolean skipSpawn = flow == null || flow.skipSpawnTransition();
+        CyclingButtonWidget<Boolean> skipSpawnToggle = GuiWidgets.toggle(
+            x, c.getCurrentY(), w, "Skip Spawn",
+            skipSpawn, "Skip spawn transition animation",
+            v -> state.set("rayFlow.skipSpawnTransition", v));
+        widgets.add(skipSpawnToggle);
+        c.advanceRow();
         
-        // Edge Transition (for 3D rays): SCALE vs CLIP at spawn/despawn edges
-        net.cyberpunk042.visual.animation.EdgeTransitionMode curEdge = 
-            flow != null && flow.edgeTransition() != null 
-                ? flow.edgeTransition() 
-                : net.cyberpunk042.visual.animation.EdgeTransitionMode.SCALE;
-        CyclingButtonWidget<net.cyberpunk042.visual.animation.EdgeTransitionMode> edgeDropdown = 
-            CyclingButtonWidget.<net.cyberpunk042.visual.animation.EdgeTransitionMode>builder(
-                    m -> Text.literal("Edge: " + m.displayName()))
-                .values(net.cyberpunk042.visual.animation.EdgeTransitionMode.values())
-                .initially(curEdge)
+        // === TRAVEL ANIMATION ===
+        c.infoText("Travel (chase/scroll along rays)");
+        
+        net.cyberpunk042.visual.energy.EnergyTravel curTravel = 
+            flow != null ? flow.effectiveTravel() : net.cyberpunk042.visual.energy.EnergyTravel.NONE;
+        
+        CyclingButtonWidget<net.cyberpunk042.visual.energy.EnergyTravel> travelDropdown = 
+            CyclingButtonWidget.<net.cyberpunk042.visual.energy.EnergyTravel>builder(
+                    m -> Text.literal("Trav: " + m.displayName()))
+                .values(net.cyberpunk042.visual.energy.EnergyTravel.values())
+                .initially(curTravel)
                 .omitKeyText()
-                .build(x, c.getCurrentY(), w, COMPACT_H, Text.literal(""),
-                    (btn, val) -> state.set("rayFlow.edgeTransition", val));
-        widgets.add(edgeDropdown);
-        c.advanceRow();
-        
-        // Wave Scale: controls visibility wave pattern (speed/frequency)
-        // < 1.0: compression (rays grouped tighter)
-        // = 1.0: normal
-        // > 1.0: faster phase cycling
-        c.slider("Wave Scale", "rayFlow.waveArc").range(0.1f, 10.0f).format("%.1f").add();
-        
-        // Sweep Copies: controls arc width and duplication
-        // < 1.0: trims the arc (0.5 = 180° visible, 0.25 = 90° visible)
-        // = 1.0: normal full circle sweep
-        // > 1.0: duplicates the sweep (2 = two sweeps 180° apart, 3 = three at 120°)
-        c.slider("Sweep #", "rayFlow.waveCount").range(0.1f, 5.0f).format("%.1f").add();
-        
-        // Wave Distribution: SEQUENTIAL (coherent wave) vs RANDOM (scattered) vs CONTINUOUS (360° coverage)
-        WaveDistribution curWaveDist = flow != null && flow.waveDistribution() != null 
-            ? flow.waveDistribution() : WaveDistribution.SEQUENTIAL;
-        CyclingButtonWidget<WaveDistribution> waveDistDropdown = CyclingButtonWidget.<WaveDistribution>builder(
-                m -> Text.literal("Wave: " + m.displayName()))
-            .values(WaveDistribution.values())
-            .initially(curWaveDist)
-            .omitKeyText()
-            .build(x, c.getCurrentY(), halfW, COMPACT_H, Text.literal(""),
-                (btn, val) -> state.set("rayFlow.waveDistribution", val));
-        widgets.add(waveDistDropdown);
-        
-        // Start Full Length toggle: ON = rays appear at full length, OFF = rays grow progressively
-        boolean curStartFull = flow == null || flow.startFullLength();
-        CyclingButtonWidget<Boolean> startFullToggle = GuiWidgets.toggle(
-            x + halfW + GuiConstants.PADDING, c.getCurrentY(), halfW, "Full Len",
-            curStartFull, "OFF = rays spawn progressively",
-            v -> state.set("rayFlow.startFullLength", v));
-        widgets.add(startFullToggle);
-        c.advanceRow();
-        
-        // Follow Curve toggle: ON = segment slides along fixed curve, OFF = curve drifts with animation
-        boolean curFollowCurve = flow != null && flow.followCurve();
-        CyclingButtonWidget<Boolean> followCurveToggle = GuiWidgets.toggle(
-            x, c.getCurrentY(), halfW, "Curve",
-            curFollowCurve, "ON = follow curve path",
-            v -> state.set("rayFlow.followCurve", v));
-        widgets.add(followCurveToggle);
-        c.advanceRow();
-        
-        // Travel dropdown + Speed
-        CyclingButtonWidget<TravelMode> travelDropdown = CyclingButtonWidget.<TravelMode>builder(
-                m -> Text.literal("Trav: " + m.displayName()))
-            .values(TravelMode.values())
-            .initially(curTravel)
-            .omitKeyText()
-            .build(x, c.getCurrentY(), halfW, COMPACT_H, Text.literal(""),
-                (btn, val) -> state.set("rayFlow.travel", val));
+                .build(x, c.getCurrentY(), halfW, COMPACT_H, Text.literal(""),
+                    (btn, val) -> state.set("rayFlow.travel", val));
         widgets.add(travelDropdown);
         
         LabeledSlider travelSpeedSlider = LabeledSlider.builder("TSpd")
             .position(x + halfW + GuiConstants.PADDING, c.getCurrentY()).width(halfW)
-            .range(0.01f, 2f).initial(flow != null ? flow.travelSpeed() : 0.5f).format("%.2f")
+            .range(0.01f, 2f).initial(flow != null ? flow.travelSpeed() : 1f).format("%.2f")
             .onChange(v -> state.set("rayFlow.travelSpeed", v))
             .build();
         widgets.add(travelSpeedSlider);
@@ -425,14 +373,20 @@ public class ModifiersSubPanel extends BoundPanel {
             "Width", "rayFlow.chaseWidth", 0.05f, 0.5f
         );
         
-        // Flicker dropdown + Intensity
-        CyclingButtonWidget<FlickerMode> flickerDropdown = CyclingButtonWidget.<FlickerMode>builder(
-                m -> Text.literal("Flkr: " + m.displayName()))
-            .values(FlickerMode.values())
-            .initially(curFlicker)
-            .omitKeyText()
-            .build(x, c.getCurrentY(), halfW, COMPACT_H, Text.literal(""),
-                (btn, val) -> state.set("rayFlow.flicker", val));
+        // === FLICKER ANIMATION ===
+        c.infoText("Flicker (twinkle/strobe effects)");
+        
+        net.cyberpunk042.visual.energy.EnergyFlicker curFlicker = 
+            flow != null ? flow.effectiveFlicker() : net.cyberpunk042.visual.energy.EnergyFlicker.NONE;
+        
+        CyclingButtonWidget<net.cyberpunk042.visual.energy.EnergyFlicker> flickerDropdown = 
+            CyclingButtonWidget.<net.cyberpunk042.visual.energy.EnergyFlicker>builder(
+                    m -> Text.literal("Flkr: " + m.displayName()))
+                .values(net.cyberpunk042.visual.energy.EnergyFlicker.values())
+                .initially(curFlicker)
+                .omitKeyText()
+                .build(x, c.getCurrentY(), halfW, COMPACT_H, Text.literal(""),
+                    (btn, val) -> state.set("rayFlow.flicker", val));
         widgets.add(flickerDropdown);
         
         LabeledSlider intensitySlider = LabeledSlider.builder("Int")

@@ -31,6 +31,115 @@ This document outlines the requirements, limitations, and compatibility of all r
 
 ---
 
+## 1.5 FLOW ANIMATION INTERACTION MATRIX (CRITICAL)
+
+This section documents how the core flow animation flags interact with each other.
+**This is the source of all animation bugs.**
+
+### Key Flags
+
+| Flag | Purpose | Default |
+|------|---------|---------|
+| `followCurve` | When ON, rays stay fixed and the visible segment slides. When OFF, entire ray translates. | OFF |
+| `waveDistribution` | CONTINUOUS = all rays same phase (360° always). SEQUENTIAL = staggered phases (sweep effect). | SEQUENTIAL |
+| `edgeTransition` | How rays spawn/despawn: SCALE (shrink), CLIP (geometric cut), FADE (alpha) | SCALE |
+| `startFullLength` | When ON, skip progressive spawn (rays appear at full size). When OFF, rays grow from nothing. | ON |
+| `segmentLength` | Visible portion for sliding segment mode (0-1). Only matters when `followCurve=ON`. | 1.0 |
+
+### Translation Model (followCurve = OFF)
+
+```
+Time=0.0:  [===RAY===]--------------------  (at inner radius)
+Time=0.5:  ----------[===RAY===]----------  (halfway)
+Time=1.0:  --------------------[===RAY===]  (at outer radius, then respawn)
+```
+- The entire ray MOVES through space
+- Start and end positions are translated
+- Curvature is computed from translated positions (may cause "drift")
+
+### Fixed Path Model (followCurve = ON)
+
+```
+Time=0.0:  [##]------curve-path-----------  (segment at start of curve)
+Time=0.5:  ------[##]---curve-path--------  (segment slides along)
+Time=1.0:  --------------curve-path---[##]  (segment at end, then loops)
+```
+- Ray geometry is FIXED (endpoints never move)
+- Only the VISIBLE portion slides
+- Curvature is stable (computed from original positions)
+- `segmentLength` controls how much is visible
+
+### Interaction Table
+
+| followCurve | waveDistribution | startFullLength | edgeTransition | Visual Result |
+|-------------|------------------|-----------------|----------------|---------------|
+| OFF | CONTINUOUS | ON | SCALE | 360° rays translating outward, full size |
+| OFF | CONTINUOUS | OFF | SCALE | 360° rays translating, scaling at spawn/despawn |
+| OFF | CONTINUOUS | OFF | CLIP | 360° rays translating, clipping at spawn/despawn |
+| OFF | CONTINUOUS | OFF | FADE | 360° rays translating, fading at spawn/despawn |
+| OFF | SEQUENTIAL | ON | SCALE | Sweep effect, staggered phases |
+| OFF | SEQUENTIAL | OFF | SCALE | Sweep effect with scale transitions |
+| **ON** | CONTINUOUS | ON | SCALE | 360° fixed rays, segment slides along curve, full segment |
+| **ON** | CONTINUOUS | OFF | SCALE | 360° fixed rays, segment scales at boundaries |
+| **ON** | CONTINUOUS | OFF | CLIP | 360° fixed rays, segment CLIPS at boundaries (PROBLEMATIC) |
+| **ON** | SEQUENTIAL | ON | SCALE | Fixed rays, sweep effect with sliding segment |
+
+### Known Conflicts
+
+| Combination | Issue | Resolution |
+|-------------|-------|------------|
+| `followCurve=ON` + `edgeTransition=CLIP` | Both try to modify visibility (clipStart/clipEnd). Conflict! | FollowCurve sets base visibility, then CLIP modifies further. May produce unexpected results. |
+| `followCurve=ON` + `segmentLength=1.0` | No sliding happens (full ray always visible) | Expected behavior, but user may not realize followCurve is "active but invisible" |
+| `waveDistribution=CONTINUOUS` + `progressiveSpawn` | All rays spawn/despawn at same time (looks like single flash) | By design, but may be surprising |
+| `curvature≠NONE` + `followCurve=OFF` | Curvature computed from translated positions, causes curve shape to "drift" | Use `followCurve=ON` for stable curved rays |
+
+### Priority Order
+
+When multiple systems modify the same values, this is the priority:
+
+1. **Phase computed first** (from time, rayIndex, waveDistribution)
+2. **Translation OR Visibility** (mutually exclusive based on followCurve)
+   - followCurve=OFF → compute `translationOffset`
+   - followCurve=ON → compute `clipStart`, `clipEnd` from phase and segmentLength
+3. **Spawn transition** (if startFullLength=OFF)
+   - SCALE → modify `widthScale`
+   - CLIP → modify `clipStart` or `clipEnd` (may conflict with step 2!)
+   - FADE → modify `flowOpacity`
+4. **Flicker** (modifies `flowOpacity`)
+
+### The CLIP Conflict Explained
+
+This is the ROOT CAUSE of many bugs:
+
+```java
+// Step 2: FollowCurve sets visibility
+if (followCurve) {
+    clipStart = phase * (1.0 - segLen);
+    clipEnd = clipStart + segLen;
+}
+
+// Step 3: Spawn transition ALSO modifies visibility
+if (progressiveSpawn && edgeMode == CLIP) {
+    if (spawning) {
+        clipEnd = progress;  // OVERWRITES the clipEnd from step 2!
+    }
+}
+```
+
+**Solution**: Spawn transition should modify visibility RELATIVE to the already-computed range, not replace it.
+
+```java
+// Correct approach
+if (progressiveSpawn && edgeMode == CLIP) {
+    if (spawning) {
+        float visiblePortion = clipEnd - clipStart;
+        clipEnd = clipStart + visiblePortion * progress;  // Scale within range
+    }
+}
+```
+
+---
+
 ## 2. TRAVEL MODES (RayFlow)
 
 | Mode | Requirements | Performance | Notes |

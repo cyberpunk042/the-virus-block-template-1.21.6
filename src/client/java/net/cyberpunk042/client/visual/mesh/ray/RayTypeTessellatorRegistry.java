@@ -29,10 +29,33 @@ public final class RayTypeTessellatorRegistry {
         // Register default tessellators
         register(RayType.LINE, RayLineTessellator.INSTANCE);
         
-        // 3D Ray Types (Basic Geometry Category)
-        register(RayType.DROPLET, RayDropletTessellator.INSTANCE);
+        // 3D Ray Types - all use RayDropletTessellator with GeoRadiusProfile selection
+        // The profile is selected per-RayType by GeoRadiusProfileFactory
         
-        // All other types default to LINE until implemented
+        // Basic Geometry Category
+        register(RayType.DROPLET, RayDropletTessellator.INSTANCE);
+        register(RayType.CONE, RayDropletTessellator.INSTANCE);
+        register(RayType.ARROW, RayDropletTessellator.INSTANCE);
+        register(RayType.CAPSULE, RayDropletTessellator.INSTANCE);
+        
+        // Energy Effects Category
+        register(RayType.KAMEHAMEHA, RayDropletTessellator.INSTANCE);
+        register(RayType.LASER, RayDropletTessellator.INSTANCE);
+        register(RayType.FIRE_JET, RayDropletTessellator.INSTANCE);
+        register(RayType.PLASMA, RayDropletTessellator.INSTANCE);
+        
+        // Particle Types
+        register(RayType.BEADS, RayDropletTessellator.INSTANCE);
+        
+        // Organic Types
+        register(RayType.TENDRIL, RayDropletTessellator.INSTANCE);
+        register(RayType.SPINE, RayDropletTessellator.INSTANCE);
+        register(RayType.ROOT, RayDropletTessellator.INSTANCE);
+        
+        // Types that need special handling stay as LINE for now
+        // (LIGHTNING, CUBES, STARS, CRYSTALS need procedural generation)
+        
+        // Fill remaining with LINE fallback
         for (RayType type : RayType.values()) {
             if (!TESSELLATORS.containsKey(type)) {
                 TESSELLATORS.put(type, RayLineTessellator.INSTANCE);

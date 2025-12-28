@@ -111,7 +111,29 @@ public record RaysShape(
     
     // === Field Deformation (gravitational distortion based on distance) ===
     @JsonField(skipIfDefault = true) FieldDeformationMode fieldDeformation,
-    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true) float fieldDeformationIntensity
+    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true) float fieldDeformationIntensity,
+    
+    // === Shape State (Stage/Phase model for animation) ===
+    /** Shape lifecycle state: stage, phase, and edge transition mode. */
+    @JsonField(skipIfDefault = true) ShapeState<RayFlowStage> shapeState,
+    
+    // === Energy Interaction (how shape renders based on phase) ===
+    /** Radiative interaction mode: defines how energy interacts with shape. */
+    @JsonField(skipIfDefault = true) net.cyberpunk042.visual.energy.RadiativeInteraction radiativeInteraction,
+    /** Visible segment length (0-1) for TRANSMISSION mode. */
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "1.0") float segmentLength,
+    /** Wave arc: <1.0 compression, =1.0 normal, >1.0 faster cycling */
+    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "1.0") float waveArc,
+    /** Wave distribution pattern (SEQUENTIAL or RANDOM). */
+    @JsonField(skipIfDefault = true) net.cyberpunk042.visual.animation.WaveDistribution waveDistribution,
+    /** Sweep copies: <1.0 trims arc, =1.0 normal, >1.0 duplicates sweeps */
+    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "2.0") float waveCount,
+    
+    // === Animation Behavior (moved from RayFlowConfig) ===
+    /** Whether rays spawn at full length (true) or grow progressively (false). */
+    @JsonField(skipIfDefault = true, defaultValue = "false") boolean startFullLength,
+    /** Whether segment slides along fixed curve path. */
+    @JsonField(skipIfDefault = true, defaultValue = "true") boolean followCurve
 ) implements Shape {
     
     // =========================================================================
@@ -148,7 +170,15 @@ public record RaysShape(
         1.0f,           // shapeLength
         RayOrientation.ALONG_RAY,  // rayOrientation
         FieldDeformationMode.NONE, // fieldDeformation
-        0.0f            // fieldDeformationIntensity
+        0.0f,           // fieldDeformationIntensity
+        null,           // shapeState (null = use default ACTIVE state)
+        net.cyberpunk042.visual.energy.RadiativeInteraction.NONE, // radiativeInteraction
+        1.0f,           // segmentLength
+        1.0f,           // waveArc
+        net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, // waveDistribution
+        2.0f,           // waveCount
+        false,          // startFullLength
+        true            // followCurve
     );
     
     /** Spherical absorption rays (converging to center). */
@@ -156,49 +186,56 @@ public record RaysShape(
         2.0f, 1.0f, 48, RayArrangement.CONVERGING, RayDistribution.RANDOM, 0.5f, 3.5f,
         8, 0.3f, RayLayerMode.SHELL, 0.1f, 0.1f, 1.0f, 0.2f, 1, 0.0f,
         RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
-        FieldDeformationMode.NONE, 0.0f);
+        FieldDeformationMode.NONE, 0.0f, null,
+        net.cyberpunk042.visual.energy.RadiativeInteraction.ABSORPTION, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, 2.0f, false, true);
     
     /** Spherical emission rays (diverging from center). */
     public static final RaysShape EMISSION = new RaysShape(
         2.0f, 1.0f, 48, RayArrangement.DIVERGING, RayDistribution.RANDOM, 0.5f, 3.5f,
         8, 0.3f, RayLayerMode.SHELL, 0.1f, 0.1f, 0.2f, 1.0f, 1, 0.0f,
         RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
-        FieldDeformationMode.NONE, 0.0f);
+        FieldDeformationMode.NONE, 0.0f, null,
+        net.cyberpunk042.visual.energy.RadiativeInteraction.EMISSION, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, 2.0f, false, true);
     
     /** Parallel laser grid. */
     public static final RaysShape LASER_GRID = new RaysShape(
         5.0f, 1.5f, 16, RayArrangement.PARALLEL, RayDistribution.UNIFORM, 0.0f, 2.0f,
         4, 0.3f, RayLayerMode.VERTICAL, 0.0f, 0.0f, 1.0f, 1.0f, 1, 0.0f,
         RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
-        FieldDeformationMode.NONE, 0.0f);
+        FieldDeformationMode.NONE, 0.0f, null,
+        net.cyberpunk042.visual.energy.RadiativeInteraction.NONE, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, 2.0f, false, true);
     
     /** Dashed pulse rays. */
     public static final RaysShape PULSE = new RaysShape(
         3.0f, 1.0f, 8, RayArrangement.RADIAL, RayDistribution.UNIFORM, 0.3f, 2.5f,
         1, 0.5f, RayLayerMode.VERTICAL, 0.0f, 0.0f, 1.0f, 0.5f, 4, 0.2f,
         RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
-        FieldDeformationMode.NONE, 0.0f);
+        FieldDeformationMode.NONE, 0.0f, null,
+        net.cyberpunk042.visual.energy.RadiativeInteraction.OSCILLATION, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, 2.0f, false, true);
     
     /** Sparse random stars. */
     public static final RaysShape STARS = new RaysShape(
         1.5f, 0.5f, 24, RayArrangement.SPHERICAL, RayDistribution.STOCHASTIC, 0.8f, 2.0f,
         1, 0.5f, RayLayerMode.SHELL, 0.3f, 0.3f, 0.8f, 0.3f, 1, 0.0f,
         RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
-        FieldDeformationMode.NONE, 0.0f);
+        FieldDeformationMode.NONE, 0.0f, null,
+        net.cyberpunk042.visual.energy.RadiativeInteraction.NONE, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, 2.0f, false, true);
     
     /** Vortex rays (spiraling into center). */
     public static final RaysShape VORTEX = new RaysShape(
         2.5f, 1.0f, 24, RayArrangement.RADIAL, RayDistribution.UNIFORM, 0.3f, 3.0f,
         1, 0.5f, RayLayerMode.VERTICAL, 0.0f, 0.0f, 1.0f, 0.8f, 1, 0.0f,
         RayLineShape.STRAIGHT, 0.1f, 2.0f, 32, RayCurvature.VORTEX, 0.5f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
-        FieldDeformationMode.NONE, 0.0f);
+        FieldDeformationMode.NONE, 0.0f, null,
+        net.cyberpunk042.visual.energy.RadiativeInteraction.NONE, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, 2.0f, false, true);
     
     /** Corkscrew rays (helical shape). */
     public static final RaysShape CORKSCREW = new RaysShape(
         2.0f, 1.0f, 12, RayArrangement.RADIAL, RayDistribution.UNIFORM, 0.5f, 2.5f,
         1, 0.5f, RayLayerMode.VERTICAL, 0.0f, 0.0f, 1.0f, 1.0f, 1, 0.0f,
         RayLineShape.CORKSCREW, 0.15f, 3.0f, 32, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
-        FieldDeformationMode.NONE, 0.0f);
+        FieldDeformationMode.NONE, 0.0f, null,
+        net.cyberpunk042.visual.energy.RadiativeInteraction.NONE, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, 2.0f, false, true);
     
     public static RaysShape defaults() { return DEFAULT; }
     
@@ -348,6 +385,47 @@ public record RaysShape(
                && fieldDeformationIntensity > 0;
     }
     
+    /** Returns the shape state, defaulting to ACTIVE stage at full phase. */
+    public ShapeState<RayFlowStage> effectiveShapeState() {
+        if (shapeState != null) {
+            return shapeState;
+        }
+        // Default: fully active (phase 1.0 = full visibility)
+        return new ShapeState<>(RayFlowStage.ACTIVE, 1.0f, EdgeTransitionMode.CLIP);
+    }
+    
+    // ─────────────────── Energy Interaction Accessors ───────────────────
+    
+    /** Returns the radiative interaction mode, defaulting to NONE if null. */
+    public net.cyberpunk042.visual.energy.RadiativeInteraction effectiveRadiativeInteraction() {
+        return radiativeInteraction != null ? radiativeInteraction : net.cyberpunk042.visual.energy.RadiativeInteraction.NONE;
+    }
+    
+    /** Whether radiative interaction is active. */
+    public boolean hasRadiativeInteraction() {
+        return radiativeInteraction != null && radiativeInteraction.isActive();
+    }
+    
+    /** Returns effective segment length, defaulting to 1.0 if not set. */
+    public float effectiveSegmentLength() {
+        return segmentLength <= 0 ? 1.0f : segmentLength;
+    }
+    
+    /** Returns effective wave arc, defaulting to 1.0 if not set. */
+    public float effectiveWaveArc() {
+        return waveArc <= 0 ? 1.0f : waveArc;
+    }
+    
+    /** Returns effective wave distribution, defaulting to SEQUENTIAL if null. */
+    public net.cyberpunk042.visual.animation.WaveDistribution effectiveWaveDistribution() {
+        return waveDistribution != null ? waveDistribution : net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL;
+    }
+    
+    /** Returns effective wave count (sweep copies), defaulting to 2.0 if not set. */
+    public float effectiveWaveCount() {
+        return waveCount <= 0 ? 2.0f : waveCount;
+    }
+    
     @Override
     public JsonObject toJson() {
         return JsonSerializer.toJson(this);
@@ -390,7 +468,18 @@ public record RaysShape(
             .rayOrientation(rayOrientation)
             // Field deformation
             .fieldDeformation(fieldDeformation)
-            .fieldDeformationIntensity(fieldDeformationIntensity);
+            .fieldDeformationIntensity(fieldDeformationIntensity)
+            // Shape state
+            .shapeState(shapeState)
+            // Energy interaction
+            .radiativeInteraction(radiativeInteraction)
+            .segmentLength(segmentLength)
+            .waveArc(waveArc)
+            .waveDistribution(waveDistribution)
+            .waveCount(waveCount)
+            // Animation behavior
+            .startFullLength(startFullLength)
+            .followCurve(followCurve);
     }
     
     public static class Builder {
@@ -423,6 +512,16 @@ public record RaysShape(
         private RayOrientation rayOrientation = RayOrientation.ALONG_RAY;
         private FieldDeformationMode fieldDeformation = FieldDeformationMode.NONE;
         private float fieldDeformationIntensity = 0.0f;
+        private ShapeState<RayFlowStage> shapeState = null;
+        // Energy interaction
+        private net.cyberpunk042.visual.energy.RadiativeInteraction radiativeInteraction = net.cyberpunk042.visual.energy.RadiativeInteraction.NONE;
+        private float segmentLength = 1.0f;
+        private float waveArc = 1.0f;
+        private net.cyberpunk042.visual.animation.WaveDistribution waveDistribution = net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL;
+        private float waveCount = 2.0f;
+        // Animation behavior (moved from RayFlowConfig)
+        private boolean startFullLength = false;
+        private boolean followCurve = true;
         
         public Builder rayLength(float v) { this.rayLength = v; return this; }
         public Builder rayWidth(float v) { this.rayWidth = v; return this; }
@@ -453,6 +552,16 @@ public record RaysShape(
         public Builder rayOrientation(RayOrientation v) { this.rayOrientation = v != null ? v : RayOrientation.ALONG_RAY; return this; }
         public Builder fieldDeformation(FieldDeformationMode v) { this.fieldDeformation = v != null ? v : FieldDeformationMode.NONE; return this; }
         public Builder fieldDeformationIntensity(float v) { this.fieldDeformationIntensity = v; return this; }
+        public Builder shapeState(ShapeState<RayFlowStage> v) { this.shapeState = v; return this; }
+        // Energy interaction setters
+        public Builder radiativeInteraction(net.cyberpunk042.visual.energy.RadiativeInteraction v) { this.radiativeInteraction = v != null ? v : net.cyberpunk042.visual.energy.RadiativeInteraction.NONE; return this; }
+        public Builder segmentLength(float v) { this.segmentLength = v; return this; }
+        public Builder waveArc(float v) { this.waveArc = v; return this; }
+        public Builder waveDistribution(net.cyberpunk042.visual.animation.WaveDistribution v) { this.waveDistribution = v != null ? v : net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL; return this; }
+        public Builder waveCount(float v) { this.waveCount = v; return this; }
+        // Animation behavior setters (moved from RayFlowConfig)
+        public Builder startFullLength(boolean v) { this.startFullLength = v; return this; }
+        public Builder followCurve(boolean v) { this.followCurve = v; return this; }
         
         public RaysShape build() {
             return new RaysShape(
@@ -461,8 +570,11 @@ public record RaysShape(
                 fadeStart, fadeEnd, segments, segmentGap,
                 lineShape, lineShapeAmplitude, lineShapeFrequency, shapeSegments,
                 curvature, curvatureIntensity, rayType, shapeIntensity, shapeLength, rayOrientation,
-                fieldDeformation, fieldDeformationIntensity
+                fieldDeformation, fieldDeformationIntensity, shapeState,
+                radiativeInteraction, segmentLength, waveArc, waveDistribution, waveCount,
+                startFullLength, followCurve
             );
         }
     }
 }
+

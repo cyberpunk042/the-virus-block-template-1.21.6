@@ -122,13 +122,13 @@ public final class Ray3DGeometryUtils {
         // Call with no travel animation
         generateDropletWithTravel(builder, center, direction, radius, intensity, length,
             rings, segments, pattern, visibility, visibleTStart, visibleTEnd, flowAlpha,
-            net.cyberpunk042.visual.animation.TravelMode.NONE, 0f, 0f, 0, 0.3f);
+            net.cyberpunk042.visual.energy.EnergyTravel.NONE, 0f, 0f, 0, 0.3f);
     }
     
     /**
-     * Generates a droplet with flow animation and TravelMode support.
+     * Generates a droplet with flow animation and EnergyTravel support.
      * 
-     * <p>TravelMode controls per-vertex alpha gradients that animate along the droplet.</p>
+     * <p>EnergyTravel controls per-vertex alpha gradients that animate along the droplet.</p>
      * 
      * @param builder MeshBuilder to add geometry to
      * @param center Center position
@@ -143,7 +143,7 @@ public final class Ray3DGeometryUtils {
      * @param visibleTStart Start of visible range on axis
      * @param visibleTEnd End of visible range on axis
      * @param flowAlpha Base alpha from flow animation
-     * @param travelMode TravelMode type
+     * @param travelMode EnergyTravel type
      * @param travelPhase Current phase of travel animation (0-1)
      * @param travelSpeed Speed multiplier
      * @param chaseCount Number of chase particles
@@ -163,7 +163,7 @@ public final class Ray3DGeometryUtils {
             float visibleTStart,
             float visibleTEnd,
             float flowAlpha,
-            net.cyberpunk042.visual.animation.TravelMode travelMode,
+            net.cyberpunk042.visual.energy.EnergyTravel travelMode,
             float travelPhase,
             float travelSpeed,
             int chaseCount,
@@ -209,7 +209,7 @@ public final class Ray3DGeometryUtils {
                 }
             }
             
-            // === Apply TravelMode alpha modulation ===
+            // === Apply EnergyTravel alpha modulation ===
             if (travelMode != null && travelMode.isActive() && alpha > 0.001f) {
                 float travelAlpha = computeTravelAlpha(t, travelMode, travelPhase, finalChaseCount, finalChaseWidth);
                 alpha *= travelAlpha;
@@ -225,76 +225,22 @@ public final class Ray3DGeometryUtils {
     }
     
     /**
-     * Computes the alpha value for a vertex based on TravelMode.
+     * Computes the alpha value for a vertex based on EnergyTravel.
+     * 
+     * <p>Delegates to {@link net.cyberpunk042.client.visual.mesh.ray.flow.FlowTravelStage#computeTravelAlpha}
+     * which has the canonical implementation.</p>
      * 
      * @param t Vertex position along axis (0 = base, 1 = tip)
-     * @param mode TravelMode type
+     * @param mode EnergyTravel type
      * @param phase Current animation phase (0-1)
      * @param chaseCount Number of chase particles
      * @param chaseWidth Width of each particle
      * @return Alpha multiplier (0-1)
      */
-    private static float computeTravelAlpha(float t, net.cyberpunk042.visual.animation.TravelMode mode, 
+    private static float computeTravelAlpha(float t, net.cyberpunk042.visual.energy.EnergyTravel mode, 
             float phase, int chaseCount, float chaseWidth) {
-        switch (mode) {
-            case CHASE -> {
-                // Multiple particles evenly spaced
-                float particleSpacing = 1.0f / chaseCount;
-                for (int i = 0; i < chaseCount; i++) {
-                    float particlePos = (phase + i * particleSpacing) % 1.0f;
-                    float dist = Math.min(Math.abs(t - particlePos), 
-                                         Math.min(Math.abs(t - particlePos + 1.0f), 
-                                                  Math.abs(t - particlePos - 1.0f)));
-                    if (dist < chaseWidth / 2) {
-                        // Smooth falloff from center of particle
-                        return 1.0f - (dist / (chaseWidth / 2));
-                    }
-                }
-                return 0.0f;
-            }
-            case REVERSE_CHASE -> {
-                // Same as CHASE but reversed direction
-                float reverseT = 1.0f - t;
-                float particleSpacing = 1.0f / chaseCount;
-                for (int i = 0; i < chaseCount; i++) {
-                    float particlePos = (phase + i * particleSpacing) % 1.0f;
-                    float dist = Math.min(Math.abs(reverseT - particlePos),
-                                         Math.min(Math.abs(reverseT - particlePos + 1.0f),
-                                                  Math.abs(reverseT - particlePos - 1.0f)));
-                    if (dist < chaseWidth / 2) {
-                        return 1.0f - (dist / (chaseWidth / 2));
-                    }
-                }
-                return 0.0f;
-            }
-            case SCROLL -> {
-                // Continuous gradient sliding along
-                float offset = (t + phase) % 1.0f;
-                return 0.5f + 0.5f * (float) Math.cos(offset * Math.PI * 2);
-            }
-            case COMET -> {
-                // Bright head with fading tail
-                float head = phase;
-                float dist = t - head;
-                if (dist < 0) dist += 1.0f; // Wrap around
-                // Exponential decay behind head
-                return (float) Math.exp(-dist * 5.0f);
-            }
-            case SPARK -> {
-                // Random bright flashes (based on position and phase)
-                float spark = (float) Math.sin(t * 17.3f + phase * 31.7f) *
-                              (float) Math.sin(t * 23.1f + phase * 47.9f);
-                return spark > 0.7f ? 1.0f : 0.1f;
-            }
-            case PULSE_WAVE -> {
-                // Traveling sine wave
-                float wave = (float) Math.sin((t - phase) * Math.PI * 4);
-                return 0.5f + 0.5f * wave;
-            }
-            default -> {
-                return 1.0f;
-            }
-        }
+        return net.cyberpunk042.client.visual.mesh.ray.flow.FlowTravelStage.computeTravelAlpha(
+            t, mode, phase, chaseCount, chaseWidth);
     }
     
     /**

@@ -1,12 +1,24 @@
 package net.cyberpunk042.client.visual.mesh.ray;
 
+import net.cyberpunk042.client.visual.mesh.ray.arrangement.ArrangementFactory;
+import net.cyberpunk042.client.visual.mesh.ray.arrangement.ArrangementStrategy;
+import net.cyberpunk042.client.visual.mesh.ray.distribution.DistributionFactory;
+import net.cyberpunk042.client.visual.mesh.ray.distribution.DistributionResult;
+import net.cyberpunk042.client.visual.mesh.ray.distribution.DistributionStrategy;
+import net.cyberpunk042.client.visual.mesh.ray.flow.AnimationState;
+import net.cyberpunk042.client.visual.mesh.ray.flow.FlowContext;
+import net.cyberpunk042.client.visual.mesh.ray.flow.FlowPipeline;
+import net.cyberpunk042.client.visual.mesh.ray.layer.LayerModeFactory;
+import net.cyberpunk042.client.visual.mesh.ray.layer.LayerModeStrategy;
+import net.cyberpunk042.client.visual.mesh.ray.layer.LayerOffset;
 import net.cyberpunk042.visual.animation.WaveConfig;
 import net.cyberpunk042.visual.shape.RayArrangement;
 import net.cyberpunk042.visual.shape.RayCurvature;
-import net.cyberpunk042.visual.shape.RayDistribution;
+import net.cyberpunk042.visual.shape.RayFlowStage;
 import net.cyberpunk042.visual.shape.RayLayerMode;
 import net.cyberpunk042.visual.shape.RayLineShape;
 import net.cyberpunk042.visual.shape.RaysShape;
+import net.cyberpunk042.visual.shape.ShapeState;
 
 import java.util.Random;
 
@@ -32,6 +44,102 @@ public final class RayPositioner {
     private static final float GOLDEN_RATIO = 1.618033988749895f;
     
     private RayPositioner() {} // Utility class
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Internal Data Types
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /** Holds computed position data for a ray */
+    private record PositionData(
+        float[] start, 
+        float[] end, 
+        float[] direction, 
+        float length, 
+        int count,
+        float[] orientationVector
+    ) {}
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Helper Methods
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /** Computes common position data for a ray */
+    private static PositionData computePositionData(RaysShape shape, int index, int layerIndex, Random rng) {
+        int count = shape.count();
+        float layerSpacing = shape.layerSpacing();
+        
+        DistributionResult dist = computeDistribution(shape, index, count, rng);
+        
+        float[] start = new float[3];
+        float[] end = new float[3];
+        computePosition(shape, index, count, layerIndex, layerSpacing, dist, start, end);
+        
+        float dx = end[0] - start[0];
+        float dy = end[1] - start[1];
+        float dz = end[2] - start[2];
+        float length = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+        
+        float[] direction = new float[3];
+        if (length > 0.0001f) {
+            direction[0] = dx / length;
+            direction[1] = dy / length;
+            direction[2] = dz / length;
+        } else {
+            direction[1] = 1.0f;
+        }
+        
+        net.cyberpunk042.visual.shape.RayOrientation orientation = shape.effectiveRayOrientation();
+        float[] orientationVector = computeOrientationVector(orientation, start, direction);
+        
+        return new PositionData(start, end, direction, length, count, orientationVector);
+    }
+    
+    /** Applies an offset along a direction to a position array */
+    private static void applyOffset(float[] pos, float[] direction, float offset) {
+        pos[0] += direction[0] * offset;
+        pos[1] += direction[1] * offset;
+        pos[2] += direction[2] * offset;
+    }
+    
+    /** Computes flow position offset for EMISSION/ABSORPTION */
+    private static float computeFlowOffset(
+            RaysShape shape, 
+            net.cyberpunk042.visual.animation.RayFlowConfig flowConfig,
+            int index, int count, float time, float[] direction) {
+        
+        net.cyberpunk042.visual.energy.RadiativeInteraction radiative = shape.effectiveRadiativeInteraction();
+        if (radiative != net.cyberpunk042.visual.energy.RadiativeInteraction.EMISSION &&
+            radiative != net.cyberpunk042.visual.energy.RadiativeInteraction.ABSORPTION) {
+            return 0.0f;
+        }
+        
+        float rayLength = shape.outerRadius() - shape.innerRadius();
+        float phase = computeRayPhase(flowConfig, index, count, time);
+        
+        if (radiative == net.cyberpunk042.visual.energy.RadiativeInteraction.EMISSION) {
+            return phase * rayLength;
+        } else {
+            return (1.0f - phase) * rayLength;
+        }
+    }
+    
+    /** Computes animated ShapeState from flow config */
+    private static ShapeState<RayFlowStage> computeAnimatedState(
+            RaysShape shape,
+            net.cyberpunk042.visual.animation.RayFlowConfig flowConfig,
+            int index, int count, float time) {
+        
+        ShapeState<RayFlowStage> userState = shape.effectiveShapeState();
+        
+        if (flowConfig != null && flowConfig.isActive()) {
+            FlowContext flowCtx = new FlowContext(
+                flowConfig, index, count, time, shape.innerRadius(), shape.outerRadius());
+            AnimationState animResult = FlowPipeline.standard().compute(flowCtx);
+            return userState.withPhase(animResult.phase());
+        } else {
+            return userState;
+        }
+    }
     
     // ═══════════════════════════════════════════════════════════════════════════
     // Main API
@@ -93,12 +201,13 @@ public final class RayPositioner {
         boolean is3DRayType = shape.effectiveRayType().is3D();
         
         if (is3DRayType && flowConfig != null && flowConfig.isActive()) {
-            net.cyberpunk042.visual.animation.LengthMode lengthMode = flowConfig.length();
-            if (lengthMode == net.cyberpunk042.visual.animation.LengthMode.RADIATE ||
-                lengthMode == net.cyberpunk042.visual.animation.LengthMode.ABSORB) {
+            // Get RadiativeInteraction from shape (not config) - Energy Interaction model
+            net.cyberpunk042.visual.energy.RadiativeInteraction radiative = shape.effectiveRadiativeInteraction();
+            if (radiative == net.cyberpunk042.visual.energy.RadiativeInteraction.EMISSION ||
+                radiative == net.cyberpunk042.visual.energy.RadiativeInteraction.ABSORPTION) {
                 
                 // Compute edge width based on sweepCopies (same logic as computeFlowAnimation)
-                float sweepCopies = Math.max(0.1f, flowConfig.waveCount());
+                float sweepCopies = Math.max(0.1f, shape.effectiveWaveCount());
                 float edgeWidth = 0.1f / sweepCopies;
                 edgeWidth = Math.max(0.01f, Math.min(0.1f, edgeWidth));
                 
@@ -127,15 +236,6 @@ public final class RayPositioner {
     
     /**
      * Computes the context for a single ray with flow animation support.
-     * 
-     * @param shape The rays shape configuration
-     * @param index Ray index (0 to count-1)
-     * @param layerIndex Layer index (0 to layers-1)
-     * @param rng Random number generator for distribution randomness
-     * @param wave Optional wave configuration (null if no wave)
-     * @param time Current animation time
-     * @param flowConfig Optional flow animation config (null if no flow)
-     * @return Computed RayContext with position, shape, and animation data
      */
     public static RayContext computeContext(
             RaysShape shape, 
@@ -146,295 +246,55 @@ public final class RayPositioner {
             float time,
             net.cyberpunk042.visual.animation.RayFlowConfig flowConfig) {
         
-        int count = shape.count();
-        float layerSpacing = shape.layerSpacing();
-        
-        // Compute distribution offsets
-        DistributionResult dist = computeDistribution(shape, index, count, rng);
-        
-        // Compute positions based on arrangement
-        float[] start = new float[3];
-        float[] end = new float[3];
-        computePosition(shape, index, count, layerIndex, layerSpacing, dist, start, end);
-        
-        // Compute direction and length
-        float dx = end[0] - start[0];
-        float dy = end[1] - start[1];
-        float dz = end[2] - start[2];
-        float length = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
-        float[] direction = new float[3];
-        if (length > 0.0001f) {
-            direction[0] = dx / length;
-            direction[1] = dy / length;
-            direction[2] = dz / length;
-        } else {
-            direction[1] = 1.0f; // Default up
-        }
+        // Compute common position data
+        PositionData pos = computePositionData(shape, index, layerIndex, rng);
         
         // Determine shape segments
-        RayLineShape lineShape = shape.effectiveLineShape();
-        RayCurvature curvature = shape.effectiveCurvature();
         int shapeSegments = shape.effectiveShapeSegments();
-        
         boolean hasWave = wave != null && wave.isActive() && wave.isCpuMode();
         if (hasWave && shapeSegments < 16) {
             shapeSegments = 16;
         }
         
-        // Compute orientation for 3D ray types
-        net.cyberpunk042.visual.shape.RayOrientation orientation = shape.effectiveRayOrientation();
-        float[] orientationVector = computeOrientationVector(orientation, start, direction);
-        
-        // === Compute flow animation values ===
+        // Compute flow position offset
         float flowPositionOffset = 0.0f;
-        float flowScale = 1.0f;
-        float visibleTStart = 0.0f;
-        float visibleTEnd = 1.0f;
-        float flowAlpha = 1.0f;
-        
         if (flowConfig != null && flowConfig.isActive()) {
-            FlowAnimationResult flowResult = computeFlowAnimation(
-                flowConfig, index, count, time, shape.innerRadius(), shape.outerRadius());
-            flowPositionOffset = flowResult.positionOffset;
-            // Use ALL values from flow animation (PULSE, SEGMENT, GROW_SHRINK use these)
-            flowScale = flowResult.scale;
-            visibleTStart = flowResult.visibleTStart;
-            visibleTEnd = flowResult.visibleTEnd;
-            flowAlpha = flowResult.alpha;
-            // Note: For RADIATE/ABSORB, position-based edge detection below will OVERRIDE
-            // scale/alpha/clip values based on actual position
+            flowPositionOffset = computeFlowOffset(shape, flowConfig, index, pos.count, time, pos.direction);
             
-            // Apply position offset to start/end positions
-            // This TRANSLATES the ray segment along the Travel Axis (innerRadius to outerRadius)
-            // For curved rays: the curve will be computed from these translated endpoints,
-            // so the entire curved shape moves through the field correctly.
-            // 
-            // EXCEPTION: If followCurve=true, we DON'T translate endpoints.
-            // Instead, the curve stays fixed and visibleTStart/visibleTEnd slide the visible segment.
-            boolean hasCurvature = curvature != null 
-                && curvature != RayCurvature.NONE 
-                && shape.curvatureIntensity() > 0.001f;
-            
-            boolean shouldTranslate = Math.abs(flowPositionOffset) > 0.001f && !flowConfig.followCurve();
-            
+            // Apply position offset (unless pathFollowing is enabled)
+            boolean shouldTranslate = Math.abs(flowPositionOffset) > 0.001f && !flowConfig.pathFollowing();
             if (shouldTranslate) {
-                start[0] += direction[0] * flowPositionOffset;
-                start[1] += direction[1] * flowPositionOffset;
-                start[2] += direction[2] * flowPositionOffset;
-                end[0] += direction[0] * flowPositionOffset;
-                end[1] += direction[1] * flowPositionOffset;
-                end[2] += direction[2] * flowPositionOffset;
+                applyOffset(pos.start, pos.direction, flowPositionOffset);
+                applyOffset(pos.end, pos.direction, flowPositionOffset);
             }
-            
-            // === POSITION-BASED EDGE TRANSITIONS ===
-            // Now that the ray is at its final position, compute edge transitions
-            // based on where the ray ACTUALLY IS relative to field boundaries.
-            // NOTE: Skip for curvature - tessellator handles edge detection using actual curved positions
-            // NOTE: Skip for CONTINUOUS mode - all rays should be visible for 360° coverage
-            net.cyberpunk042.visual.animation.WaveDistribution waveDist = flowConfig.effectiveWaveDistribution();
-            boolean isContinuous = waveDist == net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS;
-            
-            if (!hasCurvature && !isContinuous) {
-                float innerRadius = shape.innerRadius();
-                float outerRadius = shape.outerRadius();
-                float edgeWidth = length * 0.5f; // Transition zone is half the actual ray length
-                edgeWidth = Math.max(0.1f, Math.min(edgeWidth, (outerRadius - innerRadius) * 0.15f));
-                
-                // Compute radial distances of start and end from center
-                float startDist = (float) Math.sqrt(start[0]*start[0] + start[1]*start[1] + start[2]*start[2]);
-                float endDist = (float) Math.sqrt(end[0]*end[0] + end[1]*end[1] + end[2]*end[2]);
-                
-                // Determine leading and trailing edges based on ray direction
-                net.cyberpunk042.visual.animation.LengthMode lengthMode = flowConfig.length();
-                net.cyberpunk042.visual.animation.EdgeTransitionMode edgeMode = flowConfig.effectiveEdgeTransition();
-                
-                if (lengthMode == net.cyberpunk042.visual.animation.LengthMode.RADIATE) {
-                    // RADIATE: ray moves outward, leading edge is END, trailing edge is START
-                    float leadingEdge = endDist;
-                    float trailingEdge = startDist;
-                    
-                    // Spawning: trailing edge is below innerRadius
-                    if (trailingEdge < innerRadius) {
-                        float penetration = innerRadius - trailingEdge;
-                        float edgeFactor = Math.max(0, Math.min(1, 1.0f - penetration / edgeWidth));
-                        switch (edgeMode) {
-                            case SCALE -> flowScale = edgeFactor;
-                            case CLIP -> visibleTStart = 1.0f - edgeFactor;
-                            case FADE -> flowAlpha = edgeFactor;
-                        }
-                    }
-                    // Despawning: leading edge is above outerRadius
-                    else if (leadingEdge > outerRadius) {
-                        float penetration = leadingEdge - outerRadius;
-                        float edgeFactor = Math.max(0, Math.min(1, 1.0f - penetration / edgeWidth));
-                        switch (edgeMode) {
-                            case SCALE -> flowScale = edgeFactor;
-                            case CLIP -> visibleTEnd = edgeFactor;
-                            case FADE -> flowAlpha = edgeFactor;
-                        }
-                    }
-                    // FADE only: Start fading BEFORE reaching the boundary for smoother transition
-                    else if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.FADE) {
-                        // Check proximity to outer boundary (approaching despawn)
-                        float distToOuter = outerRadius - leadingEdge;
-                        if (distToOuter < edgeWidth && distToOuter >= 0) {
-                            // Approaching outer: fade as we get closer
-                            flowAlpha = distToOuter / edgeWidth;
-                        }
-                    }
-                } else if (lengthMode == net.cyberpunk042.visual.animation.LengthMode.ABSORB) {
-                    // ABSORB: ray moves inward, leading edge is START, trailing edge is END
-                    float leadingEdge = startDist;
-                    float trailingEdge = endDist;
-                    
-                    // Spawning: trailing edge is above outerRadius
-                    if (trailingEdge > outerRadius) {
-                        float penetration = trailingEdge - outerRadius;
-                        float edgeFactor = Math.max(0, Math.min(1, 1.0f - penetration / edgeWidth));
-                        switch (edgeMode) {
-                            case SCALE -> flowScale = edgeFactor;
-                            case CLIP -> visibleTEnd = edgeFactor;
-                            case FADE -> flowAlpha = edgeFactor;
-                        }
-                    }
-                    // Despawning: leading edge is below innerRadius
-                    else if (leadingEdge < innerRadius) {
-                        float penetration = innerRadius - leadingEdge;
-                        float edgeFactor = Math.max(0, Math.min(1, 1.0f - penetration / edgeWidth));
-                        switch (edgeMode) {
-                            case SCALE -> flowScale = edgeFactor;
-                            case CLIP -> visibleTStart = 1.0f - edgeFactor;
-                            case FADE -> flowAlpha = edgeFactor;
-                        }
-                    }
-                    // FADE only: Start fading BEFORE reaching the boundary for smoother transition
-                    else if (edgeMode == net.cyberpunk042.visual.animation.EdgeTransitionMode.FADE) {
-                        // Check proximity to inner boundary (approaching despawn)
-                        float distToInner = leadingEdge - innerRadius;
-                        if (distToInner < edgeWidth && distToInner >= 0) {
-                            // Approaching inner: fade as we get closer
-                            flowAlpha = distToInner / edgeWidth;
-                        }
-                    }
-                }
-            }
-            // For curvature: tessellator will handle edge detection using flowPositionOffset
         }
         
-        // === Compute field deformation values ===
-        net.cyberpunk042.visual.shape.FieldDeformationMode fieldDeformation = shape.effectiveFieldDeformation();
-        float fieldDeformationIntensity = shape.fieldDeformationIntensity();
-        float normalizedDistance = 0.5f; // Default to middle if can't compute
-        float fieldStretch = 1.0f;
+        // Compute animated ShapeState
+        ShapeState<RayFlowStage> shapeState = computeAnimatedState(shape, flowConfig, index, pos.count, time);
         
-        if (fieldDeformation.isActive()) {
-            // Compute distance from center based on the ray's position
-            // Use start position to determine how far from center this ray is
-            float distFromCenter = (float) Math.sqrt(
-                start[0] * start[0] + start[1] * start[1] + start[2] * start[2]);
-            
-            // Normalize based on inner/outer radius
-            float innerR = shape.innerRadius();
-            float outerR = shape.outerRadius();
-            if (outerR > innerR) {
-                normalizedDistance = Math.max(0.01f, Math.min(1.0f, 
-                    (distFromCenter - innerR) / (outerR - innerR)));
-            }
-            
-            // Compute stretch based on deformation mode and distance
-            fieldStretch = fieldDeformation.computeStretch(normalizedDistance, fieldDeformationIntensity);
-        }
-        
-        return RayContext.builder()
-            .start(start)
-            .end(end)
-            .direction(direction)
-            .length(length)
-            .index(index)
-            .count(count)
-            .layerIndex(layerIndex)
-            .t(count > 1 ? (float) index / (count - 1) : 0f)
-            .width(shape.rayWidth())
-            .fadeStart(shape.fadeStart())
-            .fadeEnd(shape.fadeEnd())
-            .lineShape(lineShape)
-            .lineShapeAmplitude(shape.lineShapeAmplitude())
-            .lineShapeFrequency(shape.lineShapeFrequency())
-            .curvature(curvature)
-            .curvatureIntensity(shape.curvatureIntensity())
-            .shapeSegments(shapeSegments)
-            .orientation(orientation)
-            .orientationVector(orientationVector)
-            .shapeIntensity(shape.shapeIntensity())
-            .shapeLength(shape.shapeLength())
-            .wave(wave)
-            .time(time)
-            .hasWave(hasWave)
-            .flowConfig(flowConfig)
-            .flowPositionOffset(flowPositionOffset)
-            .travelRange(shape.outerRadius() - shape.innerRadius())
-            .innerRadius(shape.innerRadius())
-            .outerRadius(shape.outerRadius())
-            .flowScale(flowScale)
-            .visibleTStart(visibleTStart)
-            .visibleTEnd(visibleTEnd)
-            .flowAlpha(flowAlpha)
-            .fieldDeformation(fieldDeformation)
-            .fieldDeformationIntensity(fieldDeformationIntensity)
-            .normalizedDistance(normalizedDistance)
-            .fieldStretch(fieldStretch)
-            .build();
+        return RayContextBuilder.build(shape, pos.start, pos.end, pos.direction, pos.length,
+            index, pos.count, layerIndex, pos.orientationVector, shapeSegments, hasWave,
+            wave, time, flowConfig, flowPositionOffset, shapeState);
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
-    // Flow Animation Computation
+    // Phase Computation (used for edge transition wrapping only)
+    // NOTE: Flow animation is now handled by FlowPipeline + TessEdgeModeFactory
     // ═══════════════════════════════════════════════════════════════════════════
-    
-    /** Result of flow animation computation. */
-    private record FlowAnimationResult(
-        float positionOffset,
-        float scale,
-        float visibleTStart,
-        float visibleTEnd,
-        float alpha
-    ) {}
     
     /**
      * Computes the phase for a ray in flow animation.
+     * Delegates to FlowPhaseStage.computePhase.
      */
     private static float computeRayPhase(
             net.cyberpunk042.visual.animation.RayFlowConfig flow,
             int rayIndex, int rayCount, float time) {
-        
-        // Compute per-ray phase offset based on wave distribution
-        float rayPhaseOffset;
-        net.cyberpunk042.visual.animation.WaveDistribution waveDist = flow.effectiveWaveDistribution();
-        if (waveDist == net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS) {
-            // CONTINUOUS: Phases scrambled by golden ratio → no sweep pattern, 360° coverage
-            rayPhaseOffset = (rayIndex * GOLDEN_RATIO) % 1.0f;
-        } else if (waveDist == net.cyberpunk042.visual.animation.WaveDistribution.RANDOM) {
-            // Use a hash function for consistent but random-looking phase per ray
-            // This creates scattered spawn/despawn instead of uniform distribution
-            int hash = (int)(rayIndex * 2654435761L); // Knuth multiplicative hash
-            rayPhaseOffset = (hash & 0x7FFFFFFF) / (float) Integer.MAX_VALUE;
-        } else {
-            // SEQUENTIAL: Rays are phased based on angular position
-            rayPhaseOffset = rayCount > 1 ? (float) rayIndex / rayCount : 0f;
-        }
-        
-        // Apply wave scale (not for CONTINUOUS - it doesn't use sweep)
-        if (waveDist != net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS) {
-            rayPhaseOffset *= flow.effectiveWaveArc();
-        }
-        
-        // Combine with time-based phase
-        float basePhase = (time * flow.lengthSpeed()) % 1.0f;
-        return (basePhase + rayPhaseOffset) % 1.0f;
+        return net.cyberpunk042.client.visual.mesh.ray.flow.FlowPhaseStage.computePhase(
+            flow, rayIndex, rayCount, time);
     }
     
     /**
      * Computes context for a ray at a specific phase, with optional wrapping.
-     * 
      * @param wrapped If true, compute the "wrapped" shape (at the opposite edge)
      */
     private static RayContext computeContextWithPhase(
@@ -448,470 +308,57 @@ public final class RayPositioner {
             float phase,
             boolean wrapped) {
         
-        int count = shape.count();
-        float layerSpacing = shape.layerSpacing();
+        // Compute common position data
+        PositionData pos = computePositionData(shape, index, layerIndex, rng);
         
-        // Compute distribution offsets
-        DistributionResult dist = computeDistribution(shape, index, count, rng);
-        
-        // Compute positions based on arrangement
-        float[] start = new float[3];
-        float[] end = new float[3];
-        computePosition(shape, index, count, layerIndex, layerSpacing, dist, start, end);
-        
-        // Compute direction and length
-        float dx = end[0] - start[0];
-        float dy = end[1] - start[1];
-        float dz = end[2] - start[2];
-        float length = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
-        float[] direction = new float[3];
-        if (length > 0.0001f) {
-            direction[0] = dx / length;
-            direction[1] = dy / length;
-            direction[2] = dz / length;
-        } else {
-            direction[1] = 1.0f;
-        }
-        
-        // Determine line shape and curvature
-        net.cyberpunk042.visual.shape.RayLineShape lineShape = shape.effectiveLineShape();
-        net.cyberpunk042.visual.shape.RayCurvature curvature = shape.effectiveCurvature();
         int shapeSegments = shape.shapeSegments();
-        
-        // Check for wave animation
         boolean hasWave = wave != null && wave.isActive() && wave.isCpuMode();
         
-        // Compute orientation
-        net.cyberpunk042.visual.shape.RayOrientation orientation = shape.effectiveRayOrientation();
-        float[] orientationVector = computeOrientationVector(orientation, start, direction);
+        // Compute position offset based on phase and wrapped flag
+        float posOffset = computeWrappedOffset(shape, phase, wrapped);
         
-        // Compute flow animation for this specific phase
-        // Travel range is from innerRadius to outerRadius (the field span)
+        // Apply position offset
+        if (Math.abs(posOffset) > 0.001f) {
+            applyOffset(pos.start, pos.direction, posOffset);
+            applyOffset(pos.end, pos.direction, posOffset);
+        }
+        
+        // Create ShapeState with the passed phase
+        ShapeState<RayFlowStage> shapeState = shape.effectiveShapeState().withPhase(phase);
+        
+        return RayContextBuilder.build(shape, pos.start, pos.end, pos.direction, pos.length,
+            index, pos.count, layerIndex, pos.orientationVector, shapeSegments, hasWave,
+            wave, time, flowConfig, posOffset, shapeState);
+    }
+    
+    /** Computes position offset for wrapped/primary shapes based on radiative mode */
+    private static float computeWrappedOffset(RaysShape shape, float phase, boolean wrapped) {
         float rayLength = shape.outerRadius() - shape.innerRadius();
-        float posOffset = 0.0f;
-        float scale = 1.0f;
-        float visibleTStart = 0.0f;
-        float visibleTEnd = 1.0f;
-        float flowAlpha = 1.0f;
+        net.cyberpunk042.visual.energy.RadiativeInteraction radiative = shape.effectiveRadiativeInteraction();
         
-        net.cyberpunk042.visual.animation.LengthMode lengthMode = flowConfig.length();
-        net.cyberpunk042.visual.animation.EdgeTransitionMode edgeMode = flowConfig.effectiveEdgeTransition();
-        
-        // === STEP 1: Compute position offset based on phase ===
-        // The position offset determines WHERE the ray is based on animation phase
         if (wrapped) {
             // WRAPPED shape: positioned at the opposite edge from primary
-            float sweepCopies = Math.max(0.1f, flowConfig.waveCount());
-            float phaseEdgeWidth = 0.1f / sweepCopies;
-            phaseEdgeWidth = Math.max(0.01f, Math.min(0.1f, phaseEdgeWidth));
+            float sweepCopies = Math.max(0.1f, shape.effectiveWaveCount());
+            float phaseEdgeWidth = Math.max(0.01f, Math.min(0.1f, 0.1f / sweepCopies));
             
             if (phase < phaseEdgeWidth) {
-                // Primary is spawning -> wrapped is at far edge (finishing despawn)
-                if (lengthMode == net.cyberpunk042.visual.animation.LengthMode.RADIATE) {
-                    posOffset = rayLength; // At outer edge
-                } else { // ABSORB
-                    posOffset = 0.0f; // At inner edge
-                }
-            } else { // phase > (1 - phaseEdgeWidth)
-                // Primary is despawning -> wrapped is at near edge (starting spawn)
-                if (lengthMode == net.cyberpunk042.visual.animation.LengthMode.RADIATE) {
-                    posOffset = 0.0f; // At inner edge
-                } else { // ABSORB
-                    posOffset = rayLength; // At outer edge
-                }
+                // Primary is spawning -> wrapped is at far edge
+                return (radiative == net.cyberpunk042.visual.energy.RadiativeInteraction.EMISSION) 
+                    ? rayLength : 0.0f;
+            } else {
+                // Primary is despawning -> wrapped is at near edge
+                return (radiative == net.cyberpunk042.visual.energy.RadiativeInteraction.EMISSION) 
+                    ? 0.0f : rayLength;
             }
         } else {
             // PRIMARY shape: position based on phase
-            if (lengthMode == net.cyberpunk042.visual.animation.LengthMode.RADIATE) {
-                // RADIATE: phase 0 = inner, phase 1 = outer
-                posOffset = phase * rayLength;
-            } else { // ABSORB
-                // ABSORB: phase 0 = outer, phase 1 = inner
-                float reversed = 1.0f - phase;
-                posOffset = reversed * rayLength;
-            }
+            return (radiative == net.cyberpunk042.visual.energy.RadiativeInteraction.EMISSION)
+                ? phase * rayLength 
+                : (1.0f - phase) * rayLength;
         }
-        
-        // === STEP 2: Apply position offset to start/end positions ===
-        // For curved rays: the curve will be computed from these translated endpoints,
-        // so the entire curved shape moves through the field correctly.
-        boolean hasCurvature = curvature != null 
-            && curvature != net.cyberpunk042.visual.shape.RayCurvature.NONE 
-            && shape.curvatureIntensity() > 0.001f;
-        
-        if (Math.abs(posOffset) > 0.001f) {
-            start[0] += direction[0] * posOffset;
-            start[1] += direction[1] * posOffset;
-            start[2] += direction[2] * posOffset;
-            end[0] += direction[0] * posOffset;
-            end[1] += direction[1] * posOffset;
-            end[2] += direction[2] * posOffset;
-        }
-        
-        // === STEP 3: POSITION-BASED EDGE TRANSITIONS ===
-        // Now compute edge transitions based on ACTUAL position
-        float innerRadius = shape.innerRadius();
-        float outerRadius = shape.outerRadius();
-        float edgeWidth = length * 0.5f; // Transition zone is half the actual ray length
-        edgeWidth = Math.max(0.1f, Math.min(edgeWidth, (outerRadius - innerRadius) * 0.15f));
-        
-        // Compute radial distances of start and end from center
-        float startDist = (float) Math.sqrt(start[0]*start[0] + start[1]*start[1] + start[2]*start[2]);
-        float endDist = (float) Math.sqrt(end[0]*end[0] + end[1]*end[1] + end[2]*end[2]);
-        
-        if (lengthMode == net.cyberpunk042.visual.animation.LengthMode.RADIATE) {
-            // RADIATE: ray moves outward, leading edge is END, trailing edge is START
-            float leadingEdge = endDist;
-            float trailingEdge = startDist;
-            
-            // Spawning: trailing edge is below innerRadius
-            if (trailingEdge < innerRadius) {
-                float penetration = innerRadius - trailingEdge;
-                float edgeFactor = Math.max(0, Math.min(1, 1.0f - penetration / edgeWidth));
-                switch (edgeMode) {
-                    case SCALE -> scale = edgeFactor;
-                    case CLIP -> visibleTStart = 1.0f - edgeFactor;
-                    case FADE -> flowAlpha = edgeFactor;
-                }
-            }
-            // Despawning: leading edge is above outerRadius
-            else if (leadingEdge > outerRadius) {
-                float penetration = leadingEdge - outerRadius;
-                float edgeFactor = Math.max(0, Math.min(1, 1.0f - penetration / edgeWidth));
-                switch (edgeMode) {
-                    case SCALE -> scale = edgeFactor;
-                    case CLIP -> visibleTEnd = edgeFactor;
-                    case FADE -> flowAlpha = edgeFactor;
-                }
-            }
-        } else if (lengthMode == net.cyberpunk042.visual.animation.LengthMode.ABSORB) {
-            // ABSORB: ray moves inward, leading edge is START, trailing edge is END
-            float leadingEdge = startDist;
-            float trailingEdge = endDist;
-            
-            // Spawning: trailing edge is above outerRadius
-            if (trailingEdge > outerRadius) {
-                float penetration = trailingEdge - outerRadius;
-                float edgeFactor = Math.max(0, Math.min(1, 1.0f - penetration / edgeWidth));
-                switch (edgeMode) {
-                    case SCALE -> scale = edgeFactor;
-                    case CLIP -> visibleTEnd = edgeFactor;
-                    case FADE -> flowAlpha = edgeFactor;
-                }
-            }
-            // Despawning: leading edge is below innerRadius
-            else if (leadingEdge < innerRadius) {
-                float penetration = innerRadius - leadingEdge;
-                float edgeFactor = Math.max(0, Math.min(1, 1.0f - penetration / edgeWidth));
-                switch (edgeMode) {
-                    case SCALE -> scale = edgeFactor;
-                    case CLIP -> visibleTStart = 1.0f - edgeFactor;
-                    case FADE -> flowAlpha = edgeFactor;
-                }
-            }
-        }
-        
-        // Compute field deformation
-        net.cyberpunk042.visual.shape.FieldDeformationMode fieldDeformation = shape.effectiveFieldDeformation();
-        float fieldDeformationIntensity = shape.fieldDeformationIntensity();
-        float normalizedDistance = 0.5f;
-        float fieldStretch = 1.0f;
-        
-        if (fieldDeformation.isActive()) {
-            float distFromCenter = (float) Math.sqrt(
-                start[0] * start[0] + start[1] * start[1] + start[2] * start[2]);
-            float innerR = shape.innerRadius();
-            float outerR = shape.outerRadius();
-            if (outerR > innerR) {
-                normalizedDistance = Math.max(0.01f, Math.min(1.0f, 
-                    (distFromCenter - innerR) / (outerR - innerR)));
-            }
-            fieldStretch = fieldDeformation.computeStretch(normalizedDistance, fieldDeformationIntensity);
-        }
-        
-        return RayContext.builder()
-            .start(start)
-            .end(end)
-            .direction(direction)
-            .length(length)
-            .index(index)
-            .count(count)
-            .layerIndex(layerIndex)
-            .t(count > 1 ? (float) index / (count - 1) : 0f)
-            .width(shape.rayWidth())
-            .fadeStart(shape.fadeStart())
-            .fadeEnd(shape.fadeEnd())
-            .lineShape(lineShape)
-            .lineShapeAmplitude(shape.lineShapeAmplitude())
-            .lineShapeFrequency(shape.lineShapeFrequency())
-            .curvature(curvature)
-            .curvatureIntensity(shape.curvatureIntensity())
-            .shapeSegments(shapeSegments)
-            .orientation(orientation)
-            .orientationVector(orientationVector)
-            .shapeIntensity(shape.shapeIntensity())
-            .shapeLength(shape.shapeLength())
-            .wave(wave)
-            .time(time)
-            .hasWave(hasWave)
-            .flowConfig(flowConfig)
-            .flowPositionOffset(posOffset)
-            .travelRange(shape.outerRadius() - shape.innerRadius())
-            .innerRadius(shape.innerRadius())
-            .outerRadius(shape.outerRadius())
-            .flowScale(scale)
-            .visibleTStart(visibleTStart)
-            .visibleTEnd(visibleTEnd)
-            .flowAlpha(flowAlpha)
-            .fieldDeformation(fieldDeformation)
-            .fieldDeformationIntensity(fieldDeformationIntensity)
-            .normalizedDistance(normalizedDistance)
-            .fieldStretch(fieldStretch)
-            .build();
     }
     
-    /**
-     * Computes flow animation values for a single ray.
-     * 
-     * The travel range is from innerRadius to outerRadius (the field span).
-     */
-    private static FlowAnimationResult computeFlowAnimation(
-            net.cyberpunk042.visual.animation.RayFlowConfig flow,
-            int rayIndex, int rayCount, float time,
-            float innerRadius, float outerRadius) {
-        
-        float posOffset = 0.0f;
-        float scale = 1.0f;
-        float tStart = 0.0f;
-        float tEnd = 1.0f;
-        float alpha = 1.0f;
-        
-        // Travel range is from innerRadius to outerRadius
-        float rayLength = outerRadius - innerRadius;
-        
-        // Compute per-ray angular position (0-1 = 0°-360°)
-        float rayAngle;
-        net.cyberpunk042.visual.animation.WaveDistribution waveDist = flow.effectiveWaveDistribution();
-        if (waveDist == net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS) {
-            // CONTINUOUS: Phases scrambled relative to angle → no sweep pattern
-            // Use golden ratio to maximally spread phases regardless of ray order
-            rayAngle = (rayIndex * GOLDEN_RATIO) % 1.0f;
-        } else if (waveDist == net.cyberpunk042.visual.animation.WaveDistribution.RANDOM) {
-            // Use hash for consistent but random-looking distribution
-            int hash = (int)(rayIndex * 2654435761L); // Knuth multiplicative hash
-            rayAngle = (hash & 0x7FFFFFFF) / (float) Integer.MAX_VALUE;
-        } else {
-            // SEQUENTIAL: Rays are phased based on angular position
-            rayAngle = rayCount > 1 ? (float) rayIndex / rayCount : 0f;
-        }
-        
-        // Apply wave arc scaling
-        float waveArc = flow.effectiveWaveArc();
-        float scaledAngle = rayAngle * waveArc;
-        
-        // === Sweep Copies (waveCount) ===
-        // < 1: TRIM - reduces the visible wedge size (fewer rays visible at once)
-        // = 1: Normal sweep behavior
-        // > 1: DUPLICATE - creates N copies of the sweep wedge around the circle
-        // NOTE: For CONTINUOUS mode, sweepCopies is ignored (no sweep)
-        float sweepCopies = Math.max(0.1f, flow.waveCount());
-        
-        // === Length Mode Animation ===
-        net.cyberpunk042.visual.animation.LengthMode lengthMode = flow.length();
-        if (lengthMode != null && lengthMode != net.cyberpunk042.visual.animation.LengthMode.NONE) {
-            float basePhase = (time * flow.lengthSpeed()) % 1.0f;
-            
-            float phase;
-            if (waveDist == net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS) {
-                // CONTINUOUS: Phase is scrambled by golden ratio, no sweep multiplication
-                // Each ray has a unique phase offset that doesn't correlate with angle
-                phase = (basePhase + rayAngle) % 1.0f;
-            } else {
-                // SEQUENTIAL/RANDOM: Apply sweepCopies for sweep effect
-                phase = (basePhase + scaledAngle * sweepCopies) % 1.0f;
-            }
-            
-            // Edge width for spawn/despawn transitions
-            // sweepCopies affects edge width: higher = narrower transitions = more rays visible at full size
-            // For CONTINUOUS: edgeWidth still applies for position-based transitions
-            float edgeWidth = 0.1f / sweepCopies;
-            edgeWidth = Math.max(0.01f, Math.min(0.1f, edgeWidth));
-            
-            // Progressive spawn: when startFullLength=false, rays grow progressively
-            // Uses EdgeTransitionMode to determine HOW: SCALE=thickness, CLIP=length, FADE=alpha
-            boolean progressiveSpawn = !flow.startFullLength();
-            net.cyberpunk042.visual.animation.EdgeTransitionMode edgeMode = flow.effectiveEdgeTransition();
-            
-            // Check if we're using follow-curve mode (slide segment along fixed curve)
-            boolean followCurve = flow.followCurve();
-            float segLen = flow.segmentLength();
-            
-            switch (lengthMode) {
-                case RADIATE -> {
-                    if (followCurve) {
-                        // FOLLOW CURVE: Ray body travels along fixed curved path (no drift)
-                        if (segLen < 0.99f) {
-                            // Partial segment slides along curve
-                            // phase 0 = segment at inner edge, phase 1 = segment at outer edge
-                            tStart = phase * (1.0f - segLen);
-                            tEnd = tStart + segLen;
-                        }
-                        // segLen >= 1.0: full ray visible (tStart=0, tEnd=1 default)
-                        // posOffset stays 0 - curve shape is fixed, no drift
-                    } else {
-                        // TRANSLATE: Endpoints move, curve drifts with them
-                        posOffset = phase * rayLength;
-                    }
-                    
-                    // Progressive spawn: ray appears during spawn phase, disappears during despawn
-                    if (progressiveSpawn) {
-                        float progress = 1.0f; // Default: fully visible
-                        
-                        // Spawn phase: 0 to edgeWidth → ray appears from 0 to full
-                        if (phase < edgeWidth) {
-                            progress = phase / edgeWidth;
-                        }
-                        // Despawn phase: (1-edgeWidth) to 1 → ray disappears from full to 0
-                        else if (phase > 1.0f - edgeWidth) {
-                            progress = (1.0f - phase) / edgeWidth;
-                        }
-                        
-                        // Apply based on edge mode
-                        switch (edgeMode) {
-                            case SCALE -> scale = progress;
-                            case CLIP -> {
-                                if (followCurve) {
-                                    // For followCurve, shrink the segment proportionally
-                                    float visibleLen = (tEnd - tStart) * progress;
-                                    tEnd = tStart + visibleLen;
-                                } else {
-                                    tEnd = progress;
-                                }
-                            }
-                            case FADE -> alpha = progress;
-                        }
-                    }
-                }
-                case ABSORB -> {
-                    if (followCurve) {
-                        // FOLLOW CURVE: Ray body travels inward along fixed curved path (no drift)
-                        if (segLen < 0.99f) {
-                            // Partial segment slides along curve (reversed direction)
-                            float reversed = 1.0f - phase;
-                            tStart = reversed * (1.0f - segLen);
-                            tEnd = tStart + segLen;
-                        }
-                        // segLen >= 1.0: full ray visible (tStart=0, tEnd=1 default)
-                        // posOffset stays 0 - curve shape is fixed, no drift
-                    } else {
-                        // TRANSLATE: Endpoints move, curve drifts with them
-                        float reversed = 1.0f - phase;
-                        posOffset = reversed * rayLength;
-                    }
-                    
-                    // Progressive spawn: ray appears during spawn phase, disappears during despawn
-                    if (progressiveSpawn) {
-                        float progress = 1.0f; // Default: fully visible
-                        
-                        // Spawn phase: 0 to edgeWidth → ray appears from 0 to full
-                        if (phase < edgeWidth) {
-                            progress = phase / edgeWidth;
-                        }
-                        // Despawn phase: (1-edgeWidth) to 1 → ray disappears from full to 0
-                        else if (phase > 1.0f - edgeWidth) {
-                            progress = (1.0f - phase) / edgeWidth;
-                        }
-                        
-                        // Apply based on edge mode
-                        switch (edgeMode) {
-                            case SCALE -> scale = progress;
-                            case CLIP -> {
-                                if (followCurve) {
-                                    // For followCurve, shrink the segment proportionally from start
-                                    float visibleLen = (tEnd - tStart) * progress;
-                                    tStart = tEnd - visibleLen;
-                                } else {
-                                    tStart = 1.0f - progress;
-                                }
-                            }
-                            case FADE -> alpha = progress;
-                        }
-                    }
-                }
-                case PULSE -> {
-                    // Breathing effect - scale oscillates
-                    scale = 0.5f + 0.5f * (float) Math.sin(phase * Math.PI * 2);
-                }
-                case SEGMENT -> {
-                    // Fixed segment visible (uses segLen from above)
-                    tStart = phase;
-                    tEnd = phase + segLen;
-                    if (tEnd > 1.0f) {
-                        // Wrap around
-                        tEnd = tEnd - 1.0f;
-                    }
-                }
-                case GROW_SHRINK -> {
-                    // Grows then shrinks
-                    if (phase < 0.5f) {
-                        scale = phase * 2.0f;
-                    } else {
-                        scale = (1.0f - phase) * 2.0f;
-                    }
-                }
-                default -> {}
-            }
-        }
-        
-        // === Flicker Mode Animation ===
-        net.cyberpunk042.visual.animation.FlickerMode flickerMode = flow.flicker();
-        if (flickerMode != null && flickerMode != net.cyberpunk042.visual.animation.FlickerMode.NONE) {
-            float intensity = flow.flickerIntensity();
-            float freq = flow.flickerFrequency();
-            float flickerPhase = time * freq + rayIndex * 1.618033988749895f;
-            
-            switch (flickerMode) {
-                case SCINTILLATION -> {
-                    // Random twinkling
-                    float noise = (float) Math.sin(flickerPhase * 7.3) * 
-                                  (float) Math.sin(flickerPhase * 13.7) * 
-                                  (float) Math.sin(flickerPhase * 23.1);
-                    alpha = 1.0f - intensity * (0.5f + 0.5f * noise);
-                }
-                case STROBE -> {
-                    // On/off blinking
-                    alpha = ((flickerPhase % 1.0f) < 0.5f) ? 1.0f : 1.0f - intensity;
-                }
-                case FADE_PULSE -> {
-                    // Sine wave alpha (breathing)
-                    alpha = 1.0f - intensity * (0.5f + 0.5f * (float) Math.sin(flickerPhase * Math.PI * 2));
-                }
-                case FLICKER -> {
-                    // Candlelight-style random flickering
-                    int seed = (int)(flickerPhase * 1000) + rayIndex * 12345;
-                    java.util.Random flickerRng = new java.util.Random(seed);
-                    alpha = 1.0f - intensity * flickerRng.nextFloat();
-                }
-                case LIGHTNING -> {
-                    // Flash bright then fade
-                    float flashPhase = flickerPhase % 1.0f;
-                    alpha = 1.0f - intensity * Math.min(1.0f, flashPhase * 3.0f);
-                }
-                case HEARTBEAT -> {
-                    // Double-pulse rhythm
-                    float beatPhase = flickerPhase % 1.0f;
-                    float pulse = beatPhase < 0.15f ? beatPhase / 0.15f :
-                                  beatPhase < 0.3f ? (0.3f - beatPhase) / 0.15f :
-                                  beatPhase < 0.4f ? (beatPhase - 0.3f) / 0.1f :
-                                  beatPhase < 0.5f ? (0.5f - beatPhase) / 0.1f : 0f;
-                    alpha = 1.0f - intensity * (1.0f - pulse);
-                }
-                default -> {}
-            }
-        }
-        
-        return new FlowAnimationResult(posOffset, scale, tStart, tEnd, alpha);
-    }
+    // NOTE: computeFlowAnimation DELETED - replaced by TessEdgeModeFactory
     
     /**
      * Computes the orientation vector based on the orientation mode.
@@ -969,16 +416,15 @@ public final class RayPositioner {
     // Distribution Calculation
     // ═══════════════════════════════════════════════════════════════════════════
     
-    /** Result from distribution calculation. */
-    public record DistributionResult(
-        float startOffset,
-        float lengthMod,
-        float angleJitter,
-        float radiusJitter
-    ) {}
-    
     /**
      * Computes distribution-based offsets for a ray.
+     * <p>Delegates to {@link DistributionFactory} for strategy-based computation.</p>
+     * 
+     * @param shape The rays shape configuration
+     * @param index Ray index (0 to count-1)
+     * @param count Total ray count
+     * @param rng Random number generator for distribution randomness
+     * @return DistributionResult with startOffset, lengthMod, angleJitter, radiusJitter
      */
     public static DistributionResult computeDistribution(
             RaysShape shape, 
@@ -986,53 +432,8 @@ public final class RayPositioner {
             int count, 
             Random rng) {
         
-        RayDistribution distribution = shape.distribution();
-        float innerRadius = shape.innerRadius();
-        float outerRadius = shape.outerRadius();
-        float rayLength = shape.rayLength();
-        float randomness = shape.randomness();
-        float lengthVariation = shape.lengthVariation();
-        
-        float startOffset = 0f;
-        float lengthMod = 1f;
-        float angleJitter = 0f;
-        float radiusJitter = 0f;
-        
-        switch (distribution) {
-            case UNIFORM -> {
-                lengthMod = 1f - lengthVariation * rng.nextFloat();
-                angleJitter = randomness * (rng.nextFloat() - 0.5f) * TWO_PI / count * 0.5f;
-            }
-            case RANDOM -> {
-                float availableRange = outerRadius - innerRadius;
-                float maxLength = Math.min(rayLength, availableRange);
-                
-                lengthMod = 0.5f + 0.5f * rng.nextFloat();
-                float actualLength = maxLength * lengthMod;
-                
-                float maxStartOffset = availableRange - actualLength;
-                if (maxStartOffset > 0) {
-                    startOffset = maxStartOffset * rng.nextFloat();
-                }
-                
-                angleJitter = randomness * (rng.nextFloat() - 0.5f) * TWO_PI / count;
-                radiusJitter = randomness * (rng.nextFloat() - 0.5f) * 0.3f;
-            }
-            case STOCHASTIC -> {
-                float availableRange = outerRadius - innerRadius;
-                
-                lengthMod = 0.2f + 0.8f * rng.nextFloat();
-                float actualLength = rayLength * lengthMod;
-                
-                float maxStartOffset = Math.max(0, availableRange - actualLength * 0.3f);
-                startOffset = maxStartOffset * rng.nextFloat();
-                
-                angleJitter = (rng.nextFloat() - 0.5f) * TWO_PI / count * 2f;
-                radiusJitter = (rng.nextFloat() - 0.5f) * 0.5f;
-            }
-        }
-        
-        return new DistributionResult(startOffset, lengthMod, angleJitter, radiusJitter);
+        DistributionStrategy strategy = DistributionFactory.get(shape.distribution());
+        return strategy.compute(shape, index, count, rng);
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -1041,6 +442,16 @@ public final class RayPositioner {
     
     /**
      * Computes start and end positions based on arrangement mode.
+     * <p>Uses strategy pattern for both layer offset and arrangement computation.</p>
+     * 
+     * @param shape The rays shape configuration
+     * @param index Ray index (0 to count-1)
+     * @param count Total ray count
+     * @param layerIndex Layer index (0 to layers-1)
+     * @param layerSpacing Spacing between layers
+     * @param dist Pre-computed distribution offsets
+     * @param start Output array for start position [x, y, z]
+     * @param end Output array for end position [x, y, z]
      */
     public static void computePosition(
             RaysShape shape, 
@@ -1052,174 +463,25 @@ public final class RayPositioner {
             float[] start, 
             float[] end) {
         
+        // Compute layer offset using strategy
+        // For SPHERICAL/CONVERGING, VERTICAL and SPIRAL fall back to SHELL
         RayArrangement arrangement = shape.arrangement();
-        float innerRadius = shape.innerRadius();
-        float outerRadius = shape.outerRadius();
-        float rayLength = shape.rayLength();
+        RayLayerMode effectiveLayerMode = shape.effectiveLayerMode();
         
-        switch (arrangement) {
-            case RADIAL -> computeRadial(shape, index, count, layerIndex, layerSpacing, dist, start, end);
-            case SPHERICAL, DIVERGING -> computeSpherical(shape, index, count, layerIndex, layerSpacing, dist, start, end, false);
-            case CONVERGING -> computeSpherical(shape, index, count, layerIndex, layerSpacing, dist, start, end, true);
-            case PARALLEL -> computeParallel(shape, index, count, layerIndex, layerSpacing, dist, start, end);
-        }
-    }
-    
-    private static void computeRadial(
-            RaysShape shape, int index, int count, int layerIndex, float layerSpacing,
-            DistributionResult dist, float[] start, float[] end) {
-        
-        float innerRadius = shape.innerRadius();
-        float rayLength = shape.rayLength();
-        RayLayerMode layerMode = shape.effectiveLayerMode();
-        
-        float angle = (index * TWO_PI / count) + dist.angleJitter();
-        float cos = (float) Math.cos(angle);
-        float sin = (float) Math.sin(angle);
-        
-        // Compute layer offset based on layer mode
-        float layerY = 0;
-        float layerRadiusOffset = 0;
-        float layerAngleOffset = 0;
-        
-        switch (layerMode) {
-            case VERTICAL -> {
-                // Stack layers vertically
-                layerY = (layerIndex - (shape.layers() - 1) / 2.0f) * layerSpacing;
-            }
-            case RADIAL -> {
-                // Layers extend radially outward (each layer starts where previous ends)
-                layerRadiusOffset = layerIndex * rayLength;
-            }
-            case SHELL -> {
-                // Concentric shells (same as RADIAL but adds to inner radius)
-                layerRadiusOffset = layerIndex * layerSpacing;
-            }
-            case SPIRAL -> {
-                // Spiral: both angular and radial offset
-                layerAngleOffset = layerIndex * TWO_PI / 8; // 45° between layers
-                layerRadiusOffset = layerIndex * layerSpacing;
+        if (arrangement == RayArrangement.SPHERICAL || 
+            arrangement == RayArrangement.CONVERGING || 
+            arrangement == RayArrangement.DIVERGING) {
+            // Spherical arrangements don't support VERTICAL/SPIRAL layer modes
+            if (effectiveLayerMode == RayLayerMode.VERTICAL || effectiveLayerMode == RayLayerMode.SPIRAL) {
+                effectiveLayerMode = RayLayerMode.SHELL;
             }
         }
         
-        // Apply angular offset for spiral mode
-        if (layerMode == RayLayerMode.SPIRAL) {
-            float newAngle = angle + layerAngleOffset;
-            cos = (float) Math.cos(newAngle);
-            sin = (float) Math.sin(newAngle);
-        }
+        LayerModeStrategy layerStrategy = LayerModeFactory.get(effectiveLayerMode);
+        LayerOffset layerOffset = layerStrategy.computeOffset(shape, layerIndex, layerSpacing);
         
-        // rayLength defines how long each ray is
-        float innerR = innerRadius + layerRadiusOffset + dist.startOffset();
-        float outerR = innerR + rayLength * dist.lengthMod();
-        innerR *= (1 + dist.radiusJitter());
-        outerR *= (1 + dist.radiusJitter());
-        
-        start[0] = cos * innerR;
-        start[1] = layerY;
-        start[2] = sin * innerR;
-        
-        end[0] = cos * outerR;
-        end[1] = layerY;
-        end[2] = sin * outerR;
-    }
-    
-    private static void computeSpherical(
-            RaysShape shape, int index, int count, int layerIndex, float layerSpacing,
-            DistributionResult dist, float[] start, float[] end, boolean converging) {
-        
-        float innerRadius = shape.innerRadius();
-        float outerRadius = shape.outerRadius();
-        float rayLength = shape.rayLength();
-        RayLayerMode layerMode = shape.effectiveLayerMode();
-        
-        // Compute layer offset based on layer mode
-        float shellOffset = 0;
-        float layerRadiusExt = 0;
-        
-        switch (layerMode) {
-            case SHELL -> {
-                // Concentric shells at increasing radii
-                shellOffset = layerIndex * layerSpacing;
-            }
-            case RADIAL -> {
-                // Rays extend further outward (each layer continues where previous ended)
-                layerRadiusExt = layerIndex * rayLength;
-            }
-            case VERTICAL, SPIRAL -> {
-                // For spherical, VERTICAL and SPIRAL don't make as much sense
-                // Fall back to SHELL behavior
-                shellOffset = layerIndex * layerSpacing;
-            }
-        }
-        
-        float phi = (float) Math.acos(1 - 2 * (index + 0.5f) / count);
-        float theta = TWO_PI * index / GOLDEN_RATIO + dist.angleJitter();
-        
-        float sinPhi = (float) Math.sin(phi);
-        float cosPhi = (float) Math.cos(phi);
-        float cosTheta = (float) Math.cos(theta);
-        float sinTheta = (float) Math.sin(theta);
-        
-        float dx = sinPhi * cosTheta;
-        float dy = cosPhi;
-        float dz = sinPhi * sinTheta;
-        
-        if (converging) {
-            float outerR = (outerRadius + shellOffset + layerRadiusExt) * (1 + dist.radiusJitter());
-            float innerR = outerR - rayLength * dist.lengthMod();
-            outerR += dist.startOffset();
-            innerR += dist.startOffset();
-            if (innerR < 0) innerR = 0;
-            
-            start[0] = dx * outerR;
-            start[1] = dy * outerR;
-            start[2] = dz * outerR;
-            
-            end[0] = dx * innerR;
-            end[1] = dy * innerR;
-            end[2] = dz * innerR;
-        } else {
-            float innerR = (innerRadius + shellOffset + layerRadiusExt + dist.startOffset()) * (1 + dist.radiusJitter());
-            float outerR = innerR + rayLength * dist.lengthMod();
-            
-            start[0] = dx * innerR;
-            start[1] = dy * innerR;
-            start[2] = dz * innerR;
-            
-            end[0] = dx * outerR;
-            end[1] = dy * outerR;
-            end[2] = dz * outerR;
-        }
-    }
-    
-    private static void computeParallel(
-            RaysShape shape, int index, int count, int layerIndex, float layerSpacing,
-            DistributionResult dist, float[] start, float[] end) {
-        
-        float outerRadius = shape.outerRadius();
-        float rayLength = shape.rayLength();
-        
-        int gridSize = (int) Math.ceil(Math.sqrt(count));
-        int gx = index % gridSize;
-        int gz = index / gridSize;
-        
-        float spacing = outerRadius * 2 / gridSize;
-        float x = (gx - gridSize / 2.0f + 0.5f) * spacing;
-        float z = (gz - gridSize / 2.0f + 0.5f) * spacing + layerIndex * layerSpacing;
-        
-        x += dist.angleJitter() * spacing;
-        z += dist.radiusJitter() * spacing;
-        
-        float yStart = -rayLength * dist.lengthMod() / 2 + dist.startOffset();
-        float yEnd = rayLength * dist.lengthMod() / 2 + dist.startOffset();
-        
-        start[0] = x;
-        start[1] = yStart;
-        start[2] = z;
-        
-        end[0] = x;
-        end[1] = yEnd;
-        end[2] = z;
+        // Compute position using arrangement strategy
+        ArrangementStrategy arrangementStrategy = ArrangementFactory.get(arrangement);
+        arrangementStrategy.compute(shape, index, count, layerOffset, dist, start, end);
     }
 }

@@ -304,10 +304,26 @@ public final class ShapeRegistry {
             RayLayerMode layerMode = RayLayerMode.VERTICAL;
             FieldDeformationMode fieldDeformation = FieldDeformationMode.NONE;
             float fieldDeformationIntensity = getFloat(params, "fieldDeformationIntensity", 0.0f);
+            // Energy interaction fields (new in v2)
+            net.cyberpunk042.visual.energy.RadiativeInteraction radiativeInteraction = 
+                net.cyberpunk042.visual.energy.RadiativeInteraction.NONE;
+            float segmentLength = getFloat(params, "segmentLength", 1.0f);
+            float waveArc = getFloat(params, "waveArc", 1.0f);
+            net.cyberpunk042.visual.animation.WaveDistribution waveDistribution = 
+                net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL;
+            float waveCount = getFloat(params, "waveCount", 2.0f);
+            // Animation behavior fields (moved from RayFlowConfig)
+            boolean startFullLength = params.containsKey("startFullLength") ?
+                Boolean.parseBoolean(params.get("startFullLength").toString()) : false;
+            boolean followCurve = params.containsKey("followCurve") ?
+                Boolean.parseBoolean(params.get("followCurve").toString()) : true;
             return new RaysShape(rayLength, rayWidth, count, arrangement, distribution, innerRadius, outerRadius,
                 layers, layerSpacing, layerMode, randomness, lengthVariation, fadeStart, fadeEnd, segments, segmentGap,
                 lineShape, lineShapeAmplitude, lineShapeFrequency, shapeSegments, curvature, curvatureIntensity, 
-                rayType, shapeIntensity, shapeLength, rayOrientation, fieldDeformation, fieldDeformationIntensity);
+                rayType, shapeIntensity, shapeLength, rayOrientation, fieldDeformation, fieldDeformationIntensity,
+                null, // shapeState
+                radiativeInteraction, segmentLength, waveArc, waveDistribution, waveCount,
+                startFullLength, followCurve);
         });
         
         Logging.REGISTRY.topic("shape").info(
