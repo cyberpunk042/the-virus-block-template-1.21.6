@@ -39,6 +39,14 @@ public final class TessEdgeModeFactory {
     /**
      * Compute edge effect based on EdgeTransitionMode, clip range, and intensity.
      * 
+     * <p>EdgeMode controls what happens at ray trajectory boundaries (phase ~0 or ~1):
+     * <ul>
+     *   <li><b>CLIP:</b> Geometrically clips the segment - invisible outside boundaries</li>
+     *   <li><b>SCALE:</b> Shrinks the line width as it approaches edges</li>
+     *   <li><b>FADE:</b> Alpha gradient across the visible segment near edges</li>
+     * </ul>
+     * </p>
+     * 
      * @param edgeMode The edge transition mode (CLIP/SCALE/FADE)
      * @param clipStart Start of visible segment (0-1), from RadiativeInteraction
      * @param clipEnd End of visible segment (0-1), from RadiativeInteraction
@@ -50,50 +58,44 @@ public final class TessEdgeModeFactory {
             edgeMode = EdgeTransitionMode.CLIP;
         }
         
-        // Clamp intensity minimum to 0 (no upper limit - values > 1 create exaggerated effects)
-        intensity = Math.max(0f, intensity);
+        // Clamp intensity
+        intensity = Math.clamp(intensity, 0f, 1f);
         
-        // Compute the shape center position (where the 3D shape is placed on the ray)
-        float shapeCenter = (clipStart + clipEnd) * 0.5f;
+        // Compute the segment center position (where the shape is on the ray)
+        float segmentCenter = (clipStart + clipEnd) * 0.5f;
         
-        // Compute edge proximity: how close is the shape center to either edge?
+        // Compute edge proximity: how close is the segment center to either edge?
         // At t=0 or t=1: proximity = 0 (at edge)
         // At t=0.5: proximity = 1 (center of ray, farthest from edges)
-        float distanceToStart = shapeCenter;           // Distance from t=0
-        float distanceToEnd = 1.0f - shapeCenter;      // Distance from t=1
+        float distanceToStart = segmentCenter;           // Distance from t=0
+        float distanceToEnd = 1.0f - segmentCenter;      // Distance from t=1
         float edgeProximity = Math.min(distanceToStart, distanceToEnd) * 2.0f; // Normalize to [0,1]
         edgeProximity = Math.clamp(edgeProximity, 0f, 1f);
         
-        // Apply intensity to edge proximity (blend between 1.0 and actual proximity)
-        // At intensity=0: proximity = 1 (no edge effect)
-        // At intensity=1: proximity = actual edge proximity (full effect)
-        float effectiveProximity = 1.0f - (1.0f - edgeProximity) * intensity;
-        
-        // Apply intensity to clip range (blend between [0,1] and actual clip)
-        float effectiveClipStart = clipStart * intensity;
-        float effectiveClipEnd = 1.0f - (1.0f - clipEnd) * intensity;
-        
         return switch (edgeMode) {
             case CLIP -> {
-                // CLIP mode: geometrically clip the visible range
-                // At intensity=0: full visibility [0,1]
-                // At intensity=1: actual clip range [clipStart, clipEnd]
-                yield new TessEdgeResult(effectiveClipStart, effectiveClipEnd, 1f, 1f, distanceToStart, distanceToEnd);
+                // CLIP mode: use the segment position directly
+                // No need to modify - the segment is already positioned by RadiativeInteraction
+                // Just return the clip bounds (no alpha/scale effects)
+                yield new TessEdgeResult(clipStart, clipEnd, 1f, 1f, distanceToStart, distanceToEnd);
             }
             case SCALE -> {
-                // SCALE mode: full visibility (no clipping), but uniform scale based on edge proximity
-                // At intensity=0: scale = 1 (no scaling)
-                // At intensity=1: scale = edgeProximity (full scaling effect)
-                yield new TessEdgeResult(0f, 1f, effectiveProximity, 1f, distanceToStart, distanceToEnd);
+                // SCALE mode: full ray visibility, but scale (line width) varies by edge proximity
+                // effectiveScale = 1 when far from edges, scales down near edges
+                // Intensity controls how much scaling occurs
+                float effectiveScale = 1.0f - (1.0f - edgeProximity) * intensity;
+                yield new TessEdgeResult(0f, 1f, effectiveScale, 1f, distanceToStart, distanceToEnd);
             }
             case FADE -> {
-                // FADE mode: full visibility, full size, gradient alpha based on edge proximity
-                // The effectiveProximity modulates the edge distances used for fade gradient
-                // At intensity=0: no fade (full alpha everywhere)
-                // At intensity=1: full fade based on edge proximity
+                // FADE mode: full ray visibility, full scale
+                // Alpha gradient is computed per-vertex based on position
+                // Pass edge distances modified by intensity - this controls the fade range
+                // Low edgeDistance = more fade; intensity=0 means edgeDistance=1 (no fade)
                 float fadeDistStart = 1.0f - (1.0f - distanceToStart) * intensity;
                 float fadeDistEnd = 1.0f - (1.0f - distanceToEnd) * intensity;
-                yield new TessEdgeResult(0f, 1f, 1f, 1f, fadeDistStart, fadeDistEnd);
+                // Also set base alpha based on overall proximity
+                float baseAlpha = 1.0f - (1.0f - edgeProximity) * intensity * 0.5f;
+                yield new TessEdgeResult(0f, 1f, 1f, baseAlpha, fadeDistStart, fadeDistEnd);
             }
         };
     }

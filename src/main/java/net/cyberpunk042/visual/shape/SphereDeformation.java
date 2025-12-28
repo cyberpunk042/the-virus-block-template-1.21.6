@@ -46,7 +46,14 @@ public enum SphereDeformation {
     BULLET("Bullet", "Rounded tip + cylinder"),
     
     /** Cone - pointy tip, wide base. */
-    CONE("Cone", "Conical taper");
+    CONE("Cone", "Conical taper"),
+    
+    // ─── Environmental/Atmospheric ───
+    /** Cloud - fluffy, billowing cumulus-like shape. */
+    CLOUD("Cloud", "Fluffy cumulus cloud"),
+    
+    /** Molecule - clustered spheres like H2O or organic molecules. */
+    MOLECULE("Molecule", "Clustered atomic spheres");
     
     private final String displayName;
     private final String description;
@@ -122,6 +129,10 @@ public enum SphereDeformation {
             case BULLET -> ShapeMath.bulletVertex(theta, phi, radius, length);
             
             case CONE -> ShapeMath.coneVertex(theta, phi, radius, length);
+            
+            case CLOUD -> ShapeMath.cloudVertex(theta, phi, radius, intensity, length);
+            
+            case MOLECULE -> ShapeMath.moleculeVertex(theta, phi, radius, intensity, length);
         };
         
         // For SPHEROID, the intensity is already applied via effectiveLength, so return directly
@@ -201,6 +212,8 @@ public enum SphereDeformation {
             case DROPLET_INVERTED -> ShapeMath.dropletInverted(theta, 1.0f + intensity * 2.0f);
             case BULLET -> ShapeMath.bullet(theta);
             case CONE -> ShapeMath.blend(ShapeMath.cone(theta), intensity);
+            case CLOUD -> 1.0f + intensity * 0.3f;  // Slight average bulge for legacy
+            case MOLECULE -> 1.0f + intensity * 0.25f;  // Average bulge for molecule
         };
     }
     

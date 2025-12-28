@@ -99,40 +99,43 @@ public class RayLineTessellator implements RayTypeTessellator {
         float[] end = context.end();
         float[] dir = context.direction();
         
-        // === POSITION THE SEGMENT ALONG THE RAY (like 3D shapes do) ===
-        // The segment is positioned at the CENTER of the clip range
-        float segmentCenter = (clipRange.start() + clipRange.end()) * 0.5f;
-        float halfLength = segmentLength * 0.5f;
+        // === COMPUTE VISIBLE SEGMENT POSITION ===
+        // The segment is positioned based on the clip range from RadiativeInteraction
+        float segmentStart = clipRange.start();
+        float segmentEnd = clipRange.end();
         
-        // Segment bounds (where the line segment actually is on the ray)
-        float segmentStart = segmentCenter - halfLength;
-        float segmentEnd = segmentCenter + halfLength;
+        // For SCALE mode: shrink the segment LENGTH based on edge proximity
+        // The scale factor (0-1) determines how long the segment is
+        float scale = edgeResult.scale();
+        if (scale < 0.999f) {
+            // Shrink from center
+            float center = (segmentStart + segmentEnd) * 0.5f;
+            float halfLength = (segmentEnd - segmentStart) * 0.5f * scale;
+            segmentStart = center - halfLength;
+            segmentEnd = center + halfLength;
+        }
         
         // Clamp to ray bounds [0, 1]
         float tStart = Math.max(0f, segmentStart);
         float tEnd = Math.min(1f, segmentEnd);
         
-        // Skip if segment is completely outside ray bounds
+        // Skip if segment is completely outside ray bounds or too small
         if (tStart >= tEnd) {
             return;
         }
         
-        // Get scale and alpha from edge mode
-        float scale = edgeResult.scale();
+        // Get base alpha from edge mode
         float baseAlpha = edgeResult.alpha();
         
         // Compute actual start/end positions by interpolating along the ray
         float[] actualStart = RayGeometryUtils.interpolate(start, end, tStart);
         float[] actualEnd = RayGeometryUtils.interpolate(start, end, tEnd);
         
-        // For FADE mode, apply per-vertex alpha based on edge proximity
-        // tNormalized maps [tStart, tEnd] to [0, 1] for the visible segment
-        float segmentSpan = tEnd - tStart;
-        float tNormStart = segmentSpan > 0 ? 0f : 0f;  // Start of visible segment
-        float tNormEnd = segmentSpan > 0 ? 1f : 1f;    // End of visible segment
-        
-        float alphaStart = edgeResult.computeFadeAlpha(tNormStart, baseAlpha);
-        float alphaEnd = edgeResult.computeFadeAlpha(tNormEnd, baseAlpha);
+        // For FADE mode, compute per-vertex alpha based on position along the ray
+        // tStart/tEnd are positions along the ray (0=inner, 1=outer)
+        // When near trajectory edges (phase ~0 or ~1), vertices fade based on edge distances
+        float alphaStart = edgeResult.computeFadeAlpha(tStart, baseAlpha);
+        float alphaEnd = edgeResult.computeFadeAlpha(tEnd, baseAlpha);
         
         // u = t value for shader, alpha from EdgeMode
         int v0 = builder.vertex(actualStart[0], actualStart[1], actualStart[2], dir[0], dir[1], dir[2], tStart, 0, alphaStart);

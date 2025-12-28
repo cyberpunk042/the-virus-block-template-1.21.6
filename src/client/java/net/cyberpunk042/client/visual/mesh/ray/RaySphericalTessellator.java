@@ -122,10 +122,19 @@ public class RaySphericalTessellator implements RayTypeTessellator {
         float edgeScale = edgeResult.scale();         // From EdgeMode (CLIP=1, SCALE=varies, FADE=1)
         float radiativeScale = clipRange.scale();     // From RadiativeInteraction (OSCILLATION etc)
         
-        // Shape dimensions
-        float baseShapeLength = context.shapeLength();
-        float axialLength = baseShapeLength * radiativeScale;  // NOT affected by edgeScale
-        float baseRadius = (baseShapeLength * 0.5f) * radiativeScale * edgeScale;  // Width is affected by edgeScale
+        // Shape dimensions:
+        // - shapeSize (from rayLength): overall size/radius of the shape
+        // - shapeLength: axial stretch factor (<1 = squashed, 1 = sphere, >1 = elongated)
+        float shapeSize = context.shapeSize();       // Overall size (from rayLength)
+        float shapeStretch = context.shapeLength();  // Axial stretch factor
+        
+        // Base size with radiative scale applied
+        float scaledSize = shapeSize * radiativeScale;
+        
+        // Axial length = base size * stretch factor
+        float axialLength = scaledSize * shapeStretch;
+        // Radius (equatorial width) = half of base size, affected by edge scale
+        float baseRadius = (scaledSize * 0.5f) * edgeScale;
         
         float[] start = context.start();
         float[] end = context.end();

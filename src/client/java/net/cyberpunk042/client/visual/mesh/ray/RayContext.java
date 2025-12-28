@@ -107,6 +107,9 @@ public record RayContext(
     /** Axial stretch factor (<1 oblate, 1 normal, >1 prolate). */
     float shapeLength,
     
+    /** Overall size of 3D shape (from rayLength). */
+    float shapeSize,
+    
     // ═══════════════════════════════════════════════════════════════════════════
     // Animation
     // ═══════════════════════════════════════════════════════════════════════════
@@ -275,6 +278,7 @@ public record RayContext(
         private float[] orientationVector = new float[] { 0, 0, 1 };
         private float shapeIntensity = 1.0f;
         private float shapeLength = 1.0f;
+        private float shapeSize = 1.0f;  // Overall size of 3D shape (separate from stretch)
         private WaveConfig wave = null;
         private float time = 0.0f;
         private boolean hasWave = false;
@@ -340,6 +344,7 @@ public record RayContext(
         }
         public Builder shapeIntensity(float v) { this.shapeIntensity = v; return this; }
         public Builder shapeLength(float v) { this.shapeLength = v; return this; }
+        public Builder shapeSize(float v) { this.shapeSize = v; return this; }
         public Builder wave(WaveConfig v) { this.wave = v; return this; }
         public Builder time(float v) { this.time = v; return this; }
         public Builder hasWave(boolean v) { this.hasWave = v; return this; }
@@ -379,7 +384,7 @@ public record RayContext(
                 lineShape, lineShapeAmplitude, lineShapeFrequency,
                 curvature, curvatureIntensity, lineResolution,
                 orientation, orientationVector,
-                shapeIntensity, shapeLength,
+                shapeIntensity, shapeLength, shapeSize,
                 wave, time, hasWave,
                 flowConfig, flowPositionOffset, travelRange, innerRadius, outerRadius,
                 fieldDeformation, fieldDeformationIntensity, normalizedDistance, fieldStretch,

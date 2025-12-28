@@ -450,5 +450,217 @@ public final class ShapeMath {
             a[2] * inv + b[2] * t
         };
     }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Cloud Deformation (Fluffy, Billowing Shape)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Cloud vertex position using multi-octave spherical noise.
+     * 
+     * <p>Creates fluffy, billowing cloud shapes by combining multiple frequencies
+     * of sine-wave displacement. The result mimics cumulus cloud formations.</p>
+     * 
+     * <p><b>Magic Formula:</b> Combines 4 octaves of spherical harmonics:
+     * <ul>
+     *   <li>Octave 1: Large bulges (frequency 2-3)</li>
+     *   <li>Octave 2: Medium bumps (frequency 4-6)</li>
+     *   <li>Octave 3: Small details (frequency 7-9)</li>
+     *   <li>Octave 4: Fine texture (frequency 11-13)</li>
+     * </ul>
+     * Each octave has decreasing amplitude (1, 0.5, 0.25, 0.125).</p>
+     * 
+     * @param theta Polar angle (0 = top, π = bottom)
+     * @param phi Azimuthal angle (0 to 2π)
+     * @param radius Base radius
+     * @param intensity Cloud "fluffiness" (0 = sphere, 1 = very fluffy)
+     * @param length Axial stretch (1 = spherical, >1 = elongated cloud)
+     * @return {x, y, z} vertex position
+     */
+    public static float[] cloudVertex(float theta, float phi, float radius, 
+            float intensity, float length) {
+        float sinTheta = (float) Math.sin(theta);
+        float cosTheta = (float) Math.cos(theta);
+        float sinPhi = (float) Math.sin(phi);
+        float cosPhi = (float) Math.cos(phi);
+        
+        // Base position (spheroid)
+        float baseX = radius * sinTheta * cosPhi;
+        float baseY = radius * length * cosTheta;
+        float baseZ = radius * sinTheta * sinPhi;
+        
+        // THE MAGIC FORMULA FOR DRAMATIC CLOUDS
+        // Uses multiple spherical "bulges" at pseudo-random positions
+        // Each bulge creates a distinct lobe like a cumulus cloud
+        
+        // Direction from center (normalized)
+        float nx = sinTheta * cosPhi;
+        float ny = cosTheta;
+        float nz = sinTheta * sinPhi;
+        
+        // Define 8 major bulge positions using golden angle distribution
+        // This creates well-distributed but organic-looking lobes
+        float goldenAngle = 2.399963f;  // ~137.5 degrees in radians
+        float[][] bulgePositions = new float[8][3];
+        for (int i = 0; i < 8; i++) {
+            float t = (float) i / 7.0f;  // 0 to 1
+            float bulgeTheta = (float) Math.acos(1 - 2 * t);  // Even distribution
+            float bulgePhi = goldenAngle * i;
+            bulgePositions[i][0] = (float) Math.sin(bulgeTheta) * (float) Math.cos(bulgePhi);
+            bulgePositions[i][1] = (float) Math.cos(bulgeTheta);
+            bulgePositions[i][2] = (float) Math.sin(bulgeTheta) * (float) Math.sin(bulgePhi);
+        }
+        
+        // Calculate bulge factor - cumulative effect of all lobes
+        float totalBulge = 0f;
+        float bulgeWidth = 0.6f + 0.4f * intensity;  // Wider bulges = more overlap = cloudier
+        
+        for (int i = 0; i < 8; i++) {
+            // Dot product = similarity to bulge direction (-1 to 1)
+            float dot = nx * bulgePositions[i][0] + 
+                       ny * bulgePositions[i][1] + 
+                       nz * bulgePositions[i][2];
+            
+            // Vary bulge strength per lobe for organic feel
+            float bulgeStrength = 0.5f + 0.5f * (float) Math.sin(i * 1.7f + 0.3f);
+            
+            // Gaussian-like falloff for smooth bulges
+            // Higher dot = closer to bulge center = more displacement
+            float proximity = (dot + 1f) * 0.5f;  // Remap to 0-1
+            float bulge = (float) Math.pow(proximity, 2.0f / bulgeWidth) * bulgeStrength;
+            totalBulge = Math.max(totalBulge, bulge);  // Use max for distinct lobes
+        }
+        
+        // Add multi-frequency noise for surface detail
+        float detailNoise = 
+            0.15f * (float) Math.sin(5 * theta + 0.3f) * (float) Math.sin(7 * phi + 1.2f) +
+            0.10f * (float) Math.sin(8 * theta + 1.5f) * (float) Math.cos(6 * phi + 0.7f) +
+            0.05f * (float) Math.sin(11 * theta + 2.1f) * (float) Math.sin(9 * phi + 0.9f);
+        
+        // Combine bulges with detail noise
+        // At intensity 0: sphere
+        // At intensity 1: dramatic multi-lobe cloud with up to 80% size variation
+        float displacement = totalBulge + detailNoise * 0.5f;
+        float radiusFactor = 1.0f + displacement * intensity * 0.8f;
+        
+        // Apply displacement outward from center
+        return new float[] {
+            baseX * radiusFactor,
+            baseY * radiusFactor,
+            baseZ * radiusFactor
+        };
+    }
+    /**
+     * Molecule vertex position - intensity-controlled branching spheres.
+     * 
+     * <p><b>MAGIC FORMULA:</b> Creates molecular structures where intensity
+     * controls the number of atomic branches:
+     * <ul>
+     *   <li>0.0 = pure sphere (single atom)</li>
+     *   <li>0.2 = 1 branch (diatomic like H2)</li>
+     *   <li>0.4 = 2 branches (like H2O - water)</li>
+     *   <li>0.6 = 3 branches (like NH3 - ammonia)</li>
+     *   <li>0.8 = 4 branches (like CH4 - methane, tetrahedral)</li>
+     *   <li>1.0 = 5 branches (complex molecule)</li>
+     * </ul>
+     * Each branch is a distinct spherical lobe with smooth metaball-like
+     * merging at the connection to the central sphere.</p>
+     * 
+     * @param theta Polar angle (0 = top, π = bottom)
+     * @param phi Azimuthal angle (0 to 2π)
+     * @param radius Base radius
+     * @param intensity Branch count control (0 = sphere, 1 = 5 branches)
+     * @param length Axial stretch
+     * @return {x, y, z} vertex position
+     */
+    public static float[] moleculeVertex(float theta, float phi, float radius, 
+            float intensity, float length) {
+        float sinTheta = (float) Math.sin(theta);
+        float cosTheta = (float) Math.cos(theta);
+        float sinPhi = (float) Math.sin(phi);
+        float cosPhi = (float) Math.cos(phi);
+        
+        // Base position (spheroid)
+        float baseX = radius * sinTheta * cosPhi;
+        float baseY = radius * length * cosTheta;
+        float baseZ = radius * sinTheta * sinPhi;
+        
+        // At intensity 0, return pure sphere
+        if (intensity < 0.05f) {
+            return new float[] { baseX, baseY, baseZ };
+        }
+        
+        // Direction from center (normalized)
+        float nx = sinTheta * cosPhi;
+        float ny = cosTheta;
+        float nz = sinTheta * sinPhi;
+        
+        // Calculate number of active branches based on intensity
+        // 0.2 = 1 branch, 0.4 = 2, 0.6 = 3, 0.8 = 4, 1.0 = 5
+        int maxBranches = (int) Math.ceil(intensity * 5.0f);
+        maxBranches = Math.max(1, Math.min(5, maxBranches));
+        
+        // How "complete" is the current branch (for smooth transitions)
+        float branchCompleteness = (intensity * 5.0f) - (maxBranches - 1);
+        branchCompleteness = Math.clamp(branchCompleteness, 0.0f, 1.0f);
+        
+        // Define branch directions using golden angle spiral for natural distribution
+        // First branch at top, others spiral around
+        float goldenAngle = 2.399963f;  // ~137.5 degrees
+        float[][] branchDirs = new float[5][3];
+        
+        // Branch 1: Top (like H in H2)
+        branchDirs[0] = new float[] { 0f, 1f, 0f };
+        
+        // Branches 2-5: Distributed around using golden angle
+        for (int i = 1; i < 5; i++) {
+            float t = (float) i / 4.0f;  // 0.25, 0.5, 0.75, 1.0
+            float branchTheta = (float) (Math.PI * 0.3 + t * Math.PI * 0.5);  // 54° to 144° from top
+            float branchPhi = goldenAngle * i;
+            branchDirs[i][0] = (float) Math.sin(branchTheta) * (float) Math.cos(branchPhi);
+            branchDirs[i][1] = (float) Math.cos(branchTheta);
+            branchDirs[i][2] = (float) Math.sin(branchTheta) * (float) Math.sin(branchPhi);
+        }
+        
+        // Calculate bulge from each active branch
+        float totalBulge = 0f;
+        float branchRadius = 0.6f;  // How far the branch sticks out
+        float branchWidth = 0.5f;   // How wide each branch lobe is
+        
+        for (int i = 0; i < maxBranches; i++) {
+            // Calculate branch strength (last branch fades in based on completeness)
+            float strength = (i == maxBranches - 1) ? branchCompleteness : 1.0f;
+            
+            // Dot product = similarity to branch direction (-1 to 1)
+            float dot = nx * branchDirs[i][0] + ny * branchDirs[i][1] + nz * branchDirs[i][2];
+            
+            // Metaball-like field function: r² / d²
+            // Creates smooth bulges that merge nicely at the center
+            float proximity = (dot + 1f) * 0.5f;  // Remap to 0-1
+            
+            // Sharp falloff for distinct spherical lobes
+            float bulge = (float) Math.pow(proximity, 3.0f / branchWidth);
+            bulge = bulge * strength * branchRadius;
+            
+            // Use max for distinct lobes rather than additive blending
+            totalBulge = Math.max(totalBulge, bulge);
+        }
+        
+        // Add neck/connection region between center and branches
+        // This creates the characteristic molecular bond look
+        float connectionFactor = 1.0f - totalBulge * 0.3f;  // Slight pinching
+        connectionFactor = Math.max(0.7f, connectionFactor);
+        
+        // Final radius: base + branch bulge
+        // The sphere contracts slightly where branches connect (neck)
+        // but expands dramatically at branch ends
+        float radiusFactor = connectionFactor + totalBulge * 1.2f;
+        
+        return new float[] {
+            baseX * radiusFactor,
+            baseY * radiusFactor,
+            baseZ * radiusFactor
+        };
+    }
 }
 

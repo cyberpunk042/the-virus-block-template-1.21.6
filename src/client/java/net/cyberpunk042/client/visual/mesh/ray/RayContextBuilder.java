@@ -92,7 +92,8 @@ public final class RayContextBuilder {
             .orientation(shape.effectiveRayOrientation())
             .orientationVector(orientationVector)
             .shapeIntensity(shape.shapeIntensity())
-            .shapeLength(shape.shapeLength())
+            .shapeLength(shape.shapeLength())  // Axial stretch (<1 squashed, >1 elongated)
+            .shapeSize(shape.rayLength())      // Overall size of 3D shape
             .wave(wave)
             .time(time)
             .hasWave(hasWave)

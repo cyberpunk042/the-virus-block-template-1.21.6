@@ -115,7 +115,7 @@ public final class RayPositioner {
         
         // trajectorySpan = travel range (NOT the ray's actual length)
         float trajectorySpan = shape.outerRadius() - shape.innerRadius();
-        float phase = computeRayPhase(flowConfig, index, count, time);
+        float phase = computeRayPhase(flowConfig, shape, index, count, time);
         
         if (radiative == net.cyberpunk042.visual.energy.RadiativeInteraction.EMISSION) {
             return phase * trajectorySpan;
@@ -133,8 +133,9 @@ public final class RayPositioner {
         ShapeState<RayFlowStage> userState = shape.effectiveShapeState();
         
         if (flowConfig != null && flowConfig.isActive()) {
-            FlowContext flowCtx = new FlowContext(
-                flowConfig, index, count, time, shape.innerRadius(), shape.outerRadius());
+            // Use FlowContext.create to include wave distribution from shape
+            FlowContext flowCtx = FlowContext.create(
+                flowConfig, shape, index, count, time, shape.innerRadius(), shape.outerRadius());
             AnimationState animResult = FlowPipeline.standard().compute(flowCtx);
             return userState.withPhase(animResult.phase());
         } else {
@@ -249,8 +250,8 @@ public final class RayPositioner {
                 float edgeWidth = 0.1f / sweepCopies;
                 edgeWidth = Math.max(0.01f, Math.min(0.1f, edgeWidth));
                 
-                // Compute the phase for this ray
-                float rayPhase = computeRayPhase(flowConfig, index, shape.count(), time);
+                // Compute the phase for this ray (includes wave distribution)
+                float rayPhase = computeRayPhase(flowConfig, shape, index, shape.count(), time);
                 
                 // During edge transitions, generate two shapes to prevent linking artifacts
                 if (rayPhase < edgeWidth || rayPhase > (1.0f - edgeWidth)) {
@@ -361,9 +362,10 @@ public final class RayPositioner {
      */
     private static float computeRayPhase(
             net.cyberpunk042.visual.animation.RayFlowConfig flow,
+            RaysShape shape,
             int rayIndex, int rayCount, float time) {
         return net.cyberpunk042.client.visual.mesh.ray.flow.FlowPhaseStage.computePhase(
-            flow, rayIndex, rayCount, time);
+            flow, shape, rayIndex, rayCount, time);
     }
     
     /**

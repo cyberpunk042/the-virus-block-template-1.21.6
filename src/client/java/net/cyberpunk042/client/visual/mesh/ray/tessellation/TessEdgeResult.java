@@ -99,45 +99,43 @@ public record TessEdgeResult(
     
     /**
      * Computes alpha for a vertex at position t based on edge proximity.
-     * For FADE mode, creates a gradient where vertices closer to edges are more transparent.
+     * For FADE mode, creates a progressive gradient across the segment.
      * 
-     * @param t Vertex position along the shape (0=base, 1=tip)
+     * <p>The edgeDistanceStart/End values (modified by intensity in TessEdgeModeFactory)
+     * control how wide the fade zone is:
+     * - edgeDistance = 0: segment is AT the edge, wide fade zone
+     * - edgeDistance = 1: segment is far from edge, no fade
+     * 
+     * The intensity slider controls this via the Factory.</p>
+     * 
+     * @param t Vertex position along the ray trajectory (0=inner radius, 1=outer radius)
      * @param baseAlpha Base alpha to multiply
      * @return Computed alpha with edge fade applied
      */
     public float computeFadeAlpha(float t, float baseAlpha) {
-        // If no edge fade needed (both edges far away), return base alpha
-        if (edgeDistanceStart > 0.4f && edgeDistanceEnd > 0.4f) {
-            return baseAlpha;
+        // Fade width is derived from edge distance:
+        // edgeDistance = 0 -> wide fade (0.4 = 40% of ray)
+        // edgeDistance = 0.5 -> medium fade (0.2 = 20%)
+        // edgeDistance = 1 -> no fade (0%)
+        
+        float fade = 1.0f;
+        
+        // FADE AT START EDGE (t approaching 0):
+        float fadeWidthStart = (1.0f - edgeDistanceStart) * 0.4f;
+        if (fadeWidthStart > 0.01f && t < fadeWidthStart) {
+            // Linear fade: 0 at t=0, 1 at t=fadeWidthStart
+            float startFade = t / fadeWidthStart;
+            fade = Math.min(fade, startFade);
         }
         
-        // Gradient fade based on vertex position and edge proximity
-        // When shape is near start edge (edgeDistanceStart small), 
-        //   vertices with low t (base) should be more transparent
-        // When shape is near end edge (edgeDistanceEnd small),
-        //   vertices with high t (tip) should be more transparent
-        
-        float startFade = 1.0f;
-        float endFade = 1.0f;
-        
-        // Fade at start edge: affects vertices with low t
-        if (edgeDistanceStart < 0.4f) {
-            // How much are we at the start edge? (0=far, 1=at edge)
-            float startEdgeFactor = 1.0f - (edgeDistanceStart / 0.4f);
-            // Vertices with low t are affected more
-            float vertexFactor = 1.0f - t;  // 1 at base, 0 at tip
-            startFade = 1.0f - (startEdgeFactor * vertexFactor);
+        // FADE AT END EDGE (t approaching 1):
+        float fadeWidthEnd = (1.0f - edgeDistanceEnd) * 0.4f;
+        if (fadeWidthEnd > 0.01f && t > (1.0f - fadeWidthEnd)) {
+            // Linear fade: 1 at t=(1-fadeWidthEnd), 0 at t=1
+            float endFade = (1.0f - t) / fadeWidthEnd;
+            fade = Math.min(fade, endFade);
         }
         
-        // Fade at end edge: affects vertices with high t
-        if (edgeDistanceEnd < 0.4f) {
-            // How much are we at the end edge? (0=far, 1=at edge)
-            float endEdgeFactor = 1.0f - (edgeDistanceEnd / 0.4f);
-            // Vertices with high t are affected more
-            float vertexFactor = t;  // 0 at base, 1 at tip
-            endFade = 1.0f - (endEdgeFactor * vertexFactor);
-        }
-        
-        return baseAlpha * startFade * endFade;
+        return baseAlpha * Math.max(0f, fade);
     }
 }
