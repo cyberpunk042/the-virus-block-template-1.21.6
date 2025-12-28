@@ -139,12 +139,14 @@ public final class RaysTessellator {
         // Generate rays for each layer
         for (int layer = 0; layer < layers; layer++) {
             for (int i = 0; i < count; i++) {
-                // Compute context for this ray (single context per ray)
-                RayContext context = RayPositioner.computeContext(
+                // Compute contexts for this ray (may return multiple for multi-copy mode)
+                java.util.List<RayContext> contexts = RayPositioner.computeContexts(
                     shape, i, layer, rng, wave, time, flowConfig);
                 
-                // Tessellate the ray
-                tessellator.tessellate(builder, shape, context, pattern, visibility);
+                // Tessellate each context (usually 1, but can be more for CONTINUOUS + waveCount > 1)
+                for (RayContext context : contexts) {
+                    tessellator.tessellate(builder, shape, context, pattern, visibility);
+                }
             }
         }
         

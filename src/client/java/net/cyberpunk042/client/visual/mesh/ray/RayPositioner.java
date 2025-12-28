@@ -194,7 +194,34 @@ public final class RayPositioner {
             float time,
             net.cyberpunk042.visual.animation.RayFlowConfig flowConfig) {
         
-        java.util.List<RayContext> result = new java.util.ArrayList<>(2);
+        java.util.List<RayContext> result = new java.util.ArrayList<>(4);
+        
+        // Check if we're using CONTINUOUS mode with waveCount > 1
+        // In this case, we render multiple phase-offset copies of the same ray
+        net.cyberpunk042.visual.animation.WaveDistribution waveDist = shape.effectiveWaveDistribution();
+        float waveCount = shape.effectiveWaveCount();
+        boolean isContinuousMultiCopy = (waveDist == net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS) 
+                                        && waveCount > 1.0f 
+                                        && flowConfig != null && flowConfig.isActive();
+        
+        if (isContinuousMultiCopy) {
+            // CONTINUOUS with waveCount > 1: render multiple copies at different phases
+            // Example: waveCount=2 -> copies at phase offsets 0 and 0.5
+            // This creates overlapping spawning - as one ray fades out, another is already spawning
+            int copyCount = Math.max(1, (int) Math.floor(waveCount));
+            float basePhase = (time * flowConfig.radiativeSpeed()) % 1.0f;
+            if (basePhase < 0) basePhase += 1.0f;
+            
+            for (int copy = 0; copy < copyCount; copy++) {
+                float phaseOffset = (float) copy / copyCount;
+                float copyPhase = (basePhase + phaseOffset) % 1.0f;
+                
+                RayContext ctx = computeContextWithPhase(
+                    shape, index, layerIndex, rng, wave, time, flowConfig, copyPhase, false);
+                result.add(ctx);
+            }
+            return result;
+        }
         
         // Check if we're in edge transition (need two shapes) - only for 3D ray types
         // LINE rays don't need the dual-context pattern since they don't have linking artifacts
