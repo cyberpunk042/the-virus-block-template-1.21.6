@@ -38,6 +38,14 @@ public final class RayTypeTessellatorRegistry {
         register(RayType.ARROW, RaySphericalTessellator.INSTANCE);
         register(RayType.CAPSULE, RaySphericalTessellator.INSTANCE);
         
+        // Organic/Natural Shapes (added for 3D rendering)
+        register(RayType.SPHERE, RaySphericalTessellator.INSTANCE);
+        register(RayType.SPHEROID, RaySphericalTessellator.INSTANCE);
+        register(RayType.OVOID, RaySphericalTessellator.INSTANCE);
+        register(RayType.EGG, RaySphericalTessellator.INSTANCE);
+        register(RayType.PEAR, RaySphericalTessellator.INSTANCE);
+        register(RayType.BULLET, RaySphericalTessellator.INSTANCE);
+        
         // Energy Effects Category
         register(RayType.KAMEHAMEHA, RaySphericalTessellator.INSTANCE);
         register(RayType.LASER, RaySphericalTessellator.INSTANCE);

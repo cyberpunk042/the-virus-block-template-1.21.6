@@ -53,6 +53,9 @@ public enum RayType {
     /** Pear - strong base mass with tapered top. */
     PEAR("Pear", "Pear shape - wide base, narrow top", Category.BASIC),
     
+    /** Bullet - hemisphere tip with cylindrical body and flat base. */
+    BULLET("Bullet", "Bullet shape - rounded tip, flat base", Category.BASIC),
+    
     // ═══════════════════════════════════════════════════════════════════════════
     // Energy/Effect
     // ═══════════════════════════════════════════════════════════════════════════
@@ -139,7 +142,7 @@ public enum RayType {
     public boolean is3D() {
         return switch (this) {
             case LINE -> false;  // Flat ribbon
-            case DROPLET, CONE, ARROW, CAPSULE -> true;
+            case DROPLET, CONE, ARROW, CAPSULE, BULLET -> true;
             case SPHERE, SPHEROID, OVOID, EGG, PEAR -> true;  // Organic shapes
             case KAMEHAMEHA, LASER, LIGHTNING, FIRE_JET, PLASMA -> true;
             case BEADS, CUBES, STARS, CRYSTALS -> true;
@@ -165,7 +168,7 @@ public enum RayType {
     public int suggestedMinSegments() {
         return switch (this) {
             case LINE, ARROW -> 1;
-            case DROPLET, CONE, CAPSULE -> 8;
+            case DROPLET, CONE, CAPSULE, BULLET -> 8;
             case SPHERE, SPHEROID, OVOID, EGG, PEAR -> 8;  // Organic shapes
             case KAMEHAMEHA, LASER -> 12;
             case BEADS, CUBES, STARS, CRYSTALS -> 1;  // Discrete objects

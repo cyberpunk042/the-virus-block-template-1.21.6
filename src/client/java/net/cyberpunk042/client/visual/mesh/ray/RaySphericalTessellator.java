@@ -254,6 +254,7 @@ public class RaySphericalTessellator implements RayTypeTessellator {
             case OVOID -> SphereDeformation.OVOID;  // Smooth egg-like
             case EGG -> SphereDeformation.EGG;  // Asymmetric egg
             case PEAR -> SphereDeformation.PEAR;  // Wide base, narrow top
+            case BULLET -> SphereDeformation.BULLET;  // Hemisphere tip + cylinder
             
             // Energy effects - use spheroid or droplet
             case KAMEHAMEHA -> SphereDeformation.SPHEROID;  // Spherical energy ball
