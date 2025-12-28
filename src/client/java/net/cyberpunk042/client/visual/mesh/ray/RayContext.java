@@ -244,21 +244,6 @@ public record RayContext(
         return new ShapeState<>(RayFlowStage.ACTIVE, 1.0f, net.cyberpunk042.visual.shape.EdgeTransitionMode.CLIP);
     }
     
-    /**
-     * Computes edge result from shapeState using TessEdgeModeFactory.
-     * 
-     * <p>This provides stage/phase-based edge transitions:
-     * <ul>
-     *   <li>DORMANT → hidden</li>
-     *   <li>SPAWNING → partial visibility based on phase</li>
-     *   <li>ACTIVE → fully visible</li>
-     *   <li>DESPAWNING → partial visibility based on phase</li>
-     * </ul>
-     */
-    public net.cyberpunk042.client.visual.mesh.ray.tessellation.TessEdgeResult computeEdgeResult() {
-        return net.cyberpunk042.client.visual.mesh.ray.tessellation.TessEdgeModeFactory.compute(effectiveShapeState());
-    }
-    
     // ═══════════════════════════════════════════════════════════════════════════
     // Builder
     // ═══════════════════════════════════════════════════════════════════════════

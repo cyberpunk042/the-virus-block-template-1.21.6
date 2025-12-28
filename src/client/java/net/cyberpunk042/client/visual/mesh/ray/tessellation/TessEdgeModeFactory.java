@@ -1,143 +1,78 @@
 package net.cyberpunk042.client.visual.mesh.ray.tessellation;
 
 import net.cyberpunk042.visual.shape.EdgeTransitionMode;
-import net.cyberpunk042.visual.shape.RayFlowStage;
-import net.cyberpunk042.visual.shape.ShapeState;
 
 /**
- * Factory for computing edge mode results from ShapeState.
+ * Factory for computing edge transition effects based on EdgeTransitionMode.
  * 
- * <h2>Stage/Phase Model</h2>
- * ALL stages use phase - phase controls the animation effect.
- * 
- * <h2>How Phase Works Per Stage</h2>
+ * <h2>EdgeTransitionMode</h2>
+ * <p>Controls how the ray segment appears at its edges during animation:</p>
  * <ul>
- *   <li><b>DORMANT:</b> Hidden, phase irrelevant</li>
- *   <li><b>SPAWNING:</b> phase 0→1 = ray appears from edge</li>
- *   <li><b>ACTIVE:</b> phase 0→1 = MAIN ANIMATION (radiation/absorption cycle)</li>
- *   <li><b>DESPAWNING:</b> phase 0→1 = ray disappears from edge</li>
+ *   <li><b>CLIP:</b> Portions of the ray are clipped (hidden) at edges</li>
+ *   <li><b>SCALE:</b> The ray size changes at edges</li>
+ *   <li><b>FADE:</b> The ray alpha fades at edges</li>
  * </ul>
  * 
- * <h2>Output</h2>
+ * <h2>Usage with RadiativeInteraction</h2>
+ * <p>RadiativeInteraction determines WHERE the segment is positioned on the ray.
+ * EdgeTransitionMode determines HOW it looks at its edges as it moves.</p>
+ * 
+ * <h2>Output (TessEdgeResult)</h2>
  * <ul>
- *   <li><b>clipStart:</b> Start of visible region (0-1)</li>
- *   <li><b>clipEnd:</b> End of visible region (0-1)</li>
- *   <li><b>scale:</b> Width scale multiplier</li>
- *   <li><b>alpha:</b> Alpha multiplier</li>
+ *   <li><b>clipStart/clipEnd:</b> Visible range (0-1) for CLIP mode</li>
+ *   <li><b>scale:</b> Size multiplier for SCALE mode</li>
+ *   <li><b>alpha:</b> Alpha multiplier for FADE mode</li>
  * </ul>
+ * 
+ * @see EdgeTransitionMode
+ * @see RadiativeInteractionFactory
  */
 public final class TessEdgeModeFactory {
     
-    private TessEdgeModeFactory() {}
+    private TessEdgeModeFactory() {} // Utility class
     
     /**
-     * Compute edge result from ShapeState.
-     */
-    public static TessEdgeResult compute(ShapeState<RayFlowStage> state) {
-        if (state == null) {
-            return TessEdgeResult.FULL;
-        }
-        
-        RayFlowStage stage = state.stage();
-        float phase = state.phase();
-        EdgeTransitionMode edgeMode = state.edgeMode();
-        
-        if (stage == null) {
-            return TessEdgeResult.FULL;
-        }
-        
-        return switch (stage) {
-            case DORMANT -> TessEdgeResult.HIDDEN;
-            case SPAWNING -> computeSpawnResult(phase, edgeMode);
-            case ACTIVE -> computeActiveResult(phase, edgeMode);
-            case DESPAWNING -> computeDespawnResult(phase, edgeMode);
-        };
-    }
-    
-    /**
-     * Compute edge result for SPAWNING stage.
-     * phase 0 = just starting to appear
-     * phase 1 = fully visible (ready for ACTIVE)
-     */
-    private static TessEdgeResult computeSpawnResult(float phase, EdgeTransitionMode edgeMode) {
-        if (edgeMode == null) edgeMode = EdgeTransitionMode.CLIP;
-        
-        return switch (edgeMode) {
-            case CLIP -> new TessEdgeResult(0f, phase, 1f, 1f);  // Clip from 0 to phase
-            case SCALE -> new TessEdgeResult(0f, 1f, phase, 1f);  // Scale width
-            case FADE -> new TessEdgeResult(0f, 1f, 1f, phase);   // Fade alpha
-        };
-    }
-    
-    /**
-     * Compute edge result for ACTIVE stage.
+     * Compute edge effect based on EdgeTransitionMode and edge proximity.
      * 
-     * <p>For ACTIVE stage, the base visibility from EdgeMode is:</p>
-     * <ul>
-     *   <li>CLIP: Full visibility (segment positioning is handled by 
-     *       RadiativeInteractionFactory using segmentLength + phase)</li>
-     *   <li>SCALE: Phase controls width scale</li>
-     *   <li>FADE: Phase controls alpha</li>
-     * </ul>
-     * 
-     * <p>Note: The actual visible segment (based on phase, segmentLength, 
-     * startFullLength) is computed in RadiativeInteractionFactory, which
-     * produces the final clipStart/clipEnd values for the moving segment.</p>
+     * @param edgeMode The edge transition mode (CLIP/SCALE/FADE)
+     * @param clipStart Start of visible segment (0-1), from RadiativeInteraction
+     * @param clipEnd End of visible segment (0-1), from RadiativeInteraction
+     * @return Edge result with appropriate effect applied
      */
-    private static TessEdgeResult computeActiveResult(float phase, EdgeTransitionMode edgeMode) {
-        if (edgeMode == null) edgeMode = EdgeTransitionMode.CLIP;
+    public static TessEdgeResult compute(EdgeTransitionMode edgeMode, float clipStart, float clipEnd) {
+        if (edgeMode == null) {
+            edgeMode = EdgeTransitionMode.CLIP;
+        }
         
         return switch (edgeMode) {
             case CLIP -> {
-                // Full base visibility - segment positioning is handled by 
-                // RadiativeInteractionFactory which knows segmentLength
-                yield TessEdgeResult.FULL;
+                // CLIP mode: use clipStart/clipEnd directly
+                yield new TessEdgeResult(clipStart, clipEnd, 1f, 1f);
             }
             case SCALE -> {
-                // Scale the ray width based on phase
-                yield new TessEdgeResult(0f, 1f, phase, 1f);
+                // SCALE mode: full visibility, but scale based on segment size
+                float segmentSize = clipEnd - clipStart;
+                yield new TessEdgeResult(0f, 1f, segmentSize, 1f);
             }
             case FADE -> {
-                // Fade alpha based on phase
-                yield new TessEdgeResult(0f, 1f, 1f, phase);
+                // FADE mode: full visibility, but alpha based on segment size  
+                float segmentSize = clipEnd - clipStart;
+                yield new TessEdgeResult(0f, 1f, 1f, segmentSize);
             }
         };
     }
     
     /**
-     * Compute edge result for DESPAWNING stage.
-     * phase 0 = fully visible (just started despawning)
-     * phase 1 = gone
+     * Compute edge effect from ClipRange (from RadiativeInteractionFactory).
+     * 
+     * @param edgeMode The edge transition mode
+     * @param clipRange The clip range from RadiativeInteractionFactory
+     * @return Edge result with appropriate effect applied
      */
-    private static TessEdgeResult computeDespawnResult(float phase, EdgeTransitionMode edgeMode) {
-        if (edgeMode == null) edgeMode = EdgeTransitionMode.CLIP;
-        
-        float visibility = 1f - phase;  // Reverse: 1 -> 0
-        
-        return switch (edgeMode) {
-            case CLIP -> new TessEdgeResult(phase, 1f, 1f, 1f);  // Clip from phase to 1
-            case SCALE -> new TessEdgeResult(0f, 1f, visibility, 1f);  // Scale width
-            case FADE -> new TessEdgeResult(0f, 1f, 1f, visibility);   // Fade alpha
-        };
-    }
-    
-    /**
-     * Compute using raw parameters (for legacy/testing).
-     */
-    public static TessEdgeResult compute(
-            RayFlowStage stage, 
-            float phase, 
-            EdgeTransitionMode edgeMode) {
-        
-        if (stage == null) {
+    public static TessEdgeResult compute(EdgeTransitionMode edgeMode, RadiativeInteractionFactory.ClipRange clipRange) {
+        if (clipRange == null) {
             return TessEdgeResult.FULL;
         }
-        
-        return switch (stage) {
-            case DORMANT -> TessEdgeResult.HIDDEN;
-            case SPAWNING -> computeSpawnResult(phase, edgeMode);
-            case ACTIVE -> computeActiveResult(phase, edgeMode);
-            case DESPAWNING -> computeDespawnResult(phase, edgeMode);
-        };
+        return compute(edgeMode, clipRange.start(), clipRange.end());
     }
 }

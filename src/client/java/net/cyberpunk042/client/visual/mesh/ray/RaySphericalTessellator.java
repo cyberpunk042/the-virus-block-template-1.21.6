@@ -49,24 +49,65 @@ public class RaySphericalTessellator implements RayTypeTessellator {
     public void tessellate(MeshBuilder builder, RaysShape shape, RayContext context,
                           net.cyberpunk042.visual.pattern.VertexPattern pattern,
                           net.cyberpunk042.visual.visibility.VisibilityMask visibility) {
-        // Get edge result from Stage/Phase model
-        TessEdgeResult edgeResult = context.computeEdgeResult();
-        
-        // Skip if completely hidden
-        if (!edgeResult.isVisible()) {
-            return;
-        }
         
         // === MAP RAY TYPE TO SPHERE DEFORMATION ===
         RayType rayType = shape != null ? shape.effectiveRayType() : RayType.DROPLET;
         SphereDeformation deformation = mapToSphereDeformation(rayType);
         float intensity = context.shapeIntensity();
         
-        // === COMPUTE POSITION & ORIENTATION ===
+        // === FLOW CONFIG ===
+        net.cyberpunk042.visual.animation.RayFlowConfig flowConfig = context.flowConfig();
+        
+        // === RADIATIVE PHASE (compute FIRST - needed for positioning) ===
+        final float userPhase = context.effectiveShapeState().phase();
+        final boolean animationPlaying = flowConfig != null && flowConfig.hasRadiative();
+        float baseLengthPhase;
+        if (animationPlaying) {
+            float timeOffset = (context.time() * flowConfig.radiativeSpeed()) % 1.0f;
+            if (timeOffset < 0) timeOffset += 1.0f;
+            baseLengthPhase = (userPhase + timeOffset) % 1.0f;
+        } else {
+            baseLengthPhase = userPhase;
+        }
+        
+        // Add wave distribution offset for this ray
+        float waveOffset = net.cyberpunk042.client.visual.mesh.ray.flow.FlowPhaseStage.computeRayPhaseOffset(
+            shape, context.index(), context.count());
+        float rayPhase = (baseLengthPhase + waveOffset) % 1.0f;
+        if (rayPhase < 0) rayPhase += 1.0f;
+        
+        // === COMPUTE CLIP RANGE (where the shape is on the ray) ===
+        net.cyberpunk042.visual.energy.RadiativeInteraction radiativeMode = 
+            shape != null ? shape.effectiveRadiativeInteraction() 
+            : net.cyberpunk042.visual.energy.RadiativeInteraction.NONE;
+        float segmentLength = shape != null ? shape.effectiveSegmentLength() : 1.0f;
+        boolean startFullLength = shape != null && shape.startFullLength();
+        
+        var clipRange = net.cyberpunk042.client.visual.mesh.ray.tessellation.RadiativeInteractionFactory.compute(
+            radiativeMode, rayPhase, segmentLength, startFullLength);
+        
+        // === APPLY EDGE MODE (HOW the shape looks at edges) ===
+        net.cyberpunk042.visual.shape.EdgeTransitionMode edgeMode = context.effectiveShapeState().edgeMode();
+        TessEdgeResult edgeResult = net.cyberpunk042.client.visual.mesh.ray.tessellation.TessEdgeModeFactory.compute(
+            edgeMode, clipRange);
+        
+        // Skip if completely hidden
+        if (!edgeResult.isVisible()) {
+            return;
+        }
+        
+        // Position is the CENTER of the clip range
+        float positionT = (clipRange.start() + clipRange.end()) * 0.5f;
+        
+        // === COMPUTE CENTER POSITION ===
         float length = context.length();
-        float baseRadius = length * 0.5f;
-        float scale = edgeResult.scale();
-        baseRadius *= scale;
+        float baseRadius = length * 0.25f;
+        
+        // Combine scales: edgeResult.scale (from EdgeMode) * clipRange.scale (from RadiativeInteraction)
+        float edgeScale = edgeResult.scale();
+        float radiativeScale = clipRange.scale();
+        float combinedScale = edgeScale * radiativeScale;
+        baseRadius *= combinedScale;
         
         float[] start = context.start();
         float[] end = context.end();
@@ -81,18 +122,15 @@ public class RaySphericalTessellator implements RayTypeTessellator {
             && curvatureIntensity > 0.001f;
         
         if (hasCurvature) {
-            float flowPositionOffset = context.flowPositionOffset();
-            float travelRange = context.travelRange();
-            float t = (travelRange > 0.01f) ? (flowPositionOffset / travelRange) : 0.5f;
-            t = Math.max(0.0f, Math.min(1.0f, t));
-            
-            center = RayGeometryUtils.computeCurvedPosition(start, end, t, curvature, curvatureIntensity);
-            direction = RayGeometryUtils.computeCurvedTangent(start, end, t, curvature, curvatureIntensity);
+            // With curvature: position on curved path at positionT
+            center = RayGeometryUtils.computeCurvedPosition(start, end, positionT, curvature, curvatureIntensity);
+            direction = RayGeometryUtils.computeCurvedTangent(start, end, positionT, curvature, curvatureIntensity);
         } else {
+            // Without curvature: linear interpolation at positionT
             center = new float[] {
-                (start[0] + end[0]) * 0.5f,
-                (start[1] + end[1]) * 0.5f,
-                (start[2] + end[2]) * 0.5f
+                start[0] + (end[0] - start[0]) * positionT,
+                start[1] + (end[1] - start[1]) * positionT,
+                start[2] + (end[2] - start[2]) * positionT
             };
             direction = context.orientationVector();
         }
@@ -102,18 +140,25 @@ public class RaySphericalTessellator implements RayTypeTessellator {
         int rings = Math.max(MIN_RINGS, totalSegs / 2);
         int segments = Math.max(MIN_SEGMENTS, totalSegs / 2);
         
-        // === FLOW PARAMETERS ===
-        float axialLength = context.shapeLength() * scale;
+        // === EDGE MODE PARAMETERS ===
+        float axialLength = context.shapeLength() * combinedScale;
         float visibleTStart = edgeResult.clipStart();
         float visibleTEnd = edgeResult.clipEnd();
         float alpha = edgeResult.alpha();
+        
+        // === FLICKER ANIMATION ===
+        if (flowConfig != null && flowConfig.hasFlicker()) {
+            float flickerAlpha = net.cyberpunk042.client.visual.mesh.ray.flow.FlowFlickerStage.computeFlickerAlpha(
+                flowConfig.effectiveFlicker(), context.time(), context.index(),
+                flowConfig.flickerIntensity(), flowConfig.flickerFrequency());
+            alpha *= flickerAlpha;
+        }
         
         // === CHECK FOR FIELD DEFORMATION ===
         net.cyberpunk042.visual.shape.FieldDeformationMode deformMode = context.fieldDeformation();
         GeoDeformationStrategy fieldDeformation = GeoDeformationFactory.get(deformMode);
         
         // === CHECK FOR TRAVEL EFFECT ===
-        net.cyberpunk042.visual.animation.RayFlowConfig flowConfig = context.flowConfig();
         EnergyTravel travelMode = null;
         float travelPhase = 0f;
         int chaseCount = 1;
@@ -125,6 +170,7 @@ public class RaySphericalTessellator implements RayTypeTessellator {
             chaseCount = flowConfig.chaseCount();
             chaseWidth = flowConfig.chaseWidth();
         }
+
         
         // === GENERATE MESH ===
         if (fieldDeformation != null && fieldDeformation.isActive()) {
