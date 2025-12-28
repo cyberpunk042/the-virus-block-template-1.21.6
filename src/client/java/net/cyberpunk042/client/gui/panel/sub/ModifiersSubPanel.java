@@ -334,15 +334,6 @@ public class ModifiersSubPanel extends BoundPanel {
         widgets.add(radiativeSpeedSlider);
         c.advanceRow();
         
-        // Skip Spawn Transition toggle (animation timing - stays here)
-        boolean skipSpawn = flow == null || flow.skipSpawnTransition();
-        CyclingButtonWidget<Boolean> skipSpawnToggle = GuiWidgets.toggle(
-            x, c.getCurrentY(), w, "Skip Spawn",
-            skipSpawn, "Skip spawn transition animation",
-            v -> state.set("rayFlow.skipSpawnTransition", v));
-        widgets.add(skipSpawnToggle);
-        c.advanceRow();
-        
         // === TRAVEL ANIMATION ===
         c.infoText("Travel (chase/scroll along rays)");
         
