@@ -4,22 +4,22 @@ import net.cyberpunk042.client.visual.mesh.MeshBuilder;
 import net.cyberpunk042.client.visual.mesh.ray.flow.FlowTravelStage;
 import net.cyberpunk042.visual.energy.EnergyTravel;
 import net.cyberpunk042.visual.pattern.VertexPattern;
+import net.cyberpunk042.visual.shape.SphereDeformation;
 import net.cyberpunk042.visual.visibility.VisibilityMask;
 
 /**
- * Generates 3D polar surfaces for ray shapes.
+ * Generates 3D polar surfaces for ray shapes using SphereDeformation.
  * 
- * <p>Based on Ray3DGeometryUtils.generateDropletWithTravel, this generates polar
- * surfaces with full support for:
+ * <p>Uses the existing {@link SphereDeformation} infrastructure from ShapeMath
+ * for proper parametric shape generation with full intensity support:
  * <ul>
- *   <li>GeoRadiusProfile-based shape definition</li>
- *   <li>Flow animation (clip start/end, base alpha)</li>
- *   <li>Travel mode effects (CHASE, SCROLL, COMET, etc.)</li>
- *   <li>Pattern and visibility mask support</li>
+ *   <li>intensity 0 = sphere</li>
+ *   <li>intensity 1 = full deformation (sharp droplet, etc.)</li>
  * </ul>
  * </p>
  * 
- * @see net.cyberpunk042.client.visual.mesh.ray.Ray3DGeometryUtils#generateDropletWithTravel
+ * @see SphereDeformation
+ * @see net.cyberpunk042.visual.shape.ShapeMath
  */
 public final class GeoPolarSurfaceGenerator {
     
@@ -29,43 +29,13 @@ public final class GeoPolarSurfaceGenerator {
     private GeoPolarSurfaceGenerator() {}
     
     /**
-     * Generate a polar surface mesh (simple version).
+     * Generate a polar surface using SphereDeformation with full flow and travel support.
      * 
      * @param builder MeshBuilder to add geometry to
-     * @param profile Radius profile function
+     * @param deformation The sphere deformation type (DROPLET, CONE, EGG, etc.)
+     * @param intensity Deformation intensity (0 = sphere, 1 = full effect)
      * @param center Center position [x, y, z]
      * @param direction Direction (axis) of the shape [x, y, z]
-     * @param length Length along the axis
-     * @param radius Maximum radius
-     * @param rings Number of rings (θ divisions)
-     * @param segments Number of segments per ring (φ divisions)
-     * @param color Vertex color (ARGB)
-     */
-    public static void generate(
-            MeshBuilder builder,
-            GeoRadiusProfile profile,
-            float[] center,
-            float[] direction,
-            float length,
-            float radius,
-            int rings,
-            int segments,
-            int color) {
-        
-        generateFull(builder, profile, center, direction, length, radius, 
-                    rings, segments, null, null, 0f, 1f, 1f,
-                    null, 0f, 1, 0.3f, color);
-    }
-    
-    /**
-     * Generate a polar surface with full flow and travel support.
-     * 
-     * <p>Based on Ray3DGeometryUtils.generateDropletWithTravel lines 152-225.</p>
-     * 
-     * @param builder MeshBuilder to add geometry to
-     * @param profile Radius profile function
-     * @param center Center position
-     * @param direction Direction (axis) of the shape
      * @param length Length along the axis
      * @param radius Maximum radius
      * @param rings Number of rings
@@ -79,11 +49,16 @@ public final class GeoPolarSurfaceGenerator {
      * @param travelPhase Current travel phase (0-1)
      * @param chaseCount Number of chase particles
      * @param chaseWidth Width of each particle
+     * @param fieldDeformation Optional field deformation strategy
+     * @param fieldCenter Center of field deformation
+     * @param fieldDeformIntensity Field deformation intensity
+     * @param outerRadius Outer radius for field deformation
      * @param baseColor Base ARGB color
      */
-    public static void generateFull(
+    public static void generateWithSphereDeformation(
             MeshBuilder builder,
-            GeoRadiusProfile profile,
+            SphereDeformation deformation,
+            float intensity,
             float[] center,
             float[] direction,
             float length,
@@ -99,24 +74,35 @@ public final class GeoPolarSurfaceGenerator {
             float travelPhase,
             int chaseCount,
             float chaseWidth,
+            GeoDeformationStrategy fieldDeformation,
+            float[] fieldCenter,
+            float fieldDeformIntensity,
+            float outerRadius,
             int baseColor) {
         
-        if (profile == null || builder == null) {
+        if (builder == null) {
             return;
         }
         
-        // Compute perpendicular frame
+        // Default to DROPLET if null
+        if (deformation == null) {
+            deformation = SphereDeformation.DROPLET;
+        }
+        
+        // Compute perpendicular frame for orientation
         float[] right = new float[3];
         float[] up = new float[3];
         computePerpendicularFrame(direction, right, up);
         
-        // Validate parameters
+        // Finalize parameters
         final float finalVisibleTStart = visibleTStart;
         final float finalVisibleTEnd = visibleTEnd;
         final float finalFlowAlpha = flowAlpha;
         final float finalChaseWidth = Math.max(0.05f, chaseWidth);
         final int finalChaseCount = Math.max(1, chaseCount);
         final boolean hasTravelMode = travelMode != null && travelMode != EnergyTravel.NONE;
+        final boolean hasFieldDeformation = fieldDeformation != null && fieldDeformation.isActive();
+        final SphereDeformation finalDeformation = deformation;
         
         // Generate rings
         for (int i = 0; i < rings; i++) {
@@ -124,18 +110,10 @@ public final class GeoPolarSurfaceGenerator {
             float theta1 = PI * (i + 1) / rings;
             
             // t-value for this ring (0 at tip, 1 at base)
-            // From Ray3DGeometryUtils line 188: t = 1.0f - (theta / PI)
             float t0 = 1.0f - (theta0 / PI);
             float t1 = 1.0f - (theta1 / PI);
             
-            float r0 = profile.radius(theta0) * radius;
-            float r1 = profile.radius(theta1) * radius;
-            
-            // Position along axis
-            float z0 = (1f - (float) Math.cos(theta0)) * length / 2f;
-            float z1 = (1f - (float) Math.cos(theta1)) * length / 2f;
-            
-            // Compute alpha for each ring (from lines 191-216)
+            // Compute alpha for each ring
             float alpha0 = computeVertexAlpha(t0, finalVisibleTStart, finalVisibleTEnd, 
                                               finalFlowAlpha, hasTravelMode, travelMode, 
                                               travelPhase, finalChaseCount, finalChaseWidth);
@@ -156,36 +134,67 @@ public final class GeoPolarSurfaceGenerator {
                 float phi0 = TWO_PI * j / segments;
                 float phi1 = TWO_PI * (j + 1) / segments;
                 
-                // Four corners of quad
-                float[] v00 = computeVertex(center, direction, right, up, r0, z0, phi0);
-                float[] v01 = computeVertex(center, direction, right, up, r0, z0, phi1);
-                float[] v10 = computeVertex(center, direction, right, up, r1, z1, phi0);
-                float[] v11 = computeVertex(center, direction, right, up, r1, z1, phi1);
+                // Use SphereDeformation.computeVertex() for proper shape!
+                // This gives us position relative to origin with Y as axis
+                float[] local00 = finalDeformation.computeVertex(theta0, phi0, radius, intensity, length);
+                float[] local01 = finalDeformation.computeVertex(theta0, phi1, radius, intensity, length);
+                float[] local10 = finalDeformation.computeVertex(theta1, phi0, radius, intensity, length);
+                float[] local11 = finalDeformation.computeVertex(theta1, phi1, radius, intensity, length);
                 
-                // Compute normals (pointing outward from center)
+                // Transform from local (Y-up) to world (direction-aligned)
+                float[] v00 = transformVertex(local00, center, direction, right, up);
+                float[] v01 = transformVertex(local01, center, direction, right, up);
+                float[] v10 = transformVertex(local10, center, direction, right, up);
+                float[] v11 = transformVertex(local11, center, direction, right, up);
+                
+                // Apply field deformation if present
+                if (hasFieldDeformation) {
+                    v00 = fieldDeformation.deform(v00, fieldCenter, fieldDeformIntensity, outerRadius);
+                    v01 = fieldDeformation.deform(v01, fieldCenter, fieldDeformIntensity, outerRadius);
+                    v10 = fieldDeformation.deform(v10, fieldCenter, fieldDeformIntensity, outerRadius);
+                    v11 = fieldDeformation.deform(v11, fieldCenter, fieldDeformIntensity, outerRadius);
+                }
+                
+                // Compute normals (pointing outward)
                 float[] n00 = computeNormal(direction, right, up, phi0, theta0);
                 float[] n01 = computeNormal(direction, right, up, phi1, theta0);
                 float[] n10 = computeNormal(direction, right, up, phi0, theta1);
                 float[] n11 = computeNormal(direction, right, up, phi1, theta1);
                 
-                // Add vertices with colors embedded
+                // Add vertices
                 int idx00 = builder.vertex(v00[0], v00[1], v00[2], n00[0], n00[1], n00[2], 0f, t0, colorAlpha(color0));
                 int idx01 = builder.vertex(v01[0], v01[1], v01[2], n01[0], n01[1], n01[2], 1f, t0, colorAlpha(color0));
                 int idx10 = builder.vertex(v10[0], v10[1], v10[2], n10[0], n10[1], n10[2], 0f, t1, colorAlpha(color1));
                 int idx11 = builder.vertex(v11[0], v11[1], v11[2], n11[0], n11[1], n11[2], 1f, t1, colorAlpha(color1));
                 
-                // Emit two triangles using indices
-                builder.triangle(idx00, idx01, idx11);
-                builder.triangle(idx00, idx11, idx10);
+                // Emit quad using pattern
+                int[] quadCell = {idx00, idx01, idx10, idx11};
+                builder.emitCellFromPattern(quadCell, pattern);
             }
         }
+    }
+    
+    // ──────────────────── Vertex Transform ────────────────────
+    
+    /**
+     * Transforms a local vertex (Y-up) to world space aligned with direction.
+     */
+    private static float[] transformVertex(float[] local, float[] center, 
+                                           float[] dir, float[] right, float[] up) {
+        // local.y is along the shape axis -> maps to dir
+        // local.x maps to right
+        // local.z maps to up
+        return new float[] {
+            center[0] + dir[0] * local[1] + right[0] * local[0] + up[0] * local[2],
+            center[1] + dir[1] * local[1] + right[1] * local[0] + up[1] * local[2],
+            center[2] + dir[2] * local[1] + right[2] * local[0] + up[2] * local[2]
+        };
     }
     
     // ──────────────────── Alpha Computation ────────────────────
     
     /**
      * Compute per-vertex alpha based on t-position, visibility clip, and travel mode.
-     * From Ray3DGeometryUtils.generateDropletWithTravel lines 191-216.
      */
     private static float computeVertexAlpha(
             float t, float visibleTStart, float visibleTEnd, float flowAlpha,
@@ -194,7 +203,7 @@ public final class GeoPolarSurfaceGenerator {
         
         float alpha = flowAlpha;
         
-        // Apply visibility clipping (from lines 194-210)
+        // Apply visibility clipping
         if (visibleTStart > 0.0f || visibleTEnd < 1.0f) {
             if (t < visibleTStart) {
                 float fadeRange = 0.1f;
@@ -213,7 +222,7 @@ public final class GeoPolarSurfaceGenerator {
             }
         }
         
-        // Apply EnergyTravel alpha modulation (from lines 213-216)
+        // Apply EnergyTravel alpha modulation
         if (hasTravelMode && alpha > 0.001f) {
             float travelAlpha = FlowTravelStage.computeTravelAlpha(t, travelMode, travelPhase, chaseCount, chaseWidth);
             alpha *= travelAlpha;
@@ -222,21 +231,7 @@ public final class GeoPolarSurfaceGenerator {
         return alpha;
     }
     
-    // ──────────────────── Vertex Helpers ────────────────────
-    
-    private static float[] computeVertex(
-            float[] center, float[] dir, float[] right, float[] up,
-            float radius, float axisOffset, float phi) {
-        
-        float cosPhi = (float) Math.cos(phi);
-        float sinPhi = (float) Math.sin(phi);
-        
-        return new float[] {
-            center[0] + dir[0] * axisOffset + (right[0] * cosPhi + up[0] * sinPhi) * radius,
-            center[1] + dir[1] * axisOffset + (right[1] * cosPhi + up[1] * sinPhi) * radius,
-            center[2] + dir[2] * axisOffset + (right[2] * cosPhi + up[2] * sinPhi) * radius
-        };
-    }
+    // ──────────────────── Helpers ────────────────────
     
     private static void computePerpendicularFrame(float[] dir, float[] outRight, float[] outUp) {
         float refX, refY, refZ;
@@ -269,13 +264,11 @@ public final class GeoPolarSurfaceGenerator {
     }
     
     private static float[] computeNormal(float[] dir, float[] right, float[] up, float phi, float theta) {
-        // Normal points outward from the surface center
         float cosPhi = (float) Math.cos(phi);
         float sinPhi = (float) Math.sin(phi);
         float cosTheta = (float) Math.cos(theta);
         float sinTheta = (float) Math.sin(theta);
         
-        // Blend between radial (perpendicular) and axial direction based on theta
         float radialWeight = sinTheta;
         float axialWeight = cosTheta;
         
@@ -283,7 +276,6 @@ public final class GeoPolarSurfaceGenerator {
         float ny = (right[1] * cosPhi + up[1] * sinPhi) * radialWeight + dir[1] * axialWeight;
         float nz = (right[2] * cosPhi + up[2] * sinPhi) * radialWeight + dir[2] * axialWeight;
         
-        // Normalize
         float mag = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
         if (mag > 0.0001f) {
             return new float[] { nx / mag, ny / mag, nz / mag };
@@ -294,114 +286,4 @@ public final class GeoPolarSurfaceGenerator {
     private static float colorAlpha(int color) {
         return ((color >> 24) & 0xFF) / 255f;
     }
-    
-    /**
-     * Generate a polar surface with deformation applied.
-     * 
-     * @param deformation Deformation strategy to apply
-     * @param fieldCenter Center of the deformation field
-     * @param deformIntensity Intensity of deformation (0-1+)
-     * @param outerRadius Outer radius of the field (for normalization)
-     */
-    public static void generateWithDeformation(
-            MeshBuilder builder,
-            GeoRadiusProfile profile,
-            float[] center,
-            float[] direction,
-            float length,
-            float radius,
-            int rings,
-            int segments,
-            net.cyberpunk042.visual.pattern.VertexPattern pattern,
-            VisibilityMask visibility,
-            float visibleTStart,
-            float visibleTEnd,
-            float flowAlpha,
-            EnergyTravel travelMode,
-            float travelPhase,
-            int chaseCount,
-            float chaseWidth,
-            GeoDeformationStrategy deformation,
-            float[] fieldCenter,
-            float deformIntensity,
-            float outerRadius,
-            int baseColor) {
-        
-        if (profile == null || builder == null) {
-            return;
-        }
-        
-        // Compute perpendicular frame
-        float[] right = new float[3];
-        float[] up = new float[3];
-        computePerpendicularFrame(direction, right, up);
-        
-        // Validate parameters
-        final float finalVisibleTStart = visibleTStart;
-        final float finalVisibleTEnd = visibleTEnd;
-        final float finalFlowAlpha = flowAlpha;
-        final float finalChaseWidth = Math.max(0.05f, chaseWidth);
-        final int finalChaseCount = Math.max(1, chaseCount);
-        final boolean hasTravelMode = travelMode != null && travelMode != EnergyTravel.NONE;
-        
-        // Generate rings with deformation
-        for (int i = 0; i < rings; i++) {
-            float theta0 = PI * i / rings;
-            float theta1 = PI * (i + 1) / rings;
-            
-            float t0 = 1.0f - (theta0 / PI);
-            float t1 = 1.0f - (theta1 / PI);
-            
-            float r0 = profile.radius(theta0) * radius;
-            float r1 = profile.radius(theta1) * radius;
-            
-            float z0 = (1f - (float) Math.cos(theta0)) * length / 2f;
-            float z1 = (1f - (float) Math.cos(theta1)) * length / 2f;
-            
-            float alpha0 = computeVertexAlpha(t0, finalVisibleTStart, finalVisibleTEnd, 
-                                              finalFlowAlpha, hasTravelMode, travelMode, 
-                                              travelPhase, finalChaseCount, finalChaseWidth);
-            float alpha1 = computeVertexAlpha(t1, finalVisibleTStart, finalVisibleTEnd, 
-                                              finalFlowAlpha, hasTravelMode, travelMode, 
-                                              travelPhase, finalChaseCount, finalChaseWidth);
-            
-            if (alpha0 < 0.001f && alpha1 < 0.001f) {
-                continue;
-            }
-            
-            int color0 = applyAlpha(baseColor, alpha0);
-            int color1 = applyAlpha(baseColor, alpha1);
-            
-            for (int j = 0; j < segments; j++) {
-                float phi0 = TWO_PI * j / segments;
-                float phi1 = TWO_PI * (j + 1) / segments;
-                
-                // Compute base vertices
-                float[] v00 = computeVertex(center, direction, right, up, r0, z0, phi0);
-                float[] v01 = computeVertex(center, direction, right, up, r0, z0, phi1);
-                float[] v10 = computeVertex(center, direction, right, up, r1, z1, phi0);
-                float[] v11 = computeVertex(center, direction, right, up, r1, z1, phi1);
-                
-                // Apply deformation
-                v00 = deformation.deform(v00, fieldCenter, deformIntensity, outerRadius);
-                v01 = deformation.deform(v01, fieldCenter, deformIntensity, outerRadius);
-                v10 = deformation.deform(v10, fieldCenter, deformIntensity, outerRadius);
-                v11 = deformation.deform(v11, fieldCenter, deformIntensity, outerRadius);
-                
-                float[] n00 = computeNormal(direction, right, up, phi0, theta0);
-                float[] n01 = computeNormal(direction, right, up, phi1, theta0);
-                float[] n10 = computeNormal(direction, right, up, phi0, theta1);
-                float[] n11 = computeNormal(direction, right, up, phi1, theta1);
-                
-                int idx00 = builder.vertex(v00[0], v00[1], v00[2], n00[0], n00[1], n00[2], 0f, t0, colorAlpha(color0));
-                int idx01 = builder.vertex(v01[0], v01[1], v01[2], n01[0], n01[1], n01[2], 1f, t0, colorAlpha(color0));
-                int idx10 = builder.vertex(v10[0], v10[1], v10[2], n10[0], n10[1], n10[2], 0f, t1, colorAlpha(color1));
-                int idx11 = builder.vertex(v11[0], v11[1], v11[2], n11[0], n11[1], n11[2], 1f, t1, colorAlpha(color1));
-                
-                builder.triangle(idx00, idx01, idx11);
-                builder.triangle(idx00, idx11, idx10);
-            }
-        }
-    }
 }
-

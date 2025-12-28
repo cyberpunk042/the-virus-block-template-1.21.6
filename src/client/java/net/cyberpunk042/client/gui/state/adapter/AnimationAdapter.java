@@ -383,14 +383,24 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
         switch (prop) {
             case "radiativeEnabled" -> b.radiativeEnabled(toBool(value));
             case "radiativeSpeed" -> b.radiativeSpeed(toFloat(value));
-            case "travel" -> b.travel(value instanceof net.cyberpunk042.visual.energy.EnergyTravel et 
-                ? et : net.cyberpunk042.visual.energy.EnergyTravel.fromString(value.toString()));
+            case "travel" -> {
+                var mode = value instanceof net.cyberpunk042.visual.energy.EnergyTravel et 
+                    ? et : net.cyberpunk042.visual.energy.EnergyTravel.fromString(value.toString());
+                b.travel(mode);
+                // Auto-enable when non-NONE, auto-disable when NONE
+                b.travelEnabled(mode != null && mode != net.cyberpunk042.visual.energy.EnergyTravel.NONE);
+            }
             case "travelEnabled" -> b.travelEnabled(toBool(value));
             case "travelSpeed" -> b.travelSpeed(toFloat(value));
             case "chaseCount" -> b.chaseCount(toInt(value));
             case "chaseWidth" -> b.chaseWidth(toFloat(value));
-            case "flicker" -> b.flicker(value instanceof net.cyberpunk042.visual.energy.EnergyFlicker ef 
-                ? ef : net.cyberpunk042.visual.energy.EnergyFlicker.fromString(value.toString()));
+            case "flicker" -> {
+                var mode = value instanceof net.cyberpunk042.visual.energy.EnergyFlicker ef 
+                    ? ef : net.cyberpunk042.visual.energy.EnergyFlicker.fromString(value.toString());
+                b.flicker(mode);
+                // Auto-enable when non-NONE, auto-disable when NONE
+                b.flickerEnabled(mode != null && mode != net.cyberpunk042.visual.energy.EnergyFlicker.NONE);
+            }
             case "flickerEnabled" -> b.flickerEnabled(toBool(value));
             case "flickerIntensity" -> b.flickerIntensity(toFloat(value));
             case "flickerFrequency" -> b.flickerFrequency(toFloat(value));

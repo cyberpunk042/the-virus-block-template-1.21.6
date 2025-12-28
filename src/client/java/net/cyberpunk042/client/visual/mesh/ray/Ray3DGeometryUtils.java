@@ -14,7 +14,7 @@ import net.cyberpunk042.visual.shape.SphereDeformation;
  * polar surface algorithm from VectorMath with ray-appropriate defaults.</p>
  * 
  * @see VectorMath#generatePolarSurface
- * @see RayDropletTessellator
+ * @see RaySphericalTessellator
  * @see ShapeMath
  */
 public final class Ray3DGeometryUtils {

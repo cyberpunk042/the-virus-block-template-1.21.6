@@ -3,33 +3,34 @@ package net.cyberpunk042.client.visual.mesh.ray;
 import net.cyberpunk042.client.visual.mesh.MeshBuilder;
 import net.cyberpunk042.client.visual.mesh.ray.geometry3d.GeoDeformationFactory;
 import net.cyberpunk042.client.visual.mesh.ray.geometry3d.GeoDeformationStrategy;
-import net.cyberpunk042.client.visual.mesh.ray.geometry3d.GeoDropletProfile;
 import net.cyberpunk042.client.visual.mesh.ray.geometry3d.GeoPolarSurfaceGenerator;
-import net.cyberpunk042.client.visual.mesh.ray.geometry3d.GeoRadiusProfile;
-import net.cyberpunk042.client.visual.mesh.ray.geometry3d.GeoRadiusProfileFactory;
 import net.cyberpunk042.client.visual.mesh.ray.tessellation.TessEdgeResult;
 import net.cyberpunk042.visual.energy.EnergyTravel;
 import net.cyberpunk042.visual.shape.RaysShape;
 import net.cyberpunk042.visual.shape.RayType;
+import net.cyberpunk042.visual.shape.SphereDeformation;
 
 /**
- * Tessellator for 3D ray types (DROPLET, CONE, etc.).
+ * Tessellator for 3D spherical ray types (DROPLET, CONE, EGG, BULLET, etc.).
  * 
- * <p>Uses the modular geometry3d system:
+ * <p>Uses the existing {@link SphereDeformation} infrastructure from ShapeMath
+ * to generate proper parametric shapes with full intensity support:
  * <ul>
- *   <li>{@link GeoRadiusProfile} - Defines shape (droplet, cone, egg, bullet)</li>
- *   <li>{@link GeoDeformationStrategy} - Optional deformation (gravity, wave)</li>
- *   <li>{@link GeoPolarSurfaceGenerator} - Generates the mesh</li>
+ *   <li>intensity 0 = sphere</li>
+ *   <li>intensity 1 = full deformation (sharp droplet, etc.)</li>
  * </ul>
  * </p>
  * 
- * @see GeoRadiusProfileFactory
+ * <p>This tessellator handles RayTypes that map to SphereDeformation shapes.
+ * Non-spherical ray types (CUBES, CRYSTALS, etc.) need separate tessellators.</p>
+ * 
+ * @see SphereDeformation
  * @see GeoPolarSurfaceGenerator
  */
-public class RayDropletTessellator implements RayTypeTessellator {
+public class RaySphericalTessellator implements RayTypeTessellator {
     
     /** Singleton instance. */
-    public static final RayDropletTessellator INSTANCE = new RayDropletTessellator();
+    public static final RaySphericalTessellator INSTANCE = new RaySphericalTessellator();
     
     /** Minimum rings for smooth 3D shape. */
     private static final int MIN_RINGS = 6;
@@ -37,7 +38,7 @@ public class RayDropletTessellator implements RayTypeTessellator {
     /** Minimum segments for round cross-section. */
     private static final int MIN_SEGMENTS = 6;
     
-    private RayDropletTessellator() {} // Use INSTANCE
+    private RaySphericalTessellator() {} // Use INSTANCE
     
     @Override
     public void tessellate(MeshBuilder builder, RaysShape shape, RayContext context) {
@@ -56,18 +57,10 @@ public class RayDropletTessellator implements RayTypeTessellator {
             return;
         }
         
-        // === SELECT RADIUS PROFILE ===
+        // === MAP RAY TYPE TO SPHERE DEFORMATION ===
         RayType rayType = shape != null ? shape.effectiveRayType() : RayType.DROPLET;
-        GeoRadiusProfile profile = GeoRadiusProfileFactory.get(rayType);
-        if (profile == null) {
-            profile = GeoDropletProfile.DEFAULT;
-        }
-        
-        // Custom intensity if available
+        SphereDeformation deformation = mapToSphereDeformation(rayType);
         float intensity = context.shapeIntensity();
-        if (intensity > 0.01f && intensity != 1.0f) {
-            profile = GeoRadiusProfileFactory.getCustom(rayType, intensity);
-        }
         
         // === COMPUTE POSITION & ORIENTATION ===
         float length = context.length();
@@ -115,9 +108,9 @@ public class RayDropletTessellator implements RayTypeTessellator {
         float visibleTEnd = edgeResult.clipEnd();
         float alpha = edgeResult.alpha();
         
-        // === CHECK FOR DEFORMATION ===
+        // === CHECK FOR FIELD DEFORMATION ===
         net.cyberpunk042.visual.shape.FieldDeformationMode deformMode = context.fieldDeformation();
-        GeoDeformationStrategy deformation = GeoDeformationFactory.get(deformMode);
+        GeoDeformationStrategy fieldDeformation = GeoDeformationFactory.get(deformMode);
         
         // === CHECK FOR TRAVEL EFFECT ===
         net.cyberpunk042.visual.animation.RayFlowConfig flowConfig = context.flowConfig();
@@ -134,30 +127,72 @@ public class RayDropletTessellator implements RayTypeTessellator {
         }
         
         // === GENERATE MESH ===
-        if (deformation != null && deformation.isActive()) {
+        if (fieldDeformation != null && fieldDeformation.isActive()) {
             // With deformation - use full generator with deformation callback
             float[] fieldCenter = new float[] {0, 0, 0};
             float outerRadius = shape != null ? shape.outerRadius() : 3.0f;
             float deformIntensity = context.fieldDeformationIntensity();
             
-            GeoPolarSurfaceGenerator.generateWithDeformation(
-                builder, profile, center, direction, axialLength, baseRadius,
+            GeoPolarSurfaceGenerator.generateWithSphereDeformation(
+                builder, deformation, intensity, center, direction, axialLength, baseRadius,
                 rings, segments, pattern, visibility,
                 visibleTStart, visibleTEnd, alpha,
                 travelMode, travelPhase, chaseCount, chaseWidth,
-                deformation, fieldCenter, deformIntensity, outerRadius,
+                fieldDeformation, fieldCenter, deformIntensity, outerRadius,
                 0xFFFFFFFF  // Color will be set by renderer
             );
         } else {
-            // No deformation - use standard generator
-            GeoPolarSurfaceGenerator.generateFull(
-                builder, profile, center, direction, axialLength, baseRadius,
+            // No field deformation - use standard generator
+            GeoPolarSurfaceGenerator.generateWithSphereDeformation(
+                builder, deformation, intensity, center, direction, axialLength, baseRadius,
                 rings, segments, pattern, visibility,
                 visibleTStart, visibleTEnd, alpha,
                 travelMode, travelPhase, chaseCount, chaseWidth,
+                null, null, 0f, 0f,
                 0xFFFFFFFF  // Color will be set by renderer
             );
         }
     }
+    
+    /**
+     * Maps RayType to the appropriate SphereDeformation.
+     * 
+     * @param rayType The ray type
+     * @return Corresponding sphere deformation, defaults to DROPLET
+     */
+    private static SphereDeformation mapToSphereDeformation(RayType rayType) {
+        if (rayType == null) {
+            return SphereDeformation.DROPLET;
+        }
+        
+        return switch (rayType) {
+            // Direct mappings
+            case DROPLET -> SphereDeformation.DROPLET;
+            case CONE -> SphereDeformation.CONE;
+            case ARROW -> SphereDeformation.CONE;  // Arrow uses cone (pointed tip)
+            case CAPSULE -> SphereDeformation.BULLET;  // Capsule uses bullet (hemisphere + cylinder)
+            
+            // Energy effects - use spheroid or droplet
+            case KAMEHAMEHA -> SphereDeformation.SPHEROID;  // Spherical energy ball
+            case LASER -> SphereDeformation.SPHEROID;  // Uniform beam
+            case FIRE_JET -> SphereDeformation.DROPLET;  // Wide base, narrow tip
+            case PLASMA -> SphereDeformation.DROPLET;  // Organic shape
+            
+            // Particle types - use sphere (no deformation)
+            case BEADS -> SphereDeformation.NONE;  // Perfect spheres
+            
+            // Organic types
+            case TENDRIL -> SphereDeformation.EGG;  // Organic asymmetry
+            case SPINE -> SphereDeformation.BULLET;  // Segmented with rounded ends
+            case ROOT -> SphereDeformation.PEAR;  // Natural taper
+            
+            // Fallback for non-spherical types (shouldn't reach here)
+            case LINE, LIGHTNING, CUBES, STARS, CRYSTALS -> SphereDeformation.NONE;
+        };
+    }
+    
+    @Override
+    public String name() {
+        return "RaySphericalTessellator";
+    }
 }
-

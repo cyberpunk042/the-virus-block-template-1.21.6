@@ -29,28 +29,28 @@ public final class RayTypeTessellatorRegistry {
         // Register default tessellators
         register(RayType.LINE, RayLineTessellator.INSTANCE);
         
-        // 3D Ray Types - all use RayDropletTessellator with GeoRadiusProfile selection
-        // The profile is selected per-RayType by GeoRadiusProfileFactory
+        // 3D Spherical Ray Types - all use RaySphericalTessellator with SphereDeformation
+        // The deformation type is selected per-RayType by RaySphericalTessellator
         
         // Basic Geometry Category
-        register(RayType.DROPLET, RayDropletTessellator.INSTANCE);
-        register(RayType.CONE, RayDropletTessellator.INSTANCE);
-        register(RayType.ARROW, RayDropletTessellator.INSTANCE);
-        register(RayType.CAPSULE, RayDropletTessellator.INSTANCE);
+        register(RayType.DROPLET, RaySphericalTessellator.INSTANCE);
+        register(RayType.CONE, RaySphericalTessellator.INSTANCE);
+        register(RayType.ARROW, RaySphericalTessellator.INSTANCE);
+        register(RayType.CAPSULE, RaySphericalTessellator.INSTANCE);
         
         // Energy Effects Category
-        register(RayType.KAMEHAMEHA, RayDropletTessellator.INSTANCE);
-        register(RayType.LASER, RayDropletTessellator.INSTANCE);
-        register(RayType.FIRE_JET, RayDropletTessellator.INSTANCE);
-        register(RayType.PLASMA, RayDropletTessellator.INSTANCE);
+        register(RayType.KAMEHAMEHA, RaySphericalTessellator.INSTANCE);
+        register(RayType.LASER, RaySphericalTessellator.INSTANCE);
+        register(RayType.FIRE_JET, RaySphericalTessellator.INSTANCE);
+        register(RayType.PLASMA, RaySphericalTessellator.INSTANCE);
         
         // Particle Types
-        register(RayType.BEADS, RayDropletTessellator.INSTANCE);
+        register(RayType.BEADS, RaySphericalTessellator.INSTANCE);
         
         // Organic Types
-        register(RayType.TENDRIL, RayDropletTessellator.INSTANCE);
-        register(RayType.SPINE, RayDropletTessellator.INSTANCE);
-        register(RayType.ROOT, RayDropletTessellator.INSTANCE);
+        register(RayType.TENDRIL, RaySphericalTessellator.INSTANCE);
+        register(RayType.SPINE, RaySphericalTessellator.INSTANCE);
+        register(RayType.ROOT, RaySphericalTessellator.INSTANCE);
         
         // Types that need special handling stay as LINE for now
         // (LIGHTNING, CUBES, STARS, CRYSTALS need procedural generation)
