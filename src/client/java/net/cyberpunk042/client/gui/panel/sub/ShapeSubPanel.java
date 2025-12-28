@@ -831,7 +831,14 @@ public class ShapeSubPanel extends AbstractPanel {
         
         // Restore scroll position, clamped to valid range for new content
         int maxScroll = Math.max(0, contentHeight - (bounds != null && !bounds.isEmpty() ? bounds.height() : panelHeight));
-        scrollOffset = Math.min(savedScrollOffset, maxScroll);
+        int restoredScroll = Math.min(savedScrollOffset, maxScroll);
+        if (restoredScroll > 0) {
+            // Apply scroll offset to widget positions (matching setScrollOffset behavior)
+            for (var widget : widgets) {
+                widget.setY(widget.getY() - restoredScroll);
+            }
+        }
+        scrollOffset = restoredScroll;
         
         // Notify parent container that widgets have changed
         notifyWidgetsChanged();
