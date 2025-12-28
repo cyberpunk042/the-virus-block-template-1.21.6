@@ -47,43 +47,14 @@ public final class RaysLineEmitter {
         Matrix4f positionMatrix = entry.getPositionMatrix();
         Matrix3f normalMatrix = entry.getNormalMatrix();
         
-        // Phase model: userPhase is the "paused at" position
-        // When animation is on, add time-based offset to cycle from userPhase
-        final float userPhase = raysShape != null ? raysShape.effectiveShapeState().phase() : 1.0f;
-        final boolean animationPlaying = flowConfig != null && flowConfig.hasRadiative();
-        final float baseLengthPhase;
-        if (animationPlaying) {
-            // Playing: cycle phase continuously from userPhase
-            float timeOffset = calculateLengthPhase(flowConfig, time);
-            baseLengthPhase = (userPhase + timeOffset) % 1.0f;
-        } else {
-            // Paused: show at userPhase
-            baseLengthPhase = userPhase;
-        }
+        // Phase model: Phase-based segment positioning is now done in the tessellator
+        // (RayLineTessellator). The tessellator already positions segments correctly
+        // based on each copy's phase. The emitter just needs to emit the geometry.
+        
         final float travelOffset = calculateTravelOffset(flowConfig, time);
         
-        // Get ray count for per-ray phase staggering
+        // Get ray count for per-ray effects (color, flicker, travel)
         final int rayCount = raysShape != null ? Math.max(1, raysShape.count()) : 1;
-        
-        // Get RadiativeInteraction from shape
-        final net.cyberpunk042.visual.energy.RadiativeInteraction radiativeMode = 
-            raysShape != null ? raysShape.effectiveRadiativeInteraction() 
-            : net.cyberpunk042.visual.energy.RadiativeInteraction.NONE;
-        final float segmentLength = raysShape != null ? raysShape.effectiveSegmentLength() : 1.0f;
-        final boolean startFullLength = raysShape != null && raysShape.startFullLength();
-        final boolean followCurve = raysShape != null && raysShape.followCurve();
-        
-        // Curvature info
-        final net.cyberpunk042.visual.shape.RayCurvature fieldCurvature = 
-            raysShape != null ? raysShape.curvature() : null;
-        final float curvatureIntensity = raysShape != null ? raysShape.curvatureIntensity() : 0f;
-        final boolean hasCurvature = fieldCurvature != null && 
-            fieldCurvature != net.cyberpunk042.visual.shape.RayCurvature.NONE && 
-            curvatureIntensity > 0;
-        
-        // Apply radiative clipping when Energy Mode is not NONE
-        // This works for both animated (phase cycling) and static (Phase slider preview)
-        final boolean applyRadiativeClipping = radiativeMode.isActive();
         
         // Build effect chain for all vertex effects
         final RenderEffectChain effectChain = RenderEffectChain.builder()
@@ -112,57 +83,10 @@ public final class RaysLineEmitter {
             float t0 = v0.u();
             float t1 = v1.u();
             
-            // Calculate per-ray phase based on wave distribution
-            // baseLengthPhase already includes time offset when animation is playing
-            // Wave offset distributes rays according to wave mode
-            float waveOffset = net.cyberpunk042.client.visual.mesh.ray.flow.FlowPhaseStage.computeRayPhaseOffset(
-                raysShape, actualRayIndex, rayCount);
-            float rayLengthPhase = (baseLengthPhase + waveOffset) % 1.0f;
-            if (rayLengthPhase < 0) rayLengthPhase += 1.0f;
-            
-            // Add curvature drift ONLY when followCurve is OFF and field has curvature
-            // followCurve ON = no extra drift (clean sweep)
-            // followCurve OFF = adds curvature-based drift on top of wave distribution
-            if (!followCurve && hasCurvature) {
-                float angularOffset = (float) actualRayIndex / rayCount;
-                float curvatureDrift = angularOffset * curvatureIntensity;
-                rayLengthPhase = (rayLengthPhase + curvatureDrift) % 1.0f;
-                if (rayLengthPhase < 0) rayLengthPhase += 1.0f;
-            }
-            
-            // Handle RadiativeInteraction clipping (works for both animated and static preview)
-            if (applyRadiativeClipping) {
-                var clipRange = net.cyberpunk042.client.visual.mesh.ray.tessellation.RadiativeInteractionFactory.compute(
-                    radiativeMode, rayLengthPhase, segmentLength, startFullLength);
-                
-                float windowStart = clipRange.start();
-                float windowEnd = clipRange.end();
-                
-                // Apply clipping if needed
-                if (radiativeMode != net.cyberpunk042.visual.energy.RadiativeInteraction.OSCILLATION) {
-                    if (t1 <= windowStart || t0 >= windowEnd) {
-                        return; // Skip this segment entirely
-                    }
-                    
-                    // Clip segment to visible window if partially visible
-                    // Note: vertices are already on curved path from tessellator
-                    // Linear interpolation here is sufficient
-                    if (t0 < windowStart && windowStart < t1) {
-                        float clipT = (windowStart - t0) / (t1 - t0);
-                        x0 = x0 + (x1 - x0) * clipT;
-                        y0 = y0 + (y1 - y0) * clipT;
-                        z0 = z0 + (z1 - z0) * clipT;
-                        t0 = windowStart;
-                    }
-                    if (t1 > windowEnd && windowEnd > t0) {
-                        float clipT = (windowEnd - t0) / (t1 - t0);
-                        x1 = x0 + (x1 - x0) * clipT;
-                        y1 = y0 + (y1 - y0) * clipT;
-                        z1 = z0 + (z1 - z0) * clipT;
-                        t1 = windowEnd;
-                    }
-                }
-            }
+            // NOTE: Radiative clipping is NO LONGER done here!
+            // The tessellator (RayLineTessellator) now handles phase-based segment positioning.
+            // Each copy of a ray has its segment positioned at a different phase offset,
+            // so the mesh already contains correctly positioned geometry.
             
             // Apply All Vertex Effects via RenderEffectChain
             if (hasEffects) {
@@ -191,10 +115,10 @@ public final class RaysLineEmitter {
             // Emit both vertices of the line
             emitLineVertex(consumer, x0, y0, z0, x1, y1, z1, positionMatrix, normalMatrix,
                           baseColor, baseAlpha, light, colorCtx, v0, flowConfig, time, actualRayIndex, rayCount,
-                          travelOffset, rayLengthPhase, fadeStart, fadeEnd, hasFade);
+                          travelOffset, fadeStart, fadeEnd, hasFade);
             emitLineVertex(consumer, x1, y1, z1, x0, y0, z0, positionMatrix, normalMatrix,
                           baseColor, baseAlpha, light, colorCtx, v1, flowConfig, time, actualRayIndex, rayCount,
-                          travelOffset, rayLengthPhase, fadeStart, fadeEnd, hasFade);
+                          travelOffset, fadeStart, fadeEnd, hasFade);
         });
     }
     
@@ -208,7 +132,7 @@ public final class RaysLineEmitter {
                                  int baseColor, float baseAlpha, int light,
                                  ColorContext colorCtx, Vertex originalVertex,
                                  RayFlowConfig flowConfig, float time, int rayIndex, int rayCount,
-                                 float travelOffset, float lengthPhase,
+                                 float travelOffset,
                                  float fadeStart, float fadeEnd, boolean hasFade) {
         
         // Transform position
