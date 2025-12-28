@@ -682,6 +682,30 @@ public class ShapeSubPanel extends AbstractPanel {
                     }));
                 widgets.add(phaseSlider);
                 y += step;
+                
+                // Edge Mode dropdown (CLIP/SCALE/FADE)
+                net.cyberpunk042.visual.shape.EdgeTransitionMode curEdge = currentShapeState.edgeMode();
+                if (curEdge == null) curEdge = net.cyberpunk042.visual.shape.EdgeTransitionMode.CLIP;
+                
+                var edgeModeDropdown = GuiWidgets.enumDropdown(
+                    x, y, w, GuiConstants.COMPACT_HEIGHT, "Edge Mode",
+                    net.cyberpunk042.visual.shape.EdgeTransitionMode.class,
+                    curEdge, "How ray edges transition (CLIP=cut off, SCALE=resize, FADE=alpha)",
+                    v -> onUserChange(() -> {
+                        // Get current state, create new with modified edgeMode
+                        Object curObj = state.get("rays.shapeState");
+                        net.cyberpunk042.visual.shape.RayFlowStage curStage = net.cyberpunk042.visual.shape.RayFlowStage.ACTIVE;
+                        float curPhase2 = 0.5f;
+                        if (curObj instanceof net.cyberpunk042.visual.shape.ShapeState<?> ss) {
+                            if (ss.stage() instanceof net.cyberpunk042.visual.shape.RayFlowStage rfs) {
+                                curStage = rfs;
+                            }
+                            curPhase2 = ss.phase();
+                        }
+                        state.set("rays.shapeState", new net.cyberpunk042.visual.shape.ShapeState<>(curStage, curPhase2, v));
+                    }));
+                widgets.add(edgeModeDropdown);
+                y += step;
             }
             
             // ═══════════════════════════════════════════════════════════════════

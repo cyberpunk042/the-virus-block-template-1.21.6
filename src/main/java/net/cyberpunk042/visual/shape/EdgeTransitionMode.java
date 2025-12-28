@@ -4,7 +4,7 @@ package net.cyberpunk042.visual.shape;
  * Controls how shapes appear at edges during transitional stages.
  * 
  * <p>This is a user-controlled setting that determines the visual effect
- * when a shape is in SPAWNING or DESPAWNING stage.</p>
+ * when a shape is in entering the field of view or leaving the field of view.</p>
  * 
  * <h2>Modes</h2>
  * <ul>

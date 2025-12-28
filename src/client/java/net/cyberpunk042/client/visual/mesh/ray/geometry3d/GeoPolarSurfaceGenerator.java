@@ -109,9 +109,10 @@ public final class GeoPolarSurfaceGenerator {
             float theta0 = PI * i / rings;
             float theta1 = PI * (i + 1) / rings;
             
-            // t-value for this ring (0 at tip, 1 at base)
-            float t0 = 1.0f - (theta0 / PI);
-            float t1 = 1.0f - (theta1 / PI);
+            // t-value for this ring (0 at base/start, 1 at tip/end)
+            // This matches ray convention: t=0 is inner radius, t=1 is outer radius
+            float t0 = theta0 / PI;
+            float t1 = theta1 / PI;
             
             // Compute alpha for each ring
             float alpha0 = computeVertexAlpha(t0, finalVisibleTStart, finalVisibleTEnd, 

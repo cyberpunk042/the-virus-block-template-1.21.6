@@ -140,7 +140,7 @@ public record RayContext(
     float outerRadius,
     
     // NOTE: flowScale, visibleTStart, visibleTEnd, flowAlpha REMOVED
-    // These are now computed by TessEdgeModeFactory via computeEdgeResult()
+    // These are now computed by RadiativeInteractionFactory + TessEdgeModeFactory
     
     // ═══════════════════════════════════════════════════════════════════════════
     // Field Deformation (gravitational distortion)
