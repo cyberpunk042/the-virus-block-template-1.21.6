@@ -38,13 +38,13 @@ public class RayLineTessellator implements RayTypeTessellator {
             tessellateSegmentedShapedRay(builder, shape, context);
         } else if (isSegmented) {
             // Simple dashed ray
-            tessellateSegmentedRay(builder, context, shape.segments(), shape.segmentGap());
+            tessellateSegmentedRay(builder, shape, context, shape.segments(), shape.segmentGap());
         } else if (needsMultiSegment) {
             // Multi-segment for complex shapes/curvature/wave
             tessellateShapedRay(builder, shape, context);
         } else {
             // Simple line (2 vertices)
-            tessellateSimpleLine(builder, context);
+            tessellateSimpleLine(builder, shape, context);
         }
     }
     
@@ -63,9 +63,28 @@ public class RayLineTessellator implements RayTypeTessellator {
      *   <li>EdgeMode SCALE: Width scaling at edges</li>
      * </ul>
      */
-    private void tessellateSimpleLine(MeshBuilder builder, RayContext context) {
-        // Compute clipRange first (where the segment is)
-        TessEdgeResult edgeResult = computeEdgeResult(context, null);
+    private void tessellateSimpleLine(MeshBuilder builder, RaysShape shape, RayContext context) {
+        // === COMPUTE PHASE-BASED POSITION ===
+        // Lines should work like 3D shapes: phase determines WHERE the segment is positioned
+        // along the ray axis, not which portion of the full ray is visible.
+        
+        // Get radiative mode and phase
+        var radiativeMode = shape != null ? shape.effectiveRadiativeInteraction() 
+            : net.cyberpunk042.visual.energy.RadiativeInteraction.NONE;
+        float userPhase = context.effectiveShapeState().phase();
+        
+        // Get segment length (how long the line segment is, as fraction of ray)
+        float segmentLength = shape != null ? shape.effectiveSegmentLength() : 1.0f;
+        boolean startFullLength = shape != null && shape.startFullLength();
+        
+        // Compute clip range from RadiativeInteraction (determines segment position)
+        var clipRange = net.cyberpunk042.client.visual.mesh.ray.tessellation.RadiativeInteractionFactory.compute(
+            radiativeMode, userPhase, segmentLength, startFullLength);
+        
+        // Apply EdgeMode effects
+        var edgeMode = context.effectiveShapeState().edgeMode();
+        float edgeIntensity = context.effectiveShapeState().edgeIntensity();
+        TessEdgeResult edgeResult = TessEdgeModeFactory.compute(edgeMode, clipRange, edgeIntensity);
         
         // Skip if completely hidden
         if (!edgeResult.isVisible()) {
@@ -76,34 +95,31 @@ public class RayLineTessellator implements RayTypeTessellator {
         float[] end = context.end();
         float[] dir = context.direction();
         
-        // Get clipping/scale/alpha from EdgeMode
-        float tStart = edgeResult.clipStart();
-        float tEnd = edgeResult.clipEnd();
-        float scale = edgeResult.scale();
-        float alpha = edgeResult.alpha();
+        // === POSITION THE SEGMENT ALONG THE RAY (like 3D shapes do) ===
+        // The segment is positioned at the CENTER of the clip range
+        float segmentCenter = (clipRange.start() + clipRange.end()) * 0.5f;
+        float halfLength = segmentLength * 0.5f;
         
-        // Skip if line is completely clipped
+        // Segment bounds (where the line segment actually is on the ray)
+        float segmentStart = segmentCenter - halfLength;
+        float segmentEnd = segmentCenter + halfLength;
+        
+        // Clamp to ray bounds [0, 1]
+        float tStart = Math.max(0f, segmentStart);
+        float tEnd = Math.min(1f, segmentEnd);
+        
+        // Skip if segment is completely outside ray bounds
         if (tStart >= tEnd) {
             return;
         }
         
-        // Compute actual start/end positions based on clipping
-        float[] actualStart;
-        float[] actualEnd;
+        // Get scale and alpha from edge mode
+        float scale = edgeResult.scale();
+        float alpha = edgeResult.alpha();
         
-        if (tStart > 0.001f || tEnd < 0.999f) {
-            // Clipping active - interpolate positions
-            actualStart = RayGeometryUtils.interpolate(start, end, tStart);
-            actualEnd = RayGeometryUtils.interpolate(start, end, tEnd);
-        } else {
-            // No clipping - use originals
-            actualStart = start;
-            actualEnd = end;
-        }
-        
-        // Apply width scaling if SCALE mode is active
-        // (For simple lines, scaling affects how the renderer interprets width)
-        float effectiveWidth = context.width() * scale;
+        // Compute actual start/end positions by interpolating along the ray
+        float[] actualStart = RayGeometryUtils.interpolate(start, end, tStart);
+        float[] actualEnd = RayGeometryUtils.interpolate(start, end, tEnd);
         
         // u = t value for shader, alpha from EdgeMode
         int v0 = builder.vertex(actualStart[0], actualStart[1], actualStart[2], dir[0], dir[1], dir[2], tStart, 0, alpha);
@@ -170,10 +186,10 @@ public class RayLineTessellator implements RayTypeTessellator {
      * <p>Uses RadiativeInteraction + EdgeMode for animation.
      * <p>Applies curvature if the ray has field curvature configured.
      */
-    private void tessellateSegmentedRay(MeshBuilder builder, RayContext context, 
+    private void tessellateSegmentedRay(MeshBuilder builder, RaysShape shape, RayContext context, 
                                         int segments, float segmentGap) {
         // Compute edge result from RadiativeInteraction + EdgeMode
-        TessEdgeResult edgeResult = computeEdgeResult(context, null);
+        TessEdgeResult edgeResult = computeEdgeResult(context, shape);
         
         // Skip if completely hidden
         if (!edgeResult.isVisible()) {
