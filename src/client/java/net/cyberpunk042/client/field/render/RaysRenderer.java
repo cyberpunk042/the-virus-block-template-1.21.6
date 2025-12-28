@@ -252,9 +252,9 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
             
             // Apply effect chain (Motion, Wiggle, Twist) if active
             if (hasEffects) {
-                w0 = applyEffectChain(w0, effectChain, idx);
-                w1 = applyEffectChain(w1, effectChain, idx);
-                w2 = applyEffectChain(w2, effectChain, idx);
+                w0 = applyEffectChain(w0, effectChain, rayIndex);
+                w1 = applyEffectChain(w1, effectChain, rayIndex);
+                w2 = applyEffectChain(w2, effectChain, rayIndex);
             }
             
             // Emit vertices with flicker alpha and ray index for INDEXED/RANDOM distribution
@@ -271,9 +271,13 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
      * For 3D ray shapes, computes the ray direction from vertex position
      * (radial direction from center) since Wiggle/Twist effects need the 
      * ray axis, not the surface normal.
+     * 
+     * @param v The vertex to transform
+     * @param chain The effect chain to apply
+     * @param rayIndex The ray index (not triangle index) - ensures all vertices of the same ray get same offsets
      */
     private Vertex applyEffectChain(Vertex v, 
-            net.cyberpunk042.client.field.render.effect.RenderEffectChain chain, int index) {
+            net.cyberpunk042.client.field.render.effect.RenderEffectChain chain, int rayIndex) {
         float[] pos = new float[]{v.x(), v.y(), v.z()};
         
         // Compute ray direction from vertex position (radial from center)
@@ -289,8 +293,10 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
             dir = new float[]{v.nx(), v.ny(), v.nz()};
         }
         
+        // For 3D shapes, the t-value (position along ray axis) is stored in v.v(), not v.u()
+        // v.u() is texture U coordinate, v.v() is the actual parametric position (0=base, 1=tip)
         net.cyberpunk042.client.field.render.effect.RenderEffectContext ctx = 
-            new net.cyberpunk042.client.field.render.effect.RenderEffectContext(index, v.u(), dir);
+            new net.cyberpunk042.client.field.render.effect.RenderEffectContext(rayIndex, v.v(), dir);
         chain.apply(pos, ctx);
         
         return new Vertex(pos[0], pos[1], pos[2], v.nx(), v.ny(), v.nz(), v.u(), v.v(), v.alpha());

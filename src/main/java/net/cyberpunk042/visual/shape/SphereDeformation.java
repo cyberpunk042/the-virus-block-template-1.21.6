@@ -88,7 +88,13 @@ public enum SphereDeformation {
         float[] shapePos = switch (this) {
             case NONE -> spherePos;
             
-            case SPHEROID -> ShapeMath.spheroidVertex(theta, phi, radius, length);
+            case SPHEROID -> {
+                // For SPHEROID, intensity controls how much the length affects the shape
+                // intensity=0 -> sphere (effectiveLength=1.0)
+                // intensity=1 -> full spheroid (effectiveLength=length)
+                float effectiveLength = 1.0f + (length - 1.0f) * intensity;
+                yield ShapeMath.spheroidVertex(theta, phi, radius, effectiveLength);
+            }
             
             case OVOID -> {
                 float asymmetry = intensity * 0.3f;  // 0 to 0.3
@@ -117,7 +123,7 @@ public enum SphereDeformation {
             case CONE -> ShapeMath.coneVertex(theta, phi, radius, length);
         };
         
-        // For SPHEROID, don't blend - it IS the sphere with stretch
+        // For SPHEROID, the intensity is already applied via effectiveLength, so return directly
         if (this == SPHEROID) {
             return shapePos;
         }
@@ -143,11 +149,16 @@ public enum SphereDeformation {
         // Compute proper normal based on shape type
         float[] normal;
         
+        // For SPHEROID, use the intensity-adjusted effective length
+        float effectiveLength = (this == SPHEROID) 
+            ? 1.0f + (length - 1.0f) * intensity 
+            : length;
+        
         // Volume-preserving spheroid radii (matches ShapeMath.spheroidVertex):
-        // polar radius c = radius * length
-        // equatorial radius a = radius / sqrt(length)
-        float c = radius * length;
-        float a = radius / (float) Math.sqrt(length);
+        // polar radius c = radius * effectiveLength
+        // equatorial radius a = radius / sqrt(effectiveLength)
+        float c = radius * effectiveLength;
+        float a = radius / (float) Math.sqrt(effectiveLength);
         
         if (this == NONE || this == SPHEROID) {
             // Use proper spheroid normal with correct a and c

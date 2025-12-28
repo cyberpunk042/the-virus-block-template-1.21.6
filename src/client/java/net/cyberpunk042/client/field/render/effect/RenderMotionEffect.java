@@ -125,9 +125,12 @@ public final class RenderMotionEffect implements RenderVertexEffect {
                 }
                 float rayAngle = (float) Math.atan2(z, x);
                 float precAngle = time * speed;
+                // Normalize angle difference to [-PI, PI] using modulo (constant time, no loops!)
                 float angleDiff = rayAngle - precAngle;
-                while (angleDiff > Math.PI) angleDiff -= TWO_PI;
-                while (angleDiff < -Math.PI) angleDiff += TWO_PI;
+                angleDiff = (float) ((angleDiff + Math.PI) % TWO_PI);
+                if (angleDiff < 0) angleDiff += TWO_PI;
+                angleDiff -= (float) Math.PI;
+                
                 float tiltFactor = (float) Math.cos(angleDiff);
                 float displacement = tiltFactor * amp * 1.0f;
                 float nx = x / dist;

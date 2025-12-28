@@ -239,11 +239,18 @@ public class RaySphericalTessellator implements RayTypeTessellator {
         }
         
         return switch (rayType) {
-            // Direct mappings
+            // Direct mappings - Basic shapes
             case DROPLET -> SphereDeformation.DROPLET;
             case CONE -> SphereDeformation.CONE;
             case ARROW -> SphereDeformation.CONE;  // Arrow uses cone (pointed tip)
             case CAPSULE -> SphereDeformation.BULLET;  // Capsule uses bullet (hemisphere + cylinder)
+            
+            // Direct mappings - Organic/natural shapes
+            case SPHERE -> SphereDeformation.NONE;  // Perfect sphere (no deformation)
+            case SPHEROID -> SphereDeformation.SPHEROID;  // Oblate/prolate spheroid
+            case OVOID -> SphereDeformation.OVOID;  // Smooth egg-like
+            case EGG -> SphereDeformation.EGG;  // Asymmetric egg
+            case PEAR -> SphereDeformation.PEAR;  // Wide base, narrow top
             
             // Energy effects - use spheroid or droplet
             case KAMEHAMEHA -> SphereDeformation.SPHEROID;  // Spherical energy ball

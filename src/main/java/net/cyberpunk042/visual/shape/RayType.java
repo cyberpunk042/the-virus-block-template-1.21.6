@@ -38,6 +38,21 @@ public enum RayType {
     /** Pill/capsule shape - cylinder with rounded hemisphere ends. */
     CAPSULE("Capsule", "Pill shape - cylinder with rounded ends", Category.BASIC),
     
+    /** Perfect sphere - uniform radius in all directions. */
+    SPHERE("Sphere", "Perfect sphere - uniform radius", Category.BASIC),
+    
+    /** Spheroid - sphere stretched (prolate) or squashed (oblate) along axis. */
+    SPHEROID("Spheroid", "Sphere stretched or squashed along axis", Category.BASIC),
+    
+    /** Ovoid - smooth egg-like shape with gentle asymmetry. */
+    OVOID("Ovoid", "Smooth egg-like shape", Category.BASIC),
+    
+    /** Egg - asymmetric egg shape (fatter at bottom). */
+    EGG("Egg", "Egg shape - fatter at bottom", Category.BASIC),
+    
+    /** Pear - strong base mass with tapered top. */
+    PEAR("Pear", "Pear shape - wide base, narrow top", Category.BASIC),
+    
     // ═══════════════════════════════════════════════════════════════════════════
     // Energy/Effect
     // ═══════════════════════════════════════════════════════════════════════════
@@ -125,6 +140,7 @@ public enum RayType {
         return switch (this) {
             case LINE -> false;  // Flat ribbon
             case DROPLET, CONE, ARROW, CAPSULE -> true;
+            case SPHERE, SPHEROID, OVOID, EGG, PEAR -> true;  // Organic shapes
             case KAMEHAMEHA, LASER, LIGHTNING, FIRE_JET, PLASMA -> true;
             case BEADS, CUBES, STARS, CRYSTALS -> true;
             case TENDRIL, SPINE, ROOT -> true;
@@ -150,6 +166,7 @@ public enum RayType {
         return switch (this) {
             case LINE, ARROW -> 1;
             case DROPLET, CONE, CAPSULE -> 8;
+            case SPHERE, SPHEROID, OVOID, EGG, PEAR -> 8;  // Organic shapes
             case KAMEHAMEHA, LASER -> 12;
             case BEADS, CUBES, STARS, CRYSTALS -> 1;  // Discrete objects
             case LIGHTNING -> 16;

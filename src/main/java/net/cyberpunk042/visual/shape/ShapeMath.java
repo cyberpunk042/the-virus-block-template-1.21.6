@@ -274,13 +274,16 @@ public final class ShapeMath {
     /**
      * Bullet/capsule-tip vertex position.
      * 
-     * <p>Hemisphere on top, cylinder below.</p>
+     * <p>Hemisphere on top, cylinder in middle, flat cap at bottom.</p>
      */
     public static float[] bulletVertex(float theta, float phi, float radius, float length) {
         float sinPhi = (float) Math.sin(phi);
         float cosPhi = (float) Math.cos(phi);
         
         float x, y, z;
+        
+        // Use last 10% of theta range for the flat base cap
+        float capStart = PI * 0.9f;
         
         if (theta < HALF_PI) {
             // Top hemisphere (0 to π/2)
@@ -290,13 +293,21 @@ public final class ShapeMath {
             x = radius * sinTheta * cosPhi;
             y = radius * cosTheta;  // Top part
             z = radius * sinTheta * sinPhi;
-        } else {
-            // Bottom cylinder (π/2 to π)
-            float t = (theta - HALF_PI) / HALF_PI;  // 0 to 1
+        } else if (theta < capStart) {
+            // Middle cylinder (π/2 to 0.9π)
+            float t = (theta - HALF_PI) / (capStart - HALF_PI);  // 0 to 1
             
             x = radius * cosPhi;
             y = -radius * length * t;  // Extends down based on length
             z = radius * sinPhi;
+        } else {
+            // Bottom cap (0.9π to π) - flat circular disc
+            float t = (theta - capStart) / (PI - capStart);  // 0 to 1
+            float capRadius = radius * (1.0f - t);  // Shrinks from full radius to 0
+            
+            x = capRadius * cosPhi;
+            y = -radius * length;  // Fixed at bottom
+            z = capRadius * sinPhi;
         }
         
         return new float[] { x, y, z };
@@ -304,23 +315,42 @@ public final class ShapeMath {
     
     /**
      * Cone vertex position.
+     * 
+     * <p>Tapered sides from tip to base, flat cap at bottom.</p>
      */
     public static float[] coneVertex(float theta, float phi, float radius, float length) {
         float sinPhi = (float) Math.sin(phi);
         float cosPhi = (float) Math.cos(phi);
         
-        // Linear taper: 0 at tip (θ=0), 1 at base (θ=π)
-        float taper = theta / PI;
-        float ringRadius = radius * taper;
+        // Use last 10% of theta range for the flat base cap
+        float capStart = PI * 0.9f;
         
-        // Map θ to Y with length scaling
-        float y = radius * length * (float) Math.cos(theta);
+        float x, y, z;
         
-        return new float[] {
-            ringRadius * cosPhi,  // X
-            y,                    // Y
-            ringRadius * sinPhi   // Z
-        };
+        if (theta < capStart) {
+            // Tapered cone surface (0 to 0.9π)
+            // Linear taper: 0 at tip (θ=0), full radius at capStart
+            float taper = theta / capStart;
+            float ringRadius = radius * taper;
+            
+            // Y position: tip is at top (y = radius*length), base cap is at bottom (y = -radius*length)
+            // Map theta [0, capStart] to y [radius*length, -radius*length]
+            float yProgress = theta / capStart;  // 0 to 1
+            y = radius * length * (1.0f - 2.0f * yProgress);  // Goes from +length to -length
+            
+            x = ringRadius * cosPhi;
+            z = ringRadius * sinPhi;
+        } else {
+            // Bottom cap (0.9π to π) - flat circular disc
+            float t = (theta - capStart) / (PI - capStart);  // 0 to 1
+            float capRadius = radius * (1.0f - t);  // Shrinks from full radius to 0
+            
+            x = capRadius * cosPhi;
+            y = -radius * length;  // Fixed at bottom
+            z = capRadius * sinPhi;
+        }
+        
+        return new float[] { x, y, z };
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
