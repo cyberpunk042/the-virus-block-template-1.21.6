@@ -54,7 +54,7 @@ public final class RayCompatibilityHint {
         } catch (Exception ignored) {}
         
         int rayCount = state.getInt("rays.count");
-        int lineSegments = state.getInt("rays.shapeSegments");
+        int lineSegments = state.getInt("rays.lineResolution");
         boolean isMultiSegment = lineShape != RayLineShape.STRAIGHT || lineSegments > 1;
         boolean is3DShape = lineShape == RayLineShape.CORKSCREW || 
                             lineShape == RayLineShape.SPRING || 

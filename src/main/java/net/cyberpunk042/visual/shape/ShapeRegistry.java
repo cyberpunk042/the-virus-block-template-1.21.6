@@ -294,7 +294,7 @@ public final class ShapeRegistry {
             RayLineShape lineShape = RayLineShape.STRAIGHT;
             float lineShapeAmplitude = getFloat(params, "lineShapeAmplitude", 0.1f);
             float lineShapeFrequency = getFloat(params, "lineShapeFrequency", 2.0f);
-            int shapeSegments = getInt(params, "shapeSegments", 16);
+            int lineResolution = getInt(params, "lineResolution", 16);
             RayCurvature curvature = RayCurvature.NONE;
             float curvatureIntensity = getFloat(params, "curvatureIntensity", 0f);
             RayType rayType = RayType.LINE;
@@ -319,7 +319,7 @@ public final class ShapeRegistry {
                 Boolean.parseBoolean(params.get("followCurve").toString()) : true;
             return new RaysShape(rayLength, rayWidth, count, arrangement, distribution, innerRadius, outerRadius,
                 layers, layerSpacing, layerMode, randomness, lengthVariation, fadeStart, fadeEnd, segments, segmentGap,
-                lineShape, lineShapeAmplitude, lineShapeFrequency, shapeSegments, curvature, curvatureIntensity, 
+                lineShape, lineShapeAmplitude, lineShapeFrequency, lineResolution, curvature, curvatureIntensity, 
                 rayType, shapeIntensity, shapeLength, rayOrientation, fieldDeformation, fieldDeformationIntensity,
                 null, // shapeState
                 radiativeInteraction, segmentLength, waveArc, waveDistribution, waveCount,

@@ -70,14 +70,26 @@ public final class RaysLineEmitter {
             raysShape != null ? raysShape.effectiveRadiativeInteraction() 
             : net.cyberpunk042.visual.energy.RadiativeInteraction.NONE;
         final float segmentLength = raysShape != null ? raysShape.effectiveSegmentLength() : 1.0f;
+        final boolean startFullLength = raysShape != null && raysShape.startFullLength();
+        final boolean followCurve = raysShape != null && raysShape.followCurve();
+        
+        // Curvature info - used for artificial drifting when followCurve is OFF
+        final net.cyberpunk042.visual.shape.RayCurvature fieldCurvature = 
+            raysShape != null ? raysShape.curvature() : null;
+        final float curvatureIntensity = raysShape != null ? raysShape.curvatureIntensity() : 0f;
+        final boolean hasCurvature = fieldCurvature != null && 
+            fieldCurvature != net.cyberpunk042.visual.shape.RayCurvature.NONE && 
+            curvatureIntensity > 0;
         
         // Stagger phase per-ray when animation is active
         final boolean staggerPhase = flowConfig != null && flowConfig.hasRadiative() && radiativeMode.isActive();
         
-        // Apply radiative clipping when mode is active (whether animated or static preview)
+        // Apply radiative clipping when Energy Mode is not NONE
+        // This works for both animated (phase cycling) and static (Phase slider preview)
         final boolean applyRadiativeClipping = radiativeMode.isActive();
         
         // Wave configuration from SHAPE
+        // When followCurve is true, we disable wave offset (no sweep drifting)
         final float waveArc = raysShape != null ? raysShape.effectiveWaveArc() : 1.0f;
         final WaveDistribution waveDist = raysShape != null ? raysShape.effectiveWaveDistribution() : WaveDistribution.SEQUENTIAL;
         final float sweepCopies = raysShape != null ? Math.max(0.1f, raysShape.effectiveWaveCount()) : 1.0f;
@@ -106,20 +118,51 @@ public final class RaysLineEmitter {
             float t0 = v0.u();
             float t1 = v1.u();
             
-            // Calculate per-ray phase using FlowPhaseStage
+            // Calculate per-ray phase
+            // When followCurve is true: all rays use the same phase (no sweep drifting)
+            // Otherwise: wave offset is applied for sweep effects
+            // Time cycling only happens when animation is playing
             float rayLengthPhase;
-            if (staggerPhase && flowConfig != null) {
-                RaysShape rs = raysShape;
+            if (followCurve) {
+                // Follow curve mode: all rays have the same phase, no sweep offset
+                if (animationPlaying && flowConfig != null) {
+                    float basePhase = (time * flowConfig.radiativeSpeed()) % 1.0f;
+                    rayLengthPhase = basePhase < 0 ? basePhase + 1.0f : basePhase;
+                } else {
+                    rayLengthPhase = baseLengthPhase;
+                }
+            } else if (animationPlaying && flowConfig != null) {
+                // Animation playing: use full phase computation with wave offset
                 rayLengthPhase = net.cyberpunk042.client.visual.mesh.ray.flow.FlowPhaseStage.computePhase(
-                    flowConfig, rs, idx, rayCount, time);
+                    flowConfig, raysShape, idx, rayCount, time);
+                
+                // Add artificial curvature drifting when field has curvature
+                if (hasCurvature) {
+                    // Angular offset based on ray index creates swirling effect
+                    float angularOffset = (float) idx / rayCount;
+                    float curvatureDrift = angularOffset * curvatureIntensity;
+                    rayLengthPhase = (rayLengthPhase + curvatureDrift) % 1.0f;
+                }
             } else {
-                rayLengthPhase = baseLengthPhase;
+                // Static or paused: apply wave offset to the base phase from slider
+                float waveOffset = net.cyberpunk042.client.visual.mesh.ray.flow.FlowPhaseStage.computeRayPhaseOffset(
+                    raysShape, idx, rayCount);
+                rayLengthPhase = (baseLengthPhase + waveOffset) % 1.0f;
+                
+                // Add curvature drifting for static preview too
+                if (hasCurvature) {
+                    float angularOffset = (float) idx / rayCount;
+                    float curvatureDrift = angularOffset * curvatureIntensity;
+                    rayLengthPhase = (rayLengthPhase + curvatureDrift) % 1.0f;
+                }
+                
+                if (rayLengthPhase < 0) rayLengthPhase += 1.0f;
             }
             
             // Handle RadiativeInteraction clipping (works for both animated and static preview)
             if (applyRadiativeClipping) {
                 var clipRange = net.cyberpunk042.client.visual.mesh.ray.tessellation.RadiativeInteractionFactory.compute(
-                    radiativeMode, rayLengthPhase, segmentLength);
+                    radiativeMode, rayLengthPhase, segmentLength, startFullLength);
                 
                 float windowStart = clipRange.start();
                 float windowEnd = clipRange.end();

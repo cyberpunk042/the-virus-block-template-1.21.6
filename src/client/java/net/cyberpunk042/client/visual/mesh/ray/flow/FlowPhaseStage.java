@@ -60,8 +60,8 @@ public final class FlowPhaseStage implements FlowStage {
         
         float phase;
         if (waveDist == WaveDistribution.CONTINUOUS) {
-            // CONTINUOUS: Phase is scrambled by golden ratio, no sweep multiplication
-            phase = (basePhase + rayAngle) % 1.0f;
+            // CONTINUOUS: All rays have the same phase (uniform animation)
+            phase = basePhase;
         } else {
             // SEQUENTIAL/RANDOM: Apply sweepCopies for sweep effect
             phase = (basePhase + scaledAngle * sweepCopies) % 1.0f;
@@ -110,8 +110,10 @@ public final class FlowPhaseStage implements FlowStage {
         
         float phase;
         if (waveDist == WaveDistribution.CONTINUOUS) {
-            phase = (basePhase + rayAngle) % 1.0f;
+            // CONTINUOUS: All rays have the same phase (uniform animation)
+            phase = basePhase;
         } else {
+            // SEQUENTIAL/RANDOM: Apply sweepCopies for sweep effect
             phase = (basePhase + scaledAngle * sweepCopies) % 1.0f;
         }
         
@@ -128,6 +130,41 @@ public final class FlowPhaseStage implements FlowStage {
     }
     
     /**
+     * Compute per-ray phase offset for wave distribution.
+     * 
+     * <p>This is the OFFSET that gets added to the base phase for each ray,
+     * based on wave distribution settings. Used for both animated and static mode.</p>
+     * 
+     * @param shape RaysShape with wave parameters
+     * @param rayIndex Index of this ray
+     * @param rayCount Total number of rays
+     * @return Phase offset (0-1) to add to base phase
+     */
+    public static float computeRayPhaseOffset(RaysShape shape, int rayIndex, int rayCount) {
+        if (shape == null || rayCount <= 1) {
+            return 0f;
+        }
+        
+        WaveDistribution waveDist = shape.effectiveWaveDistribution();
+        
+        // CONTINUOUS: All rays have the SAME phase (no offset)
+        // This creates a uniform animation where all rays move together
+        if (waveDist == WaveDistribution.CONTINUOUS) {
+            return 0f;
+        }
+        
+        float waveArc = shape.effectiveWaveArc();
+        float waveCount = Math.max(0.1f, shape.effectiveWaveCount());
+        
+        // Compute per-ray angular position based on distribution
+        float rayAngle = computeRayAngle(waveDist, rayIndex, rayCount);
+        
+        // SEQUENTIAL/RANDOM/GOLDEN_RATIO: Apply waveArc and sweepCopies for sweep effect
+        float scaledAngle = rayAngle * waveArc;
+        return (scaledAngle * waveCount) % 1.0f;
+    }
+    
+    /**
      * Compute per-ray angle based on wave distribution.
      * 
      * @param waveDist Wave distribution mode
@@ -137,7 +174,10 @@ public final class FlowPhaseStage implements FlowStage {
      */
     public static float computeRayAngle(WaveDistribution waveDist, int rayIndex, int rayCount) {
         if (waveDist == WaveDistribution.CONTINUOUS) {
-            // CONTINUOUS: Phases scrambled relative to angle → no sweep pattern
+            // CONTINUOUS: All rays same phase - no offset
+            return 0f;
+        } else if (waveDist == WaveDistribution.GOLDEN_RATIO) {
+            // GOLDEN_RATIO: Aesthetically pleasing distribution using golden ratio
             return (rayIndex * GOLDEN_RATIO) % 1.0f;
         } else if (waveDist == WaveDistribution.RANDOM) {
             // Use hash for consistent but random-looking distribution

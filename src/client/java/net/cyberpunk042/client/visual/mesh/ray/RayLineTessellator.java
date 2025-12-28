@@ -3,6 +3,7 @@ package net.cyberpunk042.client.visual.mesh.ray;
 import net.cyberpunk042.client.visual.mesh.MeshBuilder;
 import net.cyberpunk042.client.visual.mesh.ray.tessellation.TessEdgeModeFactory;
 import net.cyberpunk042.client.visual.mesh.ray.tessellation.TessEdgeResult;
+import net.cyberpunk042.visual.shape.RayCurvature;
 import net.cyberpunk042.visual.shape.RayLineShape;
 import net.cyberpunk042.visual.shape.RaysShape;
 
@@ -116,6 +117,7 @@ public class RayLineTessellator implements RayTypeTessellator {
     /**
      * Tessellates a segmented (dashed) ray.
      * <p>Uses Stage/Phase model via TessEdgeModeFactory for animation.
+     * <p>Applies curvature if the ray has field curvature configured.
      */
     private void tessellateSegmentedRay(MeshBuilder builder, RayContext context, 
                                         int segments, float segmentGap) {
@@ -137,6 +139,11 @@ public class RayLineTessellator implements RayTypeTessellator {
         float scale = edgeResult.scale();
         float alpha = edgeResult.alpha();
         
+        // Check if we need to apply curvature
+        RayCurvature curvature = context.curvature();
+        float curvatureIntensity = context.curvatureIntensity();
+        boolean hasCurvature = curvature != null && curvature != RayCurvature.NONE && curvatureIntensity > 0;
+        
         // Calculate segment and gap proportions
         float totalParts = segments + (segments - 1) * segmentGap;
         float segmentLength = 1.0f / totalParts;
@@ -157,9 +164,18 @@ public class RayLineTessellator implements RayTypeTessellator {
             float effectiveTStart = Math.max(tStart, globalTStart);
             float effectiveTEnd = Math.min(tEnd, globalTEnd);
             
-            // Interpolate positions for this segment
-            float[] segStart = RayGeometryUtils.interpolate(start, end, effectiveTStart);
-            float[] segEnd = RayGeometryUtils.interpolate(start, end, effectiveTEnd);
+            // Compute positions for this segment - with or without curvature
+            float[] segStart;
+            float[] segEnd;
+            if (hasCurvature) {
+                // Apply curvature to follow the curved path
+                segStart = RayGeometryUtils.computeCurvedPosition(start, end, effectiveTStart, curvature, curvatureIntensity);
+                segEnd = RayGeometryUtils.computeCurvedPosition(start, end, effectiveTEnd, curvature, curvatureIntensity);
+            } else {
+                // Linear interpolation for straight lines
+                segStart = RayGeometryUtils.interpolate(start, end, effectiveTStart);
+                segEnd = RayGeometryUtils.interpolate(start, end, effectiveTEnd);
+            }
             
             // Emit line segment with alpha from Stage/Phase model
             int v0 = builder.vertex(segStart[0], segStart[1], segStart[2], dir[0], dir[1], dir[2], effectiveTStart, 0, alpha);
@@ -190,7 +206,7 @@ public class RayLineTessellator implements RayTypeTessellator {
         float[] start = context.start();
         float[] end = context.end();
         float[] dir = context.direction();
-        int segments = context.shapeSegments();
+        int segments = context.lineResolution();
         
         if (context.length() < 0.0001f) {
             // Degenerate ray
@@ -281,11 +297,81 @@ public class RayLineTessellator implements RayTypeTessellator {
     // ═══════════════════════════════════════════════════════════════════════════
     
     /**
-     * Tessellates a ray that is BOTH segmented AND has complex shape.
+     * Tessellates a ray that is BOTH segmented (dashed) AND has complex shape.
+     * Creates dashed segments along the shaped/curved path.
      */
     private void tessellateSegmentedShapedRay(MeshBuilder builder, RaysShape shape, RayContext context) {
-        // For now, delegate to shaped ray (simplified)
-        // TODO: Implement proper segmented + shaped combination
-        tessellateShapedRay(builder, shape, context);
+        TessEdgeResult edgeResult = context.computeEdgeResult();
+        if (!edgeResult.isVisible()) {
+            return;
+        }
+        
+        float[] start = context.start();
+        float[] end = context.end();
+        float[] dir = context.direction();
+        int segments = shape.segments();
+        float segmentGap = shape.segmentGap();
+        
+        // Get clipping/scale/alpha from Stage/Phase model
+        float globalTStart = edgeResult.clipStart();
+        float globalTEnd = edgeResult.clipEnd();
+        float alpha = edgeResult.alpha();
+        
+        // Calculate segment and gap proportions
+        float totalParts = segments + (segments - 1) * segmentGap;
+        float segLen = 1.0f / totalParts;
+        float gapLen = segLen * segmentGap;
+        
+        // Compute perpendicular frame
+        float[] right = new float[3];
+        float[] up = new float[3];
+        RayGeometryUtils.computePerpendicularFrame(dir[0], dir[1], dir[2], right, up);
+        
+        RayLineShape lineShape = context.lineShape();
+        float shapeAmplitude = context.lineShapeAmplitude();
+        float shapeFrequency = context.lineShapeFrequency();
+        float curvatureIntensity = context.curvatureIntensity();
+        
+        float t = 0;
+        for (int seg = 0; seg < segments; seg++) {
+            float tStart = t;
+            float tEnd = t + segLen;
+            
+            // Skip segments completely outside the visible range
+            if (tEnd < globalTStart || tStart > globalTEnd) {
+                t = tEnd + gapLen;
+                continue;
+            }
+            
+            // Clip to visible range
+            float effectiveTStart = Math.max(tStart, globalTStart);
+            float effectiveTEnd = Math.min(tEnd, globalTEnd);
+            
+            // Compute shaped positions for this segment
+            float[] posStart = computeShapedPosition(start, end, effectiveTStart, context, right, up, 
+                lineShape, shapeAmplitude, shapeFrequency, curvatureIntensity);
+            float[] posEnd = computeShapedPosition(start, end, effectiveTEnd, context, right, up,
+                lineShape, shapeAmplitude, shapeFrequency, curvatureIntensity);
+            
+            int v0 = builder.vertex(posStart[0], posStart[1], posStart[2], dir[0], dir[1], dir[2], effectiveTStart, 0, alpha);
+            int v1 = builder.vertex(posEnd[0], posEnd[1], posEnd[2], dir[0], dir[1], dir[2], effectiveTEnd, 0, alpha);
+            builder.line(v0, v1);
+            
+            t = tEnd + gapLen;
+        }
+    }
+    
+    /**
+     * Compute a shaped position at parametric t.
+     */
+    private float[] computeShapedPosition(float[] start, float[] end, float t, RayContext context,
+            float[] right, float[] up, RayLineShape lineShape, float amplitude, float frequency, float curvatureIntensity) {
+        // Apply curvature
+        float[] curved = RayGeometryUtils.computeCurvedPosition(start, end, t, context.curvature(), curvatureIntensity);
+        
+        // Apply line shape offset
+        float[] offset = RayGeometryUtils.computeLineShapeOffset(lineShape, t, amplitude, frequency, right, up);
+        
+        return new float[]{curved[0] + offset[0], curved[1] + offset[1], curved[2] + offset[2]};
     }
 }

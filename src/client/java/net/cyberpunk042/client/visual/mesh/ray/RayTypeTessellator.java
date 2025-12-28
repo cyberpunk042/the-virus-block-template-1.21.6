@@ -16,7 +16,7 @@ import net.cyberpunk042.visual.shape.RaysShape;
  *   <li>Use {@link RayContext#start()}, {@link RayContext#end()}, etc. for positioning</li>
  *   <li>Respect {@link RayContext#fadeStart()} and {@link RayContext#fadeEnd()} for alpha</li>
  *   <li>Use {@link RayContext#width()} for thickness calculations</li>
- *   <li>For complex shapes, use {@link RayContext#shapeSegments()} for subdivision</li>
+ *   <li>For complex shapes, use {@link RayContext#lineResolution()} for subdivision</li>
  * </ul>
  * 
  * <h2>Mesh Building</h2>

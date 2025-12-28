@@ -85,7 +85,7 @@ public record RayContext(
     float curvatureIntensity,
     
     /** Number of segments for complex shapes. */
-    int shapeSegments,
+    int lineResolution,
     
     // ═══════════════════════════════════════════════════════════════════════════
     // Orientation (for 3D ray types)
@@ -217,12 +217,13 @@ public record RayContext(
     
     /**
      * Whether this ray needs multi-segment tessellation.
+     * lineResolution > 1 always triggers subdivision for smooth lines.
      */
     public boolean needsMultiSegment() {
-        return lineShape != RayLineShape.STRAIGHT 
-            || curvature != RayCurvature.NONE 
-            || shapeSegments > 1
-            || hasWave;
+        boolean hasShape = lineShape != RayLineShape.STRAIGHT;
+        boolean hasCurve = curvature != RayCurvature.NONE;
+        // lineResolution > 1 always triggers subdivision
+        return hasShape || hasCurve || lineResolution > 1 || hasWave;
     }
     
     /**
@@ -284,7 +285,7 @@ public record RayContext(
         private float lineShapeFrequency = 2.0f;
         private RayCurvature curvature = RayCurvature.NONE;
         private float curvatureIntensity = 0.0f;
-        private int shapeSegments = 1;
+        private int lineResolution = 1;
         private net.cyberpunk042.visual.shape.RayOrientation orientation = net.cyberpunk042.visual.shape.RayOrientation.ALONG_RAY;
         private float[] orientationVector = new float[] { 0, 0, 1 };
         private float shapeIntensity = 1.0f;
@@ -343,7 +344,7 @@ public record RayContext(
             return this; 
         }
         public Builder curvatureIntensity(float v) { this.curvatureIntensity = v; return this; }
-        public Builder shapeSegments(int v) { this.shapeSegments = v; return this; }
+        public Builder lineResolution(int v) { this.lineResolution = v; return this; }
         public Builder orientation(net.cyberpunk042.visual.shape.RayOrientation v) { 
             this.orientation = v != null ? v : net.cyberpunk042.visual.shape.RayOrientation.ALONG_RAY; 
             return this; 
@@ -391,7 +392,7 @@ public record RayContext(
                 index, count, layerIndex, t,
                 width, fadeStart, fadeEnd,
                 lineShape, lineShapeAmplitude, lineShapeFrequency,
-                curvature, curvatureIntensity, shapeSegments,
+                curvature, curvatureIntensity, lineResolution,
                 orientation, orientationVector,
                 shapeIntensity, shapeLength,
                 wave, time, hasWave,

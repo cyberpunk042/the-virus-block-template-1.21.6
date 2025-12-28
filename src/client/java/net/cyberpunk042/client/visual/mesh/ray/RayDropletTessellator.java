@@ -105,7 +105,7 @@ public class RayDropletTessellator implements RayTypeTessellator {
         }
         
         // === MESH RESOLUTION ===
-        int totalSegs = Math.max(12, context.shapeSegments());
+        int totalSegs = Math.max(12, context.lineResolution());
         int rings = Math.max(MIN_RINGS, totalSegs / 2);
         int segments = Math.max(MIN_SEGMENTS, totalSegs / 2);
         

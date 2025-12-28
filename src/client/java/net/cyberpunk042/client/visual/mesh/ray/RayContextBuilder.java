@@ -26,7 +26,7 @@ public final class RayContextBuilder {
      * @param count Total ray count
      * @param layerIndex Layer index
      * @param orientationVector Computed orientation vector [x, y, z]
-     * @param shapeSegments Number of segments for tessellation
+     * @param lineResolution Number of segments for tessellation
      * @param hasWave Whether wave animation is active
      * @param wave Wave config (may be null)
      * @param time Current animation time
@@ -45,7 +45,7 @@ public final class RayContextBuilder {
             int count,
             int layerIndex,
             float[] orientationVector,
-            int shapeSegments,
+            int lineResolution,
             boolean hasWave,
             WaveConfig wave,
             float time,
@@ -88,7 +88,7 @@ public final class RayContextBuilder {
             .lineShapeFrequency(shape.lineShapeFrequency())
             .curvature(shape.effectiveCurvature())
             .curvatureIntensity(shape.curvatureIntensity())
-            .shapeSegments(shapeSegments)
+            .lineResolution(lineResolution)
             .orientation(shape.effectiveRayOrientation())
             .orientationVector(orientationVector)
             .shapeIntensity(shape.shapeIntensity())

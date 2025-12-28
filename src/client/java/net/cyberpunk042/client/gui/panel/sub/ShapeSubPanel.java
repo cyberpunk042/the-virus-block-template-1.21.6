@@ -471,12 +471,12 @@ public class ShapeSubPanel extends AbstractPanel {
                     y += step;
                 }
                 
-                // Curve Resolution (vertex count for curved/animated rays)
-                int lineSegs = state.getInt("rays.shapeSegments");
+                // Resolution (vertex count per ray segment for smooth lines)
+                int lineSegs = state.getInt("rays.lineResolution");
                 var lineSegsSlider = GuiWidgets.slider(x, y, w,
-                    "Curve Res", 1, 256, lineSegs, "%d", 
-                    "Vertex count per ray (more = smoother curves)",
-                    v -> onUserChange(() -> state.set("rays.shapeSegments", Math.round(v))));
+                    "Resolution", 1, 256, lineSegs, "%d", 
+                    "Vertex count per ray (more = smoother lines)",
+                    v -> onUserChange(() -> state.set("rays.lineResolution", Math.round(v))));
                 widgets.add(lineSegsSlider);
                 y += step;
             }
@@ -527,11 +527,11 @@ public class ShapeSubPanel extends AbstractPanel {
                 y += step;
                 
                 // 3D Segments (for mesh resolution)
-                int segs3D = state.getInt("rays.shapeSegments");
+                int segs3D = state.getInt("rays.lineResolution");
                 var segs3DSlider = GuiWidgets.slider(x, y, w,
                     "3D Segments", 12, 128, segs3D, "%d", 
                     "Mesh resolution for 3D shapes (more = smoother)",
-                    v -> onUserChange(() -> state.set("rays.shapeSegments", Math.round(v))));
+                    v -> onUserChange(() -> state.set("rays.lineResolution", Math.round(v))));
                 widgets.add(segs3DSlider);
                 y += step;
             }
@@ -643,27 +643,26 @@ public class ShapeSubPanel extends AbstractPanel {
                     );
                 }
                 
-                boolean isStageActive = currentShapeState.stage() == net.cyberpunk042.visual.shape.RayFlowStage.ACTIVE;
+                net.cyberpunk042.visual.shape.RayFlowStage currentStage = currentShapeState.stage();
+                if (currentStage == null) currentStage = net.cyberpunk042.visual.shape.RayFlowStage.ACTIVE;
                 float phase = currentShapeState.phase();
                 
-                var stageToggle = GuiWidgets.toggle(
-                    x, y, halfW, "Stage: Active",
-                    isStageActive, "ACTIVE = full shape, OFF = SPAWNING stage",
+                var stageDropdown = GuiWidgets.enumDropdown(
+                    x, y, halfW, GuiConstants.COMPACT_HEIGHT, "Stage",
+                    net.cyberpunk042.visual.shape.RayFlowStage.class,
+                    currentStage, "Shape lifecycle stage",
                     v -> onUserChange(() -> {
                         // Get current state, create new with modified stage
                         Object curObj = state.get("rays.shapeState");
-                        net.cyberpunk042.visual.shape.RayFlowStage newStage = v 
-                            ? net.cyberpunk042.visual.shape.RayFlowStage.ACTIVE 
-                            : net.cyberpunk042.visual.shape.RayFlowStage.SPAWNING;
                         float curPhase = 0.5f;
                         net.cyberpunk042.visual.shape.EdgeTransitionMode curEdge = net.cyberpunk042.visual.shape.EdgeTransitionMode.CLIP;
                         if (curObj instanceof net.cyberpunk042.visual.shape.ShapeState<?> ss) {
                             curPhase = ss.phase();
                             curEdge = ss.edgeMode();
                         }
-                        state.set("rays.shapeState", new net.cyberpunk042.visual.shape.ShapeState<>(newStage, curPhase, curEdge));
+                        state.set("rays.shapeState", new net.cyberpunk042.visual.shape.ShapeState<>(v, curPhase, curEdge));
                     }));
-                widgets.add(stageToggle);
+                widgets.add(stageDropdown);
                 
                 var phaseSlider = GuiWidgets.slider(x + halfW + GuiConstants.PADDING, y, halfW,
                     "Phase", 0f, 1f, phase, "%.2f", 

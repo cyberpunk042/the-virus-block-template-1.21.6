@@ -13,6 +13,9 @@ public enum WaveDistribution {
     /** Rays have randomized (but consistent) phase offsets - scattered pattern. */
     RANDOM("Random"),
     
+    /** Phases spread using golden ratio - aesthetically pleasing non-repeating distribution. */
+    GOLDEN_RATIO("Golden Ratio"),
+    
     /** All rays animate in parallel with the same phase - 360° simultaneous action. */
     CONTINUOUS("Continuous");
     

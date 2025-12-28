@@ -40,12 +40,25 @@ public final class RadiativeInteractionFactory {
      * @return The computed clip range
      */
     public static ClipRange compute(RadiativeInteraction mode, float phase, float segmentLength) {
+        return compute(mode, phase, segmentLength, false);
+    }
+    
+    /**
+     * Compute the clip range for a given RadiativeInteraction and phase.
+     * 
+     * @param mode The radiative interaction mode from RaysShape
+     * @param phase The current animation phase (0-1)
+     * @param segmentLength The visible segment length (0-1) from RaysShape
+     * @param startFullLength If true: full ray at phase=0, slides out. If false: grows from 0.
+     * @return The computed clip range
+     */
+    public static ClipRange compute(RadiativeInteraction mode, float phase, float segmentLength, boolean startFullLength) {
         if (mode == null) mode = RadiativeInteraction.NONE;
         
         return switch (mode) {
             case NONE -> ClipRange.FULL;
-            case EMISSION -> computeEmission(phase, segmentLength);
-            case ABSORPTION -> computeAbsorption(phase, segmentLength);
+            case EMISSION -> computeEmission(phase, segmentLength, startFullLength);
+            case ABSORPTION -> computeAbsorption(phase, segmentLength, startFullLength);
             case TRANSMISSION -> computeTransmission(phase, segmentLength);
             case OSCILLATION -> computeOscillation(phase);
             case RESONANCE -> computeResonance(phase);
@@ -56,28 +69,49 @@ public final class RadiativeInteractionFactory {
     
     /**
      * EMISSION: Segment moves from inner (phase=0) to outer (phase=1).
-     * Energy radiates outward from center.
+     * 
+     * If startFullLength=false: Ray grows from 0 at phase 0 to full at phase 1.
+     * If startFullLength=true: Full ray visible at phase 0, slides out and disappears at phase 1.
      */
-    private static ClipRange computeEmission(float phase, float segmentLength) {
-        // Segment travels from -segmentLength to 1.0
-        float travelRange = 1.0f + segmentLength;
-        float center = phase * travelRange - segmentLength / 2;
-        float start = center - segmentLength / 2;
-        float end = center + segmentLength / 2;
-        return new ClipRange(Math.max(0, start), Math.min(1, end), 1f);
+    private static ClipRange computeEmission(float phase, float segmentLength, boolean startFullLength) {
+        if (startFullLength) {
+            // Full ray at phase 0, slides out at phase 1
+            // At phase 0: visible [0, 1]
+            // At phase 1: visible [-1, 0] (i.e., nothing visible since clamped to [0,1])
+            float start = phase;
+            float end = phase + 1.0f;
+            return new ClipRange(Math.max(0, start), Math.min(1, end), 1f);
+        } else {
+            // Segment travels from -segmentLength to 1.0
+            float travelRange = 1.0f + segmentLength;
+            float center = phase * travelRange - segmentLength / 2;
+            float start = center - segmentLength / 2;
+            float end = center + segmentLength / 2;
+            return new ClipRange(Math.max(0, start), Math.min(1, end), 1f);
+        }
     }
     
     /**
      * ABSORPTION: Segment moves from outer (phase=0) to inner (phase=1).
-     * Energy flows inward toward center.
+     * 
+     * If startFullLength=false: Segment grows inward.
+     * If startFullLength=true: Full ray visible at phase 0, slides in and disappears at phase 1.
      */
-    private static ClipRange computeAbsorption(float phase, float segmentLength) {
-        // Same as emission but reversed
-        float travelRange = 1.0f + segmentLength;
-        float center = 1.0f - (phase * travelRange - segmentLength / 2);
-        float start = center - segmentLength / 2;
-        float end = center + segmentLength / 2;
-        return new ClipRange(Math.max(0, start), Math.min(1, end), 1f);
+    private static ClipRange computeAbsorption(float phase, float segmentLength, boolean startFullLength) {
+        if (startFullLength) {
+            // Full ray at phase 0, slides inward at phase 1
+            // Reverse: at phase 0 visible [0, 1], at phase 1 visible inward
+            float end = 1.0f - phase;
+            float start = end - 1.0f;
+            return new ClipRange(Math.max(0, start), Math.min(1, end), 1f);
+        } else {
+            // Same as emission but reversed
+            float travelRange = 1.0f + segmentLength;
+            float center = 1.0f - (phase * travelRange - segmentLength / 2);
+            float start = center - segmentLength / 2;
+            float end = center + segmentLength / 2;
+            return new ClipRange(Math.max(0, start), Math.min(1, end), 1f);
+        }
     }
     
     /**
@@ -118,9 +152,9 @@ public final class RadiativeInteractionFactory {
     private static ClipRange computeReflection(float phase, float segmentLength) {
         // First half: emission, second half: absorption
         if (phase < 0.5f) {
-            return computeEmission(phase * 2, segmentLength);
+            return computeEmission(phase * 2, segmentLength, false);
         } else {
-            return computeAbsorption((phase - 0.5f) * 2, segmentLength);
+            return computeAbsorption((phase - 0.5f) * 2, segmentLength, false);
         }
     }
     

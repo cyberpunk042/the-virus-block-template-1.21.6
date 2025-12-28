@@ -250,10 +250,10 @@ public final class RayPositioner {
         PositionData pos = computePositionData(shape, index, layerIndex, rng);
         
         // Determine shape segments
-        int shapeSegments = shape.effectiveShapeSegments();
+        int lineResolution = shape.effectivelineResolution();
         boolean hasWave = wave != null && wave.isActive() && wave.isCpuMode();
-        if (hasWave && shapeSegments < 16) {
-            shapeSegments = 16;
+        if (hasWave && lineResolution < 16) {
+            lineResolution = 16;
         }
         
         // Compute flow position offset
@@ -273,7 +273,7 @@ public final class RayPositioner {
         ShapeState<RayFlowStage> shapeState = computeAnimatedState(shape, flowConfig, index, pos.count, time);
         
         return RayContextBuilder.build(shape, pos.start, pos.end, pos.direction, pos.length,
-            index, pos.count, layerIndex, pos.orientationVector, shapeSegments, hasWave,
+            index, pos.count, layerIndex, pos.orientationVector, lineResolution, hasWave,
             wave, time, flowConfig, flowPositionOffset, shapeState);
     }
     
@@ -311,7 +311,7 @@ public final class RayPositioner {
         // Compute common position data
         PositionData pos = computePositionData(shape, index, layerIndex, rng);
         
-        int shapeSegments = shape.shapeSegments();
+        int lineResolution = shape.lineResolution();
         boolean hasWave = wave != null && wave.isActive() && wave.isCpuMode();
         
         // Compute position offset based on phase and wrapped flag
@@ -327,7 +327,7 @@ public final class RayPositioner {
         ShapeState<RayFlowStage> shapeState = shape.effectiveShapeState().withPhase(phase);
         
         return RayContextBuilder.build(shape, pos.start, pos.end, pos.direction, pos.length,
-            index, pos.count, layerIndex, pos.orientationVector, shapeSegments, hasWave,
+            index, pos.count, layerIndex, pos.orientationVector, lineResolution, hasWave,
             wave, time, flowConfig, posOffset, shapeState);
     }
     

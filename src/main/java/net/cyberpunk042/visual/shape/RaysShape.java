@@ -91,7 +91,7 @@ public record RaysShape(
     @JsonField(skipIfDefault = true) RayLineShape lineShape,
     @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "0.1") float lineShapeAmplitude,
     @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "2.0") float lineShapeFrequency,
-    @Range(ValueRange.STEPS) @JsonField(skipIfDefault = true, defaultValue = "16") int shapeSegments,
+    @Range(ValueRange.STEPS) @JsonField(skipIfDefault = true, defaultValue = "16") int lineResolution,
     
     // === Field Curvature (how rays curve around center) ===
     @JsonField(skipIfDefault = true) RayCurvature curvature,
@@ -162,7 +162,7 @@ public record RaysShape(
         RayLineShape.STRAIGHT, // lineShape
         0.1f,           // lineShapeAmplitude
         2.0f,           // lineShapeFrequency
-        16,             // shapeSegments
+        16,             // lineResolution
         RayCurvature.NONE, // curvature
         0.0f,           // curvatureIntensity
         RayType.LINE,   // rayType
@@ -361,17 +361,17 @@ public record RaysShape(
     }
     
     /** Number of segments needed to render this ray shape properly. */
-    public int effectiveShapeSegments() {
+    public int effectivelineResolution() {
         if (hasLineShape()) {
             // Complex line shape - use at least the suggested minimum
-            return Math.max(shapeSegments, lineShape.suggestedMinSegments());
+            return Math.max(lineResolution, lineShape.suggestedMinSegments());
         } else if (hasCurvature()) {
             // Curvature needs multiple segments for smooth curves
-            return Math.max(shapeSegments, 16);
+            return Math.max(lineResolution, 16);
         }
-        // For straight rays, respect user's shapeSegments setting
+        // For straight rays, respect user's lineResolution setting
         // (needed for travel animations like CHASE/SCROLL to work smoothly)
-        return Math.max(1, shapeSegments);
+        return Math.max(1, lineResolution);
     }
     
     /** Returns the field deformation mode, defaulting to NONE if null. */
@@ -416,9 +416,9 @@ public record RaysShape(
         return waveArc <= 0 ? 1.0f : waveArc;
     }
     
-    /** Returns effective wave distribution, defaulting to SEQUENTIAL if null. */
+    /** Returns effective wave distribution, defaulting to CONTINUOUS if null. */
     public net.cyberpunk042.visual.animation.WaveDistribution effectiveWaveDistribution() {
-        return waveDistribution != null ? waveDistribution : net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL;
+        return waveDistribution != null ? waveDistribution : net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS;
     }
     
     /** Returns effective wave count (sweep copies), defaulting to 2.0 if not set. */
@@ -459,7 +459,7 @@ public record RaysShape(
             .lineShape(lineShape)
             .lineShapeAmplitude(lineShapeAmplitude)
             .lineShapeFrequency(lineShapeFrequency)
-            .shapeSegments(shapeSegments)
+            .lineResolution(lineResolution)
             .curvature(curvature)
             .curvatureIntensity(curvatureIntensity)
             .rayType(rayType)
@@ -503,7 +503,7 @@ public record RaysShape(
         private RayLineShape lineShape = RayLineShape.STRAIGHT;
         private float lineShapeAmplitude = 0.1f;
         private float lineShapeFrequency = 2.0f;
-        private int shapeSegments = 16;
+        private int lineResolution = 16;
         private RayCurvature curvature = RayCurvature.NONE;
         private float curvatureIntensity = 0.0f;
         private RayType rayType = RayType.LINE;
@@ -543,7 +543,7 @@ public record RaysShape(
         public Builder lineShape(RayLineShape v) { this.lineShape = v != null ? v : RayLineShape.STRAIGHT; return this; }
         public Builder lineShapeAmplitude(float v) { this.lineShapeAmplitude = v; return this; }
         public Builder lineShapeFrequency(float v) { this.lineShapeFrequency = v; return this; }
-        public Builder shapeSegments(int v) { this.shapeSegments = v; return this; }
+        public Builder lineResolution(int v) { this.lineResolution = v; return this; }
         public Builder curvature(RayCurvature v) { this.curvature = v != null ? v : RayCurvature.NONE; return this; }
         public Builder curvatureIntensity(float v) { this.curvatureIntensity = v; return this; }
         public Builder rayType(RayType v) { this.rayType = v != null ? v : RayType.LINE; return this; }
@@ -568,7 +568,7 @@ public record RaysShape(
                 rayLength, rayWidth, count, arrangement, distribution, innerRadius, outerRadius,
                 layers, layerSpacing, layerMode, randomness, lengthVariation,
                 fadeStart, fadeEnd, segments, segmentGap,
-                lineShape, lineShapeAmplitude, lineShapeFrequency, shapeSegments,
+                lineShape, lineShapeAmplitude, lineShapeFrequency, lineResolution,
                 curvature, curvatureIntensity, rayType, shapeIntensity, shapeLength, rayOrientation,
                 fieldDeformation, fieldDeformationIntensity, shapeState,
                 radiativeInteraction, segmentLength, waveArc, waveDistribution, waveCount,
