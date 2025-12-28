@@ -267,11 +267,27 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
     
     /**
      * Apply effect chain to a vertex.
+     * 
+     * For 3D ray shapes, computes the ray direction from vertex position
+     * (radial direction from center) since Wiggle/Twist effects need the 
+     * ray axis, not the surface normal.
      */
     private Vertex applyEffectChain(Vertex v, 
             net.cyberpunk042.client.field.render.effect.RenderEffectChain chain, int index) {
         float[] pos = new float[]{v.x(), v.y(), v.z()};
-        float[] dir = new float[]{v.nx(), v.ny(), v.nz()};
+        
+        // Compute ray direction from vertex position (radial from center)
+        // For 3D rays, the ray points from center outward through this vertex
+        float x = v.x(), y = v.y(), z = v.z();
+        float dist = (float) Math.sqrt(x * x + z * z);
+        float[] dir;
+        if (dist > 0.001f) {
+            // Radial direction on XZ plane, normalized
+            dir = new float[]{x / dist, 0f, z / dist};
+        } else {
+            // Fallback to surface normal if at center
+            dir = new float[]{v.nx(), v.ny(), v.nz()};
+        }
         
         net.cyberpunk042.client.field.render.effect.RenderEffectContext ctx = 
             new net.cyberpunk042.client.field.render.effect.RenderEffectContext(index, v.u(), dir);
