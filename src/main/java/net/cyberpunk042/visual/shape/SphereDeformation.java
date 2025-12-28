@@ -89,11 +89,12 @@ public enum SphereDeformation {
             case NONE -> spherePos;
             
             case SPHEROID -> {
-                // For SPHEROID, intensity controls how much the length affects the shape
-                // intensity=0 -> sphere (effectiveLength=1.0)
-                // intensity=1 -> full spheroid (effectiveLength=length)
-                float effectiveLength = 1.0f + (length - 1.0f) * intensity;
-                yield ShapeMath.spheroidVertex(theta, phi, radius, effectiveLength);
+                // SPHEROID: Independent control of polar stretch and equatorial bulge
+                // - length controls polar axis (height: <1 = squashed, >1 = stretched)
+                // - intensity controls equatorial bulge (width: 0 = sphere, 1 = 50% wider)
+                // This creates the spinning planet effect (centrifugal bulge at equator)
+                float bulge = intensity * 0.5f;  // 0 to 50% equatorial bulge
+                yield ShapeMath.spheroidWithBulge(theta, phi, radius, length, bulge);
             }
             
             case OVOID -> {
@@ -149,16 +150,19 @@ public enum SphereDeformation {
         // Compute proper normal based on shape type
         float[] normal;
         
-        // For SPHEROID, use the intensity-adjusted effective length
-        float effectiveLength = (this == SPHEROID) 
-            ? 1.0f + (length - 1.0f) * intensity 
-            : length;
-        
-        // Volume-preserving spheroid radii (matches ShapeMath.spheroidVertex):
-        // polar radius c = radius * effectiveLength
-        // equatorial radius a = radius / sqrt(effectiveLength)
-        float c = radius * effectiveLength;
-        float a = radius / (float) Math.sqrt(effectiveLength);
+        float a, c;
+        if (this == SPHEROID) {
+            // SPHEROID uses spheroidWithBulge: independent bulge and length
+            // c = radius * length (polar axis controlled by length)
+            // a = radius * (1 + bulge) where bulge = intensity * 0.5
+            float bulge = intensity * 0.5f;
+            c = radius * length;
+            a = radius * (1.0f + bulge);
+        } else {
+            // Other shapes use volume-preserving spheroid formula
+            c = radius * length;
+            a = radius / (float) Math.sqrt(length);
+        }
         
         if (this == NONE || this == SPHEROID) {
             // Use proper spheroid normal with correct a and c

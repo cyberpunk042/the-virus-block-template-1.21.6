@@ -130,6 +130,47 @@ public final class ShapeMath {
     }
     
     /**
+     * Spheroid with independent equatorial bulge control (planetary distortion).
+     * 
+     * <p>Unlike volume-preserving spheroidVertex, this allows independent control:
+     * <ul>
+     *   <li><b>length:</b> Controls polar axis stretch (c = radius * length)</li>
+     *   <li><b>bulge:</b> Controls additional equatorial bulge (0 = no extra, 0.5 = 50% wider)</li>
+     * </ul>
+     * </p>
+     * 
+     * <p>This simulates a spinning planet where centrifugal force makes the equator
+     * bulge outward independently of how tall/short the poles are.</p>
+     * 
+     * @param theta Polar angle (0 = top pole, π = bottom pole)
+     * @param phi Azimuthal angle (0 to 2π)
+     * @param radius Base radius
+     * @param length Polar axis ratio (1 = sphere height, <1 = squashed, >1 = stretched)
+     * @param bulge Equatorial bulge factor (0 = sphere width, 0.5 = 50% wider equator)
+     */
+    public static float[] spheroidWithBulge(float theta, float phi, float radius, 
+            float length, float bulge) {
+        float sinTheta = (float) Math.sin(theta);
+        float cosTheta = (float) Math.cos(theta);
+        float sinPhi = (float) Math.sin(phi);
+        float cosPhi = (float) Math.cos(phi);
+        
+        // Polar radius (c) = radius * length - controlled by length slider
+        float c = radius * length;
+        
+        // Equatorial radius (a) = radius * (1 + bulge) - controlled by intensity slider
+        // bulge = 0 -> sphere radius (a = radius)
+        // bulge = 0.5 -> 50% extra equatorial width (a = radius * 1.5)
+        float a = radius * (1.0f + bulge);
+        
+        return new float[] {
+            a * sinTheta * cosPhi,      // X (equatorial, bulges with intensity)
+            c * cosTheta,               // Y (polar axis, controlled by length)
+            a * sinTheta * sinPhi       // Z (equatorial, bulges with intensity)
+        };
+    }
+    
+    /**
      * Ellipsoid vertex position (three unequal axes).
      * 
      * @param theta Polar angle

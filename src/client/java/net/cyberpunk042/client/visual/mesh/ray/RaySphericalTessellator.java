@@ -58,9 +58,21 @@ public class RaySphericalTessellator implements RayTypeTessellator {
         // === FLOW CONFIG ===
         net.cyberpunk042.visual.animation.RayFlowConfig flowConfig = context.flowConfig();
         
-        // === RADIATIVE PHASE (compute FIRST - needed for positioning) ===
+        // === ENERGY MODE (must compute FIRST to know if animation should play) ===
+        net.cyberpunk042.visual.energy.RadiativeInteraction radiativeMode = 
+            shape != null ? shape.effectiveRadiativeInteraction() 
+            : net.cyberpunk042.visual.energy.RadiativeInteraction.NONE;
+        
+        // === RADIATIVE PHASE (compute after we know if animation should play) ===
         final float userPhase = context.effectiveShapeState().phase();
-        final boolean animationPlaying = flowConfig != null && flowConfig.hasRadiative();
+        
+        // Animation only plays when BOTH:
+        // 1. radiativeEnabled is ON (user wants animation)
+        // 2. RadiativeInteraction is active (there's an energy mode to animate)
+        // Without #2, there's nothing to animate and phase changes would just corrupt the display
+        final boolean animationPlaying = flowConfig != null 
+            && flowConfig.hasRadiative() 
+            && radiativeMode.isActive();
         
         // Animation phase: clean 0→1→0 cycle for smooth wrapping
         // userPhase is applied as visual offset LATER (to positionT), not to the phase itself
@@ -77,11 +89,12 @@ public class RaySphericalTessellator implements RayTypeTessellator {
         float waveOffset = net.cyberpunk042.client.visual.mesh.ray.flow.FlowPhaseStage.computeRayPhaseOffset(
             shape, context.index(), context.count());
         
-        // Add layer-based phase offset for emission animation to respect layers
+        // Add layer-based phase offset - layers are always staggered in phase
         // Each layer is offset by a fraction of the total phase range
+        // This applies in BOTH manual and animated modes for consistent behavior
         int layerCount = shape != null ? Math.max(1, shape.layers()) : 1;
         float layerOffset = 0f;
-        if (layerCount > 1 && animationPlaying) {
+        if (layerCount > 1) {
             // Spread layers evenly across the phase cycle
             layerOffset = (float) context.layerIndex() / layerCount;
         }
@@ -90,9 +103,6 @@ public class RaySphericalTessellator implements RayTypeTessellator {
         if (rayPhase < 0) rayPhase += 1.0f;
         
         // === COMPUTE CLIP RANGE (where the shape is on the ray) ===
-        net.cyberpunk042.visual.energy.RadiativeInteraction radiativeMode = 
-            shape != null ? shape.effectiveRadiativeInteraction() 
-            : net.cyberpunk042.visual.energy.RadiativeInteraction.NONE;
         float segmentLength = shape != null ? shape.effectiveSegmentLength() : 1.0f;
         boolean startFullLength = shape != null && shape.startFullLength();
         
