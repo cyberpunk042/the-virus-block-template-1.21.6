@@ -72,10 +72,23 @@ public final class SphericalArrangement implements ArrangementStrategy {
         // (yOffset and angleOffset don't apply to spherical)
         float shellOffset = layerOffset.radiusOffset();
         
+        // Check unifiedEnd - when true, all layers converge to same inner/outer radius
+        boolean unifiedEnd = shape.unifiedEnd();
+        
         if (converging) {
             // Converging: start at outer, end at inner
-            float outerR = (outerRadius + shellOffset) * (1 + dist.radiusJitter());
-            float innerR = outerR - rayLength * dist.lengthMod();
+            float outerR;
+            float innerR;
+            
+            if (unifiedEnd) {
+                // Unified end: inner radius is SAME for all layers (base innerRadius)
+                outerR = (outerRadius + shellOffset) * (1 + dist.radiusJitter());
+                innerR = innerRadius * (1 + dist.radiusJitter());  // No shell offset on inner
+            } else {
+                // Original: inner scales with shell offset
+                outerR = (outerRadius + shellOffset) * (1 + dist.radiusJitter());
+                innerR = outerR - rayLength * dist.lengthMod();
+            }
             outerR += dist.startOffset();
             innerR += dist.startOffset();
             if (innerR < 0) innerR = 0;
@@ -89,8 +102,18 @@ public final class SphericalArrangement implements ArrangementStrategy {
             outEnd[2] = dz * innerR;
         } else {
             // Diverging: start at inner, end at outer
-            float innerR = (innerRadius + shellOffset + dist.startOffset()) * (1 + dist.radiusJitter());
-            float outerR = innerR + rayLength * dist.lengthMod();
+            float innerR;
+            float outerR;
+            
+            if (unifiedEnd) {
+                // Unified end: inner radius is SAME for all layers (base innerRadius)
+                innerR = (innerRadius + dist.startOffset()) * (1 + dist.radiusJitter());
+                outerR = (innerRadius + shellOffset + rayLength * dist.lengthMod() + dist.startOffset()) * (1 + dist.radiusJitter());
+            } else {
+                // Original: inner includes shell offset
+                innerR = (innerRadius + shellOffset + dist.startOffset()) * (1 + dist.radiusJitter());
+                outerR = innerR + rayLength * dist.lengthMod();
+            }
             
             outStart[0] = dx * innerR;
             outStart[1] = dy * innerR;

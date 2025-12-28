@@ -52,8 +52,22 @@ public final class RadialArrangement implements ArrangementStrategy {
         float sin = (float) Math.sin(angle);
         
         // Compute radii with layer offset and distribution jitter
-        float innerR = innerRadius + layerOffset.radiusOffset() + dist.startOffset();
-        float outerR = innerR + rayLength * dist.lengthMod();
+        // When unifiedEnd is true, innerR uses base inner radius (all layers converge)
+        // When unifiedEnd is false, innerR includes layer offset (original behavior)
+        boolean unifiedEnd = shape.unifiedEnd();
+        float innerR;
+        float outerR;
+        
+        if (unifiedEnd) {
+            // Unified end: inner radius is SAME for all layers (base innerRadius)
+            // Outer radius still has layer offset (rays start from different positions)
+            innerR = innerRadius + dist.startOffset();
+            outerR = innerRadius + layerOffset.radiusOffset() + rayLength * dist.lengthMod() + dist.startOffset();
+        } else {
+            // Original behavior: both radii include layer offset
+            innerR = innerRadius + layerOffset.radiusOffset() + dist.startOffset();
+            outerR = innerR + rayLength * dist.lengthMod();
+        }
         
         // Apply radius jitter
         innerR *= (1 + dist.radiusJitter());

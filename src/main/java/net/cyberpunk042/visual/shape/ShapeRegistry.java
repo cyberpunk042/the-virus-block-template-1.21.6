@@ -317,8 +317,10 @@ public final class ShapeRegistry {
                 Boolean.parseBoolean(params.get("startFullLength").toString()) : false;
             boolean followCurve = params.containsKey("followCurve") ?
                 Boolean.parseBoolean(params.get("followCurve").toString()) : true;
+            boolean unifiedEnd = params.containsKey("unifiedEnd") ?
+                Boolean.parseBoolean(params.get("unifiedEnd").toString()) : false;
             return new RaysShape(rayLength, rayWidth, count, arrangement, distribution, innerRadius, outerRadius,
-                layers, layerSpacing, layerMode, randomness, lengthVariation, fadeStart, fadeEnd, segments, segmentGap,
+                layers, layerSpacing, layerMode, unifiedEnd, randomness, lengthVariation, fadeStart, fadeEnd, segments, segmentGap,
                 lineShape, lineShapeAmplitude, lineShapeFrequency, lineResolution, curvature, curvatureIntensity, 
                 rayType, shapeIntensity, shapeLength, rayOrientation, fieldDeformation, fieldDeformationIntensity,
                 null, // shapeState

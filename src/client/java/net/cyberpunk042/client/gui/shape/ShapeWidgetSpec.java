@@ -404,6 +404,10 @@ public final class ShapeWidgetSpec {
             net.cyberpunk042.visual.shape.RayLayerMode.class,
             net.cyberpunk042.visual.shape.RayLayerMode.VERTICAL),
         
+        // Row: Unified End (for radial/shell/spiral layers) + break
+        CheckboxSpec.half("Unified End", "rays.unifiedEnd", "All layers converge to same inner radius"),
+        new RowBreak(),
+        
         // Row: Randomness + Length Variation
         SliderSpec.half("Random", "rays.randomness", 0f, 1f, "%.2f"),
         SliderSpec.half("Len Var", "rays.lengthVariation", 0f, 1f, "%.2f")

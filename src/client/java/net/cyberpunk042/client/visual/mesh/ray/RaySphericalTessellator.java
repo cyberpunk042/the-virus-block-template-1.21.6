@@ -61,19 +61,22 @@ public class RaySphericalTessellator implements RayTypeTessellator {
         // === RADIATIVE PHASE (compute FIRST - needed for positioning) ===
         final float userPhase = context.effectiveShapeState().phase();
         final boolean animationPlaying = flowConfig != null && flowConfig.hasRadiative();
-        float baseLengthPhase;
+        
+        // Animation phase: clean 0→1→0 cycle for smooth wrapping
+        // userPhase is applied as visual offset LATER (to positionT), not to the phase itself
+        float animPhase;
         if (animationPlaying) {
             float timeOffset = (context.time() * flowConfig.radiativeSpeed()) % 1.0f;
             if (timeOffset < 0) timeOffset += 1.0f;
-            baseLengthPhase = (userPhase + timeOffset) % 1.0f;
+            animPhase = timeOffset;  // Clean cycle - no userPhase offset here
         } else {
-            baseLengthPhase = userPhase;
+            animPhase = userPhase;   // Manual mode uses userPhase directly
         }
         
         // Add wave distribution offset for this ray
         float waveOffset = net.cyberpunk042.client.visual.mesh.ray.flow.FlowPhaseStage.computeRayPhaseOffset(
             shape, context.index(), context.count());
-        float rayPhase = (baseLengthPhase + waveOffset) % 1.0f;
+        float rayPhase = (animPhase + waveOffset) % 1.0f;
         if (rayPhase < 0) rayPhase += 1.0f;
         
         // === COMPUTE CLIP RANGE (where the shape is on the ray) ===
@@ -96,8 +99,16 @@ public class RaySphericalTessellator implements RayTypeTessellator {
             return;
         }
         
-        // Position is the CENTER of the clip range
-        float positionT = (clipRange.start() + clipRange.end()) * 0.5f;
+        // Position is the CENTER of the clip range, plus userPhase offset during animation
+        float basePositionT = (clipRange.start() + clipRange.end()) * 0.5f;
+        float positionT;
+        if (animationPlaying) {
+            // Add userPhase as visual origin offset (wraps smoothly)
+            positionT = (basePositionT + userPhase) % 1.0f;
+            if (positionT < 0) positionT += 1.0f;
+        } else {
+            positionT = basePositionT;
+        }
         
         // === COMPUTE CENTER POSITION ===
         float length = context.length();

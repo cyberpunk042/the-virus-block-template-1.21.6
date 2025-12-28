@@ -74,6 +74,8 @@ public record RaysShape(
     @Range(ValueRange.STEPS) @JsonField(skipIfDefault = true, defaultValue = "1") int layers,
     @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true) float layerSpacing,
     @JsonField(skipIfDefault = true) RayLayerMode layerMode,
+    /** When true, all layers use the same inner radius as endpoint (for radial/shell/spiral modes). */
+    @JsonField(skipIfDefault = true, defaultValue = "false") boolean unifiedEnd,
     
     // === Randomness ===
     @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true) float randomness,
@@ -152,6 +154,7 @@ public record RaysShape(
         1,              // layers
         0.5f,           // layerSpacing
         RayLayerMode.VERTICAL, // layerMode
+        false,          // unifiedEnd
         0.0f,           // randomness
         0.0f,           // lengthVariation
         1.0f,           // fadeStart
@@ -184,7 +187,7 @@ public record RaysShape(
     /** Spherical absorption rays (converging to center). */
     public static final RaysShape ABSORPTION = new RaysShape(
         2.0f, 1.0f, 48, RayArrangement.CONVERGING, RayDistribution.RANDOM, 0.5f, 3.5f,
-        8, 0.3f, RayLayerMode.SHELL, 0.1f, 0.1f, 1.0f, 0.2f, 1, 0.0f,
+        8, 0.3f, RayLayerMode.SHELL, false, 0.1f, 0.1f, 1.0f, 0.2f, 1, 0.0f,
         RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
         FieldDeformationMode.NONE, 0.0f, null,
         net.cyberpunk042.visual.energy.RadiativeInteraction.ABSORPTION, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, 2.0f, false, true);
@@ -192,7 +195,7 @@ public record RaysShape(
     /** Spherical emission rays (diverging from center). */
     public static final RaysShape EMISSION = new RaysShape(
         2.0f, 1.0f, 48, RayArrangement.DIVERGING, RayDistribution.RANDOM, 0.5f, 3.5f,
-        8, 0.3f, RayLayerMode.SHELL, 0.1f, 0.1f, 0.2f, 1.0f, 1, 0.0f,
+        8, 0.3f, RayLayerMode.SHELL, false, 0.1f, 0.1f, 0.2f, 1.0f, 1, 0.0f,
         RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
         FieldDeformationMode.NONE, 0.0f, null,
         net.cyberpunk042.visual.energy.RadiativeInteraction.EMISSION, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, 2.0f, false, true);
@@ -200,7 +203,7 @@ public record RaysShape(
     /** Parallel laser grid. */
     public static final RaysShape LASER_GRID = new RaysShape(
         5.0f, 1.5f, 16, RayArrangement.PARALLEL, RayDistribution.UNIFORM, 0.0f, 2.0f,
-        4, 0.3f, RayLayerMode.VERTICAL, 0.0f, 0.0f, 1.0f, 1.0f, 1, 0.0f,
+        4, 0.3f, RayLayerMode.VERTICAL, false, 0.0f, 0.0f, 1.0f, 1.0f, 1, 0.0f,
         RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
         FieldDeformationMode.NONE, 0.0f, null,
         net.cyberpunk042.visual.energy.RadiativeInteraction.NONE, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, 2.0f, false, true);
@@ -208,7 +211,7 @@ public record RaysShape(
     /** Dashed pulse rays. */
     public static final RaysShape PULSE = new RaysShape(
         3.0f, 1.0f, 8, RayArrangement.RADIAL, RayDistribution.UNIFORM, 0.3f, 2.5f,
-        1, 0.5f, RayLayerMode.VERTICAL, 0.0f, 0.0f, 1.0f, 0.5f, 4, 0.2f,
+        1, 0.5f, RayLayerMode.VERTICAL, false, 0.0f, 0.0f, 1.0f, 0.5f, 4, 0.2f,
         RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
         FieldDeformationMode.NONE, 0.0f, null,
         net.cyberpunk042.visual.energy.RadiativeInteraction.OSCILLATION, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, 2.0f, false, true);
@@ -216,7 +219,7 @@ public record RaysShape(
     /** Sparse random stars. */
     public static final RaysShape STARS = new RaysShape(
         1.5f, 0.5f, 24, RayArrangement.SPHERICAL, RayDistribution.STOCHASTIC, 0.8f, 2.0f,
-        1, 0.5f, RayLayerMode.SHELL, 0.3f, 0.3f, 0.8f, 0.3f, 1, 0.0f,
+        1, 0.5f, RayLayerMode.SHELL, false, 0.3f, 0.3f, 0.8f, 0.3f, 1, 0.0f,
         RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
         FieldDeformationMode.NONE, 0.0f, null,
         net.cyberpunk042.visual.energy.RadiativeInteraction.NONE, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, 2.0f, false, true);
@@ -224,7 +227,7 @@ public record RaysShape(
     /** Vortex rays (spiraling into center). */
     public static final RaysShape VORTEX = new RaysShape(
         2.5f, 1.0f, 24, RayArrangement.RADIAL, RayDistribution.UNIFORM, 0.3f, 3.0f,
-        1, 0.5f, RayLayerMode.VERTICAL, 0.0f, 0.0f, 1.0f, 0.8f, 1, 0.0f,
+        1, 0.5f, RayLayerMode.VERTICAL, false, 0.0f, 0.0f, 1.0f, 0.8f, 1, 0.0f,
         RayLineShape.STRAIGHT, 0.1f, 2.0f, 32, RayCurvature.VORTEX, 0.5f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
         FieldDeformationMode.NONE, 0.0f, null,
         net.cyberpunk042.visual.energy.RadiativeInteraction.NONE, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, 2.0f, false, true);
@@ -232,7 +235,7 @@ public record RaysShape(
     /** Corkscrew rays (helical shape). */
     public static final RaysShape CORKSCREW = new RaysShape(
         2.0f, 1.0f, 12, RayArrangement.RADIAL, RayDistribution.UNIFORM, 0.5f, 2.5f,
-        1, 0.5f, RayLayerMode.VERTICAL, 0.0f, 0.0f, 1.0f, 1.0f, 1, 0.0f,
+        1, 0.5f, RayLayerMode.VERTICAL, false, 0.0f, 0.0f, 1.0f, 1.0f, 1, 0.0f,
         RayLineShape.CORKSCREW, 0.15f, 3.0f, 32, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
         FieldDeformationMode.NONE, 0.0f, null,
         net.cyberpunk042.visual.energy.RadiativeInteraction.NONE, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, 2.0f, false, true);
@@ -449,6 +452,7 @@ public record RaysShape(
             .layers(layers)
             .layerSpacing(layerSpacing)
             .layerMode(layerMode)
+            .unifiedEnd(unifiedEnd)
             .randomness(randomness)
             .lengthVariation(lengthVariation)
             .fadeStart(fadeStart)
@@ -493,6 +497,7 @@ public record RaysShape(
         private int layers = 1;
         private float layerSpacing = 0.5f;
         private RayLayerMode layerMode = RayLayerMode.VERTICAL;
+        private boolean unifiedEnd = false;
         private float randomness = 0.0f;
         private float lengthVariation = 0.0f;
         private float fadeStart = 1.0f;
@@ -533,6 +538,7 @@ public record RaysShape(
         public Builder layers(int v) { this.layers = v; return this; }
         public Builder layerSpacing(float v) { this.layerSpacing = v; return this; }
         public Builder layerMode(RayLayerMode v) { this.layerMode = v != null ? v : RayLayerMode.VERTICAL; return this; }
+        public Builder unifiedEnd(boolean v) { this.unifiedEnd = v; return this; }
         public Builder randomness(float v) { this.randomness = v; return this; }
         public Builder lengthVariation(float v) { this.lengthVariation = v; return this; }
         public Builder fadeStart(float v) { this.fadeStart = v; return this; }
@@ -566,7 +572,7 @@ public record RaysShape(
         public RaysShape build() {
             return new RaysShape(
                 rayLength, rayWidth, count, arrangement, distribution, innerRadius, outerRadius,
-                layers, layerSpacing, layerMode, randomness, lengthVariation,
+                layers, layerSpacing, layerMode, unifiedEnd, randomness, lengthVariation,
                 fadeStart, fadeEnd, segments, segmentGap,
                 lineShape, lineShapeAmplitude, lineShapeFrequency, lineResolution,
                 curvature, curvatureIntensity, rayType, shapeIntensity, shapeLength, rayOrientation,
