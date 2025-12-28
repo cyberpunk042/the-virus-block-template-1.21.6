@@ -320,12 +320,15 @@ public record RaysShape(
         return segments > 1 && segmentGap > 0;
     }
     
-    /** Ray length accounting for inner/outer radius. */
+    /** Ray length - the actual length of the visible ray segment. */
     public float effectiveRayLength() {
-        if (arrangement == RayArrangement.CONVERGING || arrangement == RayArrangement.DIVERGING) {
-            return outerRadius - innerRadius;
-        }
-        return rayLength;
+        // ALWAYS returns the configured rayLength, never computed from radii
+        return rayLength > 0 ? rayLength : 1.0f;
+    }
+    
+    /** Trajectory span - the distance the ray travels from innerRadius to outerRadius. */
+    public float trajectorySpan() {
+        return outerRadius - innerRadius;
     }
     
     /** Whether rays have a non-straight line shape. */

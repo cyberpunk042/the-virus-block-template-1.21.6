@@ -89,7 +89,10 @@ public class RaySphericalTessellator implements RayTypeTessellator {
         if (rayPhase < 0) rayPhase += 1.0f;
         
         // === COMPUTE CLIP RANGE (where the shape is on the ray) ===
-        float segmentLength = shape != null ? shape.effectiveSegmentLength() : 1.0f;
+        // segmentLength = rayLength / trajectorySpan (as a fraction)
+        float trajectorySpan = shape != null ? shape.trajectorySpan() : 1.0f;
+        float rayLength = shape != null ? shape.effectiveRayLength() : 1.0f;
+        float segmentLength = trajectorySpan > 0 ? Math.min(1.0f, rayLength / trajectorySpan) : 1.0f;
         boolean startFullLength = shape != null && shape.startFullLength();
         
         var clipRange = net.cyberpunk042.client.visual.mesh.ray.tessellation.RadiativeInteractionFactory.compute(

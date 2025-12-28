@@ -113,13 +113,14 @@ public final class RayPositioner {
             return 0.0f;
         }
         
-        float rayLength = shape.outerRadius() - shape.innerRadius();
+        // trajectorySpan = travel range (NOT the ray's actual length)
+        float trajectorySpan = shape.outerRadius() - shape.innerRadius();
         float phase = computeRayPhase(flowConfig, index, count, time);
         
         if (radiative == net.cyberpunk042.visual.energy.RadiativeInteraction.EMISSION) {
-            return phase * rayLength;
+            return phase * trajectorySpan;
         } else {
-            return (1.0f - phase) * rayLength;
+            return (1.0f - phase) * trajectorySpan;
         }
     }
     
@@ -405,7 +406,8 @@ public final class RayPositioner {
     
     /** Computes position offset for wrapped/primary shapes based on radiative mode */
     private static float computeWrappedOffset(RaysShape shape, float phase, boolean wrapped) {
-        float rayLength = shape.outerRadius() - shape.innerRadius();
+        // trajectorySpan = travel range (NOT the ray's actual length)
+        float trajectorySpan = shape.outerRadius() - shape.innerRadius();
         net.cyberpunk042.visual.energy.RadiativeInteraction radiative = shape.effectiveRadiativeInteraction();
         
         if (wrapped) {
@@ -416,17 +418,17 @@ public final class RayPositioner {
             if (phase < phaseEdgeWidth) {
                 // Primary is spawning -> wrapped is at far edge
                 return (radiative == net.cyberpunk042.visual.energy.RadiativeInteraction.EMISSION) 
-                    ? rayLength : 0.0f;
+                    ? trajectorySpan : 0.0f;
             } else {
                 // Primary is despawning -> wrapped is at near edge
                 return (radiative == net.cyberpunk042.visual.energy.RadiativeInteraction.EMISSION) 
-                    ? 0.0f : rayLength;
+                    ? 0.0f : trajectorySpan;
             }
         } else {
             // PRIMARY shape: position based on phase
             return (radiative == net.cyberpunk042.visual.energy.RadiativeInteraction.EMISSION)
-                ? phase * rayLength 
-                : (1.0f - phase) * rayLength;
+                ? phase * trajectorySpan 
+                : (1.0f - phase) * trajectorySpan;
         }
     }
     

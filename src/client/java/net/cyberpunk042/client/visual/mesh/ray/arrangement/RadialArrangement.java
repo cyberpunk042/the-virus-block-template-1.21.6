@@ -38,7 +38,7 @@ public final class RadialArrangement implements ArrangementStrategy {
             float[] outEnd) {
         
         float innerRadius = shape.innerRadius();
-        float rayLength = shape.rayLength();
+        float outerRadius = shape.outerRadius();
         
         // Base angle with distribution jitter
         float angle = (index * TWO_PI / count) + dist.angleJitter();
@@ -51,22 +51,21 @@ public final class RadialArrangement implements ArrangementStrategy {
         float cos = (float) Math.cos(angle);
         float sin = (float) Math.sin(angle);
         
-        // Compute radii with layer offset and distribution jitter
-        // When unifiedEnd is true, innerR uses base inner radius (all layers converge)
-        // When unifiedEnd is false, innerR includes layer offset (original behavior)
+        // Compute radii - SIMPLE: use the configured values directly
+        // innerR = innerRadius, outerR = outerRadius
+        // rayLength is NOT used here - it's used in tessellation for the animated segment
         boolean unifiedEnd = shape.unifiedEnd();
         float innerR;
         float outerR;
         
         if (unifiedEnd) {
-            // Unified end: inner radius is SAME for all layers (base innerRadius)
-            // Outer radius still has layer offset (rays start from different positions)
+            // Unified end: inner radius is SAME for all layers
             innerR = innerRadius + dist.startOffset();
-            outerR = innerRadius + layerOffset.radiusOffset() + rayLength * dist.lengthMod() + dist.startOffset();
+            outerR = outerRadius + layerOffset.radiusOffset() + dist.startOffset();
         } else {
-            // Original behavior: both radii include layer offset
+            // Standard: both radii include layer offset
             innerR = innerRadius + layerOffset.radiusOffset() + dist.startOffset();
-            outerR = innerR + rayLength * dist.lengthMod();
+            outerR = outerRadius + layerOffset.radiusOffset() + dist.startOffset();
         }
         
         // Apply radius jitter

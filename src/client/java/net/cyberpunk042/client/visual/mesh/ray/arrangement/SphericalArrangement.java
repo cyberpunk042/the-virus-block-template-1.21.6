@@ -51,7 +51,6 @@ public final class SphericalArrangement implements ArrangementStrategy {
         
         float innerRadius = shape.innerRadius();
         float outerRadius = shape.outerRadius();
-        float rayLength = shape.rayLength();
         
         // Fibonacci sphere distribution for even coverage
         // With angle jitter from distribution
@@ -75,19 +74,20 @@ public final class SphericalArrangement implements ArrangementStrategy {
         // Check unifiedEnd - when true, all layers converge to same inner/outer radius
         boolean unifiedEnd = shape.unifiedEnd();
         
+        // SIMPLE: use innerRadius and outerRadius directly
+        // rayLength is NOT used here - it's used in tessellation for the animated segment
+        
         if (converging) {
             // Converging: start at outer, end at inner
             float outerR;
             float innerR;
             
             if (unifiedEnd) {
-                // Unified end: inner radius is SAME for all layers (base innerRadius)
+                innerR = innerRadius * (1 + dist.radiusJitter());
                 outerR = (outerRadius + shellOffset) * (1 + dist.radiusJitter());
-                innerR = innerRadius * (1 + dist.radiusJitter());  // No shell offset on inner
             } else {
-                // Original: inner scales with shell offset
+                innerR = (innerRadius + shellOffset) * (1 + dist.radiusJitter());
                 outerR = (outerRadius + shellOffset) * (1 + dist.radiusJitter());
-                innerR = outerR - rayLength * dist.lengthMod();
             }
             outerR += dist.startOffset();
             innerR += dist.startOffset();
@@ -106,13 +106,11 @@ public final class SphericalArrangement implements ArrangementStrategy {
             float outerR;
             
             if (unifiedEnd) {
-                // Unified end: inner radius is SAME for all layers (base innerRadius)
                 innerR = (innerRadius + dist.startOffset()) * (1 + dist.radiusJitter());
-                outerR = (innerRadius + shellOffset + rayLength * dist.lengthMod() + dist.startOffset()) * (1 + dist.radiusJitter());
+                outerR = (outerRadius + shellOffset + dist.startOffset()) * (1 + dist.radiusJitter());
             } else {
-                // Original: inner includes shell offset
                 innerR = (innerRadius + shellOffset + dist.startOffset()) * (1 + dist.radiusJitter());
-                outerR = innerR + rayLength * dist.lengthMod();
+                outerR = (outerRadius + shellOffset + dist.startOffset()) * (1 + dist.radiusJitter());
             }
             
             outStart[0] = dx * innerR;

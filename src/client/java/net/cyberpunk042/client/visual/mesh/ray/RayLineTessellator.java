@@ -73,8 +73,12 @@ public class RayLineTessellator implements RayTypeTessellator {
             : net.cyberpunk042.visual.energy.RadiativeInteraction.NONE;
         float userPhase = context.effectiveShapeState().phase();
         
-        // Get segment length (how long the line segment is, as fraction of ray)
-        float segmentLength = shape != null ? shape.effectiveSegmentLength() : 1.0f;
+        // Get segment length as a FRACTION of the trajectory
+        // segmentLength = rayLength / trajectorySpan
+        // This ensures the visible ray segment has length = rayLength
+        float trajectorySpan = shape != null ? shape.trajectorySpan() : 1.0f;
+        float rayLength = shape != null ? shape.effectiveRayLength() : 1.0f;
+        float segmentLength = trajectorySpan > 0 ? Math.min(1.0f, rayLength / trajectorySpan) : 1.0f;
         boolean startFullLength = shape != null && shape.startFullLength();
         
         // Compute clip range from RadiativeInteraction (determines segment position)
@@ -135,19 +139,22 @@ public class RayLineTessellator implements RayTypeTessellator {
      * Tessellates a dashed line (multiple short segments with gaps).
      * <p>Uses RadiativeInteraction + EdgeMode for animation.
      * <p>Phase controls segment positioning along the ray axis.
+     * <p>NOTE: This is only called when needsMultiSegment() is FALSE,
+     * meaning no curvature/lineShape/wave. Curved dashed goes to tessellateDashedCurvedLine.
      */
     private void tessellateDashedLine(MeshBuilder builder, RaysShape shape, RayContext context, 
                                         int dashCount, float dashGap) {
         // === COMPUTE PHASE-BASED POSITION ===
-        // Phase determines WHERE the dashed pattern is positioned along the ray axis
         
         // Get radiative mode and phase
         var radiativeMode = shape != null ? shape.effectiveRadiativeInteraction() 
             : net.cyberpunk042.visual.energy.RadiativeInteraction.NONE;
         float userPhase = context.effectiveShapeState().phase();
         
-        // Get segment length (total length of the dashed pattern as fraction of ray)
-        float patternLength = shape != null ? shape.effectiveSegmentLength() : 1.0f;
+        // Get segment length as a FRACTION of the trajectory
+        float trajectorySpan = shape != null ? shape.trajectorySpan() : 1.0f;
+        float rayLength = shape != null ? shape.effectiveRayLength() : 1.0f;
+        float patternLength = trajectorySpan > 0 ? Math.min(1.0f, rayLength / trajectorySpan) : 1.0f;
         boolean startFullLength = shape != null && shape.startFullLength();
         
         // Compute clip range from RadiativeInteraction (determines pattern position)
@@ -167,23 +174,12 @@ public class RayLineTessellator implements RayTypeTessellator {
         float[] start = context.start();
         float[] end = context.end();
         float[] dir = context.direction();
-        
-        // Get alpha from edge mode
         float alpha = edgeResult.alpha();
         
         // === POSITION THE DASHED PATTERN ALONG THE RAY ===
-        // The pattern is centered at the center of the clip range
         float patternCenter = (clipRange.start() + clipRange.end()) * 0.5f;
         float halfPattern = patternLength * 0.5f;
-        
-        // Pattern bounds
         float patternStart = patternCenter - halfPattern;
-        float patternEnd = patternCenter + halfPattern;
-        
-        // Check if we need to apply curvature
-        RayCurvature curvature = context.curvature();
-        float curvatureIntensity = context.curvatureIntensity();
-        boolean hasCurvature = curvature != null && curvature != RayCurvature.NONE && curvatureIntensity > 0;
         
         // Calculate dash and gap proportions within the pattern
         float totalParts = dashCount + (dashCount - 1) * dashGap;
@@ -205,18 +201,10 @@ public class RayLineTessellator implements RayTypeTessellator {
                 continue;
             }
             
-            // Compute positions for this dash - with or without curvature
-            float[] segStart;
-            float[] segEnd;
-            if (hasCurvature) {
-                segStart = RayGeometryUtils.computeCurvedPosition(start, end, tStart, curvature, curvatureIntensity);
-                segEnd = RayGeometryUtils.computeCurvedPosition(start, end, tEnd, curvature, curvatureIntensity);
-            } else {
-                segStart = RayGeometryUtils.interpolate(start, end, tStart);
-                segEnd = RayGeometryUtils.interpolate(start, end, tEnd);
-            }
+            // Simple straight line segment (no curvature/shape)
+            float[] segStart = RayGeometryUtils.interpolate(start, end, tStart);
+            float[] segEnd = RayGeometryUtils.interpolate(start, end, tEnd);
             
-            // Emit line segment
             int v0 = builder.vertex(segStart[0], segStart[1], segStart[2], dir[0], dir[1], dir[2], tStart, 0, alpha);
             int v1 = builder.vertex(segEnd[0], segEnd[1], segEnd[2], dir[0], dir[1], dir[2], tEnd, 0, alpha);
             builder.line(v0, v1);
@@ -242,8 +230,10 @@ public class RayLineTessellator implements RayTypeTessellator {
             : net.cyberpunk042.visual.energy.RadiativeInteraction.NONE;
         float userPhase = context.effectiveShapeState().phase();
         
-        // Get segment length (how long the curved segment is as fraction of ray)
-        float segmentLength = shape != null ? shape.effectiveSegmentLength() : 1.0f;
+        // Get segment length as a FRACTION of the trajectory
+        float trajectorySpan = shape != null ? shape.trajectorySpan() : 1.0f;
+        float rayLength = shape != null ? shape.effectiveRayLength() : 1.0f;
+        float segmentLength = trajectorySpan > 0 ? Math.min(1.0f, rayLength / trajectorySpan) : 1.0f;
         boolean startFullLength = shape != null && shape.startFullLength();
         
         // Compute clip range from RadiativeInteraction (determines segment position)
@@ -378,8 +368,10 @@ public class RayLineTessellator implements RayTypeTessellator {
             : net.cyberpunk042.visual.energy.RadiativeInteraction.NONE;
         float userPhase = context.effectiveShapeState().phase();
         
-        // Get segment length (total length of the dashed pattern as fraction of ray)
-        float patternLength = shape != null ? shape.effectiveSegmentLength() : 1.0f;
+        // Get segment length as a FRACTION of the trajectory
+        float trajectorySpan = shape != null ? shape.trajectorySpan() : 1.0f;
+        float rayLength = shape != null ? shape.effectiveRayLength() : 1.0f;
+        float patternLength = trajectorySpan > 0 ? Math.min(1.0f, rayLength / trajectorySpan) : 1.0f;
         boolean startFullLength = shape != null && shape.startFullLength();
         
         // Compute clip range from RadiativeInteraction (determines pattern position)
@@ -439,15 +431,22 @@ public class RayLineTessellator implements RayTypeTessellator {
                 continue;
             }
             
-            // Compute shaped positions for this dash
-            float[] posStart = computeShapedPosition(start, end, tStart, context, right, up, 
-                lineShape, shapeAmplitude, shapeFrequency, curvatureIntensity);
-            float[] posEnd = computeShapedPosition(start, end, tEnd, context, right, up,
-                lineShape, shapeAmplitude, shapeFrequency, curvatureIntensity);
+            // Tessellate each dash into multiple segments so it follows the curved path
+            int dashSegments = Math.max(4, context.lineResolution() / dashCount);
+            float dashSpan = tEnd - tStart;
             
-            int v0 = builder.vertex(posStart[0], posStart[1], posStart[2], dir[0], dir[1], dir[2], tStart, 0, alpha);
-            int v1 = builder.vertex(posEnd[0], posEnd[1], posEnd[2], dir[0], dir[1], dir[2], tEnd, 0, alpha);
-            builder.line(v0, v1);
+            int[] vertexIndices = new int[dashSegments + 1];
+            for (int s = 0; s <= dashSegments; s++) {
+                float segT = tStart + (s / (float) dashSegments) * dashSpan;
+                float[] pos = computeShapedPosition(start, end, segT, context, right, up, 
+                    lineShape, shapeAmplitude, shapeFrequency, curvatureIntensity);
+                vertexIndices[s] = builder.vertex(pos[0], pos[1], pos[2], dir[0], dir[1], dir[2], segT, 0, alpha);
+            }
+            
+            // Connect with lines
+            for (int s = 0; s < dashSegments; s++) {
+                builder.line(vertexIndices[s], vertexIndices[s + 1]);
+            }
             
             t = dashEnd + gapLength;
         }
