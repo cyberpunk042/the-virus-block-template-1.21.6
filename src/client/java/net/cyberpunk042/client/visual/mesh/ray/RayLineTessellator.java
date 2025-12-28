@@ -125,20 +125,16 @@ public class RayLineTessellator implements RayTypeTessellator {
         var radiativeMode = shape != null ? shape.effectiveRadiativeInteraction() 
             : net.cyberpunk042.visual.energy.RadiativeInteraction.NONE;
         
-        // Compute phase - animation only plays when BOTH radiativeEnabled AND radiativeMode is active
+        // Phase is now pre-computed in RayPositioner.computeContexts() which handles:
+        // - Manual phase (from user slider)
+        // - Animated phase (from time * radiativeSpeed)
+        // - Multi-copy phase offsets (for CONTINUOUS + waveCount > 1)
         float userPhase = context.effectiveShapeState().phase();
+        
+        // Check if radiative animation is conceptually active (for wave distribution offset)
         boolean animationPlaying = flowConfig != null 
             && flowConfig.hasRadiative() 
             && radiativeMode.isActive();
-        
-        float baseLengthPhase;
-        if (animationPlaying) {
-            float timeOffset = (context.time() * flowConfig.radiativeSpeed()) % 1.0f;
-            if (timeOffset < 0) timeOffset += 1.0f;
-            baseLengthPhase = timeOffset;  // Don't add userPhase here - let it control position offset
-        } else {
-            baseLengthPhase = userPhase;
-        }
         
         // Add wave distribution offset for this ray (ONLY during animation)
         // In manual mode, all rays should have the same phase for consistent user control
@@ -148,11 +144,8 @@ public class RayLineTessellator implements RayTypeTessellator {
                 shape, context.index(), context.count());
         }
         
-        // Layer offset is NOT applied during animation:
-        // All layers should animate in sync (same phase) to match manual slider behavior.
-        // The layers are already visually separated by their physical positions (layer spacing).
-        
-        float rayPhase = (baseLengthPhase + waveOffset) % 1.0f;
+        // Use the pre-computed phase + wave offset
+        float rayPhase = (userPhase + waveOffset) % 1.0f;
         if (rayPhase < 0) rayPhase += 1.0f;
         
         // Get clipRange from RadiativeInteraction

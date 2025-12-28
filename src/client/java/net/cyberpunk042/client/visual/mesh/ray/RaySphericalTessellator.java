@@ -63,27 +63,18 @@ public class RaySphericalTessellator implements RayTypeTessellator {
             shape != null ? shape.effectiveRadiativeInteraction() 
             : net.cyberpunk042.visual.energy.RadiativeInteraction.NONE;
         
-        // === RADIATIVE PHASE (compute after we know if animation should play) ===
+        // === RADIATIVE PHASE ===
+        // Phase is now pre-computed in RayPositioner.computeContexts() which handles:
+        // - Manual phase (from user slider)
+        // - Animated phase (from time * radiativeSpeed)
+        // - Multi-copy phase offsets (for CONTINUOUS + waveCount > 1)
+        // The tessellator just uses the phase as-is from ShapeState.
         final float userPhase = context.effectiveShapeState().phase();
         
-        // Animation only plays when BOTH:
-        // 1. radiativeEnabled is ON (user wants animation)
-        // 2. RadiativeInteraction is active (there's an energy mode to animate)
-        // Without #2, there's nothing to animate and phase changes would just corrupt the display
+        // Check if radiative animation is conceptually active (for wave distribution offset)
         final boolean animationPlaying = flowConfig != null 
             && flowConfig.hasRadiative() 
             && radiativeMode.isActive();
-        
-        // Animation phase: clean 0→1→0 cycle for smooth wrapping
-        // userPhase is applied as visual offset LATER (to positionT), not to the phase itself
-        float animPhase;
-        if (animationPlaying) {
-            float timeOffset = (context.time() * flowConfig.radiativeSpeed()) % 1.0f;
-            if (timeOffset < 0) timeOffset += 1.0f;
-            animPhase = timeOffset;  // Clean cycle - no userPhase offset here
-        } else {
-            animPhase = userPhase;   // Manual mode uses userPhase directly
-        }
         
         // Add wave distribution offset for this ray (ONLY during animation)
         // In manual mode, all rays should have the same phase for consistent user control
@@ -93,11 +84,8 @@ public class RaySphericalTessellator implements RayTypeTessellator {
                 shape, context.index(), context.count());
         }
         
-        // Layer offset is NOT applied during animation:
-        // All layers should animate in sync (same phase) to match manual slider behavior.
-        // The layers are already visually separated by their physical positions (layer spacing).
-        
-        float rayPhase = (animPhase + waveOffset) % 1.0f;
+        // Use the pre-computed phase + wave offset
+        float rayPhase = (userPhase + waveOffset) % 1.0f;
         if (rayPhase < 0) rayPhase += 1.0f;
         
         // === COMPUTE CLIP RANGE (where the shape is on the ray) ===
