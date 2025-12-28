@@ -63,7 +63,7 @@ public final class RaysLineEmitter {
         final float travelOffset = calculateTravelOffset(flowConfig, time);
         
         // Get ray count for per-ray phase staggering
-        final int rayCount = Math.max(1, mesh.primitiveCount());
+        final int rayCount = raysShape != null ? Math.max(1, raysShape.count()) : 1;
         
         // Get RadiativeInteraction from shape
         final net.cyberpunk042.visual.energy.RadiativeInteraction radiativeMode = 
@@ -73,7 +73,7 @@ public final class RaysLineEmitter {
         final boolean startFullLength = raysShape != null && raysShape.startFullLength();
         final boolean followCurve = raysShape != null && raysShape.followCurve();
         
-        // Curvature info - used for artificial drifting when followCurve is OFF
+        // Curvature info
         final net.cyberpunk042.visual.shape.RayCurvature fieldCurvature = 
             raysShape != null ? raysShape.curvature() : null;
         final float curvatureIntensity = raysShape != null ? raysShape.curvatureIntensity() : 0f;
@@ -81,18 +81,9 @@ public final class RaysLineEmitter {
             fieldCurvature != net.cyberpunk042.visual.shape.RayCurvature.NONE && 
             curvatureIntensity > 0;
         
-        // Stagger phase per-ray when animation is active
-        final boolean staggerPhase = flowConfig != null && flowConfig.hasRadiative() && radiativeMode.isActive();
-        
         // Apply radiative clipping when Energy Mode is not NONE
         // This works for both animated (phase cycling) and static (Phase slider preview)
         final boolean applyRadiativeClipping = radiativeMode.isActive();
-        
-        // Wave configuration from SHAPE
-        // When followCurve is true, we disable wave offset (no sweep drifting)
-        final float waveArc = raysShape != null ? raysShape.effectiveWaveArc() : 1.0f;
-        final WaveDistribution waveDist = raysShape != null ? raysShape.effectiveWaveDistribution() : WaveDistribution.CONTINUOUS;
-        final float sweepCopies = raysShape != null ? Math.max(0.1f, raysShape.effectiveWaveCount()) : 1.0f;
         
         // Build effect chain for all vertex effects
         final RenderEffectChain effectChain = RenderEffectChain.builder()
@@ -106,9 +97,12 @@ public final class RaysLineEmitter {
         final boolean hasEffects = effectChain.hasActiveEffects();
         
         // For each line segment
-        final int[] rayIndex = {0};
+        // Segments are ordered: ray0-seg0, ray0-seg1, ..., ray1-seg0, ray1-seg1, ...
+        final int lineResolution = raysShape != null ? Math.max(1, raysShape.lineResolution()) : 1;
+        final int[] segmentIndex = {0};
         mesh.forEachLine((v0, v1) -> {
-            int idx = rayIndex[0]++;
+            int segIdx = segmentIndex[0]++;
+            int actualRayIndex = segIdx / lineResolution;
             
             // Get base positions
             float x0 = v0.x(), y0 = v0.y(), z0 = v0.z();
@@ -119,25 +113,18 @@ public final class RaysLineEmitter {
             float t1 = v1.u();
             
             // Calculate per-ray phase based on wave distribution
-            // Wave mode ALWAYS applies - controls how rays are phased relative to each other
-            float rayLengthPhase;
-            if (animationPlaying && flowConfig != null) {
-                // Animation playing: use full phase computation with wave offset
-                rayLengthPhase = net.cyberpunk042.client.visual.mesh.ray.flow.FlowPhaseStage.computePhase(
-                    flowConfig, raysShape, idx, rayCount, time);
-            } else {
-                // Static or paused: apply wave offset to the base phase from slider
-                float waveOffset = net.cyberpunk042.client.visual.mesh.ray.flow.FlowPhaseStage.computeRayPhaseOffset(
-                    raysShape, idx, rayCount);
-                rayLengthPhase = (baseLengthPhase + waveOffset) % 1.0f;
-                if (rayLengthPhase < 0) rayLengthPhase += 1.0f;
-            }
+            // baseLengthPhase already includes time offset when animation is playing
+            // Wave offset distributes rays according to wave mode
+            float waveOffset = net.cyberpunk042.client.visual.mesh.ray.flow.FlowPhaseStage.computeRayPhaseOffset(
+                raysShape, actualRayIndex, rayCount);
+            float rayLengthPhase = (baseLengthPhase + waveOffset) % 1.0f;
+            if (rayLengthPhase < 0) rayLengthPhase += 1.0f;
             
             // Add curvature drift ONLY when followCurve is OFF and field has curvature
             // followCurve ON = no extra drift (clean sweep)
             // followCurve OFF = adds curvature-based drift on top of wave distribution
             if (!followCurve && hasCurvature) {
-                float angularOffset = (float) idx / rayCount;
+                float angularOffset = (float) actualRayIndex / rayCount;
                 float curvatureDrift = angularOffset * curvatureIntensity;
                 rayLengthPhase = (rayLengthPhase + curvatureDrift) % 1.0f;
                 if (rayLengthPhase < 0) rayLengthPhase += 1.0f;
@@ -158,6 +145,8 @@ public final class RaysLineEmitter {
                     }
                     
                     // Clip segment to visible window if partially visible
+                    // Note: vertices are already on curved path from tessellator
+                    // Linear interpolation here is sufficient
                     if (t0 < windowStart && windowStart < t1) {
                         float clipT = (windowStart - t0) / (t1 - t0);
                         x0 = x0 + (x1 - x0) * clipT;
@@ -189,8 +178,8 @@ public final class RaysLineEmitter {
                 float[] pos0 = new float[]{x0, y0, z0};
                 float[] pos1 = new float[]{x1, y1, z1};
                 
-                RenderEffectContext ctx0 = new RenderEffectContext(idx, t0, dir);
-                RenderEffectContext ctx1 = new RenderEffectContext(idx, t1, dir);
+                RenderEffectContext ctx0 = new RenderEffectContext(segIdx, t0, dir);
+                RenderEffectContext ctx1 = new RenderEffectContext(segIdx, t1, dir);
                 
                 effectChain.apply(pos0, ctx0);
                 effectChain.apply(pos1, ctx1);
@@ -201,10 +190,10 @@ public final class RaysLineEmitter {
             
             // Emit both vertices of the line
             emitLineVertex(consumer, x0, y0, z0, x1, y1, z1, positionMatrix, normalMatrix,
-                          baseColor, baseAlpha, light, colorCtx, v0, flowConfig, time, idx, 
+                          baseColor, baseAlpha, light, colorCtx, v0, flowConfig, time, segIdx, 
                           travelOffset, rayLengthPhase, fadeStart, fadeEnd, hasFade);
             emitLineVertex(consumer, x1, y1, z1, x0, y0, z0, positionMatrix, normalMatrix,
-                          baseColor, baseAlpha, light, colorCtx, v1, flowConfig, time, idx, 
+                          baseColor, baseAlpha, light, colorCtx, v1, flowConfig, time, segIdx, 
                           travelOffset, rayLengthPhase, fadeStart, fadeEnd, hasFade);
         });
     }

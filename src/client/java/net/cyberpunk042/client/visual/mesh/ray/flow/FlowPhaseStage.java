@@ -148,18 +148,16 @@ public final class FlowPhaseStage implements FlowStage {
         WaveDistribution waveDist = shape.effectiveWaveDistribution();
         
         // CONTINUOUS: All rays have the SAME phase (no offset)
-        // This creates a uniform animation where all rays move together
         if (waveDist == WaveDistribution.CONTINUOUS) {
             return 0f;
         }
         
-        float waveArc = shape.effectiveWaveArc();
-        float waveCount = Math.max(0.1f, shape.effectiveWaveCount());
-        
         // Compute per-ray angular position based on distribution
         float rayAngle = computeRayAngle(waveDist, rayIndex, rayCount);
         
-        // SEQUENTIAL/RANDOM/GOLDEN_RATIO: Apply waveArc and sweepCopies for sweep effect
+        // Apply waveArc and sweepCopies for sweep effect
+        float waveArc = shape.effectiveWaveArc();
+        float waveCount = Math.max(0.1f, shape.effectiveWaveCount());
         float scaledAngle = rayAngle * waveArc;
         return (scaledAngle * waveCount) % 1.0f;
     }
