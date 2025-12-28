@@ -93,17 +93,11 @@ public class RaySphericalTessellator implements RayTypeTessellator {
                 shape, context.index(), context.count());
         }
         
-        // Add layer-based phase offset (ONLY during animation)
-        // In manual mode: all layers have SAME phase (user controls visibility uniformly)
-        // In animated mode: layers are staggered to create cascading wave effect
-        int layerCount = shape != null ? Math.max(1, shape.layers()) : 1;
-        float layerOffset = 0f;
-        if (layerCount > 1 && animationPlaying) {
-            // During animation, spread layers evenly across the phase cycle
-            layerOffset = (float) context.layerIndex() / layerCount;
-        }
+        // Layer offset is NOT applied during animation:
+        // All layers should animate in sync (same phase) to match manual slider behavior.
+        // The layers are already visually separated by their physical positions (layer spacing).
         
-        float rayPhase = (animPhase + waveOffset + layerOffset) % 1.0f;
+        float rayPhase = (animPhase + waveOffset) % 1.0f;
         if (rayPhase < 0) rayPhase += 1.0f;
         
         // === COMPUTE CLIP RANGE (where the shape is on the ray) ===
@@ -123,16 +117,10 @@ public class RaySphericalTessellator implements RayTypeTessellator {
             return;
         }
         
-        // Position is the CENTER of the clip range, plus userPhase offset during animation
-        float basePositionT = (clipRange.start() + clipRange.end()) * 0.5f;
-        float positionT;
-        if (animationPlaying) {
-            // Add userPhase as visual origin offset (wraps smoothly)
-            positionT = (basePositionT + userPhase) % 1.0f;
-            if (positionT < 0) positionT += 1.0f;
-        } else {
-            positionT = basePositionT;
-        }
+        // Position is the CENTER of the clip range
+        // Note: rayPhase already includes all phase offsets (time, wave, layer)
+        // so we don't add userPhase here - that would cause double-offset
+        float positionT = (clipRange.start() + clipRange.end()) * 0.5f;
         
         // === COMPUTE CENTER POSITION ===
         float length = context.length();

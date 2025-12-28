@@ -148,17 +148,11 @@ public class RayLineTessellator implements RayTypeTessellator {
                 shape, context.index(), context.count());
         }
         
-        // Add layer-based phase offset (ONLY during animation)
-        // In manual mode: all layers have SAME phase (user controls visibility uniformly)
-        // In animated mode: layers are staggered to create cascading wave effect
-        int layerCount = shape != null ? Math.max(1, shape.layers()) : 1;
-        float layerOffset = 0f;
-        if (layerCount > 1 && animationPlaying) {
-            // During animation, spread layers evenly across the phase cycle
-            layerOffset = (float) context.layerIndex() / layerCount;
-        }
+        // Layer offset is NOT applied during animation:
+        // All layers should animate in sync (same phase) to match manual slider behavior.
+        // The layers are already visually separated by their physical positions (layer spacing).
         
-        float rayPhase = (baseLengthPhase + waveOffset + layerOffset) % 1.0f;
+        float rayPhase = (baseLengthPhase + waveOffset) % 1.0f;
         if (rayPhase < 0) rayPhase += 1.0f;
         
         // Get clipRange from RadiativeInteraction
