@@ -13,6 +13,13 @@ import net.cyberpunk042.visual.shape.EdgeTransitionMode;
  *   <li><b>FADE:</b> The shape fades with gradient alpha based on edge proximity</li>
  * </ul>
  * 
+ * <h2>Edge Intensity</h2>
+ * <p>The intensity parameter (0-1) controls how strong the edge effect is:</p>
+ * <ul>
+ *   <li><b>0:</b> No edge effect - shape is fully visible regardless of position</li>
+ *   <li><b>1:</b> Full edge effect - maximum clipping/scaling/fading at edges</li>
+ * </ul>
+ * 
  * <h2>Usage with RadiativeInteraction</h2>
  * <p>RadiativeInteraction determines WHERE the segment is positioned on the ray (clipStart/clipEnd).
  * EdgeTransitionMode determines HOW the shape looks at boundaries as it moves.</p>
@@ -30,17 +37,21 @@ public final class TessEdgeModeFactory {
     private TessEdgeModeFactory() {} // Utility class
     
     /**
-     * Compute edge effect based on EdgeTransitionMode and clip range.
+     * Compute edge effect based on EdgeTransitionMode, clip range, and intensity.
      * 
      * @param edgeMode The edge transition mode (CLIP/SCALE/FADE)
      * @param clipStart Start of visible segment (0-1), from RadiativeInteraction
      * @param clipEnd End of visible segment (0-1), from RadiativeInteraction
+     * @param intensity Edge effect intensity (0=no effect, 1=full effect)
      * @return Edge result with appropriate effect applied
      */
-    public static TessEdgeResult compute(EdgeTransitionMode edgeMode, float clipStart, float clipEnd) {
+    public static TessEdgeResult compute(EdgeTransitionMode edgeMode, float clipStart, float clipEnd, float intensity) {
         if (edgeMode == null) {
             edgeMode = EdgeTransitionMode.CLIP;
         }
+        
+        // Clamp intensity minimum to 0 (no upper limit - values > 1 create exaggerated effects)
+        intensity = Math.max(0f, intensity);
         
         // Compute the shape center position (where the 3D shape is placed on the ray)
         float shapeCenter = (clipStart + clipEnd) * 0.5f;
@@ -53,25 +64,45 @@ public final class TessEdgeModeFactory {
         float edgeProximity = Math.min(distanceToStart, distanceToEnd) * 2.0f; // Normalize to [0,1]
         edgeProximity = Math.clamp(edgeProximity, 0f, 1f);
         
+        // Apply intensity to edge proximity (blend between 1.0 and actual proximity)
+        // At intensity=0: proximity = 1 (no edge effect)
+        // At intensity=1: proximity = actual edge proximity (full effect)
+        float effectiveProximity = 1.0f - (1.0f - edgeProximity) * intensity;
+        
+        // Apply intensity to clip range (blend between [0,1] and actual clip)
+        float effectiveClipStart = clipStart * intensity;
+        float effectiveClipEnd = 1.0f - (1.0f - clipEnd) * intensity;
+        
         return switch (edgeMode) {
             case CLIP -> {
                 // CLIP mode: geometrically clip the visible range
-                // The shape is rendered normally but portions outside [clipStart, clipEnd] are hidden
-                yield new TessEdgeResult(clipStart, clipEnd, 1f, 1f, distanceToStart, distanceToEnd);
+                // At intensity=0: full visibility [0,1]
+                // At intensity=1: actual clip range [clipStart, clipEnd]
+                yield new TessEdgeResult(effectiveClipStart, effectiveClipEnd, 1f, 1f, distanceToStart, distanceToEnd);
             }
             case SCALE -> {
                 // SCALE mode: full visibility (no clipping), but uniform scale based on edge proximity
-                // Shape scales from 0 (at edge) to 1 (at center)
-                // Full visibility range [0,1], shape uniformly scaled by edgeProximity
-                yield new TessEdgeResult(0f, 1f, edgeProximity, 1f, distanceToStart, distanceToEnd);
+                // At intensity=0: scale = 1 (no scaling)
+                // At intensity=1: scale = edgeProximity (full scaling effect)
+                yield new TessEdgeResult(0f, 1f, effectiveProximity, 1f, distanceToStart, distanceToEnd);
             }
             case FADE -> {
                 // FADE mode: full visibility, full size, gradient alpha based on edge proximity
-                // Base alpha is 1.0 - the per-vertex gradient is applied in the generator
-                // using edgeDistanceStart/End to create smooth fade at edges
-                yield new TessEdgeResult(0f, 1f, 1f, 1f, distanceToStart, distanceToEnd);
+                // The effectiveProximity modulates the edge distances used for fade gradient
+                // At intensity=0: no fade (full alpha everywhere)
+                // At intensity=1: full fade based on edge proximity
+                float fadeDistStart = 1.0f - (1.0f - distanceToStart) * intensity;
+                float fadeDistEnd = 1.0f - (1.0f - distanceToEnd) * intensity;
+                yield new TessEdgeResult(0f, 1f, 1f, 1f, fadeDistStart, fadeDistEnd);
             }
         };
+    }
+    
+    /**
+     * Compute edge effect with default intensity of 1.0 (full effect).
+     */
+    public static TessEdgeResult compute(EdgeTransitionMode edgeMode, float clipStart, float clipEnd) {
+        return compute(edgeMode, clipStart, clipEnd, 1.0f);
     }
     
     /**
@@ -79,12 +110,20 @@ public final class TessEdgeModeFactory {
      * 
      * @param edgeMode The edge transition mode
      * @param clipRange The clip range from RadiativeInteractionFactory
+     * @param intensity Edge effect intensity (0=no effect, 1=full effect)
      * @return Edge result with appropriate effect applied
      */
-    public static TessEdgeResult compute(EdgeTransitionMode edgeMode, RadiativeInteractionFactory.ClipRange clipRange) {
+    public static TessEdgeResult compute(EdgeTransitionMode edgeMode, RadiativeInteractionFactory.ClipRange clipRange, float intensity) {
         if (clipRange == null) {
             return TessEdgeResult.FULL;
         }
-        return compute(edgeMode, clipRange.start(), clipRange.end());
+        return compute(edgeMode, clipRange.start(), clipRange.end(), intensity);
+    }
+    
+    /**
+     * Compute edge effect from ClipRange with default intensity of 1.0.
+     */
+    public static TessEdgeResult compute(EdgeTransitionMode edgeMode, RadiativeInteractionFactory.ClipRange clipRange) {
+        return compute(edgeMode, clipRange, 1.0f);
     }
 }

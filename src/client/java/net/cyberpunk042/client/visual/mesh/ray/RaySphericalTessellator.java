@@ -109,8 +109,9 @@ public class RaySphericalTessellator implements RayTypeTessellator {
         
         // === APPLY EDGE MODE (HOW the shape looks at edges) ===
         net.cyberpunk042.visual.shape.EdgeTransitionMode edgeMode = context.effectiveShapeState().edgeMode();
+        float edgeIntensity = context.effectiveShapeState().edgeIntensity();
         TessEdgeResult edgeResult = net.cyberpunk042.client.visual.mesh.ray.tessellation.TessEdgeModeFactory.compute(
-            edgeMode, clipRange);
+            edgeMode, clipRange, edgeIntensity);
         
         // Skip if completely hidden
         if (!edgeResult.isVisible()) {

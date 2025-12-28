@@ -164,7 +164,8 @@ public class RayLineTessellator implements RayTypeTessellator {
         
         // Apply EdgeMode
         var edgeMode = context.effectiveShapeState().edgeMode();
-        return TessEdgeModeFactory.compute(edgeMode, clipRange);
+        float edgeIntensity = context.effectiveShapeState().edgeIntensity();
+        return TessEdgeModeFactory.compute(edgeMode, clipRange, edgeIntensity);
     }
     
     // ═══════════════════════════════════════════════════════════════════════════

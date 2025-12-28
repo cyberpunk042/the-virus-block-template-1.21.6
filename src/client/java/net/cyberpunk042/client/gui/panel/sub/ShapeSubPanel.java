@@ -135,11 +135,13 @@ public class ShapeSubPanel extends AbstractPanel {
     
     /**
      * Rebuilds controls for the current shape type.
+     * Preserves scroll position when possible.
      */
     public void rebuildForCurrentShape() {
         boolean needsOffset = bounds != null && !bounds.isEmpty();
         
-        // Reset scroll offset to avoid position corruption
+        // Save scroll position before rebuilding, then reset to 0 for rebuild
+        int savedScrollOffset = scrollOffset;
         scrollOffset = 0;
         
         widgets.clear();
@@ -152,6 +154,8 @@ public class ShapeSubPanel extends AbstractPanel {
         if (!shapeType.equals(currentShapeType)) {
             currentShapeType = shapeType;
             currentFragment = "Default";
+            // Reset scroll only when shape type actually changes
+            savedScrollOffset = 0;
         }
         
         int x = GuiConstants.PADDING;
@@ -696,15 +700,45 @@ public class ShapeSubPanel extends AbstractPanel {
                         Object curObj = state.get("rays.shapeState");
                         net.cyberpunk042.visual.shape.RayFlowStage curStage = net.cyberpunk042.visual.shape.RayFlowStage.ACTIVE;
                         float curPhase2 = 0.5f;
+                        float curIntensity = 1.0f;
                         if (curObj instanceof net.cyberpunk042.visual.shape.ShapeState<?> ss) {
                             if (ss.stage() instanceof net.cyberpunk042.visual.shape.RayFlowStage rfs) {
                                 curStage = rfs;
                             }
                             curPhase2 = ss.phase();
+                            curIntensity = ss.edgeIntensity();
                         }
-                        state.set("rays.shapeState", new net.cyberpunk042.visual.shape.ShapeState<>(curStage, curPhase2, v));
+                        state.set("rays.shapeState", new net.cyberpunk042.visual.shape.ShapeState<>(curStage, curPhase2, v, curIntensity));
                     }));
                 widgets.add(edgeModeDropdown);
+                y += step;
+                
+                // Edge Intensity slider
+                float curEdgeIntensity = 1.0f;
+                Object intensityObj = state.get("rays.shapeState");
+                if (intensityObj instanceof net.cyberpunk042.visual.shape.ShapeState<?> ss) {
+                    curEdgeIntensity = ss.edgeIntensity();
+                }
+                
+                var edgeIntensitySlider = GuiWidgets.slider(
+                    x, y, w, "Edge Inten",
+                    0f, 5f, curEdgeIntensity, "%.2f",
+                    "Intensity of edge transition effect (0=none, 1=normal, >1=exaggerated)",
+                    v -> onUserChange(() -> {
+                        Object obj = state.get("rays.shapeState");
+                        net.cyberpunk042.visual.shape.RayFlowStage st = net.cyberpunk042.visual.shape.RayFlowStage.ACTIVE;
+                        float ph = 0.5f;
+                        net.cyberpunk042.visual.shape.EdgeTransitionMode em = net.cyberpunk042.visual.shape.EdgeTransitionMode.CLIP;
+                        if (obj instanceof net.cyberpunk042.visual.shape.ShapeState<?> ss) {
+                            if (ss.stage() instanceof net.cyberpunk042.visual.shape.RayFlowStage rfs) {
+                                st = rfs;
+                            }
+                            ph = ss.phase();
+                            em = ss.edgeMode();
+                        }
+                        state.set("rays.shapeState", new net.cyberpunk042.visual.shape.ShapeState<>(st, ph, em, v));
+                    }));
+                widgets.add(edgeIntensitySlider);
                 y += step;
             }
             
@@ -794,6 +828,10 @@ public class ShapeSubPanel extends AbstractPanel {
         }
         
         Logging.GUI.topic("panel").debug("Built {} controls for shape: {}", widgets.size(), shapeType);
+        
+        // Restore scroll position, clamped to valid range for new content
+        int maxScroll = Math.max(0, contentHeight - (bounds != null && !bounds.isEmpty() ? bounds.height() : panelHeight));
+        scrollOffset = Math.min(savedScrollOffset, maxScroll);
         
         // Notify parent container that widgets have changed
         notifyWidgetsChanged();

@@ -89,10 +89,14 @@ public abstract class BoundPanel extends AbstractPanel implements StateChangeLis
     
     /**
      * Override reflow to use proper initialization with bounds offsetting.
+     * Preserves scroll position when possible.
      */
     @Override
     protected void reflow() {
         if (bounds.isEmpty()) return;
+        
+        // Save scroll position before rebuilding
+        int savedScrollOffset = scrollOffset;
         
         // Use bounds dimensions if panel dimensions not set
         int width = panelWidth > 0 ? panelWidth : bounds.width();
@@ -103,6 +107,10 @@ public abstract class BoundPanel extends AbstractPanel implements StateChangeLis
         
         // Apply bounds offset so widgets and labels are positioned correctly
         applyBoundsOffset();
+        
+        // Restore scroll position, clamped to valid range
+        int maxScroll = Math.max(0, contentHeight - bounds.height());
+        scrollOffset = Math.min(savedScrollOffset, maxScroll);
     }
     
     /**
@@ -227,14 +235,24 @@ public abstract class BoundPanel extends AbstractPanel implements StateChangeLis
     
     /**
      * Rebuilds the panel content. Call when structural changes require new widgets.
+     * Preserves scroll position when possible.
      * Override if special behavior is needed.
      */
     protected void rebuildContent() {
+        // Save scroll position before rebuilding
+        int savedScrollOffset = scrollOffset;
+        
         init(panelWidth, panelHeight);
+        
         // Apply bounds offset so widgets are positioned correctly relative to panel
         if (bounds != null && !bounds.isEmpty()) {
             applyBoundsOffset();
         }
+        
+        // Restore scroll position, clamped to valid range
+        int maxScroll = Math.max(0, contentHeight - (bounds != null ? bounds.height() : panelHeight));
+        scrollOffset = Math.min(savedScrollOffset, maxScroll);
+        
         notifyWidgetsChanged();
     }
     
