@@ -201,23 +201,33 @@ public final class RayPositioner {
         net.cyberpunk042.visual.animation.WaveDistribution waveDist = shape.effectiveWaveDistribution();
         float waveCount = shape.effectiveWaveCount();
         boolean isContinuousMultiCopy = (waveDist == net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS) 
-                                        && waveCount > 1.0f 
-                                        && flowConfig != null && flowConfig.isActive();
+                                        && waveCount > 1.0f;
         
         if (isContinuousMultiCopy) {
             // CONTINUOUS with waveCount > 1: render multiple copies at different phases
             // Example: waveCount=2 -> copies at phase offsets 0 and 0.5
             // This creates overlapping spawning - as one ray fades out, another is already spawning
             int copyCount = Math.max(1, (int) Math.floor(waveCount));
-            float basePhase = (time * flowConfig.radiativeSpeed()) % 1.0f;
-            if (basePhase < 0) basePhase += 1.0f;
+            
+            // Get base phase - either from animation OR from manual ShapeState.phase control
+            float basePhase;
+            if (flowConfig != null && flowConfig.isActive() && flowConfig.radiativeSpeed() > 0.001f) {
+                // Animated: phase from time
+                basePhase = (time * flowConfig.radiativeSpeed()) % 1.0f;
+                if (basePhase < 0) basePhase += 1.0f;
+            } else {
+                // Manual: phase from ShapeState (user control via slider)
+                basePhase = shape.effectiveShapeState().phase();
+            }
             
             for (int copy = 0; copy < copyCount; copy++) {
                 float phaseOffset = (float) copy / copyCount;
                 float copyPhase = (basePhase + phaseOffset) % 1.0f;
                 
-                RayContext ctx = computeContextWithPhase(
-                    shape, index, layerIndex, rng, wave, time, flowConfig, copyPhase, false);
+                // Each copy uses its OWN phase for ShapeState, so edge effects are computed
+                // per-copy based on that copy's actual position in the animation cycle
+                RayContext ctx = computeContextWithPhaseForCopy(
+                    shape, index, layerIndex, rng, wave, time, flowConfig, copyPhase);
                 result.add(ctx);
             }
             return result;
@@ -259,6 +269,41 @@ public final class RayPositioner {
         // Normal case: single context
         result.add(computeContext(shape, index, layerIndex, rng, wave, time, flowConfig));
         return result;
+    }
+    
+    /**
+     * Computes context for a ray copy with a specific phase (for multi-copy mode).
+     * Each copy uses its own phase for ShapeState, so edge effects are computed independently.
+     */
+    private static RayContext computeContextWithPhaseForCopy(
+            RaysShape shape,
+            int index,
+            int layerIndex,
+            Random rng,
+            WaveConfig wave,
+            float time,
+            net.cyberpunk042.visual.animation.RayFlowConfig flowConfig,
+            float copyPhase) {
+        
+        // Compute common position data
+        PositionData pos = computePositionData(shape, index, layerIndex, rng);
+        
+        int lineResolution = shape.effectivelineResolution();
+        boolean hasWave = wave != null && wave.isActive() && wave.isCpuMode();
+        if (hasWave && lineResolution < 16) {
+            lineResolution = 16;
+        }
+        
+        // No position offset for multi-copy mode (all copies at same position, different phases)
+        float flowPositionOffset = 0.0f;
+        
+        // Create ShapeState with this copy's specific phase
+        // This way TessEdgeModeFactory will compute edge effects based on THIS copy's phase
+        ShapeState<RayFlowStage> shapeState = shape.effectiveShapeState().withPhase(copyPhase);
+        
+        return RayContextBuilder.build(shape, pos.start, pos.end, pos.direction, pos.length,
+            index, pos.count, layerIndex, pos.orientationVector, lineResolution, hasWave,
+            wave, time, flowConfig, flowPositionOffset, shapeState);
     }
     
     /**
