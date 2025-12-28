@@ -76,7 +76,17 @@ public class RaySphericalTessellator implements RayTypeTessellator {
         // Add wave distribution offset for this ray
         float waveOffset = net.cyberpunk042.client.visual.mesh.ray.flow.FlowPhaseStage.computeRayPhaseOffset(
             shape, context.index(), context.count());
-        float rayPhase = (animPhase + waveOffset) % 1.0f;
+        
+        // Add layer-based phase offset for emission animation to respect layers
+        // Each layer is offset by a fraction of the total phase range
+        int layerCount = shape != null ? Math.max(1, shape.layers()) : 1;
+        float layerOffset = 0f;
+        if (layerCount > 1 && animationPlaying) {
+            // Spread layers evenly across the phase cycle
+            layerOffset = (float) context.layerIndex() / layerCount;
+        }
+        
+        float rayPhase = (animPhase + waveOffset + layerOffset) % 1.0f;
         if (rayPhase < 0) rayPhase += 1.0f;
         
         // === COMPUTE CLIP RANGE (where the shape is on the ray) ===

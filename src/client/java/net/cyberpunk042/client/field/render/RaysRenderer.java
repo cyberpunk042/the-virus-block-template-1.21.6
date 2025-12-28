@@ -183,7 +183,8 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
             net.cyberpunk042.visual.fill.FillMode mode = fill != null ? fill.mode() : net.cyberpunk042.visual.fill.FillMode.SOLID;
             
             switch (mode) {
-                case SOLID -> emitRayTriangles(matrices, consumer, mesh, color, baseAlpha, light, colorCtx, waveConfig, time);
+                case SOLID -> emitRayTriangles(matrices, consumer, mesh, color, baseAlpha, light, colorCtx, 
+                    waveConfig, time, flowConfig, motionConfig, wiggleConfig, twistConfig);
                 case WIREFRAME -> emitWireframe(matrices, consumer, mesh, color, light, fill, waveConfig, time);
                 case CAGE -> emitCage(matrices, consumer, mesh, color, light, fill, primitive, waveConfig, time);
                 case POINTS -> emitPoints(matrices, consumer, mesh, color, light, fill, waveConfig, time);
@@ -195,10 +196,13 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
     
     /**
      * Emits 3D ray triangles (for droplet, egg, sphere ray types).
+     * Supports Wave, Motion, Wiggle, Twist, and Flicker effects.
      */
     private void emitRayTriangles(MatrixStack matrices, VertexConsumer consumer,
                                    Mesh mesh, int baseColor, float baseAlpha, int light,
-                                   ColorContext colorCtx, WaveConfig waveConfig, float time) {
+                                   ColorContext colorCtx, WaveConfig waveConfig, float time,
+                                   RayFlowConfig flowConfig, RayMotionConfig motionConfig,
+                                   RayWiggleConfig wiggleConfig, RayTwistConfig twistConfig) {
         MatrixStack.Entry entry = matrices.peek();
         Matrix4f positionMatrix = entry.getPositionMatrix();
         Matrix3f normalMatrix = entry.getNormalMatrix();
@@ -206,18 +210,84 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
         // Check if wave deformation should be applied
         boolean applyWave = waveConfig != null && waveConfig.isActive() && waveConfig.isCpuMode();
         
-        // Triangle rendering with optional wave deformation
-        mesh.forEachTriangle((v0, v1, v2) -> {
+        // Build effect chain for geometry vertex effects (Motion, Wiggle, Twist)
+        final net.cyberpunk042.client.field.render.effect.RenderEffectChain effectChain = 
+            net.cyberpunk042.client.field.render.effect.RenderEffectChain.builder()
+                .addIf(motionConfig != null && motionConfig.isActive(), 
+                       new net.cyberpunk042.client.field.render.effect.RenderMotionEffect(motionConfig, time))
+                .addIf(wiggleConfig != null && wiggleConfig.isActive(), 
+                       new net.cyberpunk042.client.field.render.effect.RenderWiggleEffect(wiggleConfig, time))
+                .addIf(twistConfig != null && twistConfig.isActive(), 
+                       new net.cyberpunk042.client.field.render.effect.RenderTwistEffect(twistConfig, time))
+                .build();
+        final boolean hasEffects = effectChain.hasActiveEffects();
+        
+        // Calculate flicker alpha multiplier (applies to entire shape)
+        final float flickerAlpha = calculateFlickerAlpha(flowConfig, time);
+        
+        // Triangle index for effects
+        final int[] triIndex = {0};
+        
+        // Triangle rendering with optional effects
+        mesh.forEachTriangle((v0, v1, v2) -\u003e {
+            int idx = triIndex[0]++;
+            
             Vertex w0 = v0, w1 = v1, w2 = v2;
+            
+            // Apply wave deformation first
             if (applyWave) {
-                w0 = WaveDeformer.applyToVertex(v0, waveConfig, time);
-                w1 = WaveDeformer.applyToVertex(v1, waveConfig, time);
-                w2 = WaveDeformer.applyToVertex(v2, waveConfig, time);
+                w0 = WaveDeformer.applyToVertex(w0, waveConfig, time);
+                w1 = WaveDeformer.applyToVertex(w1, waveConfig, time);
+                w2 = WaveDeformer.applyToVertex(w2, waveConfig, time);
             }
-            emitVertex(consumer, positionMatrix, normalMatrix, w0, baseColor, baseAlpha, light, colorCtx);
-            emitVertex(consumer, positionMatrix, normalMatrix, w1, baseColor, baseAlpha, light, colorCtx);
-            emitVertex(consumer, positionMatrix, normalMatrix, w2, baseColor, baseAlpha, light, colorCtx);
+            
+            // Apply effect chain (Motion, Wiggle, Twist) if active
+            if (hasEffects) {
+                w0 = applyEffectChain(w0, effectChain, idx);
+                w1 = applyEffectChain(w1, effectChain, idx);
+                w2 = applyEffectChain(w2, effectChain, idx);
+            }
+            
+            // Emit vertices with flicker alpha
+            float finalAlpha = baseAlpha * flickerAlpha;
+            emitVertex(consumer, positionMatrix, normalMatrix, w0, baseColor, finalAlpha, light, colorCtx);
+            emitVertex(consumer, positionMatrix, normalMatrix, w1, baseColor, finalAlpha, light, colorCtx);
+            emitVertex(consumer, positionMatrix, normalMatrix, w2, baseColor, finalAlpha, light, colorCtx);
         });
+    }
+    
+    /**
+     * Apply effect chain to a vertex.
+     */
+    private Vertex applyEffectChain(Vertex v, 
+            net.cyberpunk042.client.field.render.effect.RenderEffectChain chain, int index) {
+        float[] pos = new float[]{v.x(), v.y(), v.z()};
+        float[] dir = new float[]{v.nx(), v.ny(), v.nz()};
+        
+        net.cyberpunk042.client.field.render.effect.RenderEffectContext ctx = 
+            new net.cyberpunk042.client.field.render.effect.RenderEffectContext(index, v.u(), dir);
+        chain.apply(pos, ctx);
+        
+        return new Vertex(pos[0], pos[1], pos[2], v.nx(), v.ny(), v.nz(), v.u(), v.v(), v.alpha());
+    }
+    
+    /**
+     * Calculate flicker alpha for the entire shape.
+     */
+    private float calculateFlickerAlpha(RayFlowConfig config, float time) {
+        if (config == null || !config.hasFlicker()) {
+            return 1f;
+        }
+        net.cyberpunk042.visual.energy.EnergyFlicker mode = config.effectiveFlicker();
+        if (mode == net.cyberpunk042.visual.energy.EnergyFlicker.NONE) {
+            return 1f;
+        }
+        
+        float intensity = Math.max(0.1f, config.flickerIntensity());
+        float freq = Math.max(0.5f, config.flickerFrequency());
+        
+        return net.cyberpunk042.client.visual.mesh.ray.flow.FlowFlickerStage.computeFlickerAlpha(
+            mode, time, 0, intensity, freq);
     }
     
     private void emitVertex(VertexConsumer consumer, Matrix4f positionMatrix, Matrix3f normalMatrix,
