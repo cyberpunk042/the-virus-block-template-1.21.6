@@ -333,6 +333,32 @@ public class RayLineTessellator implements RayTypeTessellator {
                     pz = deformed[2];
                 }
                 
+                // Apply field deformation if active (gravitational lensing effect)
+                // This stretches/compresses the vertex radially based on distance from center
+                if (context.fieldDeformation().isActive()) {
+                    float innerR = context.innerRadius();
+                    float outerR = context.outerRadius();
+                    
+                    // Compute radial distance of this vertex from center
+                    float dist = (float) Math.sqrt(px * px + py * py + pz * pz);
+                    
+                    if (dist > 0.001f && outerR > innerR) {
+                        // Normalize distance (0 = at inner, 1 = at outer)
+                        float normalizedDist = Math.clamp((dist - innerR) / (outerR - innerR), 0.01f, 1f);
+                        
+                        // Compute stretch factor for this vertex position
+                        float stretch = context.fieldDeformation().computeStretch(
+                            normalizedDist, context.fieldDeformationIntensity());
+                        
+                        // Apply radial stretch (move vertex toward/away from center)
+                        float stretchedDist = dist * stretch;
+                        float scaleFactor = stretchedDist / dist;
+                        px *= scaleFactor;
+                        py *= scaleFactor;
+                        pz *= scaleFactor;
+                    }
+                }
+                
                 // Create vertex with alpha from Stage/Phase model
                 vertexIndices[i] = builder.vertex(px, py, pz, dir[0], dir[1], dir[2], t, 0, alpha);
             }
@@ -429,6 +455,27 @@ public class RayLineTessellator implements RayTypeTessellator {
         // Apply line shape offset
         float[] offset = RayGeometryUtils.computeLineShapeOffset(lineShape, t, amplitude, frequency, right, up);
         
-        return new float[]{curved[0] + offset[0], curved[1] + offset[1], curved[2] + offset[2]};
+        float px = curved[0] + offset[0];
+        float py = curved[1] + offset[1];
+        float pz = curved[2] + offset[2];
+        
+        // Apply field deformation if active
+        if (context.fieldDeformation().isActive()) {
+            float innerR = context.innerRadius();
+            float outerR = context.outerRadius();
+            float dist = (float) Math.sqrt(px * px + py * py + pz * pz);
+            
+            if (dist > 0.001f && outerR > innerR) {
+                float normalizedDist = Math.clamp((dist - innerR) / (outerR - innerR), 0.01f, 1f);
+                float stretch = context.fieldDeformation().computeStretch(
+                    normalizedDist, context.fieldDeformationIntensity());
+                float scaleFactor = (dist * stretch) / dist;
+                px *= scaleFactor;
+                py *= scaleFactor;
+                pz *= scaleFactor;
+            }
+        }
+        
+        return new float[]{px, py, pz};
     }
 }

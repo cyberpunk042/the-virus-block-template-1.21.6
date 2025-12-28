@@ -178,7 +178,7 @@ public record RaysShape(
         net.cyberpunk042.visual.energy.RadiativeInteraction.NONE, // radiativeInteraction
         1.0f,           // segmentLength
         1.0f,           // waveArc
-        net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, // waveDistribution
+        net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS, // waveDistribution
         2.0f,           // waveCount
         false,          // startFullLength
         true            // followCurve
@@ -190,7 +190,7 @@ public record RaysShape(
         8, 0.3f, RayLayerMode.SHELL, false, 0.1f, 0.1f, 1.0f, 0.2f, 1, 0.0f,
         RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
         FieldDeformationMode.NONE, 0.0f, null,
-        net.cyberpunk042.visual.energy.RadiativeInteraction.ABSORPTION, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, 2.0f, false, true);
+        net.cyberpunk042.visual.energy.RadiativeInteraction.ABSORPTION, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS, 2.0f, false, true);
     
     /** Spherical emission rays (diverging from center). */
     public static final RaysShape EMISSION = new RaysShape(
@@ -198,7 +198,7 @@ public record RaysShape(
         8, 0.3f, RayLayerMode.SHELL, false, 0.1f, 0.1f, 0.2f, 1.0f, 1, 0.0f,
         RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
         FieldDeformationMode.NONE, 0.0f, null,
-        net.cyberpunk042.visual.energy.RadiativeInteraction.EMISSION, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, 2.0f, false, true);
+        net.cyberpunk042.visual.energy.RadiativeInteraction.EMISSION, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS, 2.0f, false, true);
     
     /** Parallel laser grid. */
     public static final RaysShape LASER_GRID = new RaysShape(
@@ -206,7 +206,7 @@ public record RaysShape(
         4, 0.3f, RayLayerMode.VERTICAL, false, 0.0f, 0.0f, 1.0f, 1.0f, 1, 0.0f,
         RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
         FieldDeformationMode.NONE, 0.0f, null,
-        net.cyberpunk042.visual.energy.RadiativeInteraction.NONE, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, 2.0f, false, true);
+        net.cyberpunk042.visual.energy.RadiativeInteraction.NONE, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS, 2.0f, false, true);
     
     /** Dashed pulse rays. */
     public static final RaysShape PULSE = new RaysShape(
@@ -214,7 +214,7 @@ public record RaysShape(
         1, 0.5f, RayLayerMode.VERTICAL, false, 0.0f, 0.0f, 1.0f, 0.5f, 4, 0.2f,
         RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
         FieldDeformationMode.NONE, 0.0f, null,
-        net.cyberpunk042.visual.energy.RadiativeInteraction.OSCILLATION, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, 2.0f, false, true);
+        net.cyberpunk042.visual.energy.RadiativeInteraction.OSCILLATION, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS, 2.0f, false, true);
     
     /** Sparse random stars. */
     public static final RaysShape STARS = new RaysShape(
@@ -222,7 +222,7 @@ public record RaysShape(
         1, 0.5f, RayLayerMode.SHELL, false, 0.3f, 0.3f, 0.8f, 0.3f, 1, 0.0f,
         RayLineShape.STRAIGHT, 0.1f, 2.0f, 16, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
         FieldDeformationMode.NONE, 0.0f, null,
-        net.cyberpunk042.visual.energy.RadiativeInteraction.NONE, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, 2.0f, false, true);
+        net.cyberpunk042.visual.energy.RadiativeInteraction.NONE, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS, 2.0f, false, true);
     
     /** Vortex rays (spiraling into center). */
     public static final RaysShape VORTEX = new RaysShape(
@@ -230,7 +230,7 @@ public record RaysShape(
         1, 0.5f, RayLayerMode.VERTICAL, false, 0.0f, 0.0f, 1.0f, 0.8f, 1, 0.0f,
         RayLineShape.STRAIGHT, 0.1f, 2.0f, 32, RayCurvature.VORTEX, 0.5f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
         FieldDeformationMode.NONE, 0.0f, null,
-        net.cyberpunk042.visual.energy.RadiativeInteraction.NONE, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, 2.0f, false, true);
+        net.cyberpunk042.visual.energy.RadiativeInteraction.NONE, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS, 2.0f, false, true);
     
     /** Corkscrew rays (helical shape). */
     public static final RaysShape CORKSCREW = new RaysShape(
@@ -238,7 +238,7 @@ public record RaysShape(
         1, 0.5f, RayLayerMode.VERTICAL, false, 0.0f, 0.0f, 1.0f, 1.0f, 1, 0.0f,
         RayLineShape.CORKSCREW, 0.15f, 3.0f, 32, RayCurvature.NONE, 0.0f, RayType.LINE, 1.0f, 1.0f, RayOrientation.ALONG_RAY,
         FieldDeformationMode.NONE, 0.0f, null,
-        net.cyberpunk042.visual.energy.RadiativeInteraction.NONE, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL, 2.0f, false, true);
+        net.cyberpunk042.visual.energy.RadiativeInteraction.NONE, 1.0f, 1.0f, net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS, 2.0f, false, true);
     
     public static RaysShape defaults() { return DEFAULT; }
     
@@ -522,7 +522,7 @@ public record RaysShape(
         private net.cyberpunk042.visual.energy.RadiativeInteraction radiativeInteraction = net.cyberpunk042.visual.energy.RadiativeInteraction.NONE;
         private float segmentLength = 1.0f;
         private float waveArc = 1.0f;
-        private net.cyberpunk042.visual.animation.WaveDistribution waveDistribution = net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL;
+        private net.cyberpunk042.visual.animation.WaveDistribution waveDistribution = net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS;
         private float waveCount = 2.0f;
         // Animation behavior (moved from RayFlowConfig)
         private boolean startFullLength = false;
@@ -563,7 +563,7 @@ public record RaysShape(
         public Builder radiativeInteraction(net.cyberpunk042.visual.energy.RadiativeInteraction v) { this.radiativeInteraction = v != null ? v : net.cyberpunk042.visual.energy.RadiativeInteraction.NONE; return this; }
         public Builder segmentLength(float v) { this.segmentLength = v; return this; }
         public Builder waveArc(float v) { this.waveArc = v; return this; }
-        public Builder waveDistribution(net.cyberpunk042.visual.animation.WaveDistribution v) { this.waveDistribution = v != null ? v : net.cyberpunk042.visual.animation.WaveDistribution.SEQUENTIAL; return this; }
+        public Builder waveDistribution(net.cyberpunk042.visual.animation.WaveDistribution v) { this.waveDistribution = v != null ? v : net.cyberpunk042.visual.animation.WaveDistribution.CONTINUOUS; return this; }
         public Builder waveCount(float v) { this.waveCount = v; return this; }
         // Animation behavior setters (moved from RayFlowConfig)
         public Builder startFullLength(boolean v) { this.startFullLength = v; return this; }
