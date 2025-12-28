@@ -54,6 +54,8 @@ public final class GeoPolarSurfaceGenerator {
      * @param fieldDeformIntensity Field deformation intensity
      * @param outerRadius Outer radius for field deformation
      * @param baseColor Base ARGB color
+     * @param edgeDistanceStart Distance from shape center to start edge (for FADE gradient)
+     * @param edgeDistanceEnd Distance from shape center to end edge (for FADE gradient)
      */
     public static void generateWithSphereDeformation(
             MeshBuilder builder,
@@ -78,7 +80,9 @@ public final class GeoPolarSurfaceGenerator {
             float[] fieldCenter,
             float fieldDeformIntensity,
             float outerRadius,
-            int baseColor) {
+            int baseColor,
+            float edgeDistanceStart,
+            float edgeDistanceEnd) {
         
         if (builder == null) {
             return;
@@ -103,6 +107,8 @@ public final class GeoPolarSurfaceGenerator {
         final boolean hasTravelMode = travelMode != null && travelMode != EnergyTravel.NONE;
         final boolean hasFieldDeformation = fieldDeformation != null && fieldDeformation.isActive();
         final SphereDeformation finalDeformation = deformation;
+        final float finalEdgeDistStart = edgeDistanceStart;
+        final float finalEdgeDistEnd = edgeDistanceEnd;
         
         // Generate rings
         for (int i = 0; i < rings; i++) {
@@ -117,10 +123,12 @@ public final class GeoPolarSurfaceGenerator {
             // Compute alpha for each ring
             float alpha0 = computeVertexAlpha(t0, finalVisibleTStart, finalVisibleTEnd, 
                                               finalFlowAlpha, hasTravelMode, travelMode, 
-                                              travelPhase, finalChaseCount, finalChaseWidth);
+                                              travelPhase, finalChaseCount, finalChaseWidth,
+                                              finalEdgeDistStart, finalEdgeDistEnd);
             float alpha1 = computeVertexAlpha(t1, finalVisibleTStart, finalVisibleTEnd, 
                                               finalFlowAlpha, hasTravelMode, travelMode, 
-                                              travelPhase, finalChaseCount, finalChaseWidth);
+                                              travelPhase, finalChaseCount, finalChaseWidth,
+                                              finalEdgeDistStart, finalEdgeDistEnd);
             
             // Skip fully transparent rings
             if (alpha0 < 0.001f && alpha1 < 0.001f) {
@@ -134,6 +142,14 @@ public final class GeoPolarSurfaceGenerator {
             for (int j = 0; j < segments; j++) {
                 float phi0 = TWO_PI * j / segments;
                 float phi1 = TWO_PI * (j + 1) / segments;
+                
+                // Check visibility mask (for checker, bands, etc.)
+                // u = segment fraction around, v = ring fraction (t-value)
+                float segFrac = (float) j / segments;
+                float ringFrac = (t0 + t1) * 0.5f;  // Use midpoint t for this quad
+                if (visibility != null && !visibility.isVisible(segFrac, ringFrac)) {
+                    continue;  // Skip invisible segments
+                }
                 
                 // Use SphereDeformation.computeVertex() for proper shape!
                 // This gives us position relative to origin with Y as axis
@@ -192,19 +208,31 @@ public final class GeoPolarSurfaceGenerator {
         };
     }
     
-    // ──────────────────── Alpha Computation ────────────────────
-    
     /**
-     * Compute per-vertex alpha based on t-position, visibility clip, and travel mode.
+     * Compute per-vertex alpha based on t-position, visibility clip, travel mode, and edge fade.
+     * 
+     * @param t Vertex position on shape (0=base, 1=tip)
+     * @param visibleTStart Start of visible range
+     * @param visibleTEnd End of visible range
+     * @param flowAlpha Base alpha from flow animation
+     * @param hasTravelMode Whether travel animation is active
+     * @param travelMode Travel animation mode
+     * @param travelPhase Current travel phase
+     * @param chaseCount Chase particle count
+     * @param chaseWidth Chase particle width
+     * @param edgeDistStart Distance from shape center to t=0 edge (for fade gradient)
+     * @param edgeDistEnd Distance from shape center to t=1 edge (for fade gradient)
+     * @return Computed alpha for this vertex
      */
     private static float computeVertexAlpha(
             float t, float visibleTStart, float visibleTEnd, float flowAlpha,
             boolean hasTravelMode, EnergyTravel travelMode, float travelPhase,
-            int chaseCount, float chaseWidth) {
+            int chaseCount, float chaseWidth,
+            float edgeDistStart, float edgeDistEnd) {
         
         float alpha = flowAlpha;
         
-        // Apply visibility clipping
+        // Apply visibility clipping (for CLIP mode)
         if (visibleTStart > 0.0f || visibleTEnd < 1.0f) {
             if (t < visibleTStart) {
                 float fadeRange = 0.1f;
@@ -223,6 +251,13 @@ public final class GeoPolarSurfaceGenerator {
             }
         }
         
+        // Apply edge fade gradient (for FADE mode)
+        // When shape center is near an edge, vertices on that side fade more
+        if (edgeDistStart < 0.4f || edgeDistEnd < 0.4f) {
+            float edgeFade = computeEdgeFade(t, edgeDistStart, edgeDistEnd);
+            alpha *= edgeFade;
+        }
+        
         // Apply EnergyTravel alpha modulation
         if (hasTravelMode && alpha > 0.001f) {
             float travelAlpha = FlowTravelStage.computeTravelAlpha(t, travelMode, travelPhase, chaseCount, chaseWidth);
@@ -230,6 +265,37 @@ public final class GeoPolarSurfaceGenerator {
         }
         
         return alpha;
+    }
+    
+    /**
+     * Compute edge fade factor for FADE mode gradient.
+     * Vertices closer to the edge that the shape center is approaching fade out more.
+     */
+    private static float computeEdgeFade(float t, float edgeDistStart, float edgeDistEnd) {
+        float startFade = 1.0f;
+        float endFade = 1.0f;
+        
+        // When shape is near start edge (t=0), vertices with low t fade out
+        if (edgeDistStart < 0.4f) {
+            // How close are we to the start edge? (1=at edge, 0=far)
+            float edgeProximity = 1.0f - (edgeDistStart / 0.4f);
+            // How much is this vertex at the start side? (1=at t=0, 0=at t=1)
+            float vertexProximity = 1.0f - t;
+            // Fade = less alpha when both are high
+            startFade = 1.0f - (edgeProximity * vertexProximity);
+        }
+        
+        // When shape is near end edge (t=1), vertices with high t fade out
+        if (edgeDistEnd < 0.4f) {
+            // How close are we to the end edge? (1=at edge, 0=far)
+            float edgeProximity = 1.0f - (edgeDistEnd / 0.4f);
+            // How much is this vertex at the end side? (0=at t=0, 1=at t=1)
+            float vertexProximity = t;
+            // Fade = less alpha when both are high
+            endFade = 1.0f - (edgeProximity * vertexProximity);
+        }
+        
+        return Math.max(0.0f, startFade * endFade);
     }
     
     // ──────────────────── Helpers ────────────────────

@@ -31,11 +31,11 @@ public final class RayCageGenerator {
             RayContext context,
             int latCount, int lonCount) {
         
-        // Get droplet parameters
+        // Get droplet parameters - use shapeLength for consistent sizing with solid rendering
         float length = context.length();
-        float radius = length * 0.5f;  // Base radius
-        float intensity = context.shapeIntensity();
         float axialLength = context.shapeLength();
+        float radius = axialLength * 0.5f;  // Base radius matches solid rendering (shapeLength * 0.5)
+        float intensity = context.shapeIntensity();
         
         // Get ray endpoints
         float[] start = context.start();

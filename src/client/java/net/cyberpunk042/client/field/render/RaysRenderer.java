@@ -183,7 +183,7 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
             net.cyberpunk042.visual.fill.FillMode mode = fill != null ? fill.mode() : net.cyberpunk042.visual.fill.FillMode.SOLID;
             
             switch (mode) {
-                case SOLID -> emitRayTriangles(matrices, consumer, mesh, color, baseAlpha, light, colorCtx);
+                case SOLID -> emitRayTriangles(matrices, consumer, mesh, color, baseAlpha, light, colorCtx, waveConfig, time);
                 case WIREFRAME -> emitWireframe(matrices, consumer, mesh, color, light, fill, waveConfig, time);
                 case CAGE -> emitCage(matrices, consumer, mesh, color, light, fill, primitive, waveConfig, time);
                 case POINTS -> emitPoints(matrices, consumer, mesh, color, light, fill, waveConfig, time);
@@ -198,16 +198,25 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
      */
     private void emitRayTriangles(MatrixStack matrices, VertexConsumer consumer,
                                    Mesh mesh, int baseColor, float baseAlpha, int light,
-                                   ColorContext colorCtx) {
+                                   ColorContext colorCtx, WaveConfig waveConfig, float time) {
         MatrixStack.Entry entry = matrices.peek();
         Matrix4f positionMatrix = entry.getPositionMatrix();
         Matrix3f normalMatrix = entry.getNormalMatrix();
         
-        // Simple triangle rendering - each triangle rendered as-is
+        // Check if wave deformation should be applied
+        boolean applyWave = waveConfig != null && waveConfig.isActive() && waveConfig.isCpuMode();
+        
+        // Triangle rendering with optional wave deformation
         mesh.forEachTriangle((v0, v1, v2) -> {
-            emitVertex(consumer, positionMatrix, normalMatrix, v0, baseColor, baseAlpha, light, colorCtx);
-            emitVertex(consumer, positionMatrix, normalMatrix, v1, baseColor, baseAlpha, light, colorCtx);
-            emitVertex(consumer, positionMatrix, normalMatrix, v2, baseColor, baseAlpha, light, colorCtx);
+            Vertex w0 = v0, w1 = v1, w2 = v2;
+            if (applyWave) {
+                w0 = WaveDeformer.applyToVertex(v0, waveConfig, time);
+                w1 = WaveDeformer.applyToVertex(v1, waveConfig, time);
+                w2 = WaveDeformer.applyToVertex(v2, waveConfig, time);
+            }
+            emitVertex(consumer, positionMatrix, normalMatrix, w0, baseColor, baseAlpha, light, colorCtx);
+            emitVertex(consumer, positionMatrix, normalMatrix, w1, baseColor, baseAlpha, light, colorCtx);
+            emitVertex(consumer, positionMatrix, normalMatrix, w2, baseColor, baseAlpha, light, colorCtx);
         });
     }
     
@@ -222,8 +231,8 @@ public final class RaysRenderer extends AbstractPrimitiveRenderer {
             finalColor = colorCtx.calculateColor(x, y, z, 0);
         }
         
-        // Apply alpha
-        int a = (int) ((finalColor >> 24 & 0xFF) * alpha);
+        // Apply alpha (base alpha * vertex alpha from tessellation)
+        int a = (int) ((finalColor >> 24 & 0xFF) * alpha * v.alpha());
         finalColor = (a << 24) | (finalColor & 0x00FFFFFF);
         
         consumer.vertex(positionMatrix, x, y, z)

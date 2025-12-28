@@ -101,13 +101,16 @@ public class RaySphericalTessellator implements RayTypeTessellator {
         
         // === COMPUTE CENTER POSITION ===
         float length = context.length();
-        float baseRadius = length * 0.25f;
         
-        // Combine scales: edgeResult.scale (from EdgeMode) * clipRange.scale (from RadiativeInteraction)
-        float edgeScale = edgeResult.scale();
-        float radiativeScale = clipRange.scale();
-        float combinedScale = edgeScale * radiativeScale;
-        baseRadius *= combinedScale;
+        // EdgeMode scale affects WIDTH only (radius)
+        // RadiativeInteraction scale affects overall shape size (from modes like OSCILLATION)
+        float edgeScale = edgeResult.scale();         // From EdgeMode (CLIP=1, SCALE=varies, FADE=1)
+        float radiativeScale = clipRange.scale();     // From RadiativeInteraction (OSCILLATION etc)
+        
+        // Shape dimensions
+        float baseShapeLength = context.shapeLength();
+        float axialLength = baseShapeLength * radiativeScale;  // NOT affected by edgeScale
+        float baseRadius = (baseShapeLength * 0.5f) * radiativeScale * edgeScale;  // Width is affected by edgeScale
         
         float[] start = context.start();
         float[] end = context.end();
@@ -141,10 +144,11 @@ public class RaySphericalTessellator implements RayTypeTessellator {
         int segments = Math.max(MIN_SEGMENTS, totalSegs / 2);
         
         // === EDGE MODE PARAMETERS ===
-        float axialLength = context.shapeLength() * combinedScale;
         float visibleTStart = edgeResult.clipStart();
         float visibleTEnd = edgeResult.clipEnd();
         float alpha = edgeResult.alpha();
+        float edgeDistStart = edgeResult.edgeDistanceStart();
+        float edgeDistEnd = edgeResult.edgeDistanceEnd();
         
         // === FLICKER ANIMATION ===
         if (flowConfig != null && flowConfig.hasFlicker()) {
@@ -185,7 +189,8 @@ public class RaySphericalTessellator implements RayTypeTessellator {
                 visibleTStart, visibleTEnd, alpha,
                 travelMode, travelPhase, chaseCount, chaseWidth,
                 fieldDeformation, fieldCenter, deformIntensity, outerRadius,
-                0xFFFFFFFF  // Color will be set by renderer
+                0xFFFFFFFF,  // Color will be set by renderer
+                edgeDistStart, edgeDistEnd
             );
         } else {
             // No field deformation - use standard generator
@@ -195,7 +200,8 @@ public class RaySphericalTessellator implements RayTypeTessellator {
                 visibleTStart, visibleTEnd, alpha,
                 travelMode, travelPhase, chaseCount, chaseWidth,
                 null, null, 0f, 0f,
-                0xFFFFFFFF  // Color will be set by renderer
+                0xFFFFFFFF,  // Color will be set by renderer
+                edgeDistStart, edgeDistEnd
             );
         }
     }
