@@ -119,15 +119,24 @@ public class RayLineTessellator implements RayTypeTessellator {
         
         // Get scale and alpha from edge mode
         float scale = edgeResult.scale();
-        float alpha = edgeResult.alpha();
+        float baseAlpha = edgeResult.alpha();
         
         // Compute actual start/end positions by interpolating along the ray
         float[] actualStart = RayGeometryUtils.interpolate(start, end, tStart);
         float[] actualEnd = RayGeometryUtils.interpolate(start, end, tEnd);
         
+        // For FADE mode, apply per-vertex alpha based on edge proximity
+        // tNormalized maps [tStart, tEnd] to [0, 1] for the visible segment
+        float segmentSpan = tEnd - tStart;
+        float tNormStart = segmentSpan > 0 ? 0f : 0f;  // Start of visible segment
+        float tNormEnd = segmentSpan > 0 ? 1f : 1f;    // End of visible segment
+        
+        float alphaStart = edgeResult.computeFadeAlpha(tNormStart, baseAlpha);
+        float alphaEnd = edgeResult.computeFadeAlpha(tNormEnd, baseAlpha);
+        
         // u = t value for shader, alpha from EdgeMode
-        int v0 = builder.vertex(actualStart[0], actualStart[1], actualStart[2], dir[0], dir[1], dir[2], tStart, 0, alpha);
-        int v1 = builder.vertex(actualEnd[0], actualEnd[1], actualEnd[2], dir[0], dir[1], dir[2], tEnd, 0, alpha);
+        int v0 = builder.vertex(actualStart[0], actualStart[1], actualStart[2], dir[0], dir[1], dir[2], tStart, 0, alphaStart);
+        int v1 = builder.vertex(actualEnd[0], actualEnd[1], actualEnd[2], dir[0], dir[1], dir[2], tEnd, 0, alphaEnd);
         builder.line(v0, v1);
     }
     
@@ -174,7 +183,7 @@ public class RayLineTessellator implements RayTypeTessellator {
         float[] start = context.start();
         float[] end = context.end();
         float[] dir = context.direction();
-        float alpha = edgeResult.alpha();
+        float baseAlpha = edgeResult.alpha();
         
         // === POSITION THE DASHED PATTERN ALONG THE RAY ===
         float patternCenter = (clipRange.start() + clipRange.end()) * 0.5f;
@@ -201,12 +210,19 @@ public class RayLineTessellator implements RayTypeTessellator {
                 continue;
             }
             
+            // Compute normalized position for each dash vertex (for fade gradient)
+            float tNormStart = patternLength > 0 ? (tStart - patternStart) / patternLength : 0f;
+            float tNormEnd = patternLength > 0 ? (tEnd - patternStart) / patternLength : 1f;
+            
+            float alphaStart = edgeResult.computeFadeAlpha(tNormStart, baseAlpha);
+            float alphaEnd = edgeResult.computeFadeAlpha(tNormEnd, baseAlpha);
+            
             // Simple straight line segment (no curvature/shape)
             float[] segStart = RayGeometryUtils.interpolate(start, end, tStart);
             float[] segEnd = RayGeometryUtils.interpolate(start, end, tEnd);
             
-            int v0 = builder.vertex(segStart[0], segStart[1], segStart[2], dir[0], dir[1], dir[2], tStart, 0, alpha);
-            int v1 = builder.vertex(segEnd[0], segEnd[1], segEnd[2], dir[0], dir[1], dir[2], tEnd, 0, alpha);
+            int v0 = builder.vertex(segStart[0], segStart[1], segStart[2], dir[0], dir[1], dir[2], tStart, 0, alphaStart);
+            int v1 = builder.vertex(segEnd[0], segEnd[1], segEnd[2], dir[0], dir[1], dir[2], tEnd, 0, alphaEnd);
             builder.line(v0, v1);
             
             t = dashEnd + gapLength;
@@ -260,8 +276,8 @@ public class RayLineTessellator implements RayTypeTessellator {
             return;
         }
         
-        // Get alpha from edge mode
-        float alpha = edgeResult.alpha();
+        // Get base alpha from edge mode (for per-vertex fade calculation)
+        float baseAlpha = edgeResult.alpha();
         
         // === POSITION THE CURVED SEGMENT ALONG THE RAY ===
         float segmentCenter = (clipRange.start() + clipRange.end()) * 0.5f;
@@ -273,6 +289,12 @@ public class RayLineTessellator implements RayTypeTessellator {
         
         // Skip if segment is completely outside ray bounds
         if (segStart >= segEnd) {
+            return;
+        }
+        
+        // Skip if degenerate
+        if (context.length() < 0.0001f) {
+            builder.vertex(start[0], start[1], start[2], 0, 0, 0, 0.0f, 0, baseAlpha);
             return;
         }
         
@@ -340,8 +362,11 @@ public class RayLineTessellator implements RayTypeTessellator {
                     }
                 }
                 
-                // Create vertex with alpha from edge mode
-                vertexIndices[i] = builder.vertex(px, py, pz, dir[0], dir[1], dir[2], t, 0, alpha);
+                // Compute per-vertex alpha using edge proximity fade
+                float vertexAlpha = edgeResult.computeFadeAlpha(tLocal, baseAlpha);
+                
+                // Create vertex with per-vertex alpha from edge mode
+                vertexIndices[i] = builder.vertex(px, py, pz, dir[0], dir[1], dir[2], t, 0, vertexAlpha);
             }
             
             // Connect with lines
@@ -393,8 +418,8 @@ public class RayLineTessellator implements RayTypeTessellator {
         int dashCount = shape.segments();
         float dashGap = shape.segmentGap();
         
-        // Get alpha from edge mode
-        float alpha = edgeResult.alpha();
+        // Get base alpha from edge mode (for per-vertex fade)
+        float baseAlpha = edgeResult.alpha();
         
         // === POSITION THE DASHED PATTERN ALONG THE RAY ===
         float patternCenter = (clipRange.start() + clipRange.end()) * 0.5f;
@@ -440,7 +465,12 @@ public class RayLineTessellator implements RayTypeTessellator {
                 float segT = tStart + (s / (float) dashSegments) * dashSpan;
                 float[] pos = computeShapedPosition(start, end, segT, context, right, up, 
                     lineShape, shapeAmplitude, shapeFrequency, curvatureIntensity);
-                vertexIndices[s] = builder.vertex(pos[0], pos[1], pos[2], dir[0], dir[1], dir[2], segT, 0, alpha);
+                    
+                // Compute normalized position for fade gradient
+                float tNorm = patternLength > 0 ? (segT - patternStart) / patternLength : 0.5f;
+                float vertexAlpha = edgeResult.computeFadeAlpha(tNorm, baseAlpha);
+                
+                vertexIndices[s] = builder.vertex(pos[0], pos[1], pos[2], dir[0], dir[1], dir[2], segT, 0, vertexAlpha);
             }
             
             // Connect with lines
