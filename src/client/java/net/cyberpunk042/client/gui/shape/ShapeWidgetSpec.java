@@ -161,6 +161,7 @@ public final class ShapeWidgetSpec {
             case "cone" -> CONE_SPECS;
             case "jet" -> JET_SPECS;
             case "rays" -> RAYS_SPECS;
+            case "kamehameha" -> KAMEHAMEHA_SPECS;
             default -> List.of();
         };
     }
@@ -182,14 +183,22 @@ public final class ShapeWidgetSpec {
         SliderSpec.half("Start", "sphere.latStart", 0f, 1f, "%.2f"),
         SliderSpec.half("End", "sphere.latEnd", 0f, 1f, "%.2f"),
         
-        // Row 4: Deformation (droplet, egg, cone, spheroid, etc.)
+        // Row 4: Deformation (droplet, egg, cone, spheroid, cloud, molecule, etc.)
         new SectionHeader("Deformation"),
         EnumDropdownSpec.half("Deform", "sphere.deformation", 
             net.cyberpunk042.visual.shape.SphereDeformation.class, 
             net.cyberpunk042.visual.shape.SphereDeformation.NONE),
         SliderSpec.half("Intensity", "sphere.deformationIntensity", 0f, 1f, "%.2f"),
         // Length = axial stretch: <1 = oblate (squashed), 1 = normal, >1 = prolate (elongated)
-        SliderSpec.half("Length", "sphere.deformationLength", 0.2f, 3f, "%.2f")
+        SliderSpec.half("Length", "sphere.deformationLength", 0.2f, 3f, "%.2f"),
+        // Count = number of lobes/atoms for CLOUD/MOLECULE (1-20)
+        SliderSpec.halfInt("Count", "sphere.deformationCount", 1, 20),
+        // Smoothness = roundness of bumps (0 = spiky, 1 = smooth) for CLOUD/MOLECULE
+        SliderSpec.half("Smooth", "sphere.deformationSmoothness", 0f, 1f, "%.2f"),
+        // BumpSize = individual bump/atom size for CLOUD/MOLECULE (0.1-2.0)
+        SliderSpec.half("BumpSz", "sphere.deformationBumpSize", 0.1f, 2f, "%.2f"),
+        // Separation = atom distance from center for MOLECULE (0.3-1.5)
+        SliderSpec.half("Separ", "sphere.deformationSeparation", 0.3f, 1.5f, "%.2f")
         
         // Note: QuadPattern dropdown is added separately in ShapeSubPanel
     );
@@ -364,7 +373,18 @@ public final class ShapeWidgetSpec {
         
         // Row 5: Cap Base + Cap Tip
         CheckboxSpec.half("Cap Base", "jet.capBase", "Close base end"),
-        CheckboxSpec.half("Cap Tip", "jet.capTip", "Close tip end (if not pointed)")
+        CheckboxSpec.half("Cap Tip", "jet.capTip", "Close tip end (if not pointed)"),
+        
+        // === ALPHA GRADIENT ===
+        new SectionHeader("Alpha Gradient"),
+        
+        // Row: Base Alpha + Base Min Alpha
+        SliderSpec.half("Base α", "jet.baseAlpha", 0f, 1f, "%.2f"),
+        SliderSpec.half("Base Min α", "jet.baseMinAlpha", 0f, 1f, "%.2f"),
+        
+        // Row: Tip Alpha + Tip Min Alpha
+        SliderSpec.half("Tip α", "jet.tipAlpha", 0f, 1f, "%.2f"),
+        SliderSpec.half("Tip Min α", "jet.tipMinAlpha", 0f, 1f, "%.2f")
     );
     
     // ───────────────────────────────────────────────────────────────────────────
@@ -417,5 +437,98 @@ public final class ShapeWidgetSpec {
         // LINE-ONLY: Ray Width, Fade Start/End, Segments/Seg Gap, Line Shape, Amplitude/Frequency
         // 3D-ONLY: Orientation, Intensity, Shape Length, Quad Pattern
         // ALL TYPES: Ray Type dropdown, Field Curvature (both at bottom of panel)
+    );
+    
+    // ───────────────────────────────────────────────────────────────────────────
+    // KAMEHAMEHA (Energy beam with charging orb)
+    // ───────────────────────────────────────────────────────────────────────────
+    
+    private static final List<Object> KAMEHAMEHA_SPECS = List.of(
+        // === ORB CONFIGURATION ===
+        new SectionHeader("Orb"),
+        
+        // Row: Orb Radius + Segments
+        SliderSpec.half("Orb R", "kamehameha.orbRadius", 0.1f, 2f, "%.2f"),
+        SliderSpec.halfInt("Orb Segs", "kamehameha.orbSegments", 4, 48),
+        
+        // Row: Orb Type + Transition
+        EnumDropdownSpec.half("Orb Type", "kamehameha.orbType", 
+            net.cyberpunk042.visual.shape.EnergyType.class, 
+            net.cyberpunk042.visual.shape.EnergyType.CLASSIC),
+        EnumDropdownSpec.half("Orb Trans", "kamehameha.orbTransition",
+            net.cyberpunk042.visual.shape.TransitionStyle.class,
+            net.cyberpunk042.visual.shape.TransitionStyle.FADE_AND_SCALE),
+        
+        // Row: Orb Alpha + Min Alpha
+        SliderSpec.half("Orb α", "kamehameha.orbAlpha", 0f, 1f, "%.2f"),
+        SliderSpec.half("Orb Min α", "kamehameha.orbMinAlpha", 0f, 1f, "%.2f"),
+        
+        // Row: Orb Progress (for animation testing)
+        SliderSpec.full("Orb Progress", "kamehameha.orbProgress", 0f, 1f, "%.2f"),
+        
+        // === BEAM CONFIGURATION ===
+        new SectionHeader("Beam"),
+        
+        // Row: Beam Length + Scale Axis
+        SliderSpec.half("Length", "kamehameha.beamLength", 0f, 20f, "%.1f"),
+        EnumDropdownSpec.half("Scale", "kamehameha.beamScaleAxis",
+            net.cyberpunk042.visual.shape.BeamScaleAxis.class,
+            net.cyberpunk042.visual.shape.BeamScaleAxis.LENGTH),
+        
+        // Row: Base Radius + Tip Radius
+        SliderSpec.half("Base R", "kamehameha.beamBaseRadius", 0.05f, 2f, "%.2f"),
+        SliderSpec.half("Tip R", "kamehameha.beamTipRadius", 0f, 2f, "%.2f"),
+        
+        // Row: Beam Segments + Length Segments
+        SliderSpec.halfInt("Segs", "kamehameha.beamSegments", 4, 48),
+        SliderSpec.halfInt("Len Segs", "kamehameha.beamLengthSegments", 1, 32),
+        
+        // Row: Beam Type + Transition
+        EnumDropdownSpec.half("Beam Type", "kamehameha.beamType",
+            net.cyberpunk042.visual.shape.EnergyType.class,
+            net.cyberpunk042.visual.shape.EnergyType.CLASSIC),
+        EnumDropdownSpec.half("Beam Trans", "kamehameha.beamTransition",
+            net.cyberpunk042.visual.shape.TransitionStyle.class,
+            net.cyberpunk042.visual.shape.TransitionStyle.SCALE),
+        
+        // Row: Beam Progress (for animation testing)
+        SliderSpec.full("Beam Progress", "kamehameha.beamProgress", 0f, 1f, "%.2f"),
+        
+        // === BEAM ALPHA GRADIENT ===
+        new SectionHeader("Beam Alpha"),
+        
+        // Row: Base Alpha + Base Min Alpha
+        SliderSpec.half("Base α", "kamehameha.beamBaseAlpha", 0f, 1f, "%.2f"),
+        SliderSpec.half("Base Min α", "kamehameha.beamBaseMinAlpha", 0f, 1f, "%.2f"),
+        
+        // Row: Tip Alpha + Tip Min Alpha
+        SliderSpec.half("Tip α", "kamehameha.beamTipAlpha", 0f, 1f, "%.2f"),
+        SliderSpec.half("Tip Min α", "kamehameha.beamTipMinAlpha", 0f, 1f, "%.2f"),
+        
+        // === TIP STYLE ===
+        new SectionHeader("Tip"),
+        EnumDropdownSpec.full("Tip Style", "kamehameha.tipStyle",
+            net.cyberpunk042.visual.shape.KamehamehaShape.TipStyle.class,
+            net.cyberpunk042.visual.shape.KamehamehaShape.TipStyle.ROUNDED),
+        
+        // === CORE CONFIGURATION ===
+        new SectionHeader("Core (inner intense)"),
+        
+        // Row: Has Core checkbox + Core Ratio
+        CheckboxSpec.half("Has Core", "kamehameha.hasCore", "Render inner bright core"),
+        SliderSpec.half("Core Ratio", "kamehameha.coreRatio", 0.1f, 0.9f, "%.2f"),
+        
+        // Row: Core Brightness (full width)
+        SliderSpec.full("Core Bright", "kamehameha.coreBrightness", 0.5f, 3f, "%.2f"),
+        
+        // === AURA CONFIGURATION ===
+        new SectionHeader("Aura (outer glow)"),
+        
+        // Row: Has Aura checkbox + Aura Scale
+        CheckboxSpec.half("Has Aura", "kamehameha.hasAura", "Render outer glow aura"),
+        SliderSpec.half("Aura Scale", "kamehameha.auraScale", 1f, 2f, "%.2f"),
+        
+        // Row: Aura Alpha (full width)
+        SliderSpec.full("Aura Alpha", "kamehameha.auraAlpha", 0.05f, 1f, "%.2f")
     );
 }

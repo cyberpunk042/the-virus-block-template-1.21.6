@@ -80,6 +80,36 @@ public enum SphereDeformation {
      */
     public float[] computeVertex(float theta, float phi, float radius, 
             float intensity, float length) {
+        // Delegate to full version with default parameters
+        return computeVertex(theta, phi, radius, intensity, length, 6, 0.5f, 0.5f, 0.6f);
+    }
+    
+    /**
+     * Computes the deformed vertex position with count and smoothness.
+     * Backward compatibility - delegates to full version.
+     */
+    public float[] computeVertex(float theta, float phi, float radius, 
+            float intensity, float length, int count, float smoothness) {
+        return computeVertex(theta, phi, radius, intensity, length, count, smoothness, 0.5f, 0.6f);
+    }
+    
+    /**
+     * Computes the deformed vertex position with full control for CLOUD/MOLECULE.
+     * 
+     * @param theta Polar angle (0 = top, π = bottom)
+     * @param phi Azimuthal angle (0 to 2π)
+     * @param radius Base radius
+     * @param intensity Deformation intensity (0 = sphere, 1 = full effect)
+     * @param length Axial stretch factor
+     * @param count Number of lobes (CLOUD) or atoms (MOLECULE), 1-20
+     * @param smoothness Roundness of bumps (0 = sharp, 1 = smooth)
+     * @param bumpSize Size of individual bumps/atoms (0.1-2.0)
+     * @param separation Distance of atoms from center for MOLECULE (0.3-1.5)
+     * @return {x, y, z} vertex position
+     */
+    public float[] computeVertex(float theta, float phi, float radius, 
+            float intensity, float length, int count, float smoothness,
+            float bumpSize, float separation) {
         // Get sphere position for blending
         float[] spherePos = ShapeMath.sphereVertex(theta, phi, radius);
         
@@ -130,13 +160,13 @@ public enum SphereDeformation {
             
             case CONE -> ShapeMath.coneVertex(theta, phi, radius, length);
             
-            case CLOUD -> ShapeMath.cloudVertex(theta, phi, radius, intensity, length);
+            case CLOUD -> ShapeMath.cloudVertex(theta, phi, radius, intensity, length, count, smoothness, bumpSize);
             
-            case MOLECULE -> ShapeMath.moleculeVertex(theta, phi, radius, intensity, length);
+            case MOLECULE -> ShapeMath.moleculeVertex(theta, phi, radius, intensity, length, count, smoothness, bumpSize, separation);
         };
         
-        // For SPHEROID, the intensity is already applied via effectiveLength, so return directly
-        if (this == SPHEROID) {
+        // For SPHEROID, CLOUD, MOLECULE - intensity is already applied, return directly
+        if (this == SPHEROID || this == CLOUD || this == MOLECULE) {
             return shapePos;
         }
         
@@ -149,14 +179,42 @@ public enum SphereDeformation {
     
     /**
      * Computes BOTH position AND normal for proper lighting.
-     * 
-     * <p>For spheroids, normals ≠ normalize(position). Uses gradient-based normals.</p>
-     * 
-     * @return {x, y, z, nx, ny, nz} - 6 element array
+     * Delegates to full version with default parameters.
      */
     public float[] computeFullVertex(float theta, float phi, float radius, 
             float intensity, float length) {
-        float[] pos = computeVertex(theta, phi, radius, intensity, length);
+        return computeFullVertex(theta, phi, radius, intensity, length, 6, 0.5f, 0.5f, 0.6f);
+    }
+    
+    /**
+     * Computes BOTH position AND normal for proper lighting with count and smoothness.
+     * Backward compatibility - delegates to full version.
+     */
+    public float[] computeFullVertex(float theta, float phi, float radius, 
+            float intensity, float length, int count, float smoothness) {
+        return computeFullVertex(theta, phi, radius, intensity, length, count, smoothness, 0.5f, 0.6f);
+    }
+    
+    /**
+     * Computes BOTH position AND normal for proper lighting with full control.
+     * 
+     * <p>For spheroids, normals ≠ normalize(position). Uses gradient-based normals.</p>
+     * 
+     * @param theta Polar angle
+     * @param phi Azimuthal angle
+     * @param radius Base radius
+     * @param intensity Deformation intensity
+     * @param length Axial stretch
+     * @param count Number of lobes/atoms for CLOUD/MOLECULE
+     * @param smoothness Roundness for CLOUD/MOLECULE
+     * @param bumpSize Size of individual bumps/atoms
+     * @param separation Distance of atoms from center for MOLECULE
+     * @return {x, y, z, nx, ny, nz} - 6 element array
+     */
+    public float[] computeFullVertex(float theta, float phi, float radius, 
+            float intensity, float length, int count, float smoothness,
+            float bumpSize, float separation) {
+        float[] pos = computeVertex(theta, phi, radius, intensity, length, count, smoothness, bumpSize, separation);
         
         // Compute proper normal based on shape type
         float[] normal;

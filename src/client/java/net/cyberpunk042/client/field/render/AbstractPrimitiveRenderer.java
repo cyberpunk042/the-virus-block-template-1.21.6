@@ -226,7 +226,7 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
                     float shapeHeight = getShapeHeight(primitive);
                     colorCtx = ColorContext.from(appearance, primaryColor, secondaryColor, time, shapeRadius, shapeHeight);
                 }
-                emitSolid(matrices, consumer, mesh, color, light, waveConfig, time, colorCtx, animation);
+                emitSolid(matrices, consumer, mesh, color, light, waveConfig, time, colorCtx, animation, primitive.shape());
             }
             case WIREFRAME -> emitWireframe(matrices, consumer, mesh, color, light, fill, waveConfig, time);
             case CAGE -> emitCage(matrices, consumer, mesh, color, light, fill, primitive, waveConfig, time);
@@ -495,6 +495,7 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
      * @param time Current time for wave animation
      * @param colorCtx ColorContext for per-vertex coloring (null for uniform color)
      * @param animation Animation config for travel effects (null for no travel effect)
+     * @param shape Shape for bounds calculation (used for travel effect on non-spherical shapes)
      */
     protected void emitSolid(
             MatrixStack matrices,
@@ -505,7 +506,8 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
             net.cyberpunk042.visual.animation.WaveConfig waveConfig,
             float time,
             ColorContext colorCtx,
-            Animation animation) {
+            Animation animation,
+            net.cyberpunk042.visual.shape.Shape shape) {
         
         // CP7: Final vertex emission - ALL segments that reach the vertex stage
         int a = (color >> 24) & 0xFF;
@@ -607,7 +609,39 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
             // Calculate travel phase from time and speed
             float travelSpeed = travelEffect.speed();
             float travelPhase = (time * travelSpeed * 0.05f) % 1f;  // 0.05 = speed scaling factor
-            emitter.travelEffect(travelEffect, travelPhase);
+            
+            // Check if shape is spherical (use normal-based) or not (use position-based)
+            boolean isSphericalShape = shape instanceof net.cyberpunk042.visual.shape.SphereShape;
+            
+            if (isSphericalShape) {
+                // Spheres: use normal-based t calculation
+                emitter.travelEffect(travelEffect, travelPhase);
+            } else if (shape instanceof net.cyberpunk042.visual.shape.JetShape jet) {
+                // Jet shapes: use position-based with shape-level minAlpha gradient
+                org.joml.Vector3f bounds = shape.getBounds();
+                float[] boundsMin = new float[] { -bounds.x / 2, -bounds.y / 2, -bounds.z / 2 };
+                float[] boundsMax = new float[] { bounds.x / 2, bounds.y / 2, bounds.z / 2 };
+                emitter.travelEffect(travelEffect, travelPhase, boundsMin, boundsMax,
+                    jet.baseMinAlpha(), jet.tipMinAlpha());
+            } else if (shape instanceof net.cyberpunk042.visual.shape.KamehamehaShape kamehameha) {
+                // Kamehameha shapes: use position-based with beam minAlpha gradient
+                org.joml.Vector3f bounds = shape.getBounds();
+                float[] boundsMin = new float[] { -bounds.x / 2, -bounds.y / 2, -bounds.z / 2 };
+                float[] boundsMax = new float[] { bounds.x / 2, bounds.y / 2, bounds.z / 2 };
+                // Use beam alpha gradient (orb is at base, tip is at end of beam)
+                emitter.travelEffect(travelEffect, travelPhase, boundsMin, boundsMax,
+                    kamehameha.beamBaseMinAlpha(), kamehameha.beamTipMinAlpha());
+            } else if (shape != null) {
+                // Other non-spherical shapes: use position-based t calculation with bounds
+                org.joml.Vector3f bounds = shape.getBounds();
+                // Bounds are half-extents from center, so full extent is -half to +half
+                float[] boundsMin = new float[] { -bounds.x / 2, -bounds.y / 2, -bounds.z / 2 };
+                float[] boundsMax = new float[] { bounds.x / 2, bounds.y / 2, bounds.z / 2 };
+                emitter.travelEffect(travelEffect, travelPhase, boundsMin, boundsMax);
+            } else {
+                // Fallback to normal-based
+                emitter.travelEffect(travelEffect, travelPhase);
+            }
         }
         
         emitter.emit(mesh);

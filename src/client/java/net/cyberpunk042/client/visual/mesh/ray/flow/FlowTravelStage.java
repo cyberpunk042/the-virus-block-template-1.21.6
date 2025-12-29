@@ -64,19 +64,20 @@ public final class FlowTravelStage implements FlowStage {
         
         return switch (mode) {
             case NONE -> 1.0f;
-            case CHASE -> {
+            case CHASE, BIPOLAR_CHASE_SYNC, BIPOLAR_CHASE_ALT, BIPOLAR -> {
                 // Multiple particles evenly spaced
                 float spacing = 1f / count;
+                float maxAlpha = 0f;
                 for (int i = 0; i < count; i++) {
                     float center = (phase + i * spacing) % 1f;
                     float dist = Math.min(Math.abs(t - center), Math.min(
                         Math.abs(t - center - 1f), Math.abs(t - center + 1f)));
                     if (dist <= width / 2f) {
                         float falloff = 1f - (dist / (width / 2f));
-                        yield falloff * falloff;
+                        maxAlpha = Math.max(maxAlpha, falloff * falloff);
                     }
                 }
-                yield 0f;
+                yield maxAlpha;
             }
             case REVERSE_CHASE -> {
                 // Same as CHASE but moves inward (from tip to base)
@@ -93,12 +94,16 @@ public final class FlowTravelStage implements FlowStage {
                 }
                 yield 0f;
             }
-            case SCROLL -> {
+            case SCROLL, BIPOLAR_SCROLL_SYNC, BIPOLAR_SCROLL_ALT -> {
                 // Continuous gradient scrolls along the ray
                 float scrolledT = (t + phase) % 1f;
                 yield 1f - Math.abs(scrolledT - 0.5f) * 2f;
             }
-            case COMET -> {
+            case REVERSE_SCROLL -> {
+                float scrolledT = (t - phase + 1f) % 1f;
+                yield 1f - Math.abs(scrolledT - 0.5f) * 2f;
+            }
+            case COMET, BIPOLAR_COMET_SYNC, BIPOLAR_COMET_ALT -> {
                 // Bright head with fading tail
                 float headPos = phase;
                 float tailLength = Math.max(0.1f, width);
@@ -129,7 +134,37 @@ public final class FlowTravelStage implements FlowStage {
                     yield 0f;
                 }
             }
-            case SPARK -> {
+            case REVERSE_COMET -> {
+                // Comet traveling inward
+                float headPos = 1f - phase;
+                float tailLength = Math.max(0.1f, width);
+                float tailEnd = headPos + tailLength;
+                
+                float distBehind;
+                if (t < headPos) {
+                    yield 0f;
+                } else if (t <= tailEnd || tailEnd > 1f) {
+                    distBehind = t - headPos;
+                    if (distBehind > tailLength && tailEnd > 1f) {
+                        // Wrapped case
+                        if (t < tailEnd - 1f) {
+                            distBehind = t + (1f - headPos);
+                        } else {
+                            yield 0f;
+                        }
+                    }
+                } else {
+                    yield 0f;
+                }
+                
+                if (distBehind >= 0 && distBehind <= tailLength) {
+                    float tailAlpha = 1f - (distBehind / tailLength);
+                    yield tailAlpha * tailAlpha;
+                } else {
+                    yield 0f;
+                }
+            }
+            case SPARK, BIPOLAR_SPARK_SYNC, BIPOLAR_SPARK_ALT -> {
                 // Random bright flashes
                 float maxAlpha = 0f;
                 for (int i = 0; i < count; i++) {
@@ -145,7 +180,7 @@ public final class FlowTravelStage implements FlowStage {
                 }
                 yield maxAlpha;
             }
-            case PULSE_WAVE -> {
+            case PULSE_WAVE, BIPOLAR_PULSE_SYNC, BIPOLAR_PULSE_ALT -> {
                 // Traveling wave of brightness
                 float waveWidth = Math.max(0.1f, width);
                 float maxAlpha = 0f;
@@ -162,28 +197,20 @@ public final class FlowTravelStage implements FlowStage {
                 }
                 yield maxAlpha;
             }
-            case BIPOLAR -> {
-                // Bipolar jet: TWO jets traveling from center (t=0.5) outward in both directions
-                // t=0.5 is center, t=0 and t=1 are the extremities
-                // Both jets have SAME phase (synchronized)
-                
-                // Convert t to distance from center (0 at center, 0.5 at extremities)
-                float distFromCenter = Math.abs(t - 0.5f);
-                
-                // Normalize to 0-1 range (0 = center, 1 = extremity)
-                float normalizedDist = distFromCenter * 2f;
-                
-                // Apply chase-like effect based on distance from center
-                float spacing = 1f / count;
+            case REVERSE_PULSE -> {
+                // Pulse wave traveling inward
+                float waveWidth = Math.max(0.1f, width);
                 float maxAlpha = 0f;
+                float reversePhase = 1f - phase;
                 for (int i = 0; i < count; i++) {
-                    float center = (phase + i * spacing) % 1f;
-                    float dist = Math.min(Math.abs(normalizedDist - center), 
-                        Math.min(Math.abs(normalizedDist - center - 1f), 
-                                 Math.abs(normalizedDist - center + 1f)));
-                    if (dist <= width / 2f) {
-                        float falloff = 1f - (dist / (width / 2f));
-                        maxAlpha = Math.max(maxAlpha, falloff * falloff);
+                    float waveCenter = (reversePhase + (float)i / count) % 1f;
+                    float dist = Math.min(Math.abs(t - waveCenter),
+                                 Math.min(Math.abs(t - waveCenter - 1f),
+                                          Math.abs(t - waveCenter + 1f)));
+                    if (dist < waveWidth) {
+                        float normalized = dist / waveWidth;
+                        float pulse = (float) Math.exp(-normalized * normalized * 4);
+                        maxAlpha = Math.max(maxAlpha, pulse);
                     }
                 }
                 yield maxAlpha;

@@ -38,6 +38,7 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
     @StateField private ConeShape cone = ConeShape.DEFAULT;
     @StateField private JetShape jet = JetShape.DEFAULT;
     @StateField private RaysShape rays = RaysShape.DEFAULT;
+    @StateField private KamehamehaShape kamehameha = KamehamehaShape.DEFAULT;
     
     // ═══════════════════════════════════════════════════════════════════════════
     // SHAPE SELECTOR
@@ -82,6 +83,7 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
             case ConeShape c -> this.cone = c;
             case JetShape j -> this.jet = j;
             case RaysShape r -> this.rays = r;
+            case KamehamehaShape k -> this.kamehameha = k;
             default -> Logging.GUI.topic("adapter").warn("Unknown shape type: {}", shape.getClass().getSimpleName());
         }
     }
@@ -116,6 +118,7 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
             case "cone" -> cone;
             case "jet" -> jet;
             case "rays" -> rays;
+            case "kamehameha" -> kamehameha;
             default -> {
                 Logging.GUI.topic("adapter").warn("Unknown shapeType '{}', defaulting to sphere", shapeType);
                 yield sphere;
@@ -160,6 +163,9 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
     public RaysShape rays() { return rays; }
     public void setRays(RaysShape rays) { this.rays = rays; }
     
+    public KamehamehaShape kamehameha() { return kamehameha; }
+    public void setKamehameha(KamehamehaShape kamehameha) { this.kamehameha = kamehameha; }
+    
     // ═══════════════════════════════════════════════════════════════════════════
     // RESET
     // ═══════════════════════════════════════════════════════════════════════════
@@ -176,6 +182,7 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
         this.cone = ConeShape.DEFAULT;
         this.jet = JetShape.DEFAULT;
         this.rays = RaysShape.DEFAULT;
+        this.kamehameha = KamehamehaShape.DEFAULT;
         this.shapeType = "sphere";
     }
 }

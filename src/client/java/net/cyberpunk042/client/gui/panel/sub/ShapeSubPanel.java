@@ -83,7 +83,8 @@ public class ShapeSubPanel extends AbstractPanel {
         CAPSULE("capsule", "Capsule"),
         CONE("cone", "Cone"),
         JET("jet", "Jet"),
-        RAYS("rays", "Rays");
+        RAYS("rays", "Rays"),
+        KAMEHAMEHA("kamehameha", "Kamehameha");
         
         private final String id;
         private final String label;

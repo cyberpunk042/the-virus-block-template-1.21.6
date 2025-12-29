@@ -98,7 +98,17 @@ public record JetShape(
     
     // === Caps ===
     @JsonField(skipIfDefault = true, defaultValue = "true") boolean capBase,
-    @JsonField(skipIfDefault = true) boolean capTip
+    @JsonField(skipIfDefault = true) boolean capTip,
+    
+    // === Alpha Gradient (along length) ===
+    /** Base alpha at center (where jet originates). */
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "1.0") float baseAlpha,
+    /** Minimum alpha at base (floor for travel effects). */
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "0.0") float baseMinAlpha,
+    /** Tip alpha at extremity (where jet ends). */
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "1.0") float tipAlpha,
+    /** Minimum alpha at tip (floor for travel effects). */
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "0.0") float tipMinAlpha
 ) implements Shape {
     
     // =========================================================================
@@ -121,33 +131,42 @@ public record JetShape(
         true,           // unifiedInner (use thickness mode by default)
         0.02f,          // innerWallThickness
         true,           // capBase
-        true            // capTip
+        true,           // capTip
+        1.0f,           // baseAlpha
+        0.0f,           // baseMinAlpha
+        0.3f,           // tipAlpha (fade out at tips)
+        0.0f            // tipMinAlpha
     );
     
     /** Pointed cone jet (classic sci-fi look). */
     public static final JetShape CONE = new JetShape(
         2.0f, 0.3f, 0.0f, 0.0f, 16, 1, true, 0.0f,
-        false, 0.0f, 0.0f, true, 0.02f, true, false);
+        false, 0.0f, 0.0f, true, 0.02f, true, false,
+        1.0f, 0.0f, 0.0f, 0.0f);  // Full at base, invisible at pointed tip
     
     /** Tube jet (parallel sided beams). */
     public static final JetShape TUBE = new JetShape(
         3.0f, 0.2f, 0.2f, 0.2f, 16, 4, true, 0.2f,
-        false, 0.0f, 0.0f, true, 0.02f, true, true);
+        false, 0.0f, 0.0f, true, 0.02f, true, true,
+        1.0f, 0.2f, 0.8f, 0.1f);  // Slight fade, high min alphas
     
     /** Hollow tube jet (like relativistic plasma jets). */
     public static final JetShape HOLLOW_TUBE = new JetShape(
         3.0f, 0.25f, 0.25f, 0.25f, 24, 4, true, 0.3f,
-        true, 0.18f, 0.18f, false, 0.02f, true, true);  // Uses custom radii (unifiedInner=false)
+        true, 0.18f, 0.18f, false, 0.02f, true, true,
+        1.0f, 0.3f, 0.6f, 0.2f);  // Plasma-like glow gradient
     
     /** Single upward jet (pointed cone). */
     public static final JetShape SINGLE_CONE = new JetShape(
         2.0f, 0.4f, 0.0f, 0.0f, 16, 1, false, 0.0f,
-        false, 0.0f, 0.0f, true, 0.02f, true, false);
+        false, 0.0f, 0.0f, true, 0.02f, true, false,
+        1.0f, 0.0f, 0.0f, 0.0f);  // Fades to invisible at tip
     
     /** Wide flared jets (like pulsar beams). */
     public static final JetShape FLARED = new JetShape(
         2.5f, 0.15f, 0.4f, 0.4f, 24, 4, true, 0.2f,
-        false, 0.0f, 0.0f, true, 0.02f, true, true);
+        false, 0.0f, 0.0f, true, 0.02f, true, true,
+        1.0f, 0.1f, 0.5f, 0.0f);  // Strong at base, fades at flared tips
     
     public static JetShape defaults() { return DEFAULT; }
     
@@ -279,7 +298,11 @@ public record JetShape(
             .unifiedInner(unifiedInner)
             .innerWallThickness(innerWallThickness)
             .capBase(capBase)
-            .capTip(capTip);
+            .capTip(capTip)
+            .baseAlpha(baseAlpha)
+            .baseMinAlpha(baseMinAlpha)
+            .tipAlpha(tipAlpha)
+            .tipMinAlpha(tipMinAlpha);
     }
     
     public static class Builder {
@@ -298,6 +321,10 @@ public record JetShape(
         private float innerWallThickness = 0.02f;
         private boolean capBase = true;
         private boolean capTip = false;
+        private float baseAlpha = 1.0f;
+        private float baseMinAlpha = 0.0f;
+        private float tipAlpha = 1.0f;
+        private float tipMinAlpha = 0.0f;
         
         public Builder length(float v) { this.length = v; return this; }
         public Builder baseRadius(float v) { this.baseRadius = v; return this; }
@@ -313,6 +340,10 @@ public record JetShape(
         public Builder unifiedInner(boolean v) { this.unifiedInner = v; return this; }
         public Builder innerWallThickness(float v) { this.innerWallThickness = v; return this; }
         public Builder capBase(boolean v) { this.capBase = v; return this; }
+        public Builder baseAlpha(float v) { this.baseAlpha = v; return this; }
+        public Builder baseMinAlpha(float v) { this.baseMinAlpha = v; return this; }
+        public Builder tipAlpha(float v) { this.tipAlpha = v; return this; }
+        public Builder tipMinAlpha(float v) { this.tipMinAlpha = v; return this; }
         public Builder capTip(boolean v) { this.capTip = v; return this; }
         
         /** Sets wall thickness for hollow jets (auto-calculates inner radii). */
@@ -329,7 +360,8 @@ public record JetShape(
                 segments, lengthSegments, dualJets, gap,
                 hollow, innerBaseRadius, innerTipRadius,
                 unifiedInner, innerWallThickness,
-                capBase, capTip
+                capBase, capTip,
+                baseAlpha, baseMinAlpha, tipAlpha, tipMinAlpha
             );
         }
     }

@@ -149,7 +149,13 @@ public final class ShapeRegistry {
             float lonStart = getFloat(params, "lonStart", 0.0f);
             float lonEnd = getFloat(params, "lonEnd", 1.0f);
             SphereAlgorithm algorithm = SphereAlgorithm.values()[0];
-            return new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm, SphereDeformation.NONE, 0f, 1f);
+            int deformCount = getInt(params, "deformationCount", 6);
+            float deformSmoothness = getFloat(params, "deformationSmoothness", 0.5f);
+            float deformBumpSize = getFloat(params, "deformationBumpSize", 0.5f);
+            float deformSeparation = getFloat(params, "deformationSeparation", 0.6f);
+            return new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, 
+                algorithm, SphereDeformation.NONE, 0f, 1f, deformCount, deformSmoothness, 
+                deformBumpSize, deformSeparation);
         });
         
         // Ring
@@ -260,10 +266,14 @@ public final class ShapeRegistry {
                 Boolean.parseBoolean(params.get("capBase").toString()) : true;
             boolean capTip = params.containsKey("capTip") ?
                 Boolean.parseBoolean(params.get("capTip").toString()) : false;
+            float baseAlpha = getFloat(params, "baseAlpha", 1.0f);
+            float baseMinAlpha = getFloat(params, "baseMinAlpha", 0f);
+            float tipAlpha = getFloat(params, "tipAlpha", 1.0f);
+            float tipMinAlpha = getFloat(params, "tipMinAlpha", 0f);
             return new JetShape(length, baseRadius, topTipRadius, bottomTipRadius, 
                 segments, lengthSegments, dualJets, gap, hollow, 
                 innerBaseRadius, innerTipRadius, unifiedInner, innerWallThickness,
-                capBase, capTip);
+                capBase, capTip, baseAlpha, baseMinAlpha, tipAlpha, tipMinAlpha);
         });
         
         // Rays (collection of straight line segments)

@@ -451,231 +451,301 @@ public final class ShapeMath {
         };
     }
     
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Cloud Deformation (Fluffy, Billowing Shape)
-    // ═══════════════════════════════════════════════════════════════════════════
-    
     /**
      * Cloud vertex position using multi-octave spherical noise.
+     * Legacy overload - delegates to full version with default bumpSize.
+     */
+    public static float[] cloudVertex(float theta, float phi, float radius, 
+            float intensity, float length) {
+        return cloudVertex(theta, phi, radius, intensity, length, 6, 0.5f, 0.5f);
+    }
+    
+    /**
+     * Cloud vertex position with count and smoothness (backward compat).
+     * Delegates to full version with default bumpSize.
+     */
+    public static float[] cloudVertex(float theta, float phi, float radius, 
+            float intensity, float length, int count, float smoothness) {
+        return cloudVertex(theta, phi, radius, intensity, length, count, smoothness, 0.5f);
+    }
+    
+    /**
+     * Cloud vertex position using SPHERICAL GAUSSIAN bumps.
      * 
-     * <p>Creates fluffy, billowing cloud shapes by combining multiple frequencies
-     * of sine-wave displacement. The result mimics cumulus cloud formations.</p>
+     * <p><b>Algorithm:</b> Uses Spherical Gaussian (SG) functions to create smooth,
+     * localized bumps on the sphere surface. Each bump is defined by:
+     * G(v) = e^(λ * (v·p - 1)) where v is vertex direction and p is bump center.</p>
      * 
-     * <p><b>Magic Formula:</b> Combines 4 octaves of spherical harmonics:
+     * <p><b>Mathematical Foundation:</b></p>
      * <ul>
-     *   <li>Octave 1: Large bulges (frequency 2-3)</li>
-     *   <li>Octave 2: Medium bumps (frequency 4-6)</li>
-     *   <li>Octave 3: Small details (frequency 7-9)</li>
-     *   <li>Octave 4: Fine texture (frequency 11-13)</li>
+     *   <li>Bump centers distributed using Fibonacci spiral (golden angle = 2.399963 rad)</li>
+     *   <li>Spherical Gaussian falloff: aligned (v·p=1) → full bump, opposite (v·p=-1) → no bump</li>
+     *   <li>Sharpness λ controls bump width (higher = narrower)</li>
+     *   <li>Bumps are ADDITIVE, not normalized by count</li>
      * </ul>
-     * Each octave has decreasing amplitude (1, 0.5, 0.25, 0.125).</p>
      * 
      * @param theta Polar angle (0 = top, π = bottom)
      * @param phi Azimuthal angle (0 to 2π)
      * @param radius Base radius
-     * @param intensity Cloud "fluffiness" (0 = sphere, 1 = very fluffy)
-     * @param length Axial stretch (1 = spherical, >1 = elongated cloud)
+     * @param intensity Overall bump prominence (0 = sphere, 1 = very bumpy)
+     * @param length Axial stretch (1 = spherical, >1 = elongated)
+     * @param count Number of bumps (1-20), evenly distributed on sphere
+     * @param smoothness Bump roundness (0 = sharp spikes, 1 = soft billows)
+     * @param bumpSize Individual bump amplitude (0.1-2.0)
      * @return {x, y, z} vertex position
      */
     public static float[] cloudVertex(float theta, float phi, float radius, 
-            float intensity, float length) {
+            float intensity, float length, int count, float smoothness, float bumpSize) {
+        
+        // Base trigonometry
         float sinTheta = (float) Math.sin(theta);
         float cosTheta = (float) Math.cos(theta);
         float sinPhi = (float) Math.sin(phi);
         float cosPhi = (float) Math.cos(phi);
         
-        // At intensity 0, return pure sphere
-        if (intensity < 0.05f) {
-            float baseX = radius * sinTheta * cosPhi;
-            float baseY = radius * length * cosTheta;
-            float baseZ = radius * sinTheta * sinPhi;
-            return new float[] { baseX, baseY, baseZ };
+        // Current vertex direction (unit vector on sphere)
+        float vx = sinTheta * cosPhi;
+        float vy = cosTheta;
+        float vz = sinTheta * sinPhi;
+        
+        // At intensity 0, return pure spheroid
+        if (intensity < 0.01f) {
+            return new float[] {
+                radius * vx,
+                radius * length * vy,
+                radius * vz
+            };
+        }
+        
+        // Clamp parameters
+        count = Math.max(1, Math.min(20, count));
+        smoothness = Math.max(0f, Math.min(1f, smoothness));
+        bumpSize = Math.max(0.1f, Math.min(2f, bumpSize));
+        
+        // ======================================================================
+        // SPHERICAL GAUSSIAN ALGORITHM
+        // ======================================================================
+        
+        // Map smoothness to sharpness (λ)
+        // Low smoothness (0) → high sharpness → narrow, distinct bumps
+        // High smoothness (1) → low sharpness → wide, blended bumps
+        float sharpness = 2.0f + (1.0f - smoothness) * 20.0f;  // Range: 2 to 22
+        
+        // Golden angle for Fibonacci spiral distribution (even coverage)
+        float goldenAngle = 2.399963f;  // ≈ 137.5°
+        
+        // Accumulate bump displacements
+        float totalDisplacement = 0.0f;
+        
+        for (int i = 0; i < count; i++) {
+            // Distribute bump centers using Fibonacci spiral
+            // This provides near-optimal even distribution on sphere
+            float t = (float) (i + 0.5f) / (float) count;  // 0.5 offset for centering
+            float bumpTheta = (float) Math.acos(1.0f - 2.0f * t);  // 0 to π
+            float bumpPhi = goldenAngle * i;  // Spiral around
+            
+            // Bump center direction (unit vector)
+            float px = (float) Math.sin(bumpTheta) * (float) Math.cos(bumpPhi);
+            float py = (float) Math.cos(bumpTheta);
+            float pz = (float) Math.sin(bumpTheta) * (float) Math.sin(bumpPhi);
+            
+            // Dot product = cos(angular_distance between vertex and bump center)
+            // Range: 1 (aligned) to -1 (opposite)
+            float dot = vx * px + vy * py + vz * pz;
+            
+            // Spherical Gaussian: G(v) = e^(λ * (dot - 1))
+            // When aligned (dot = 1): e^0 = 1 (full bump)
+            // When opposite (dot = -1): e^(-2λ) ≈ 0 (no bump)
+            float gaussian = (float) Math.exp(sharpness * (dot - 1.0f));
+            
+            // Add bump contribution with individual size variation
+            // Slight per-bump size variation for natural look
+            float sizeVariation = 0.8f + 0.4f * (float) Math.sin(i * 1.7f + 0.5f);
+            totalDisplacement += gaussian * bumpSize * sizeVariation;
         }
         
         // ======================================================================
-        // SPHERICAL HARMONICS FORMULA (from research)
-        // r'(θ, φ) = R_base + Σ f_l^m * Y_l^m(θ, φ)
-        // Using Real Spherical Harmonics for easier computation
+        // APPLY DISPLACEMENT
         // ======================================================================
         
-        // Real Spherical Harmonics Y_l^m(θ, φ)
-        // l=0: Y_0^0 = 0.5 * sqrt(1/π) ≈ 0.282 (constant, just sphere - skip)
+        // Scale displacement by intensity
+        // NO normalization by count - more bumps = bumpier surface (intentional)
+        float displacement = totalDisplacement * intensity * 0.25f;
         
-        // l=1: Dipole terms (large-scale asymmetry)
-        float y1_0 = cosTheta;  // Y_1^0 ∝ cos(θ) - vertical asymmetry
-        float y1_1 = sinTheta * cosPhi;  // Y_1^1 ∝ sin(θ)cos(φ) - x-direction
-        float y1_m1 = sinTheta * sinPhi;  // Y_1^-1 ∝ sin(θ)sin(φ) - z-direction
+        // Final radius: base + displacement (ADDITIVE, not multiplicative)
+        float finalRadius = radius * (1.0f + displacement);
         
-        // l=2: Quadrupole terms (4-lobe patterns)
-        float cos2Theta = 2 * cosTheta * cosTheta - 1;
-        float y2_0 = cos2Theta;  // Y_2^0 ∝ (3cos²θ - 1)
-        float y2_1 = sinTheta * cosTheta * cosPhi;  // Y_2^1
-        float y2_2 = sinTheta * sinTheta * (float) Math.cos(2 * phi);  // Y_2^2
-        
-        // l=3: Octupole terms (8-lobe patterns)
-        float y3_0 = cosTheta * (5 * cosTheta * cosTheta - 3) * 0.5f;  // Y_3^0
-        float y3_1 = sinTheta * (5 * cosTheta * cosTheta - 1) * cosPhi * 0.25f;  // Y_3^1
-        float y3_2 = sinTheta * sinTheta * cosTheta * (float) Math.cos(2 * phi);  // Y_3^2
-        float y3_3 = sinTheta * sinTheta * sinTheta * (float) Math.cos(3 * phi);  // Y_3^3
-        
-        // l=4: 16-lobe patterns (fine detail)
-        float y4_0 = (35 * cosTheta * cosTheta * cosTheta * cosTheta 
-                    - 30 * cosTheta * cosTheta + 3) * 0.125f;  // Y_4^0
-        float y4_4 = sinTheta * sinTheta * sinTheta * sinTheta 
-                    * (float) Math.cos(4 * phi);  // Y_4^4
-        
-        // ======================================================================
-        // COEFFICIENTS: Create cloud-like shape with billowing lobes
-        // ======================================================================
-        
-        // Intensity controls the amplitude - higher intensity = more dramatic
-        float amp = intensity * 0.5f;  // Max 50% displacement
-        
-        // Combine harmonics with pseudo-random coefficients for organic look
-        // The coefficients are chosen to create asymmetric, cloud-like bumps
-        float displacement = 
-            // l=1: Large asymmetric bulges
-            amp * 0.3f * (0.8f * y1_0 + 0.6f * y1_1 + 0.4f * y1_m1) +
-            // l=2: Medium 4-lobe pattern
-            amp * 0.4f * (0.5f * y2_0 + 0.7f * y2_1 + 0.3f * y2_2) +
-            // l=3: Smaller 8-lobe bumps
-            amp * 0.5f * (0.4f * y3_0 + 0.5f * y3_1 + 0.6f * y3_2 + 0.3f * y3_3) +
-            // l=4: Fine detail (cauliflower texture)
-            amp * 0.3f * (0.3f * y4_0 + 0.4f * y4_4);
-        
-        // Make displacement always positive (outward bulges only)
-        // This creates the characteristic cumulus "puffiness"
-        displacement = 0.5f + displacement * 0.5f;  // Map to 0.5-1.0 range
-        displacement = Math.max(0.3f, displacement);  // Minimum 30% radius
-        
-        // Add high-frequency noise for surface texture
-        float noise = 
-            0.1f * (float) Math.sin(7 * theta + 0.3f) * (float) Math.sin(11 * phi + 1.2f) +
-            0.05f * (float) Math.sin(13 * theta + 2.1f) * (float) Math.cos(9 * phi + 0.7f);
-        
-        float radiusFactor = displacement + noise * intensity;
-        
-        // Apply to base position
-        float baseX = radius * sinTheta * cosPhi * radiusFactor;
-        float baseY = radius * length * cosTheta * radiusFactor;
-        float baseZ = radius * sinTheta * sinPhi * radiusFactor;
-        
-        return new float[] { baseX, baseY, baseZ };
+        // Apply to position with axial stretch
+        return new float[] {
+            finalRadius * vx,
+            finalRadius * length * vy,
+            finalRadius * vz
+        };
     }
 
     /**
      * Molecule vertex position using METABALL IMPLICIT SURFACE formula.
+     * Legacy overload - delegates to full version.
+     */
+    public static float[] moleculeVertex(float theta, float phi, float radius, 
+            float intensity, float length) {
+        // Legacy: use fixed count of 4, default smoothness
+        return moleculeVertex(theta, phi, radius, intensity, length, 4, 0.5f, 0.4f, 0.6f);
+    }
+    
+    /**
+     * Molecule vertex position with count and smoothness (backward compat).
+     * Delegates to full version with default atomSize and separation.
+     */
+    public static float[] moleculeVertex(float theta, float phi, float radius, 
+            float intensity, float length, int count, float smoothness) {
+        return moleculeVertex(theta, phi, radius, intensity, length, count, smoothness, 0.4f, 0.6f);
+    }
+    
+    /**
+     * Molecule vertex position using METABALL IMPLICIT SURFACE algorithm.
      * 
-     * <p><b>RESEARCH-BASED MAGIC FORMULA (Jim Blinn, 1982):</b>
-     * Uses the metaball field equation: Influence = R² / distance²
+     * <p><b>Algorithm (Jim Blinn, 1982):</b> Each atom creates a spherical
+     * influence field with inverse-square falloff. Surface is where total
+     * field exceeds threshold.</p>
      * 
-     * <p>Intensity controls number of atomic lobes:
+     * <p><b>Key difference from CLOUD:</b></p>
      * <ul>
-     *   <li>0.0 = pure sphere (center only)</li>
-     *   <li>0.1 = 1 atom (diatomic)</li>
-     *   <li>0.2 = 2 atoms (like H2O)</li>
-     *   <li>0.3 = 3 atoms (like NH3)</li>
-     *   <li>0.4 = 4 atoms (like CH4 - tetrahedral)</li>
-     *   <li>0.5-1.0 = 5-10 atoms (complex molecule)</li>
+     *   <li>CLOUD: Bumps are centered ON the sphere surface</li>
+     *   <li>MOLECULE: Atoms are positioned AROUND the center at a distance</li>
      * </ul>
      * 
-     * <p>Each atom creates a spherical influence field that blends
-     * smoothly with neighbors using the metaball equation.</p>
+     * <p><b>Blending Modes (based on smoothness):</b></p>
+     * <ul>
+     *   <li>Low smoothness: MAX blending → distinct, separate atoms</li>
+     *   <li>High smoothness: ADDITIVE blending → merged blob</li>
+     * </ul>
      * 
      * @param theta Polar angle (0 = top, π = bottom)
      * @param phi Azimuthal angle (0 to 2π)
      * @param radius Base radius
-     * @param intensity Atom count control (0 = sphere, 1 = 10 atoms)
+     * @param intensity Overall atom prominence (0 = sphere, 1 = full atoms)
      * @param length Axial stretch
+     * @param count Number of atoms (1-12)
+     * @param smoothness Blend mode (0 = distinct spheres, 1 = merged blob)
+     * @param atomSize Size of each atom (0.1-1.0)
+     * @param separation Distance of atoms from center (0.3-1.5)
      * @return {x, y, z} vertex position
      */
     public static float[] moleculeVertex(float theta, float phi, float radius, 
-            float intensity, float length) {
+            float intensity, float length, int count, float smoothness, 
+            float atomSize, float separation) {
+        
+        // Base trigonometry
         float sinTheta = (float) Math.sin(theta);
         float cosTheta = (float) Math.cos(theta);
         float sinPhi = (float) Math.sin(phi);
         float cosPhi = (float) Math.cos(phi);
         
-        // Surface point direction (normalized)
-        float nx = sinTheta * cosPhi;
-        float ny = cosTheta;
-        float nz = sinTheta * sinPhi;
+        // Current vertex direction (unit vector on sphere)
+        float vx = sinTheta * cosPhi;
+        float vy = cosTheta;
+        float vz = sinTheta * sinPhi;
         
-        // At intensity 0, return pure sphere
-        if (intensity < 0.05f) {
-            float baseX = radius * nx;
-            float baseY = radius * length * ny;
-            float baseZ = radius * nz;
-            return new float[] { baseX, baseY, baseZ };
+        // At intensity 0, return pure spheroid
+        if (intensity < 0.01f) {
+            return new float[] {
+                radius * vx,
+                radius * length * vy,
+                radius * vz
+            };
         }
         
-        // Number of atoms: intensity 0.1 = 1 atom, 1.0 = 10 atoms
-        int numAtoms = (int) Math.ceil(intensity * 10.0f);
-        numAtoms = Math.max(1, Math.min(10, numAtoms));
+        // Clamp parameters
+        count = Math.max(1, Math.min(12, count));
+        smoothness = Math.max(0f, Math.min(1f, smoothness));
+        atomSize = Math.max(0.1f, Math.min(1f, atomSize));
+        separation = Math.max(0.3f, Math.min(1.5f, separation));
         
-        // Smooth transition for partial atoms
-        float partialAtom = (intensity * 10.0f) - (numAtoms - 1);
-        partialAtom = Math.max(0f, Math.min(1f, partialAtom));
+        // ======================================================================
+        // METABALL ALGORITHM
+        // ======================================================================
         
-        // Atom positions: golden angle spiral distribution
-        // Atoms are placed at distance atomOffset from center
+        // Golden angle for Fibonacci spiral distribution
         float goldenAngle = 2.399963f;
-        float atomOffset = 0.6f;  // How far atoms are from center
-        float atomRadius = 0.5f;  // Size of each atom sphere
         
-        // ==== METABALL FIELD CALCULATION ====
-        // For each point on surface, calculate sum of all atom influences
-        // Influence_i = R² / distance² where distance is from point to atom center
+        // Calculate influence from all atoms
+        float maxInfluence = 0.0f;
+        float sumInfluence = 0.0f;
         
-        float totalField = 0f;
-        float centralField = 1.0f;  // Central sphere always contributes
-        
-        for (int i = 0; i < numAtoms; i++) {
-            // Atom direction using golden angle spiral
-            float t = (float) i / Math.max(1, numAtoms - 1);
-            float atomTheta = (float) Math.acos(1.0 - 1.6 * t);  // 0° to ~100° from top
+        for (int i = 0; i < count; i++) {
+            // Distribute atoms using Fibonacci spiral (even coverage)
+            float t = (float) (i + 0.5f) / (float) count;
+            float atomTheta = (float) Math.acos(1.0f - 2.0f * t);
             float atomPhi = goldenAngle * i;
             
+            // Atom direction (unit vector)
             float ax = (float) Math.sin(atomTheta) * (float) Math.cos(atomPhi);
             float ay = (float) Math.cos(atomTheta);
             float az = (float) Math.sin(atomTheta) * (float) Math.sin(atomPhi);
             
-            // Atom center at offset from origin
-            float acx = ax * atomOffset;
-            float acy = ay * atomOffset;
-            float acz = az * atomOffset;
+            // Atom position in space (at distance 'separation' from center)
+            // Atoms are NOT on the surface, they're orbiting around center
+            float atomDist = separation;
+            float atomX = ax * atomDist;
+            float atomY = ay * atomDist;
+            float atomZ = az * atomDist;
             
-            // Distance from surface point direction to atom center
-            // We use (1 - dot) as proxy for angular distance
-            float dot = nx * ax + ny * ay + nz * az;
-            float angularDist = 1.0f - dot;  // 0 when pointing at atom, 2 when opposite
+            // Dot product = cos(angle between vertex direction and atom direction)
+            float dot = vx * ax + vy * ay + vz * az;
             
-            // Metaball field: R² / (distance² + epsilon)
-            // Higher value = closer to atom = more "pull"
-            float distSq = angularDist * angularDist + 0.01f;
-            float atomField = (atomRadius * atomRadius) / distSq;
+            // Angular distance: 0 when aligned, 2 when opposite
+            // This approximates "how close is this ray to passing through the atom"
+            float angularDist = 1.0f - dot;
             
-            // Last atom fades in smoothly
-            if (i == numAtoms - 1) {
-                atomField *= partialAtom;
-            }
+            // Metaball field: inverse-square falloff
+            // Higher atomSize = larger influence radius
+            float influenceRadius = atomSize * 0.8f;
+            float distSq = angularDist * angularDist;
+            float epsilon = 0.05f;  // Prevent division by zero
             
-            // ADDITIVE blending for metaball effect
-            totalField += atomField;
+            // Classic metaball: R² / (r² + ε)
+            float influence = (influenceRadius * influenceRadius) / (distSq + epsilon);
+            
+            // Track both max and sum for blending modes
+            maxInfluence = Math.max(maxInfluence, influence);
+            sumInfluence += influence;
         }
         
-        // Surface displacement based on total field
-        // Field threshold: where field >= 1.0, we get surface
-        // Map total field to radius displacement
-        float fieldEffect = Math.min(2.0f, totalField);  // Cap at 2x
-        float radiusFactor = 0.7f + fieldEffect * 0.4f;  // Range 0.7 to 1.5
+        // ======================================================================
+        // BLEND MODE: MAX vs ADDITIVE based on smoothness
+        // ======================================================================
         
-        // Apply to base position
-        float baseX = radius * nx * radiusFactor;
-        float baseY = radius * length * ny * radiusFactor;
-        float baseZ = radius * nz * radiusFactor;
+        // Interpolate between max-blending and additive-blending
+        // Low smoothness (0) → use MAX → distinct atoms
+        // High smoothness (1) → use SUM → merged blob
+        float blendFactor = smoothness;
+        float finalInfluence = maxInfluence * (1.0f - blendFactor) + 
+                               (sumInfluence / count) * blendFactor;
         
-        return new float[] { baseX, baseY, baseZ };
+        // ======================================================================
+        // MAP INFLUENCE TO DISPLACEMENT
+        // ======================================================================
+        
+        // Convert influence to a bump displacement
+        // Influence ranges from ~0 to potentially very high near atoms
+        // We want displacement to saturate at a reasonable maximum
+        
+        // Normalize influence to 0-1 range using smooth saturation
+        float normalizedInfluence = finalInfluence / (1.0f + finalInfluence);
+        
+        // Apply intensity
+        float displacement = normalizedInfluence * intensity * 0.6f;
+        
+        // Final radius: base + displacement (ADDITIVE)
+        float finalRadius = radius * (1.0f + displacement);
+        
+        // Apply to position with axial stretch
+        return new float[] {
+            finalRadius * vx,
+            finalRadius * length * vy,
+            finalRadius * vz
+        };
     }
 }
 

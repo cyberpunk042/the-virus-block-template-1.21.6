@@ -478,6 +478,7 @@ public final class FieldLoader {
                 .polyType(PolyType.valueOf(json.get("polyType").getAsString().toUpperCase()))
                 .radius(json.get("radius").getAsFloat())
                 .build();
+            case "kamehameha" -> KamehamehaShape.fromJson(json);
             default -> DefaultsProvider.getDefaultShape(type);
         };
     }

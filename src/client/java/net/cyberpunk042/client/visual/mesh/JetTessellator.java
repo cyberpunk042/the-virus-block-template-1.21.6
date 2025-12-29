@@ -113,6 +113,10 @@ public final class JetTessellator {
         float baseR = shape.baseRadius();
         float tipR = isTop ? shape.topTipRadius() : shape.bottomTipRadius();
         
+        // Alpha gradient: base to tip
+        float baseAlpha = shape.baseAlpha();
+        float tipAlpha = shape.tipAlpha();
+        
         // Y coordinates: base at gap edge, tip at base + length
         float yBase = isTop ? halfGap : -halfGap;
         float yTip = isTop ? (halfGap + length) : -(halfGap + length);
@@ -126,6 +130,7 @@ public final class JetTessellator {
         tessellateConeFrustum(builder, segments, lengthSegs,
             baseR, tipR, yBase, yTip, dir,
             true, // isOuter
+            baseAlpha, tipAlpha,
             pattern, visibility, wave, time, applyWave);
         
         // =====================================================================
@@ -149,6 +154,7 @@ public final class JetTessellator {
                 tessellateConeFrustum(builder, segments, lengthSegs,
                     innerBaseR, innerTipR, yBase, yTip, dir,
                     false, // inner wall (normals point inward)
+                    baseAlpha, tipAlpha,
                     pattern, visibility, wave, time, applyWave);
             }
         }
@@ -201,6 +207,7 @@ public final class JetTessellator {
                                                float baseR, float tipR,
                                                float yBase, float yTip, float dir,
                                                boolean isOuter,
+                                               float baseAlpha, float tipAlpha,
                                                VertexPattern pattern, VisibilityMask visibility,
                                                WaveConfig wave, float time, boolean applyWave) {
         
@@ -220,6 +227,9 @@ public final class JetTessellator {
             float t = h / (float) lengthSegs;
             float y = yBase + (yTip - yBase) * t;
             float r = baseR + (tipR - baseR) * t;
+            
+            // Interpolate alpha from base to tip
+            float alpha = baseAlpha + (tipAlpha - baseAlpha) * t;
             
             for (int s = 0; s <= segments; s++) {
                 float angle = (s / (float) segments) * GeometryMath.TWO_PI;
@@ -241,7 +251,7 @@ public final class JetTessellator {
                 float u = s / (float) segments;
                 float v = t;
                 
-                Vertex vert = new Vertex(x, y, z, nx, ny, nz, u, v, 1.0f);
+                Vertex vert = new Vertex(x, y, z, nx, ny, nz, u, v, alpha);
                 if (applyWave) {
                     vert = WaveDeformer.applyToVertex(vert, wave, time);
                 }

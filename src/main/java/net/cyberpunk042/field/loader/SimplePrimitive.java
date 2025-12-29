@@ -162,6 +162,7 @@ public record SimplePrimitive(
                     : net.cyberpunk042.visual.shape.PolyType.ICOSAHEDRON)
                 .radius(json.has("radius") ? json.get("radius").getAsFloat() : 1.0f)
                 .build();
+            case "kamehameha" -> net.cyberpunk042.visual.shape.KamehamehaShape.fromJson(json);
             default -> net.cyberpunk042.visual.shape.SphereShape.builder().radius(1.0f).latSteps(32).lonSteps(64).build();
         };
     }

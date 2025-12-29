@@ -186,7 +186,41 @@ public record KamehamehaShape(
     /** Aura alpha multiplier. */
     @Range(ValueRange.NORMALIZED) 
     @JsonField(skipIfDefault = true, defaultValue = "0.3")
-    float auraAlpha
+    float auraAlpha,
+    
+    // =========================================================================
+    // ALPHA GRADIENT CONFIGURATION
+    // =========================================================================
+    
+    /** Orb alpha (standard opacity). */
+    @Range(ValueRange.NORMALIZED)
+    @JsonField(skipIfDefault = true, defaultValue = "1.0")
+    float orbAlpha,
+    
+    /** Orb minimum alpha (floor for travel effects). */
+    @Range(ValueRange.NORMALIZED)
+    @JsonField(skipIfDefault = true, defaultValue = "0.0")
+    float orbMinAlpha,
+    
+    /** Beam base alpha at orb connection. */
+    @Range(ValueRange.NORMALIZED)
+    @JsonField(skipIfDefault = true, defaultValue = "1.0")
+    float beamBaseAlpha,
+    
+    /** Beam base minimum alpha (floor for travel effects). */
+    @Range(ValueRange.NORMALIZED)
+    @JsonField(skipIfDefault = true, defaultValue = "0.0")
+    float beamBaseMinAlpha,
+    
+    /** Beam tip alpha at far end. */
+    @Range(ValueRange.NORMALIZED)
+    @JsonField(skipIfDefault = true, defaultValue = "0.8")
+    float beamTipAlpha,
+    
+    /** Beam tip minimum alpha (floor for travel effects). */
+    @Range(ValueRange.NORMALIZED)
+    @JsonField(skipIfDefault = true, defaultValue = "0.0")
+    float beamTipMinAlpha
     
 ) implements Shape {
     
@@ -232,7 +266,11 @@ public record KamehamehaShape(
         // Core
         true, 0.4f, 1.5f,
         // Aura
-        true, 1.3f, 0.3f
+        true, 1.3f, 0.3f,
+        // Alpha gradient
+        1.0f, 0.2f,  // orbAlpha, orbMinAlpha
+        1.0f, 0.1f,  // beamBaseAlpha, beamBaseMinAlpha
+        0.6f, 0.0f   // beamTipAlpha, beamTipMinAlpha (fades at tip)
     );
     
     /** Rasengan orb (no beam, just spiraling sphere). */
@@ -242,7 +280,8 @@ public record KamehamehaShape(
         0.0f, 0.0f, 0.0f, 16, 1, 0.0f,  // No beam
         TipStyle.ROUNDED,
         true, 0.5f, 2.0f,
-        true, 1.4f, 0.4f
+        true, 1.4f, 0.4f,
+        1.0f, 0.3f, 1.0f, 0.0f, 0.0f, 0.0f  // Strong orb, no beam
     );
     
     /** Lightning bolt attack. */
@@ -252,7 +291,8 @@ public record KamehamehaShape(
         8.0f, 0.1f, 0.05f, 8, 12, 1.0f,
         TipStyle.POINTED,
         true, 0.3f, 2.0f,
-        true, 1.5f, 0.5f
+        true, 1.5f, 0.5f,
+        0.8f, 0.1f, 1.0f, 0.2f, 0.3f, 0.0f  // Flickering lightning
     );
     
     /** Fire blast. */
@@ -262,7 +302,8 @@ public record KamehamehaShape(
         4.0f, 0.35f, 0.5f, 16, 6, 1.0f,
         TipStyle.ROUNDED,
         true, 0.6f, 1.8f,
-        true, 1.4f, 0.4f
+        true, 1.4f, 0.4f,
+        1.0f, 0.3f, 0.9f, 0.2f, 0.7f, 0.1f  // Bright fire gradient
     );
     
     /** Frost beam. */
@@ -272,7 +313,8 @@ public record KamehamehaShape(
         6.0f, 0.15f, 0.1f, 6, 10, 1.0f,
         TipStyle.POINTED,
         false, 0.0f, 1.0f,
-        true, 1.2f, 0.2f
+        true, 1.2f, 0.2f,
+        0.9f, 0.1f, 0.8f, 0.1f, 0.4f, 0.0f  // Cold crisp fade
     );
     
     /** Unstable overloaded attack. */
@@ -282,7 +324,8 @@ public record KamehamehaShape(
         3.0f, 0.4f, 0.6f, 16, 4, 1.0f,
         TipStyle.VORTEX,
         true, 0.7f, 2.5f,
-        true, 1.6f, 0.5f
+        true, 1.6f, 0.5f,
+        1.0f, 0.4f, 1.0f, 0.3f, 0.8f, 0.2f  // Unstable flickering glow
     );
     
     /** Ghost spirit attack. */
@@ -292,7 +335,8 @@ public record KamehamehaShape(
         7.0f, 0.3f, 0.25f, 16, 10, 1.0f,
         TipStyle.ROUNDED,
         false, 0.0f, 1.0f,
-        true, 1.5f, 0.2f
+        true, 1.5f, 0.2f,
+        0.6f, 0.1f, 0.5f, 0.0f, 0.2f, 0.0f  // Ethereal fade
     );
     
     /** Void/dark energy. */
@@ -302,7 +346,8 @@ public record KamehamehaShape(
         6.0f, 0.35f, 0.4f, 16, 8, 1.0f,
         TipStyle.VORTEX,
         true, 0.8f, 0.5f,  // Dark core
-        true, 1.4f, 0.4f
+        true, 1.4f, 0.4f,
+        0.8f, 0.3f, 0.7f, 0.2f, 0.5f, 0.1f  // Dark energy gradient
     );
     
     /** Charging state (orb only, no beam). */
@@ -464,6 +509,13 @@ public record KamehamehaShape(
             .hasAura(json.has("hasAura") && json.get("hasAura").getAsBoolean())
             .auraScale(json.has("auraScale") ? json.get("auraScale").getAsFloat() : 1.3f)
             .auraAlpha(json.has("auraAlpha") ? json.get("auraAlpha").getAsFloat() : 0.3f)
+            // Alpha gradient
+            .orbAlpha(json.has("orbAlpha") ? json.get("orbAlpha").getAsFloat() : 1.0f)
+            .orbMinAlpha(json.has("orbMinAlpha") ? json.get("orbMinAlpha").getAsFloat() : 0.0f)
+            .beamBaseAlpha(json.has("beamBaseAlpha") ? json.get("beamBaseAlpha").getAsFloat() : 1.0f)
+            .beamBaseMinAlpha(json.has("beamBaseMinAlpha") ? json.get("beamBaseMinAlpha").getAsFloat() : 0.0f)
+            .beamTipAlpha(json.has("beamTipAlpha") ? json.get("beamTipAlpha").getAsFloat() : 0.8f)
+            .beamTipMinAlpha(json.has("beamTipMinAlpha") ? json.get("beamTipMinAlpha").getAsFloat() : 0.0f)
             .build();
     }
     
@@ -487,7 +539,11 @@ public record KamehamehaShape(
             // Core
             .hasCore(hasCore).coreRatio(coreRatio).coreBrightness(coreBrightness)
             // Aura
-            .hasAura(hasAura).auraScale(auraScale).auraAlpha(auraAlpha);
+            .hasAura(hasAura).auraScale(auraScale).auraAlpha(auraAlpha)
+            // Alpha gradient
+            .orbAlpha(orbAlpha).orbMinAlpha(orbMinAlpha)
+            .beamBaseAlpha(beamBaseAlpha).beamBaseMinAlpha(beamBaseMinAlpha)
+            .beamTipAlpha(beamTipAlpha).beamTipMinAlpha(beamTipMinAlpha);
     }
     
     public static class Builder {
@@ -517,6 +573,13 @@ public record KamehamehaShape(
         private boolean hasAura = true;
         private float auraScale = 1.3f;
         private float auraAlpha = 0.3f;
+        // Alpha gradient
+        private float orbAlpha = 1.0f;
+        private float orbMinAlpha = 0.0f;
+        private float beamBaseAlpha = 1.0f;
+        private float beamBaseMinAlpha = 0.0f;
+        private float beamTipAlpha = 0.8f;
+        private float beamTipMinAlpha = 0.0f;
         
         // Orb setters
         public Builder orbType(EnergyType v) { this.orbType = v != null ? v : EnergyType.CLASSIC; return this; }
@@ -549,6 +612,14 @@ public record KamehamehaShape(
         public Builder auraScale(float v) { this.auraScale = v; return this; }
         public Builder auraAlpha(float v) { this.auraAlpha = v; return this; }
         
+        // Alpha gradient setters
+        public Builder orbAlpha(float v) { this.orbAlpha = v; return this; }
+        public Builder orbMinAlpha(float v) { this.orbMinAlpha = v; return this; }
+        public Builder beamBaseAlpha(float v) { this.beamBaseAlpha = v; return this; }
+        public Builder beamBaseMinAlpha(float v) { this.beamBaseMinAlpha = v; return this; }
+        public Builder beamTipAlpha(float v) { this.beamTipAlpha = v; return this; }
+        public Builder beamTipMinAlpha(float v) { this.beamTipMinAlpha = v; return this; }
+        
         public KamehamehaShape build() {
             return new KamehamehaShape(
                 orbType, orbTransition, orbRadius, orbSegments, orbProgress,
@@ -556,7 +627,8 @@ public record KamehamehaShape(
                 beamLength, beamBaseRadius, beamTipRadius, beamSegments, beamLengthSegments, beamProgress,
                 tipStyle,
                 hasCore, coreRatio, coreBrightness,
-                hasAura, auraScale, auraAlpha
+                hasAura, auraScale, auraAlpha,
+                orbAlpha, orbMinAlpha, beamBaseAlpha, beamBaseMinAlpha, beamTipAlpha, beamTipMinAlpha
             );
         }
     }

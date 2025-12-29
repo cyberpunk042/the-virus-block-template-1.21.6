@@ -46,6 +46,10 @@ public final class VertexEmitter {
     // Travel effect support (directional alpha animation)
     private TravelEffectConfig travelEffect = null;
     private float travelPhase = 0f;
+    private float[] travelBoundsMin = null;  // [minX, minY, minZ] for position-based t
+    private float[] travelBoundsMax = null;  // [maxX, maxY, maxZ]
+    private float shapeBaseMinAlpha = 0f;    // Shape's minimum alpha at base (t=0)
+    private float shapeTipMinAlpha = 0f;     // Shape's minimum alpha at tip (t=1)
     
     // Per-vertex color support
     private ColorContext colorContext = null;
@@ -180,6 +184,9 @@ public final class VertexEmitter {
      * Sets travel effect configuration for directional alpha animation.
      * When set, vertex alpha is modulated based on position along the travel axis.
      * 
+     * <p>For spherical shapes, use this method without bounds - it will use vertex
+     * normals to compute position (works because normals point radially outward).</p>
+     * 
      * @param config Travel effect configuration
      * @param phase Current animation phase (0-1, varies over time)
      * @return this emitter for chaining
@@ -187,6 +194,58 @@ public final class VertexEmitter {
     public VertexEmitter travelEffect(TravelEffectConfig config, float phase) {
         this.travelEffect = config;
         this.travelPhase = phase;
+        this.travelBoundsMin = null;
+        this.travelBoundsMax = null;
+        return this;
+    }
+    
+    /**
+     * Sets travel effect with explicit bounds for position-based t calculation.
+     * 
+     * <p>Use this method for non-spherical shapes (jets, cylinders, prisms, etc.)
+     * where vertex normals don't point radially from center. The bounds define
+     * the extents of the shape along each axis for proper t normalization.</p>
+     * 
+     * @param config Travel effect configuration
+     * @param phase Current animation phase (0-1, varies over time)
+     * @param boundsMin Minimum extents [minX, minY, minZ]
+     * @param boundsMax Maximum extents [maxX, maxY, maxZ]
+     * @return this emitter for chaining
+     */
+    public VertexEmitter travelEffect(TravelEffectConfig config, float phase, 
+                                       float[] boundsMin, float[] boundsMax) {
+        this.travelEffect = config;
+        this.travelPhase = phase;
+        this.travelBoundsMin = boundsMin;
+        this.travelBoundsMax = boundsMax;
+        this.shapeBaseMinAlpha = 0f;
+        this.shapeTipMinAlpha = 0f;
+        return this;
+    }
+    
+    /**
+     * Sets travel effect with bounds AND shape-level min alpha gradient.
+     * 
+     * <p>Use this for shapes like jets or beams that have a base-to-tip alpha
+     * gradient where the travel effect should not go below the interpolated floor.</p>
+     * 
+     * @param config Travel effect configuration
+     * @param phase Current animation phase (0-1)
+     * @param boundsMin Minimum extents [minX, minY, minZ]
+     * @param boundsMax Maximum extents [maxX, maxY, maxZ]
+     * @param baseMinAlpha Minimum alpha at base (t=0) - travel can't go below this
+     * @param tipMinAlpha Minimum alpha at tip (t=1) - travel can't go below this
+     * @return this emitter for chaining
+     */
+    public VertexEmitter travelEffect(TravelEffectConfig config, float phase, 
+                                       float[] boundsMin, float[] boundsMax,
+                                       float baseMinAlpha, float tipMinAlpha) {
+        this.travelEffect = config;
+        this.travelPhase = phase;
+        this.travelBoundsMin = boundsMin;
+        this.travelBoundsMax = boundsMax;
+        this.shapeBaseMinAlpha = baseMinAlpha;
+        this.shapeTipMinAlpha = tipMinAlpha;
         return this;
     }
     
@@ -195,6 +254,10 @@ public final class VertexEmitter {
      */
     public VertexEmitter noTravelEffect() {
         this.travelEffect = null;
+        this.travelBoundsMin = null;
+        this.travelBoundsMax = null;
+        this.shapeBaseMinAlpha = 0f;
+        this.shapeTipMinAlpha = 0f;
         return this;
     }
     
@@ -295,9 +358,24 @@ public final class VertexEmitter {
         
         // Apply travel effect to alpha if configured
         if (travelEffect != null && travelEffect.isActive()) {
-            // Use vertex normal as direction (works for spheres and any centered shape)
-            float t = TravelEffectComputer.computeTForSphere(
-                vertex.nx(), vertex.ny(), vertex.nz(), travelEffect);
+            float t;
+            
+            if (travelBoundsMin != null && travelBoundsMax != null) {
+                // Position-based t calculation (for jets, cylinders, etc.)
+                // Use the LOCAL (pre-transform) vertex position
+                t = TravelEffectComputer.computeT(
+                    vertex.x(), vertex.y(), vertex.z(),
+                    travelEffect, travelBoundsMin, travelBoundsMax);
+            } else {
+                // Normal-based t calculation (for spheres and centered shapes)
+                // Works because normals point radially outward from center
+                t = TravelEffectComputer.computeTForSphere(
+                    vertex.nx(), vertex.ny(), vertex.nz(), travelEffect);
+            }
+            
+            // Compute interpolated shape-level minAlpha floor
+            // This is the minimum alpha at this vertex's position along the shape
+            float shapeMinAlpha = shapeBaseMinAlpha + (shapeTipMinAlpha - shapeBaseMinAlpha) * t;
             
             // Get base alpha from color
             int baseAlpha = (vertexColor >> 24) & 0xFF;
@@ -306,6 +384,10 @@ public final class VertexEmitter {
             // Compute travel-modified alpha
             float modifiedAlpha = TravelEffectComputer.computeAlpha(
                 baseAlphaF, t, travelEffect, travelPhase);
+            
+            // Apply the shape-level minAlpha floor
+            // The final alpha cannot go below the interpolated shape minimum
+            modifiedAlpha = Math.max(modifiedAlpha, shapeMinAlpha);
             
             // Replace alpha in vertexColor
             int newAlpha = (int)(modifiedAlpha * 255) & 0xFF;

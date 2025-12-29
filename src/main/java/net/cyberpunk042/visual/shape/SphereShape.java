@@ -56,11 +56,19 @@ public record SphereShape(
     @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true) float lonStart,
     @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "1") float lonEnd,
     @JsonField(skipIfEqualsConstant = "LAT_LON") SphereAlgorithm algorithm,
-    // === Deformation (transform sphere into droplet, egg, etc.) ===
+    // === Deformation (transform sphere into droplet, egg, cloud, molecule, etc.) ===
     @JsonField(skipIfDefault = true) SphereDeformation deformation,
     @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true) float deformationIntensity,
     /** Axial stretch: 1.0 = normal, >1 = elongated (prolate), <1 = squashed (oblate) */
-    @JsonField(skipIfDefault = true, defaultValue = "1") float deformationLength
+    @JsonField(skipIfDefault = true, defaultValue = "1") float deformationLength,
+    /** Number of lobes/atoms for CLOUD/MOLECULE (1-20, default 6) */
+    @JsonField(skipIfDefault = true, defaultValue = "6") int deformationCount,
+    /** Smoothness for rounding spikes in CLOUD/MOLECULE (0 = sharp, 1 = smooth, default 0.5) */
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "0.5") float deformationSmoothness,
+    /** Size of individual bumps/atoms (0.1-2.0, default 0.5). CLOUD: bump prominence. MOLECULE: atom size. */
+    @JsonField(skipIfDefault = true, defaultValue = "0.5") float deformationBumpSize,
+    /** Distance of atoms from center for MOLECULE (0.3-1.5, default 0.6). Higher = atoms further out. */
+    @JsonField(skipIfDefault = true, defaultValue = "0.6") float deformationSeparation
 ) implements Shape {
     public static final String DEFAULT_ALGORITHM = "uv";
 
@@ -68,23 +76,23 @@ public record SphereShape(
     /** Default sphere (1.0 radius, medium detail, full sphere). */
     public static SphereShape of(float radius) { 
         return new SphereShape(radius, 16, 32, 0f, 1f, 0f, 1f, SphereAlgorithm.values()[0], 
-            SphereDeformation.NONE, 0f, 1f); 
+            SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, 0.6f); 
     }
     public static SphereShape defaults() { return DEFAULT; }
     
     public static final SphereShape DEFAULT = new SphereShape(
         1.0f, 32, 64, 0.0f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON,
-        SphereDeformation.NONE, 0f, 1f);
+        SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, 0.6f);
     
     /** Low-poly sphere for performance. */
     public static final SphereShape LOW_POLY = new SphereShape(
         1.0f, 8, 16, 0.0f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON,
-        SphereDeformation.NONE, 0f, 1f);
+        SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, 0.6f);
     
     /** High-detail sphere. */
     public static final SphereShape HIGH_DETAIL = new SphereShape(
         1.0f, 64, 128, 0.0f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON,
-        SphereDeformation.NONE, 0f, 1f);
+        SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, 0.6f);
     
     /**
      * Creates a simple sphere with default tessellation.
@@ -92,7 +100,7 @@ public record SphereShape(
      */
     public static SphereShape ofRadius(@Range(ValueRange.RADIUS) float radius) {
         return new SphereShape(radius, 32, 64, 0.0f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON,
-            SphereDeformation.NONE, 0f, 1f);
+            SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, 0.6f);
     }
     
     /**
@@ -101,7 +109,7 @@ public record SphereShape(
      */
     public static SphereShape hemisphereTop(@Range(ValueRange.RADIUS) float radius) {
         return new SphereShape(radius, 16, 64, 0.0f, 0.5f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON,
-            SphereDeformation.NONE, 0f, 1f);
+            SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, 0.6f);
     }
     
     /**
@@ -110,7 +118,7 @@ public record SphereShape(
      */
     public static SphereShape hemisphereBottom(@Range(ValueRange.RADIUS) float radius) {
         return new SphereShape(radius, 16, 64, 0.5f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON,
-            SphereDeformation.NONE, 0f, 1f);
+            SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, 0.6f);
     }
     
     @Override
@@ -180,8 +188,26 @@ public record SphereShape(
                 Logging.FIELD.topic("parse").warn("Invalid sphere algorithm '{}', using LAT_LON", algStr);
             }
         }
+        SphereDeformation deformation = SphereDeformation.NONE;
+        if (json.has("deformation")) {
+            String defStr = json.get("deformation").getAsString();
+            try {
+                deformation = SphereDeformation.valueOf(defStr.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                Logging.FIELD.topic("parse").warn("Invalid sphere deformation '{}', using NONE", defStr);
+            }
+        }
         
-        SphereShape result = new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm, SphereDeformation.NONE, 0f, 1f);
+        float deformationIntensity = json.has("deformationIntensity") ? json.get("deformationIntensity").getAsFloat() : 0f;
+        float deformationLength = json.has("deformationLength") ? json.get("deformationLength").getAsFloat() : 1f;
+        int deformationCount = json.has("deformationCount") ? json.get("deformationCount").getAsInt() : 6;
+        float deformationSmoothness = json.has("deformationSmoothness") ? json.get("deformationSmoothness").getAsFloat() : 0.5f;
+        float deformationBumpSize = json.has("deformationBumpSize") ? json.get("deformationBumpSize").getAsFloat() : 0.5f;
+        float deformationSeparation = json.has("deformationSeparation") ? json.get("deformationSeparation").getAsFloat() : 0.6f;
+        
+        SphereShape result = new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm, 
+            deformation, deformationIntensity, deformationLength, deformationCount, deformationSmoothness,
+            deformationBumpSize, deformationSeparation);
         Logging.FIELD.topic("parse").trace("Parsed SphereShape: radius={}, latSteps={}, lonSteps={}, algorithm={}", 
             radius, latSteps, lonSteps, algorithm);
         return result;
@@ -210,7 +236,11 @@ public record SphereShape(
             .algorithm(algorithm)
             .deformation(deformation)
             .deformationIntensity(deformationIntensity)
-            .deformationLength(deformationLength);
+            .deformationLength(deformationLength)
+            .deformationCount(deformationCount)
+            .deformationSmoothness(deformationSmoothness)
+            .deformationBumpSize(deformationBumpSize)
+            .deformationSeparation(deformationSeparation);
     }
     
     /** Returns effective deformation, defaulting to NONE if null. */
@@ -235,6 +265,10 @@ public record SphereShape(
         private SphereDeformation deformation = SphereDeformation.NONE;
         private float deformationIntensity = 0f;
         private float deformationLength = 1f;
+        private int deformationCount = 6;
+        private float deformationSmoothness = 0.5f;
+        private float deformationBumpSize = 0.5f;
+        private float deformationSeparation = 0.6f;
         
         public Builder radius(float r) { this.radius = r; return this; }
         public Builder latSteps(int s) { this.latSteps = s; return this; }
@@ -247,10 +281,16 @@ public record SphereShape(
         public Builder deformation(SphereDeformation d) { this.deformation = d != null ? d : SphereDeformation.NONE; return this; }
         public Builder deformationIntensity(float i) { this.deformationIntensity = i; return this; }
         public Builder deformationLength(float l) { this.deformationLength = l; return this; }
+        public Builder deformationCount(int c) { this.deformationCount = Math.max(1, Math.min(20, c)); return this; }
+        public Builder deformationSmoothness(float s) { this.deformationSmoothness = Math.max(0, Math.min(1, s)); return this; }
+        public Builder deformationBumpSize(float s) { this.deformationBumpSize = Math.max(0.1f, Math.min(2f, s)); return this; }
+        public Builder deformationSeparation(float s) { this.deformationSeparation = Math.max(0.3f, Math.min(1.5f, s)); return this; }
         
         public SphereShape build() {
             return new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm,
-                deformation, deformationIntensity, deformationLength);
+                deformation, deformationIntensity, deformationLength, deformationCount, deformationSmoothness,
+                deformationBumpSize, deformationSeparation);
         }
     }
 }
+

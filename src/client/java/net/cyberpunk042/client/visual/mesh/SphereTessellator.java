@@ -162,10 +162,15 @@ public final class SphereTessellator {
         SphereDeformation deformation = shape.effectiveDeformation();
         float deformIntensity = shape.deformationIntensity();
         float deformLength = shape.deformationLength();
+        int deformCount = shape.deformationCount();
+        float deformSmoothness = shape.deformationSmoothness();
+        float deformBumpSize = shape.deformationBumpSize();
+        float deformSeparation = shape.deformationSeparation();
         
         // Build the FULL vertex function (position + normal) for proper spheroid lighting
         VectorMath.FullVertexFunction fullVertexFunc = (theta, phi, r) -> 
-            deformation.computeFullVertex(theta, phi, r, deformIntensity, deformLength);
+            deformation.computeFullVertex(theta, phi, r, deformIntensity, deformLength, 
+                deformCount, deformSmoothness, deformBumpSize, deformSeparation);
         
         // Generate the entire surface using the shared algorithm with proper vertex positions AND normals
         VectorMath.generateLatLonGridFull(
