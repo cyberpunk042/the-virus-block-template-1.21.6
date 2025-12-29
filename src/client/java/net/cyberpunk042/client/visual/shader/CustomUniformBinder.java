@@ -199,20 +199,6 @@ public final class CustomUniformBinder {
                 builder.get()
             );
             renderPass.setUniform("FresnelParams", gpuBuffer);
-            
-            if (corona != null && corona.enabled()) {
-                Logging.FIELD.topic("shader").info(
-                    "[FRESNEL+CORONA] Bound combined uniforms: horizon=({},{},{}) corona=({},{},{})",
-                    effect.red(), effect.green(), effect.blue(),
-                    corona.red(), corona.green(), corona.blue()
-                );
-            } else {
-                Logging.FIELD.topic("shader").info(
-                    "[FRESNEL] Bound uniforms: color=({},{},{}), power={}, intensity={}",
-                    effect.red(), effect.green(), effect.blue(),
-                    effect.power(), effect.intensity()
-                );
-            }
         } catch (Exception e) {
             Logging.FIELD.topic("shader").warn("[FRESNEL] Failed to bind uniforms: {}", e.getMessage());
         }
@@ -256,12 +242,6 @@ public final class CustomUniformBinder {
                 builder.get()
             );
             renderPass.setUniform("CoronaParams", gpuBuffer);
-            
-            Logging.FIELD.topic("shader").info(
-                "[CORONA] Bound uniforms: color=({},{},{}), power={}, intensity={}, falloff={}, offset={}, width={}",
-                effect.red(), effect.green(), effect.blue(),
-                effect.power(), effect.intensity(), effect.falloff(), effect.offset(), effect.width()
-            );
         } catch (Exception e) {
             Logging.FIELD.topic("shader").warn("[CORONA] Failed to bind uniforms: {}", e.getMessage());
         }

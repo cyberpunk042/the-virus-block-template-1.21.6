@@ -32,11 +32,7 @@ public class RenderSystemMixin {
         method = "bindDefaultUniforms",
         at = @At("TAIL")
     )
-    private static void onBindDefaultUniforms(RenderPass pass, CallbackInfo ci) {
-        net.cyberpunk042.log.Logging.FIELD.topic("shader").info(
-            "[MIXIN-RenderSystem] bindDefaultUniforms called!"
-        );
-        
+    private static void onBindDefaultUniforms(RenderPass pass, CallbackInfo ci) {        
         // Bind our custom uniforms  
         CustomUniformBinder.bindCustomUniforms(pass);
     }
