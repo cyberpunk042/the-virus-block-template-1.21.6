@@ -167,7 +167,7 @@ public final class ShapeRegistry {
                 planetFrequency, planetOctaves, planetLacunarity, planetPersistence, 
                 planetRidged, planetCraterCount, planetSeed,
                 false, 3f, 1.5f, 1f, 1f, 1f,  // horizon defaults
-                false, 2f, 1f, 0.5f, 1f, 1f, 1f); // corona defaults
+                false, 2f, 1f, 0.5f, 1f, 1f, 1f, 0f, 1f); // corona defaults (+ offset, width)
         });
         
         // Ring

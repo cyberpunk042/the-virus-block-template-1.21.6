@@ -248,7 +248,11 @@ public final class ShapeWidgetSpec {
         SliderSpec.half("Red", "sphere.coronaRed", 0f, 1f, "%.2f"),
         SliderSpec.half("Green", "sphere.coronaGreen", 0f, 1f, "%.2f"),
         SliderSpec.half("Blue", "sphere.coronaBlue", 0f, 1f, "%.2f"),
-        new RowBreak()
+        new RowBreak(),
+        // Offset = corona layer offset from surface (-1 to 1). Positive = outward
+        SliderSpec.half("Offset", "sphere.coronaOffset", -1f, 1f, "%.2f"),
+        // Width = glow band width (0.1-3). Higher = wider glow band
+        SliderSpec.half("Width", "sphere.coronaWidth", 0.1f, 3f, "%.2f")
         
         // Note: QuadPattern dropdown is added separately in ShapeSubPanel
     );

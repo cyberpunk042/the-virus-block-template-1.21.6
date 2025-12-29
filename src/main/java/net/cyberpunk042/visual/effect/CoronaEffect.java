@@ -47,7 +47,11 @@ public record CoronaEffect(
     @JsonField(skipIfDefault = true, defaultValue = "0.5") float falloff,
     @JsonField(skipIfDefault = true, defaultValue = "1") float red,
     @JsonField(skipIfDefault = true, defaultValue = "1") float green,
-    @JsonField(skipIfDefault = true, defaultValue = "1") float blue
+    @JsonField(skipIfDefault = true, defaultValue = "1") float blue,
+    /** Offset of corona layer from surface (-1 to 1, default 0). Positive = outward. */
+    @JsonField(skipIfDefault = true) float offset,
+    /** Width/spread of the corona glow (0.1-3, default 1). Higher = wider glow band. */
+    @JsonField(skipIfDefault = true, defaultValue = "1") float width
 ) {
     
     // =========================================================================
@@ -66,10 +70,10 @@ public record CoronaEffect(
     // =========================================================================
     
     /** Disabled corona effect. */
-    public static final CoronaEffect NONE = new CoronaEffect(false, 2f, 1f, 0.5f, 1f, 1f, 1f);
+    public static final CoronaEffect NONE = new CoronaEffect(false, 2f, 1f, 0.5f, 1f, 1f, 1f, 0f, 1f);
     
     /** Default soft white corona. */
-    public static final CoronaEffect DEFAULT = new CoronaEffect(true, 2f, 1f, 0.5f, 1f, 1f, 1f);
+    public static final CoronaEffect DEFAULT = new CoronaEffect(true, 2f, 1f, 0.5f, 1f, 1f, 1f, 0f, 1f);
     
     // =========================================================================
     // Themed Presets - Astrophysical
@@ -78,25 +82,25 @@ public record CoronaEffect(
     /** Solar corona - intense orange/yellow glow. */
     public static final CoronaEffect SOLAR = new CoronaEffect(
         true, 1.5f, 2.5f, 0.3f,
-        1f, 0.9f, 0.4f  // Warm yellow-orange
+        1f, 0.9f, 0.4f, 0f, 1f  // Warm yellow-orange
     );
     
     /** Blue star corona - hot blue glow. */
     public static final CoronaEffect BLUE_STAR = new CoronaEffect(
         true, 2f, 2f, 0.4f,
-        0.3f, 0.6f, 1f  // Hot blue
+        0.3f, 0.6f, 1f, 0f, 1f  // Hot blue
     );
     
     /** Red dwarf corona - dim red glow. */
     public static final CoronaEffect RED_DWARF = new CoronaEffect(
         true, 3f, 0.8f, 0.6f,
-        1f, 0.3f, 0.2f  // Deep red
+        1f, 0.3f, 0.2f, 0f, 1f  // Deep red
     );
     
     /** Nebula corona - purple/magenta diffuse glow. */
     public static final CoronaEffect NEBULA = new CoronaEffect(
         true, 1.2f, 1.5f, 0.2f,
-        0.8f, 0.3f, 1f  // Magenta-purple
+        0.8f, 0.3f, 1f, 0f, 1f  // Magenta-purple
     );
     
     // =========================================================================
@@ -106,37 +110,37 @@ public record CoronaEffect(
     /** Energy shield - cyan electric glow. */
     public static final CoronaEffect ENERGY_SHIELD = new CoronaEffect(
         true, 3f, 1.8f, 0.5f,
-        0.2f, 0.9f, 1f  // Electric cyan
+        0.2f, 0.9f, 1f, 0f, 1f  // Electric cyan
     );
     
     /** Dark matter - inverted/purple-black glow. */
     public static final CoronaEffect DARK_MATTER = new CoronaEffect(
         true, 4f, 1.2f, 0.7f,
-        0.4f, 0.1f, 0.6f  // Dark purple
+        0.4f, 0.1f, 0.6f, 0f, 1f  // Dark purple
     );
     
     /** Holy aura - soft golden glow. */
     public static final CoronaEffect HOLY = new CoronaEffect(
         true, 1.5f, 1.5f, 0.3f,
-        1f, 0.95f, 0.7f  // Soft gold
+        1f, 0.95f, 0.7f, 0f, 1f  // Soft gold
     );
     
     /** Toxic corona - sickly green glow. */
     public static final CoronaEffect TOXIC = new CoronaEffect(
         true, 2.5f, 1.3f, 0.5f,
-        0.3f, 1f, 0.2f  // Toxic green
+        0.3f, 1f, 0.2f, 0f, 1f  // Toxic green
     );
     
     /** Fire corona - flickering orange-red. */
     public static final CoronaEffect FIRE = new CoronaEffect(
         true, 2f, 2f, 0.4f,
-        1f, 0.4f, 0.1f  // Fire orange
+        1f, 0.4f, 0.1f, 0f, 1f  // Fire orange
     );
     
     /** Ice corona - cold white-blue. */
     public static final CoronaEffect ICE = new CoronaEffect(
         true, 3f, 1f, 0.6f,
-        0.8f, 0.95f, 1f  // Ice blue-white
+        0.8f, 0.95f, 1f, 0f, 1f  // Ice blue-white
     );
     
     // =========================================================================
@@ -154,28 +158,28 @@ public record CoronaEffect(
      * Creates a modified copy with different intensity.
      */
     public CoronaEffect withIntensity(float newIntensity) {
-        return new CoronaEffect(enabled, power, newIntensity, falloff, red, green, blue);
+        return new CoronaEffect(enabled, power, newIntensity, falloff, red, green, blue, offset, width);
     }
     
     /**
      * Creates a modified copy with different color.
      */
     public CoronaEffect withColor(float r, float g, float b) {
-        return new CoronaEffect(enabled, power, intensity, falloff, r, g, b);
+        return new CoronaEffect(enabled, power, intensity, falloff, r, g, b, offset, width);
     }
     
     /**
      * Creates a modified copy with different power/sharpness.
      */
     public CoronaEffect withPower(float newPower) {
-        return new CoronaEffect(enabled, newPower, intensity, falloff, red, green, blue);
+        return new CoronaEffect(enabled, newPower, intensity, falloff, red, green, blue, offset, width);
     }
     
     /**
      * Creates a modified copy with different falloff.
      */
     public CoronaEffect withFalloff(float newFalloff) {
-        return new CoronaEffect(enabled, power, intensity, newFalloff, red, green, blue);
+        return new CoronaEffect(enabled, power, intensity, newFalloff, red, green, blue, offset, width);
     }
     
     /**

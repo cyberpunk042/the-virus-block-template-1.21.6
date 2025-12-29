@@ -9,6 +9,7 @@ uniform sampler2D Sampler0;
 layout(std140) uniform CoronaParams {
     vec4 CoronaColorAndPower;      // xyz = CoronaColor, w = CoronaPower
     vec4 CoronaIntensityFalloff;   // x = CoronaIntensity, y = CoronaFalloff, zw = padding
+    vec4 CoronaOffsetWidthPad;     // x = Offset, y = Width, zw = padding
 };
 
 in float sphericalVertexDistance;
@@ -28,11 +29,26 @@ void main() {
     float coronaPower = CoronaColorAndPower.w;
     float coronaIntensity = CoronaIntensityFalloff.x;
     float coronaFalloff = CoronaIntensityFalloff.y;
+    float coronaOffset = CoronaOffsetWidthPad.x;
+    float coronaWidth = CoronaOffsetWidthPad.y;
     
     // Corona only outputs rim glow, not base texture
     // Use abs() to handle backfaces correctly
     float NdotV = abs(dot(vNormal, vViewDir));
-    float fresnel = pow(1.0 - NdotV, coronaPower);
+    
+    // Apply offset: shifts the fresnel curve center
+    // Offset > 0 makes glow appear more towards edges
+    // Offset < 0 makes glow appear more towards center
+    float adjustedNdotV = clamp(NdotV + coronaOffset, 0.0, 1.0);
+    
+    // Base fresnel calculation
+    float fresnel = pow(1.0 - adjustedNdotV, coronaPower);
+    
+    // Apply width: controls the band spread of the glow
+    // Width < 1 makes the glow narrower/sharper
+    // Width > 1 makes the glow wider/softer
+    fresnel = smoothstep(0.0, coronaWidth, fresnel);
+    
     float glow = fresnel * coronaIntensity;
     
     // Apply falloff to control spread

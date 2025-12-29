@@ -111,7 +111,11 @@ public record SphereShape(
     /** CORONA: Glow color green component (0-1, default 1). */
     @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "1") float coronaGreen,
     /** CORONA: Glow color blue component (0-1, default 1). */
-    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "1") float coronaBlue
+    @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "1") float coronaBlue,
+    /** CORONA: Vertical offset of glow layer (-1 to 1, default 0). Positive = outward. */
+    @JsonField(skipIfDefault = true) float coronaOffset,
+    /** CORONA: Width/spread of the glow (0.1-3, default 1). Higher = wider glow band. */
+    @JsonField(skipIfDefault = true, defaultValue = "1") float coronaWidth
 ) implements Shape {
     public static final String DEFAULT_ALGORITHM = "uv";
 
@@ -122,7 +126,7 @@ public record SphereShape(
             SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, 0.6f,
             2f, 4, 2f, 0.5f, 0f, 0, 42,
             false, 3f, 1.5f, 1f, 1f, 1f,  // horizon defaults
-            false, 2f, 1f, 0.5f, 1f, 1f, 1f); // corona defaults
+            false, 2f, 1f, 0.5f, 1f, 1f, 1f, 0f, 1f); // corona defaults (+ offset, width)
     }
     public static SphereShape defaults() { return DEFAULT; }
     
@@ -131,7 +135,7 @@ public record SphereShape(
         SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, 0.6f,
         2f, 4, 2f, 0.5f, 0f, 0, 42,
         false, 3f, 1.5f, 1f, 1f, 1f,
-        false, 2f, 1f, 0.5f, 1f, 1f, 1f);
+        false, 2f, 1f, 0.5f, 1f, 1f, 1f, 0f, 1f);
     
     /** Low-poly sphere for performance. */
     public static final SphereShape LOW_POLY = new SphereShape(
@@ -139,7 +143,7 @@ public record SphereShape(
         SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, 0.6f,
         2f, 4, 2f, 0.5f, 0f, 0, 42,
         false, 3f, 1.5f, 1f, 1f, 1f,
-        false, 2f, 1f, 0.5f, 1f, 1f, 1f);
+        false, 2f, 1f, 0.5f, 1f, 1f, 1f, 0f, 1f);
     
     /** High-detail sphere. */
     public static final SphereShape HIGH_DETAIL = new SphereShape(
@@ -147,7 +151,7 @@ public record SphereShape(
         SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, 0.6f,
         2f, 4, 2f, 0.5f, 0f, 0, 42,
         false, 3f, 1.5f, 1f, 1f, 1f,
-        false, 2f, 1f, 0.5f, 1f, 1f, 1f);
+        false, 2f, 1f, 0.5f, 1f, 1f, 1f, 0f, 1f);
     
     /**
      * Creates a simple sphere with default tessellation.
@@ -158,7 +162,7 @@ public record SphereShape(
             SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, 0.6f,
             2f, 4, 2f, 0.5f, 0f, 0, 42,
             false, 3f, 1.5f, 1f, 1f, 1f,
-            false, 2f, 1f, 0.5f, 1f, 1f, 1f);
+            false, 2f, 1f, 0.5f, 1f, 1f, 1f, 0f, 1f);
     }
     
     /**
@@ -170,7 +174,7 @@ public record SphereShape(
             SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, 0.6f,
             2f, 4, 2f, 0.5f, 0f, 0, 42,
             false, 3f, 1.5f, 1f, 1f, 1f,
-            false, 2f, 1f, 0.5f, 1f, 1f, 1f);
+            false, 2f, 1f, 0.5f, 1f, 1f, 1f, 0f, 1f);
     }
     
     /**
@@ -182,7 +186,7 @@ public record SphereShape(
             SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, 0.6f,
             2f, 4, 2f, 0.5f, 0f, 0, 42,
             false, 3f, 1.5f, 1f, 1f, 1f,
-            false, 2f, 1f, 0.5f, 1f, 1f, 1f);
+            false, 2f, 1f, 0.5f, 1f, 1f, 1f, 0f, 1f);
     }
     
     @Override
@@ -294,13 +298,15 @@ public record SphereShape(
         float coronaRed = json.has("coronaRed") ? json.get("coronaRed").getAsFloat() : 1f;
         float coronaGreen = json.has("coronaGreen") ? json.get("coronaGreen").getAsFloat() : 1f;
         float coronaBlue = json.has("coronaBlue") ? json.get("coronaBlue").getAsFloat() : 1f;
+        float coronaOffset = json.has("coronaOffset") ? json.get("coronaOffset").getAsFloat() : 0f;
+        float coronaWidth = json.has("coronaWidth") ? json.get("coronaWidth").getAsFloat() : 1f;
         
         SphereShape result = new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm, 
             deformation, deformationIntensity, deformationLength, deformationCount, deformationSmoothness,
             deformationBumpSize, deformationSeparation,
             planetFrequency, planetOctaves, planetLacunarity, planetPersistence, planetRidged, planetCraterCount, planetSeed,
             horizonEnabled, horizonPower, horizonIntensity, horizonRed, horizonGreen, horizonBlue,
-            coronaEnabled, coronaPower, coronaIntensity, coronaFalloff, coronaRed, coronaGreen, coronaBlue);
+            coronaEnabled, coronaPower, coronaIntensity, coronaFalloff, coronaRed, coronaGreen, coronaBlue, coronaOffset, coronaWidth);
         Logging.FIELD.topic("parse").trace("Parsed SphereShape: radius={}, latSteps={}, lonSteps={}, algorithm={}", 
             radius, latSteps, lonSteps, algorithm);
         return result;
@@ -353,7 +359,9 @@ public record SphereShape(
             .coronaFalloff(coronaFalloff)
             .coronaRed(coronaRed)
             .coronaGreen(coronaGreen)
-            .coronaBlue(coronaBlue);
+            .coronaBlue(coronaBlue)
+            .coronaOffset(coronaOffset)
+            .coronaWidth(coronaWidth);
     }
     
     /** Returns effective deformation, defaulting to NONE if null. */
@@ -389,7 +397,7 @@ public record SphereShape(
     public net.cyberpunk042.visual.effect.CoronaEffect toCoronaEffect() {
         return new net.cyberpunk042.visual.effect.CoronaEffect(
             coronaEnabled, coronaPower, coronaIntensity, coronaFalloff,
-            coronaRed, coronaGreen, coronaBlue
+            coronaRed, coronaGreen, coronaBlue, coronaOffset, coronaWidth
         );
     }
     
@@ -437,6 +445,8 @@ public record SphereShape(
         private float coronaRed = 1f;
         private float coronaGreen = 1f;
         private float coronaBlue = 1f;
+        private float coronaOffset = 0f;
+        private float coronaWidth = 1f;
         
         public Builder radius(float r) { this.radius = r; return this; }
         public Builder latSteps(int s) { this.latSteps = s; return this; }
@@ -476,6 +486,8 @@ public record SphereShape(
         public Builder coronaRed(float r) { this.coronaRed = Math.max(0f, Math.min(1f, r)); return this; }
         public Builder coronaGreen(float g) { this.coronaGreen = Math.max(0f, Math.min(1f, g)); return this; }
         public Builder coronaBlue(float b) { this.coronaBlue = Math.max(0f, Math.min(1f, b)); return this; }
+        public Builder coronaOffset(float o) { this.coronaOffset = Math.max(-1f, Math.min(1f, o)); return this; }
+        public Builder coronaWidth(float w) { this.coronaWidth = Math.max(0.1f, Math.min(3f, w)); return this; }
         
         public SphereShape build() {
             return new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm,
@@ -483,7 +495,7 @@ public record SphereShape(
                 deformationBumpSize, deformationSeparation,
                 planetFrequency, planetOctaves, planetLacunarity, planetPersistence, planetRidged, planetCraterCount, planetSeed,
                 horizonEnabled, horizonPower, horizonIntensity, horizonRed, horizonGreen, horizonBlue,
-                coronaEnabled, coronaPower, coronaIntensity, coronaFalloff, coronaRed, coronaGreen, coronaBlue);
+                coronaEnabled, coronaPower, coronaIntensity, coronaFalloff, coronaRed, coronaGreen, coronaBlue, coronaOffset, coronaWidth);
         }
     }
 }

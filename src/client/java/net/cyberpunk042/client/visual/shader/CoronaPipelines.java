@@ -67,7 +67,7 @@ public final class CoronaPipelines {
                 // Render state
                 .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
                 .withCull(true)
-                .withBlend(BlendFunction.TRANSLUCENT)
+                .withBlend(BlendFunction.ADDITIVE)
                 .withDepthWrite(false)  // Don't write depth - we're an overlay
                 .withColorWrite(true, true)
                 

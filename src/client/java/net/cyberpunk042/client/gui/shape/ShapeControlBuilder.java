@@ -248,7 +248,23 @@ public class ShapeControlBuilder {
         String stateKey = spec.stateKey();
         CheckboxWidget checkbox = GuiWidgets.checkbox(
             x, y, spec.label(), initial, spec.tooltip(),
-            textRenderer, v -> onChangeWrapper.accept(() -> state.set(stateKey, v))
+            textRenderer, v -> onChangeWrapper.accept(() -> {
+                state.set(stateKey, v);
+                
+                // SPECIAL: When sphere.horizonEnabled changes, auto-switch quad pattern
+                // Horizon/Fresnel shader requires standard_quad winding, normal rendering uses filled_1
+                if ("sphere.horizonEnabled".equals(stateKey)) {
+                    if (v) {
+                        // Horizon ON → use standard_quad pattern
+                        state.set("arrangement.defaultPattern", "standard_quad");
+                        Logging.GUI.topic("shape").info("Horizon enabled: switching to standard_quad pattern");
+                    } else {
+                        // Horizon OFF → use filled_1 pattern
+                        state.set("arrangement.defaultPattern", "filled_1");
+                        Logging.GUI.topic("shape").info("Horizon disabled: switching to filled_1 pattern");
+                    }
+                }
+            })
         );
         
         checkboxes.put(stateKey, checkbox);

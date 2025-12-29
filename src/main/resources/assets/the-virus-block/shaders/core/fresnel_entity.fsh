@@ -23,19 +23,13 @@ in vec3 vViewDir;
 out vec4 fragColor;
 
 void main() {
-    vec4 color = texture(Sampler0, texCoord0);
-#ifdef ALPHA_CUTOUT
-    if (color.a < ALPHA_CUTOUT) {
-        discard;
-    }
-#endif
-    color *= vertexColor * ColorModulator;
-#ifndef NO_OVERLAY
-    color.rgb = mix(overlayColor.rgb, color.rgb, overlayColor.a);
-#endif
-#ifndef EMISSIVE
-    color *= lightMapColor;
-#endif
+    // Start with vertex color directly (ignore texture when no texture is bound)
+    // Sampler0 may not have a valid texture, so use vertexColor as base
+    vec4 color = vertexColor * ColorModulator;
+    
+// Skip overlay - we don't use it for field geometry
+// Skip lightmap - we use full bright (0xF000F0)
+// These checks caused black output when samplers weren't properly bound
 
     // Extract Fresnel params from UBO
     vec3 rimColor = RimColorAndPower.xyz;

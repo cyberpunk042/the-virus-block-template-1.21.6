@@ -85,7 +85,9 @@ public final class CoronaUniformManager {
             coronaFalloff,
             coronaColor.x,
             coronaColor.y,
-            coronaColor.z
+            coronaColor.z,
+            0f,  // offset (default)
+            1f   // width (default)
         );
     }
     

@@ -24,9 +24,10 @@ import org.lwjgl.system.MemoryStack;
  *   vec4 RimColorAndPower;      // xyz = RimColor, w = RimPower
  *   vec4 RimIntensityAndPad;    // x = RimIntensity, yzw = padding
  * 
- * CoronaParams (32 bytes):
- *   vec4 CoronaColorAndPower;   // xyz = CoronaColor, w = CoronaPower
- *   vec4 CoronaIntensityFalloff; // x = CoronaIntensity, y = CoronaFalloff, zw = padding
+ * CoronaParams (48 bytes):
+ *   vec4 CoronaColorAndPower;        // xyz = CoronaColor, w = CoronaPower
+ *   vec4 CoronaIntensityFalloff;     // x = CoronaIntensity, y = CoronaFalloff, zw = padding
+ *   vec4 CoronaOffsetWidthPad;       // x = Offset, y = Width, zw = padding
  * </pre>
  * 
  * @see FresnelPipelines
@@ -34,7 +35,8 @@ import org.lwjgl.system.MemoryStack;
  */
 public final class CustomUniformBinder {
     
-    private static final int BUFFER_SIZE = 32; // 2 x vec4 = 32 bytes
+    private static final int FRESNEL_BUFFER_SIZE = 32;  // 2 x vec4 = 32 bytes
+    private static final int CORONA_BUFFER_SIZE = 48;   // 3 x vec4 = 48 bytes
     
     // Thread-local storage for current effect parameters
     private static HorizonEffect currentHorizon = null;
@@ -133,7 +135,7 @@ public final class CustomUniformBinder {
      */
     private static void bindFresnelParams(RenderPass renderPass, HorizonEffect effect) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            Std140Builder builder = Std140Builder.onStack(stack, BUFFER_SIZE);
+            Std140Builder builder = Std140Builder.onStack(stack, FRESNEL_BUFFER_SIZE);
             
             // vec4 RimColorAndPower (rgb = color, w = power)
             builder.putVec4(
@@ -174,7 +176,7 @@ public final class CustomUniformBinder {
      */
     private static void bindCoronaParams(RenderPass renderPass, CoronaEffect effect) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            Std140Builder builder = Std140Builder.onStack(stack, BUFFER_SIZE);
+            Std140Builder builder = Std140Builder.onStack(stack, CORONA_BUFFER_SIZE);
             
             // vec4 CoronaColorAndPower (rgb = color, w = power)
             builder.putVec4(
@@ -192,6 +194,14 @@ public final class CustomUniformBinder {
                 0.0f
             );
             
+            // vec4 CoronaOffsetWidthPad (x = offset, y = width, zw = padding)
+            builder.putVec4(
+                effect.offset(),
+                effect.width(),
+                0.0f,
+                0.0f
+            );
+            
             // Upload buffer to GPU and bind
             GpuBuffer gpuBuffer = RenderSystem.getDevice().createBuffer(
                 () -> "CoronaParams UBO",
@@ -201,9 +211,9 @@ public final class CustomUniformBinder {
             renderPass.setUniform("CoronaParams", gpuBuffer);
             
             Logging.FIELD.topic("shader").info(
-                "[CORONA] Bound uniforms: color=({},{},{}), power={}, intensity={}, falloff={}",
+                "[CORONA] Bound uniforms: color=({},{},{}), power={}, intensity={}, falloff={}, offset={}, width={}",
                 effect.red(), effect.green(), effect.blue(),
-                effect.power(), effect.intensity(), effect.falloff()
+                effect.power(), effect.intensity(), effect.falloff(), effect.offset(), effect.width()
             );
         } catch (Exception e) {
             Logging.FIELD.topic("shader").warn("[CORONA] Failed to bind uniforms: {}", e.getMessage());

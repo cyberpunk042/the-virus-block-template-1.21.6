@@ -31,6 +31,8 @@ public final class CoronaRenderLayers {
      * 
      * <p>This layer uses additive blending (src + dst) and doesn't
      * write to the depth buffer, making it suitable for glow overlays.</p>
+     * 
+     * <p>Uses Z-offset layering to render in front of base geometry.</p>
      */
     public static RenderLayer coronaAdditive() {
         if (CORONA_ADDITIVE == null) {
@@ -39,6 +41,7 @@ public final class CoronaRenderLayers {
                 256,
                 CoronaPipelines.CORONA_ENTITY_ADDITIVE,
                 RenderLayer.MultiPhaseParameters.builder()
+                    .layering(net.minecraft.client.render.RenderPhase.VIEW_OFFSET_Z_LAYERING_FORWARD)
                     .build(false)
             );
         }

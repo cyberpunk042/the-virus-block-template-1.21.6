@@ -22,6 +22,10 @@ import net.minecraft.client.render.RenderLayer;
  */
 public final class FresnelRenderLayers {
     
+    // White texture so vertex colors work properly (texture * vertexColor = vertexColor)
+    private static final net.minecraft.util.Identifier WHITE_TEXTURE = 
+        net.minecraft.util.Identifier.of("minecraft", "textures/misc/white.png");
+    
     // Cached layer instance (immutable, can be shared)
     private static RenderLayer FRESNEL_TRANSLUCENT;
     
