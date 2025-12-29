@@ -5,6 +5,12 @@
 
 uniform sampler2D Sampler0;
 
+// Custom UBO for Corona parameters (bound by CustomUniformBinder via Mixin)
+layout(std140) uniform CoronaParams {
+    vec4 CoronaColorAndPower;      // xyz = CoronaColor, w = CoronaPower
+    vec4 CoronaIntensityFalloff;   // x = CoronaIntensity, y = CoronaFalloff, zw = padding
+};
+
 in float sphericalVertexDistance;
 in float cylindricalVertexDistance;
 in vec4 vertexColor;
@@ -17,15 +23,16 @@ in vec3 vViewDir;
 out vec4 fragColor;
 
 void main() {
-    // Corona effect - HARDCODED for now to prove concept works
-    // TODO: Make these dynamic via UBO once binding is fixed
-    vec3 coronaColor = vec3(1.0, 0.5, 0.2);  // Orange glow
-    float coronaPower = 2.0;
-    float coronaIntensity = 1.5;
-    float coronaFalloff = 0.5;
+    // Extract Corona params from UBO
+    vec3 coronaColor = CoronaColorAndPower.xyz;
+    float coronaPower = CoronaColorAndPower.w;
+    float coronaIntensity = CoronaIntensityFalloff.x;
+    float coronaFalloff = CoronaIntensityFalloff.y;
     
     // Corona only outputs rim glow, not base texture
-    float fresnel = pow(1.0 - max(dot(vNormal, vViewDir), 0.0), coronaPower);
+    // Use abs() to handle backfaces correctly
+    float NdotV = abs(dot(vNormal, vViewDir));
+    float fresnel = pow(1.0 - NdotV, coronaPower);
     float glow = fresnel * coronaIntensity;
     
     // Apply falloff to control spread

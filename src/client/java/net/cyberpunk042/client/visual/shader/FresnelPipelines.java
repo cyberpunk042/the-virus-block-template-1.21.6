@@ -64,8 +64,8 @@ public final class FresnelPipelines {
                 .withSampler("Sampler1")  // Overlay
                 .withSampler("Sampler2")  // Lightmap
                 
-                // NOTE: Custom uniforms hardcoded in shader for now
-                // TODO: Add UBO binding once RenderPass access is resolved
+                // Custom UBO for Fresnel parameters (bound by CustomUniformBinder via Mixin)
+                .withUniform("FresnelParams", net.minecraft.client.gl.UniformType.UNIFORM_BUFFER)
                 
                 // Vertex format: same as entity translucent
                 .withVertexFormat(

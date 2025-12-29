@@ -201,8 +201,8 @@ public final class LayerRenderer {
                     // If this is a sphere with Corona enabled, render it again with additive blending
                     if (primitive.shape() instanceof net.cyberpunk042.visual.shape.SphereShape sphere 
                             && sphere.hasCoronaEffect()) {
-                        // Set corona uniforms
-                        net.cyberpunk042.client.visual.shader.CoronaUniformManager.setParams(sphere.toCoronaEffect());
+                        // Set corona uniforms - will be bound by Mixin when RenderLayer draws
+                        net.cyberpunk042.client.visual.shader.CustomUniformBinder.setCoronaParams(sphere.toCoronaEffect());
                         
                         // Get corona render layer
                         boolean doubleSided = fill != null && fill.doubleSided();
@@ -215,7 +215,7 @@ public final class LayerRenderer {
                         renderPrimitive(matrices, coronaConsumer, primitive, resolver, light, time, effectiveAlpha, overrides, primitiveIndex);
                         
                         // Reset corona uniforms
-                        net.cyberpunk042.client.visual.shader.CoronaUniformManager.reset();
+                        net.cyberpunk042.client.visual.shader.CustomUniformBinder.reset();
                     }
                     
                     primCount++;
@@ -301,8 +301,14 @@ public final class LayerRenderer {
                 if (primitive.shape() instanceof net.cyberpunk042.visual.shape.SphereShape sphere 
                         && sphere.hasHorizonEffect()) {
                     // Use Fresnel shader for rim lighting
-                    // Note: Set uniforms before the actual render call in SphereRenderer
-                    net.cyberpunk042.client.visual.shader.FresnelUniformManager.setParams(sphere.toHorizonEffect());
+                    // Uniforms will be bound by the Mixin when the RenderLayer draws
+                    net.cyberpunk042.visual.effect.HorizonEffect horizonEffect = sphere.toHorizonEffect();
+                    net.cyberpunk042.log.Logging.FIELD.topic("shader").info(
+                        "[LayerRenderer] Setting Horizon params: enabled={}, power={}, intensity={}, rgb=({},{},{})",
+                        horizonEffect.enabled(), horizonEffect.power(), horizonEffect.intensity(),
+                        horizonEffect.red(), horizonEffect.green(), horizonEffect.blue()
+                    );
+                    net.cyberpunk042.client.visual.shader.CustomUniformBinder.setHorizonParams(horizonEffect);
                     RenderLayer fresnelLayer = doubleSided 
                         ? net.cyberpunk042.client.visual.shader.FresnelRenderLayers.fresnelTranslucentNoCull()
                         : net.cyberpunk042.client.visual.shader.FresnelRenderLayers.fresnelTranslucent();

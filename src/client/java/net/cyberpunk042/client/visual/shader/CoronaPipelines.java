@@ -57,7 +57,8 @@ public final class CoronaPipelines {
                 .withSampler("Sampler1")  // Overlay
                 .withSampler("Sampler2")  // Lightmap
                 
-                // Vertex format - same as entity
+                // Custom UBO for Corona parameters (bound by CustomUniformBinder via Mixin)
+                .withUniform("CoronaParams", net.minecraft.client.gl.UniformType.UNIFORM_BUFFER)
                 .withVertexFormat(
                     VertexFormats.POSITION_COLOR_TEXTURE_OVERLAY_LIGHT_NORMAL,
                     VertexFormat.DrawMode.TRIANGLES

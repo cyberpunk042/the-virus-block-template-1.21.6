@@ -5,6 +5,12 @@
 
 uniform sampler2D Sampler0;
 
+// Custom UBO for Fresnel parameters (bound by CustomUniformBinder via Mixin)
+layout(std140) uniform FresnelParams {
+    vec4 RimColorAndPower;      // xyz = RimColor, w = RimPower
+    vec4 RimIntensityAndPad;    // x = RimIntensity, yzw = padding
+};
+
 in float sphericalVertexDistance;
 in float cylindricalVertexDistance;
 in vec4 vertexColor;
@@ -31,12 +37,12 @@ void main() {
     color *= lightMapColor;
 #endif
 
-    // Fresnel rim effect - HARDCODED for now to prove concept works
-    // TODO: Make these dynamic via UBO once binding is fixed
-    vec3 rimColor = vec3(0.3, 0.8, 1.0);  // Cyan rim
-    float rimPower = 3.0;
-    float rimIntensity = 1.5;
+    // Extract Fresnel params from UBO
+    vec3 rimColor = RimColorAndPower.xyz;
+    float rimPower = RimColorAndPower.w;
+    float rimIntensity = RimIntensityAndPad.x;
     
+    // Fresnel rim effect
     // Use abs() to handle backfaces - they'll have negative dot product
     float NdotV = abs(dot(vNormal, vViewDir));
     float fresnel = pow(1.0 - NdotV, rimPower);

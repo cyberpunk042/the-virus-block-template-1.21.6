@@ -17,7 +17,8 @@
     "access.LivingEntityRendererAccessor",
     "access.FramebufferAccessor",
     "FramebufferMixin",
-    "GameRendererMixin"
+    "GameRendererMixin",
+    "RenderSystemMixin"
   ],
   "injectors": {
     "defaultRequire": 1
