@@ -166,10 +166,14 @@ public final class ShapeWidgetSpec {
         };
     }
     
-    // ───────────────────────────────────────────────────────────────────────────
     // SPHERE
     // ───────────────────────────────────────────────────────────────────────────
     
+    /**
+     * SPHERE base specs - geometry only.
+     * Deformation, Horizon, and Corona sections are added CONDITIONALLY
+     * in ShapeSubPanel based on current state values.
+     */
     private static final List<Object> SPHERE_SPECS = List.of(
         // Row 1: Radius + Algorithm
         SliderSpec.half("Radius", "sphere.radius", 0.1f, 20.0f, "%.2f"),
@@ -181,80 +185,14 @@ public final class ShapeWidgetSpec {
         
         // Row 3: Lat Start + End (fraction 0-1)
         SliderSpec.half("Start", "sphere.latStart", 0f, 1f, "%.2f"),
-        SliderSpec.half("End", "sphere.latEnd", 0f, 1f, "%.2f"),
+        SliderSpec.half("End", "sphere.latEnd", 0f, 1f, "%.2f")
         
-        // Row 4: Deformation (droplet, egg, cone, spheroid, cloud, molecule, planet)
-        new SectionHeader("Deformation"),
-        EnumDropdownSpec.half("Deform", "sphere.deformation", 
-            net.cyberpunk042.visual.shape.SphereDeformation.class, 
-            net.cyberpunk042.visual.shape.SphereDeformation.NONE),
-        SliderSpec.half("Intensity", "sphere.deformationIntensity", 0f, 1f, "%.2f"),
-        // Length = axial stretch: <1 = oblate (squashed), 1 = normal, >1 = prolate (elongated)
-        SliderSpec.half("Length", "sphere.deformationLength", 0.2f, 3f, "%.2f"),
-        // Count = number of lobes/atoms for CLOUD/MOLECULE (1-20)
-        SliderSpec.halfInt("Count", "sphere.deformationCount", 1, 20),
-        // Smoothness = roundness of bumps (0 = spiky, 1 = smooth) for CLOUD/MOLECULE
-        SliderSpec.half("Smooth", "sphere.deformationSmoothness", 0f, 1f, "%.2f"),
-        // BumpSize = individual bump/atom size for CLOUD/MOLECULE (0.1-2.0)
-        SliderSpec.half("BumpSz", "sphere.deformationBumpSize", 0.1f, 2f, "%.2f"),
-        // Separation = atom distance from center for MOLECULE (0.3-1.5)
-        SliderSpec.half("Separ", "sphere.deformationSeparation", 0.3f, 1.5f, "%.2f"),
-        
-        // PLANET-specific controls
-        new SectionHeader("Planet Terrain"),
-        // Frequency = base noise scale (0.5-10). Higher = more detailed terrain
-        SliderSpec.half("Freq", "sphere.planetFrequency", 0.5f, 10f, "%.1f"),
-        // Octaves = noise detail layers (1-8). More = finer detail
-        SliderSpec.halfInt("Octav", "sphere.planetOctaves", 1, 8),
-        // Lacunarity = frequency growth (1.5-3.5). Controls complexity
-        SliderSpec.half("Lacun", "sphere.planetLacunarity", 1.5f, 3.5f, "%.2f"),
-        // Persistence = amplitude decay (0.2-0.8). Lower = smoother terrain
-        SliderSpec.half("Perst", "sphere.planetPersistence", 0.2f, 0.8f, "%.2f"),
-        // Ridged = mountain sharpness (0-1). 0 = rolling hills, 1 = sharp ridges
-        SliderSpec.half("Ridgd", "sphere.planetRidged", 0f, 1f, "%.2f"),
-        // Craters = number of impact craters (0-20)
-        SliderSpec.halfInt("Crtrs", "sphere.planetCraterCount", 0, 20),
-        // Seed = random seed for reproducibility (0-999)
-        SliderSpec.halfInt("Seed", "sphere.planetSeed", 0, 999),
-        
-        // HORIZON Effect (rim/edge glow - modifies material shader)
-        new SectionHeader("Horizon Effect"),
-        // Enable checkbox
-        CheckboxSpec.half("Enable", "sphere.horizonEnabled", "Enable rim lighting effect"),
-        new RowBreak(),
-        // Power = edge sharpness (1-10). Low = soft glow, high = sharp edge
-        SliderSpec.half("Power", "sphere.horizonPower", 1f, 10f, "%.1f"),
-        // Intensity = brightness (0-5). 0 = off, 1.5 = default, 5 = very bright
-        SliderSpec.half("Inten", "sphere.horizonIntensity", 0f, 5f, "%.2f"),
-        // RGB color sliders (0-1 each)
-        SliderSpec.half("Red", "sphere.horizonRed", 0f, 1f, "%.2f"),
-        SliderSpec.half("Green", "sphere.horizonGreen", 0f, 1f, "%.2f"),
-        SliderSpec.half("Blue", "sphere.horizonBlue", 0f, 1f, "%.2f"),
-        new RowBreak(),
-        
-        // CORONA Effect (additive overlay glow - rendered on top)
-        new SectionHeader("Corona Effect"),
-        // Enable checkbox
-        CheckboxSpec.half("Enable", "sphere.coronaEnabled", "Enable additive glow overlay"),
-        new RowBreak(),
-        // Power = edge sharpness (1-10). Low = wider glow, high = tighter edge  
-        SliderSpec.half("Power", "sphere.coronaPower", 1f, 10f, "%.1f"),
-        // Intensity = brightness (0-5). 0 = off, 1 = default, 5 = very bright
-        SliderSpec.half("Inten", "sphere.coronaIntensity", 0f, 5f, "%.2f"),
-        // Falloff = glow spread (0.1-2). Lower = wider glow
-        SliderSpec.half("Falloff", "sphere.coronaFalloff", 0.1f, 2f, "%.2f"),
-        new RowBreak(),
-        // RGB color sliders (0-1 each)
-        SliderSpec.half("Red", "sphere.coronaRed", 0f, 1f, "%.2f"),
-        SliderSpec.half("Green", "sphere.coronaGreen", 0f, 1f, "%.2f"),
-        SliderSpec.half("Blue", "sphere.coronaBlue", 0f, 1f, "%.2f"),
-        new RowBreak(),
-        // Offset = halo distance from surface (0-1). Higher = bigger halo shell
-        SliderSpec.half("Halo", "sphere.coronaOffset", 0f, 1f, "%.2f"),
-        // Width = glow band spread (0.1-3). Higher = wider/softer glow
-        SliderSpec.half("Width", "sphere.coronaWidth", 0.1f, 3f, "%.2f")
-        
-        // Note: QuadPattern dropdown is added separately in ShapeSubPanel
+        // NOTE: The following sections are added CONDITIONALLY in ShapeSubPanel:
+        // - Deformation section (Deform dropdown + type-specific sliders)
+        // - Planet Terrain section (only when deformation == PLANET)
+        // - Horizon Effect section (Enable checkbox + conditional sliders)
+        // - Corona Effect section (Enable checkbox + conditional sliders)
+        // - QuadPattern dropdown (for all sphere types)
     );
     
     // ───────────────────────────────────────────────────────────────────────────

@@ -213,6 +213,14 @@ public class ShapeSubPanel extends AbstractPanel {
         widgets.addAll(controlBuilder.getWidgets());
         
         // ═══════════════════════════════════════════════════════════════════════
+        // SPHERE CONDITIONAL SECTIONS
+        // ═══════════════════════════════════════════════════════════════════════
+        
+        if (shapeType.equalsIgnoreCase("sphere")) {
+            y = buildSphereConditionalControls(x, y, w, halfW, step);
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════════
         // SPECIAL: Quad Pattern Dropdown (for shapes that use QUAD cells)
         // ═══════════════════════════════════════════════════════════════════════
         
@@ -969,6 +977,332 @@ public class ShapeSubPanel extends AbstractPanel {
     // ═══════════════════════════════════════════════════════════════════════════
     // STATE MANAGEMENT
     // ═══════════════════════════════════════════════════════════════════════════
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SPHERE CONDITIONAL CONTROLS
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Builds sphere-specific controls that depend on current state values.
+     * 
+     * @return The Y position after all controls
+     */
+    private int buildSphereConditionalControls(int x, int y, int w, int halfW, int step) {
+        var textRenderer = MinecraftClient.getInstance().textRenderer;
+        
+        // ─── DEFORMATION SECTION ─────────────────────────────────────────────────
+        // Section header
+        var deformHeader = net.minecraft.client.gui.widget.ButtonWidget.builder(
+                net.minecraft.text.Text.literal("── Deformation ──"), btn -> {})
+            .dimensions(x, y, w, GuiConstants.COMPACT_HEIGHT)
+            .build();
+        widgets.add(deformHeader);
+        y += step;
+        
+        // Get current deformation type
+        String deformStr = state.getString("sphere.deformation");
+        net.cyberpunk042.visual.shape.SphereDeformation deformation;
+        try {
+            deformation = net.cyberpunk042.visual.shape.SphereDeformation.valueOf(
+                deformStr != null ? deformStr : "NONE");
+        } catch (IllegalArgumentException e) {
+            deformation = net.cyberpunk042.visual.shape.SphereDeformation.NONE;
+        }
+        
+        // Deformation dropdown (always visible)
+        var deformDropdown = GuiWidgets.enumDropdown(
+            x, y, halfW, GuiConstants.COMPACT_HEIGHT, "Deform",
+            net.cyberpunk042.visual.shape.SphereDeformation.class,
+            deformation, "Shape deformation type",
+            v -> {
+                state.set("sphere.deformation", v.name());
+                rebuildForCurrentShape();
+                if (shapeChangedCallback != null) {
+                    shapeChangedCallback.run();
+                }
+            });
+        widgets.add(deformDropdown);
+        
+        // Intensity (only when not NONE or BULLET)
+        boolean showIntensity = deformation != net.cyberpunk042.visual.shape.SphereDeformation.NONE
+            && deformation != net.cyberpunk042.visual.shape.SphereDeformation.BULLET;
+        
+        if (showIntensity) {
+            float intensity = state.getFloat("sphere.deformationIntensity");
+            var intensitySlider = GuiWidgets.slider(x + halfW + GuiConstants.PADDING, y, halfW,
+                "Intensity", 0f, 1f, intensity, "%.2f", "Deformation strength",
+                v -> onUserChange(() -> state.set("sphere.deformationIntensity", v)));
+            widgets.add(intensitySlider);
+        }
+        y += step;
+        
+        // Length (for shapes that use axial stretch)
+        boolean showLength = deformation != net.cyberpunk042.visual.shape.SphereDeformation.NONE;
+        if (showLength) {
+            float length = state.getFloat("sphere.deformationLength");
+            var lengthSlider = GuiWidgets.slider(x, y, w,
+                "Length", 0.2f, 3f, length, "%.2f", "Axial stretch (<1=squash, 1=normal, >1=elongate)",
+                v -> onUserChange(() -> state.set("sphere.deformationLength", v)));
+            widgets.add(lengthSlider);
+            y += step;
+        }
+        
+        // CLOUD/MOLECULE specific controls
+        boolean isCloudOrMolecule = deformation == net.cyberpunk042.visual.shape.SphereDeformation.CLOUD
+            || deformation == net.cyberpunk042.visual.shape.SphereDeformation.MOLECULE;
+        
+        if (isCloudOrMolecule) {
+            // Count + Smoothness
+            int count = state.getInt("sphere.deformationCount");
+            var countSlider = GuiWidgets.slider(x, y, halfW,
+                "Count", 1, 20, count, "%d", "Number of lobes/atoms",
+                v -> onUserChange(() -> state.set("sphere.deformationCount", Math.round(v))));
+            widgets.add(countSlider);
+            
+            float smooth = state.getFloat("sphere.deformationSmoothness");
+            var smoothSlider = GuiWidgets.slider(x + halfW + GuiConstants.PADDING, y, halfW,
+                "Smooth", 0f, 1f, smooth, "%.2f", "Roundness (0=spiky, 1=smooth)",
+                v -> onUserChange(() -> state.set("sphere.deformationSmoothness", v)));
+            widgets.add(smoothSlider);
+            y += step;
+            
+            // BumpSize
+            float bumpSize = state.getFloat("sphere.deformationBumpSize");
+            var bumpSlider = GuiWidgets.slider(x, y, halfW,
+                "BumpSz", 0.1f, 2f, bumpSize, "%.2f", "Individual bump/atom size",
+                v -> onUserChange(() -> state.set("sphere.deformationBumpSize", v)));
+            widgets.add(bumpSlider);
+            
+            // Separation (MOLECULE only)
+            if (deformation == net.cyberpunk042.visual.shape.SphereDeformation.MOLECULE) {
+                float separation = state.getFloat("sphere.deformationSeparation");
+                var separSlider = GuiWidgets.slider(x + halfW + GuiConstants.PADDING, y, halfW,
+                    "Separ", 0.3f, 1.5f, separation, "%.2f", "Atom distance from center",
+                    v -> onUserChange(() -> state.set("sphere.deformationSeparation", v)));
+                widgets.add(separSlider);
+            }
+            y += step;
+        }
+        
+        // PLANET specific controls
+        if (deformation == net.cyberpunk042.visual.shape.SphereDeformation.PLANET) {
+            // Planet Terrain section header
+            var planetHeader = net.minecraft.client.gui.widget.ButtonWidget.builder(
+                    net.minecraft.text.Text.literal("── Planet Terrain ──"), btn -> {})
+                .dimensions(x, y, w, GuiConstants.COMPACT_HEIGHT)
+                .build();
+            widgets.add(planetHeader);
+            y += step;
+            
+            // Frequency + Octaves
+            float freq = state.getFloat("sphere.planetFrequency");
+            var freqSlider = GuiWidgets.slider(x, y, halfW,
+                "Freq", 0.5f, 10f, freq, "%.1f", "Noise scale (higher=more detail)",
+                v -> onUserChange(() -> state.set("sphere.planetFrequency", v)));
+            widgets.add(freqSlider);
+            
+            int octaves = state.getInt("sphere.planetOctaves");
+            var octSlider = GuiWidgets.slider(x + halfW + GuiConstants.PADDING, y, halfW,
+                "Octav", 1, 8, octaves, "%d", "Detail layers",
+                v -> onUserChange(() -> state.set("sphere.planetOctaves", Math.round(v))));
+            widgets.add(octSlider);
+            y += step;
+            
+            // Lacunarity + Persistence
+            float lacun = state.getFloat("sphere.planetLacunarity");
+            var lacunSlider = GuiWidgets.slider(x, y, halfW,
+                "Lacun", 1.5f, 3.5f, lacun, "%.2f", "Frequency multiplier",
+                v -> onUserChange(() -> state.set("sphere.planetLacunarity", v)));
+            widgets.add(lacunSlider);
+            
+            float persist = state.getFloat("sphere.planetPersistence");
+            var persistSlider = GuiWidgets.slider(x + halfW + GuiConstants.PADDING, y, halfW,
+                "Perst", 0.2f, 0.8f, persist, "%.2f", "Amplitude decay",
+                v -> onUserChange(() -> state.set("sphere.planetPersistence", v)));
+            widgets.add(persistSlider);
+            y += step;
+            
+            // Ridged + Craters
+            float ridged = state.getFloat("sphere.planetRidged");
+            var ridgedSlider = GuiWidgets.slider(x, y, halfW,
+                "Ridgd", 0f, 1f, ridged, "%.2f", "Mountain sharpness",
+                v -> onUserChange(() -> state.set("sphere.planetRidged", v)));
+            widgets.add(ridgedSlider);
+            
+            int craters = state.getInt("sphere.planetCraterCount");
+            var cratersSlider = GuiWidgets.slider(x + halfW + GuiConstants.PADDING, y, halfW,
+                "Crtrs", 0, 20, craters, "%d", "Impact craters",
+                v -> onUserChange(() -> state.set("sphere.planetCraterCount", Math.round(v))));
+            widgets.add(cratersSlider);
+            y += step;
+            
+            // Seed (full width)
+            int seed = state.getInt("sphere.planetSeed");
+            var seedSlider = GuiWidgets.slider(x, y, w,
+                "Seed", 0, 999, seed, "%d", "Random seed",
+                v -> onUserChange(() -> state.set("sphere.planetSeed", Math.round(v))));
+            widgets.add(seedSlider);
+            y += step;
+        }
+        
+        // ─── HORIZON EFFECT SECTION ──────────────────────────────────────────────
+        var horizonHeader = net.minecraft.client.gui.widget.ButtonWidget.builder(
+                net.minecraft.text.Text.literal("── Horizon Effect ──"), btn -> {})
+            .dimensions(x, y, w, GuiConstants.COMPACT_HEIGHT)
+            .build();
+        widgets.add(horizonHeader);
+        y += step;
+        
+        boolean horizonEnabled = state.getBool("sphere.horizonEnabled");
+        var horizonCheck = GuiWidgets.checkbox(x, y, "Enable", horizonEnabled, 
+            "Enable rim lighting effect", textRenderer, v -> {
+                state.set("sphere.horizonEnabled", v);
+                
+                // Auto-switch quad pattern for shader effects
+                boolean coronaOn = state.getBool("sphere.coronaEnabled");
+                if (v || coronaOn) {
+                    state.set("arrangement.defaultPattern", "standard_quad");
+                } else {
+                    state.set("arrangement.defaultPattern", "filled_1");
+                }
+                
+                rebuildForCurrentShape();
+                if (shapeChangedCallback != null) {
+                    shapeChangedCallback.run();
+                }
+            });
+        widgets.add(horizonCheck);
+        y += step;
+        
+        // Only show horizon controls when enabled
+        if (horizonEnabled) {
+            // Power + Intensity
+            float hPower = state.getFloat("sphere.horizonPower");
+            var hPowerSlider = GuiWidgets.slider(x, y, halfW,
+                "Power", 1f, 10f, hPower, "%.1f", "Edge sharpness",
+                v -> onUserChange(() -> state.set("sphere.horizonPower", v)));
+            widgets.add(hPowerSlider);
+            
+            float hIntensity = state.getFloat("sphere.horizonIntensity");
+            var hIntensitySlider = GuiWidgets.slider(x + halfW + GuiConstants.PADDING, y, halfW,
+                "Inten", 0f, 5f, hIntensity, "%.2f", "Brightness",
+                v -> onUserChange(() -> state.set("sphere.horizonIntensity", v)));
+            widgets.add(hIntensitySlider);
+            y += step;
+            
+            // RGB Color
+            float hR = state.getFloat("sphere.horizonRed");
+            var hRedSlider = GuiWidgets.slider(x, y, halfW,
+                "Red", 0f, 1f, hR, "%.2f", "Red component",
+                v -> onUserChange(() -> state.set("sphere.horizonRed", v)));
+            widgets.add(hRedSlider);
+            
+            float hG = state.getFloat("sphere.horizonGreen");
+            var hGreenSlider = GuiWidgets.slider(x + halfW + GuiConstants.PADDING, y, halfW,
+                "Green", 0f, 1f, hG, "%.2f", "Green component",
+                v -> onUserChange(() -> state.set("sphere.horizonGreen", v)));
+            widgets.add(hGreenSlider);
+            y += step;
+            
+            float hB = state.getFloat("sphere.horizonBlue");
+            var hBlueSlider = GuiWidgets.slider(x, y, halfW,
+                "Blue", 0f, 1f, hB, "%.2f", "Blue component",
+                v -> onUserChange(() -> state.set("sphere.horizonBlue", v)));
+            widgets.add(hBlueSlider);
+            y += step;
+        }
+        
+        // ─── CORONA EFFECT SECTION ───────────────────────────────────────────────
+        var coronaHeader = net.minecraft.client.gui.widget.ButtonWidget.builder(
+                net.minecraft.text.Text.literal("── Corona Effect ──"), btn -> {})
+            .dimensions(x, y, w, GuiConstants.COMPACT_HEIGHT)
+            .build();
+        widgets.add(coronaHeader);
+        y += step;
+        
+        boolean coronaEnabled = state.getBool("sphere.coronaEnabled");
+        var coronaCheck = GuiWidgets.checkbox(x, y, "Enable", coronaEnabled, 
+            "Enable additive glow overlay", textRenderer, v -> {
+                state.set("sphere.coronaEnabled", v);
+                
+                // Auto-switch quad pattern for shader effects
+                boolean horizonOn = state.getBool("sphere.horizonEnabled");
+                if (v || horizonOn) {
+                    state.set("arrangement.defaultPattern", "standard_quad");
+                } else {
+                    state.set("arrangement.defaultPattern", "filled_1");
+                }
+                
+                rebuildForCurrentShape();
+                if (shapeChangedCallback != null) {
+                    shapeChangedCallback.run();
+                }
+            });
+        widgets.add(coronaCheck);
+        y += step;
+        
+        // Only show corona controls when enabled
+        if (coronaEnabled) {
+            // Power + Intensity
+            float cPower = state.getFloat("sphere.coronaPower");
+            var cPowerSlider = GuiWidgets.slider(x, y, halfW,
+                "Power", 1f, 10f, cPower, "%.1f", "Edge sharpness",
+                v -> onUserChange(() -> state.set("sphere.coronaPower", v)));
+            widgets.add(cPowerSlider);
+            
+            float cIntensity = state.getFloat("sphere.coronaIntensity");
+            var cIntensitySlider = GuiWidgets.slider(x + halfW + GuiConstants.PADDING, y, halfW,
+                "Inten", 0f, 5f, cIntensity, "%.2f", "Brightness",
+                v -> onUserChange(() -> state.set("sphere.coronaIntensity", v)));
+            widgets.add(cIntensitySlider);
+            y += step;
+            
+            // Falloff (full width)
+            float cFalloff = state.getFloat("sphere.coronaFalloff");
+            var cFalloffSlider = GuiWidgets.slider(x, y, w,
+                "Falloff", 0.1f, 2f, cFalloff, "%.2f", "Glow spread (lower=wider)",
+                v -> onUserChange(() -> state.set("sphere.coronaFalloff", v)));
+            widgets.add(cFalloffSlider);
+            y += step;
+            
+            // RGB Color
+            float cR = state.getFloat("sphere.coronaRed");
+            var cRedSlider = GuiWidgets.slider(x, y, halfW,
+                "Red", 0f, 1f, cR, "%.2f", "Red component",
+                v -> onUserChange(() -> state.set("sphere.coronaRed", v)));
+            widgets.add(cRedSlider);
+            
+            float cG = state.getFloat("sphere.coronaGreen");
+            var cGreenSlider = GuiWidgets.slider(x + halfW + GuiConstants.PADDING, y, halfW,
+                "Green", 0f, 1f, cG, "%.2f", "Green component",
+                v -> onUserChange(() -> state.set("sphere.coronaGreen", v)));
+            widgets.add(cGreenSlider);
+            y += step;
+            
+            float cB = state.getFloat("sphere.coronaBlue");
+            var cBlueSlider = GuiWidgets.slider(x, y, halfW,
+                "Blue", 0f, 1f, cB, "%.2f", "Blue component",
+                v -> onUserChange(() -> state.set("sphere.coronaBlue", v)));
+            widgets.add(cBlueSlider);
+            y += step;
+            
+            // Halo + Width
+            float cOffset = state.getFloat("sphere.coronaOffset");
+            var cOffsetSlider = GuiWidgets.slider(x, y, halfW,
+                "Halo", 0f, 1f, cOffset, "%.2f", "Distance from surface",
+                v -> onUserChange(() -> state.set("sphere.coronaOffset", v)));
+            widgets.add(cOffsetSlider);
+            
+            float cWidth = state.getFloat("sphere.coronaWidth");
+            var cWidthSlider = GuiWidgets.slider(x + halfW + GuiConstants.PADDING, y, halfW,
+                "Width", 0.1f, 3f, cWidth, "%.2f", "Glow band spread",
+                v -> onUserChange(() -> state.set("sphere.coronaWidth", v)));
+            widgets.add(cWidthSlider);
+            y += step;
+        }
+        
+        return y;
+    }
     
     private void onUserChange(Runnable r) {
         r.run();

@@ -6,9 +6,11 @@ import net.cyberpunk042.client.gui.util.GuiWidgets;
 import net.cyberpunk042.client.gui.widget.LabeledSlider;
 import net.cyberpunk042.log.Logging;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.CheckboxWidget;
 import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
+import net.minecraft.text.Text;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -198,8 +200,8 @@ public class ShapeControlBuilder {
         } else if (spec instanceof ShapeWidgetSpec.EnumDropdownSpec<?> e) {
             return buildEnumDropdown(e, x, y, width);
         } else if (spec instanceof ShapeWidgetSpec.SectionHeader h) {
-            // Section headers are rendered separately, not as widgets
-            return null;
+            // Create a styled section header label
+            return buildSectionHeader(h, x, y, width);
         } else if (spec instanceof ShapeWidgetSpec.RowBreak) {
             // Row breaks are layout control, not widgets
             return null;
@@ -315,5 +317,19 @@ public class ShapeControlBuilder {
             return e.halfWidth();
         }
         return false;  // Section headers, row breaks are not half-width
+    }
+    
+    /**
+     * Builds a section header label.
+     * Uses an inactive button styled as a header for visual consistency.
+     */
+    private ClickableWidget buildSectionHeader(ShapeWidgetSpec.SectionHeader spec, int x, int y, int width) {
+        // Create a simple button that acts as a label (non-interactive)
+        // Using "── Title ──" format for visual clarity
+        String title = "── " + spec.text() + " ──";
+        
+        return ButtonWidget.builder(Text.literal(title), button -> {})
+            .dimensions(x, y, width, GuiConstants.COMPACT_HEIGHT)
+            .build();
     }
 }
