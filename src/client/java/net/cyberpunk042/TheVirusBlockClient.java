@@ -37,7 +37,9 @@ public class TheVirusBlockClient implements ClientModInitializer {
 				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.RENDER_WARMUP)
 				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.TEST_RENDERER)
 				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.FRAGMENT_PRESETS)
-				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.WAVE_SHADER))
+				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.WAVE_SHADER)
+				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.FRESNEL_SHADER)
+				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.CORONA_SHADER))
 			
 			// Stage 4: GUI
 			.stage(net.cyberpunk042.init.InitStage.of("client_gui", "GUI")

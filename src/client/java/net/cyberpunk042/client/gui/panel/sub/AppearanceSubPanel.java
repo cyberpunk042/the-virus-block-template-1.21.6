@@ -142,6 +142,13 @@ public class AppearanceSubPanel extends BoundPanel {
             net.cyberpunk042.visual.appearance.ColorDistribution.class);
         
         // ═══════════════════════════════════════════════════════════════════
+        // ROW 8b: Blend Mode (NORMAL / ADD / MULTIPLY / SCREEN)
+        // ═══════════════════════════════════════════════════════════════════
+        
+        content.dropdown("Blend Mode", "appearance.blendMode", 
+            net.cyberpunk042.visual.layer.BlendMode.class);
+        
+        // ═══════════════════════════════════════════════════════════════════
         // ROW 9: Color Set (for CYCLING and RANDOM modes)
         // ═══════════════════════════════════════════════════════════════════
         

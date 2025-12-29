@@ -51,7 +51,8 @@ public class AppearanceAdapter extends AbstractAdapter implements PrimitiveAdapt
                 app.effectiveDistribution(),                    // colorDistribution
                 app.effectiveColorSet(),                        // colorSet
                 app.effectiveDirection(),                       // gradientDirection
-                app.timePhase()                                 // timePhase
+                app.timePhase(),                                // timePhase
+                net.cyberpunk042.visual.layer.BlendMode.NORMAL  // blendMode (layer-level, default NORMAL)
             );
         } else {
             this.appearance = AppearanceState.DEFAULT;

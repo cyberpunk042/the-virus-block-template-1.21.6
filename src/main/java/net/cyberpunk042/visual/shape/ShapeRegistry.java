@@ -153,9 +153,21 @@ public final class ShapeRegistry {
             float deformSmoothness = getFloat(params, "deformationSmoothness", 0.5f);
             float deformBumpSize = getFloat(params, "deformationBumpSize", 0.5f);
             float deformSeparation = getFloat(params, "deformationSeparation", 0.6f);
+            // Planet parameters
+            float planetFrequency = getFloat(params, "planetFrequency", 2f);
+            int planetOctaves = getInt(params, "planetOctaves", 4);
+            float planetLacunarity = getFloat(params, "planetLacunarity", 2f);
+            float planetPersistence = getFloat(params, "planetPersistence", 0.5f);
+            float planetRidged = getFloat(params, "planetRidged", 0f);
+            int planetCraterCount = getInt(params, "planetCraterCount", 0);
+            int planetSeed = getInt(params, "planetSeed", 42);
             return new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, 
                 algorithm, SphereDeformation.NONE, 0f, 1f, deformCount, deformSmoothness, 
-                deformBumpSize, deformSeparation);
+                deformBumpSize, deformSeparation,
+                planetFrequency, planetOctaves, planetLacunarity, planetPersistence, 
+                planetRidged, planetCraterCount, planetSeed,
+                false, 3f, 1.5f, 1f, 1f, 1f,  // horizon defaults
+                false, 2f, 1f, 0.5f, 1f, 1f, 1f); // corona defaults
         });
         
         // Ring

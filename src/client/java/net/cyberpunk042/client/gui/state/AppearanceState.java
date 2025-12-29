@@ -4,6 +4,7 @@ import net.cyberpunk042.visual.appearance.ColorDistribution;
 import net.cyberpunk042.visual.appearance.ColorMode;
 import net.cyberpunk042.visual.appearance.ColorSet;
 import net.cyberpunk042.visual.appearance.GradientDirection;
+import net.cyberpunk042.visual.layer.BlendMode;
 
 /**
  * GUI editing state for appearance properties.
@@ -28,7 +29,9 @@ public record AppearanceState(
     ColorDistribution colorDistribution,
     ColorSet colorSet,
     GradientDirection gradientDirection,
-    float timePhase
+    float timePhase,
+    // Blend mode for layer compositing
+    BlendMode blendMode
 ) {
     public static final AppearanceState DEFAULT = new AppearanceState(
         0xFF00FFFF,  // color (cyan)
@@ -46,7 +49,8 @@ public record AppearanceState(
         ColorDistribution.UNIFORM,      // colorDistribution
         ColorSet.RAINBOW,               // colorSet
         GradientDirection.Y_AXIS,       // gradientDirection
-        0f                              // timePhase
+        0f,                             // timePhase
+        BlendMode.NORMAL                // blendMode
     );
 
     // Legacy compatibility: single alpha accessor
@@ -71,7 +75,8 @@ public record AppearanceState(
             .colorDistribution(colorDistribution)
             .colorSet(colorSet)
             .gradientDirection(gradientDirection)
-            .timePhase(timePhase);
+            .timePhase(timePhase)
+            .blendMode(blendMode);
     }
 
     public static class Builder {
@@ -91,6 +96,7 @@ public record AppearanceState(
         private ColorSet colorSet = ColorSet.RAINBOW;
         private GradientDirection gradientDirection = GradientDirection.Y_AXIS;
         private float timePhase = 0f;
+        private BlendMode blendMode = BlendMode.NORMAL;
 
         public Builder color(int c) { this.color = c; return this; }
         public Builder alphaMin(float a) { this.alphaMin = a; return this; }
@@ -109,13 +115,14 @@ public record AppearanceState(
         public Builder colorSet(ColorSet s) { this.colorSet = s; return this; }
         public Builder gradientDirection(GradientDirection d) { this.gradientDirection = d; return this; }
         public Builder timePhase(float p) { this.timePhase = p; return this; }
+        public Builder blendMode(BlendMode b) { this.blendMode = b != null ? b : BlendMode.NORMAL; return this; }
         /** @deprecated Use timePhase instead */
         @Deprecated public Builder rainbowSpeed(float s) { this.timePhase = s; return this; }
 
         public AppearanceState build() {
             return new AppearanceState(color, alphaMin, alphaMax, glow, emissive, 
                 saturation, brightness, hueShift, primaryColor, secondaryColor, colorBlend,
-                colorMode, colorDistribution, colorSet, gradientDirection, timePhase);
+                colorMode, colorDistribution, colorSet, gradientDirection, timePhase, blendMode);
         }
     }
 }

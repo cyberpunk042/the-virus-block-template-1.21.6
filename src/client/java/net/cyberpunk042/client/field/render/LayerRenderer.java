@@ -196,6 +196,28 @@ public final class LayerRenderer {
                     
                     VertexConsumer consumer = getConsumerForPrimitive(consumers, primitive);
                     renderPrimitive(matrices, consumer, primitive, resolver, light, time, effectiveAlpha, overrides, primitiveIndex);
+                    
+                    // === CORONA EFFECT: Second pass for additive overlay ===
+                    // If this is a sphere with Corona enabled, render it again with additive blending
+                    if (primitive.shape() instanceof net.cyberpunk042.visual.shape.SphereShape sphere 
+                            && sphere.hasCoronaEffect()) {
+                        // Set corona uniforms
+                        net.cyberpunk042.client.visual.shader.CoronaUniformManager.setParams(sphere.toCoronaEffect());
+                        
+                        // Get corona render layer
+                        boolean doubleSided = fill != null && fill.doubleSided();
+                        net.minecraft.client.render.RenderLayer coronaLayer = doubleSided
+                            ? net.cyberpunk042.client.visual.shader.CoronaRenderLayers.coronaAdditiveNoCull()
+                            : net.cyberpunk042.client.visual.shader.CoronaRenderLayers.coronaAdditive();
+                        
+                        // Render the same primitive again with corona shader
+                        VertexConsumer coronaConsumer = consumers.getBuffer(coronaLayer);
+                        renderPrimitive(matrices, coronaConsumer, primitive, resolver, light, time, effectiveAlpha, overrides, primitiveIndex);
+                        
+                        // Reset corona uniforms
+                        net.cyberpunk042.client.visual.shader.CoronaUniformManager.reset();
+                    }
+                    
                     primCount++;
                 }
                 
@@ -275,7 +297,19 @@ public final class LayerRenderer {
         return switch (mode) {
             case WIREFRAME, CAGE -> consumers.getBuffer(FieldRenderLayers.lines(wireThickness));
             case SOLID, POINTS -> {
-                // Select layer based on depth write setting
+                // Check if this is a sphere with Horizon effect enabled
+                if (primitive.shape() instanceof net.cyberpunk042.visual.shape.SphereShape sphere 
+                        && sphere.hasHorizonEffect()) {
+                    // Use Fresnel shader for rim lighting
+                    // Note: Set uniforms before the actual render call in SphereRenderer
+                    net.cyberpunk042.client.visual.shader.FresnelUniformManager.setParams(sphere.toHorizonEffect());
+                    RenderLayer fresnelLayer = doubleSided 
+                        ? net.cyberpunk042.client.visual.shader.FresnelRenderLayers.fresnelTranslucentNoCull()
+                        : net.cyberpunk042.client.visual.shader.FresnelRenderLayers.fresnelTranslucent();
+                    yield consumers.getBuffer(fresnelLayer);
+                }
+                
+                // Standard layer selection
                 RenderLayer layer;
                 if (!depthWrite) {
                     // No depth write = true transparency (see-through)

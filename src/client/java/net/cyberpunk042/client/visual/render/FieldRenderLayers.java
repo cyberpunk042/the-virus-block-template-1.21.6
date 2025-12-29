@@ -5,6 +5,8 @@ import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderPhase;
 import net.minecraft.util.Identifier;
+import net.cyberpunk042.client.visual.shader.FresnelRenderLayers;
+import net.cyberpunk042.visual.effect.HorizonEffect;
 import net.cyberpunk042.visual.layer.BlendMode;
 import org.lwjgl.opengl.GL14;
 
@@ -98,6 +100,32 @@ public final class FieldRenderLayers extends RenderPhase {
      */
     public static RenderLayer solidTranslucent(Identifier texture) {
         return RenderLayer.getEntityTranslucent(texture);
+    }
+    
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Fresnel Rim Effect Layers
+    // ─────────────────────────────────────────────────────────────────────────────
+    
+    /**
+     * Translucent layer with Fresnel rim lighting effect.
+     * 
+     * <p>Before using this layer, call {@link net.cyberpunk042.client.visual.shader.FresnelUniformManager#setParams}
+     * to configure the rim color, power, and intensity.</p>
+     * 
+     * @return RenderLayer configured for Fresnel rendering
+     * @see FresnelRenderLayers#fresnelTranslucent()
+     */
+    public static RenderLayer fresnelTranslucent() {
+        return FresnelRenderLayers.fresnelTranslucent();
+    }
+    
+    /**
+     * Translucent layer with Fresnel rim lighting (no backface culling).
+     * 
+     * @return RenderLayer for double-sided Fresnel rendering
+     */
+    public static RenderLayer fresnelTranslucentNoCull() {
+        return FresnelRenderLayers.fresnelTranslucentNoCull();
     }
     
     /**

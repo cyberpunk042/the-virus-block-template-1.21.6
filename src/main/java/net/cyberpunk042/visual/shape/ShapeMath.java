@@ -747,5 +747,179 @@ public final class ShapeMath {
             finalRadius * vz
         };
     }
+    
+    // =========================================================================
+    // PLANET DEFORMATION
+    // =========================================================================
+    
+    /**
+     * Planet vertex position using PROCEDURAL TERRAIN GENERATION.
+     * 
+     * <p><b>Algorithm:</b> Combines fractal Brownian motion (fBm) noise with
+     * optional ridged multifractal for mountains and crater profiles for
+     * impact features.</p>
+     * 
+     * <p><b>Key Features:</b></p>
+     * <ul>
+     *   <li>Terrain: fBm noise for continents and hills</li>
+     *   <li>Mountains: Ridged multifractal for sharp peaks (ridged > 0)</li>
+     *   <li>Craters: Paraboloid depressions with raised rims (craterCount > 0)</li>
+     * </ul>
+     * 
+     * @param theta Polar angle (0 = top, π = bottom)
+     * @param phi Azimuthal angle (0 to 2π)
+     * @param radius Base radius
+     * @param intensity Overall terrain prominence (0 = sphere, 1 = full terrain)
+     * @param length Axial stretch
+     * @param frequency Base noise scale (0.5-10)
+     * @param octaves Noise detail layers (1-8)
+     * @param lacunarity Frequency growth per octave (1.5-3.5)
+     * @param persistence Amplitude decay per octave (0.2-0.8)
+     * @param ridged Mountain sharpness (0 = rolling hills, 1 = sharp ridges)
+     * @param craterCount Number of impact craters (0-20)
+     * @param seed Random seed for reproducibility
+     * @return {x, y, z} vertex position
+     */
+    public static float[] planetVertex(float theta, float phi, float radius,
+            float intensity, float length,
+            float frequency, int octaves, float lacunarity, float persistence,
+            float ridged, int craterCount, int seed) {
+        
+        // Base trigonometry
+        float sinTheta = (float) Math.sin(theta);
+        float cosTheta = (float) Math.cos(theta);
+        float sinPhi = (float) Math.sin(phi);
+        float cosPhi = (float) Math.cos(phi);
+        
+        // Current vertex direction (unit vector on sphere)
+        float vx = sinTheta * cosPhi;
+        float vy = cosTheta;
+        float vz = sinTheta * sinPhi;
+        
+        // At intensity 0, return pure spheroid
+        if (intensity < 0.01f) {
+            return new float[] {
+                radius * vx,
+                radius * length * vy,
+                radius * vz
+            };
+        }
+        
+        // Clamp parameters
+        octaves = Math.max(1, Math.min(8, octaves));
+        frequency = Math.max(0.5f, Math.min(10f, frequency));
+        lacunarity = Math.max(1.5f, Math.min(3.5f, lacunarity));
+        persistence = Math.max(0.2f, Math.min(0.8f, persistence));
+        ridged = Math.max(0f, Math.min(1f, ridged));
+        craterCount = Math.max(0, Math.min(20, craterCount));
+        
+        // ======================================================================
+        // TERRAIN GENERATION
+        // ======================================================================
+        
+        float displacement = 0;
+        
+        // Sample noise at vertex position (scaled by frequency)
+        float nx = vx * frequency;
+        float ny = vy * frequency;
+        float nz = vz * frequency;
+        
+        // Use terrain noise (blends fBm and ridged based on ridged parameter)
+        float terrainValue = SimplexNoise.terrainNoise(
+            nx, ny, nz,
+            octaves, lacunarity, persistence,
+            ridged, seed
+        );
+        
+        // Scale terrain to reasonable displacement range
+        displacement += terrainValue * 0.3f;
+        
+        // ======================================================================
+        // CRATER GENERATION
+        // ======================================================================
+        
+        if (craterCount > 0) {
+            float craterDisp = 0;
+            float goldenAngle = 2.399963f;
+            
+            for (int i = 0; i < craterCount; i++) {
+                // Crater center position (Fibonacci spiral for even distribution)
+                float t = (float) (i + 0.5f) / (float) craterCount;
+                float craterTheta = (float) Math.acos(1.0f - 2.0f * t);
+                float craterPhi = goldenAngle * i;
+                
+                // Crater direction
+                float cx = (float) Math.sin(craterTheta) * (float) Math.cos(craterPhi);
+                float cy = (float) Math.cos(craterTheta);
+                float cz = (float) Math.sin(craterTheta) * (float) Math.sin(craterPhi);
+                
+                // Dot product = cos(angle) between vertex and crater center
+                float dot = vx * cx + vy * cy + vz * cz;
+                
+                // Angular distance (0 when aligned, π when opposite)
+                float angularDist = (float) Math.acos(Math.max(-1, Math.min(1, dot)));
+                
+                // Crater size varies by index (pseudo-random via seed)
+                float sizeVariation = 0.7f + 0.6f * (float) Math.sin((i + seed) * 1.7f);
+                float craterRadius = 0.25f * sizeVariation;  // Angular radius in radians
+                
+                // Crater depth (depth-to-radius ratio ~0.3 for realistic craters)
+                float craterDepth = 0.15f * sizeVariation;
+                float rimHeight = craterDepth * 0.3f;
+                
+                // Apply crater profile
+                craterDisp += craterProfile(angularDist, craterRadius, craterDepth, rimHeight);
+            }
+            
+            displacement += craterDisp;
+        }
+        
+        // ======================================================================
+        // APPLY DISPLACEMENT
+        // ======================================================================
+        
+        // Scale by intensity
+        displacement *= intensity;
+        
+        // Final radius: base + displacement (ADDITIVE)
+        float finalRadius = radius * (1.0f + displacement);
+        
+        // Apply to position with axial stretch
+        return new float[] {
+            finalRadius * vx,
+            finalRadius * length * vy,
+            finalRadius * vz
+        };
+    }
+    
+    /**
+     * Crater profile function - paraboloid depression with raised rim.
+     * 
+     * @param distance Angular distance from crater center (radians)
+     * @param craterRadius Angular radius of crater (radians)
+     * @param depth Maximum depression depth
+     * @param rimHeight Height of raised rim
+     * @return Displacement value (negative = depression, positive = rim)
+     */
+    private static float craterProfile(float distance, float craterRadius, float depth, float rimHeight) {
+        // Normalized distance (0 at center, 1 at rim)
+        float r = distance / craterRadius;
+        
+        if (r > 2.0f) {
+            return 0;  // Outside influence
+        }
+        
+        if (r <= 1.0f) {
+            // Inside crater: paraboloid depression
+            // At center (r=0): -depth
+            // At rim (r=1): 0
+            return -depth * (1.0f - r * r);
+        } else {
+            // Rim and ejecta blanket (r > 1, up to 2)
+            float rimFalloff = r - 1.0f;  // 0 at rim, 1 at edge
+            // Raised rim with exponential falloff
+            return rimHeight * (float) Math.exp(-rimFalloff * 3.0f) * (1.0f - rimFalloff);
+        }
+    }
 }
 

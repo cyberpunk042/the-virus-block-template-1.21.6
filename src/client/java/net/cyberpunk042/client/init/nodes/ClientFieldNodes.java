@@ -231,6 +231,28 @@ public final class ClientFieldNodes {
         }
     );
     
+    /**
+     * Fresnel (Horizon) shader for rim lighting effects.
+     */
+    public static final InitNode FRESNEL_SHADER = InitNode.simple(
+        "fresnel_shader", "Fresnel Shader",
+        () -> {
+            net.cyberpunk042.client.visual.shader.FresnelPipelines.init();
+            return 1;
+        }
+    );
+    
+    /**
+     * Corona shader for additive overlay glow effects.
+     */
+    public static final InitNode CORONA_SHADER = InitNode.simple(
+        "corona_shader", "Corona Shader",
+        () -> {
+            net.cyberpunk042.client.visual.shader.CoronaPipelines.init();
+            return 1;
+        }
+    );
+    
     // ═══════════════════════════════════════════════════════════════════════════
     // HELPER METHODS
     // ═══════════════════════════════════════════════════════════════════════════
