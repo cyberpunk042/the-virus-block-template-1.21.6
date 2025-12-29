@@ -640,6 +640,7 @@ public final class DefinitionBuilder {
             .wave(state.wave())
             .colorCycle(state.colorCycle())
             .precession(state.precession())
+            .travelEffect(state.travelEffect())
             .rayFlow(state.rayFlow())
             .rayMotion(state.rayMotion())
             .rayWiggle(state.rayWiggle())

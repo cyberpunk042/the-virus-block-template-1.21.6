@@ -23,6 +23,7 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
     @StateField private WaveConfig wave = WaveConfig.NONE;
     @StateField private ColorCycleConfig colorCycle = ColorCycleConfig.NONE;
     @StateField private PrecessionConfig precession = null;
+    @StateField private TravelEffectConfig travelEffect = null;
     @StateField private RayFlowConfig rayFlow = null;
     @StateField private RayMotionConfig rayMotion = null;
     @StateField private RayWiggleConfig rayWiggle = null;
@@ -42,6 +43,7 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             this.wave = orDefault(anim.wave(), WaveConfig.NONE);
             this.colorCycle = orDefault(anim.colorCycle(), ColorCycleConfig.NONE);
             this.precession = anim.precession();
+            this.travelEffect = anim.travelEffect();
             this.rayFlow = anim.rayFlow();
             this.rayMotion = anim.rayMotion();
             this.rayWiggle = anim.rayWiggle();
@@ -62,6 +64,7 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             .wave(wave)
             .colorCycle(colorCycle)
             .precession(precession)
+            .travelEffect(travelEffect)
             .rayFlow(rayFlow)
             .rayMotion(rayMotion)
             .rayWiggle(rayWiggle)
@@ -90,6 +93,9 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
     
     public PrecessionConfig precession() { return precession; }
     public void setPrecession(PrecessionConfig precession) { this.precession = precession; }
+    
+    public TravelEffectConfig travelEffect() { return travelEffect; }
+    public void setTravelEffect(TravelEffectConfig travelEffect) { this.travelEffect = travelEffect; }
     
     public RayFlowConfig rayFlow() { return rayFlow; }
     public void setRayFlow(RayFlowConfig rayFlow) { this.rayFlow = rayFlow; }
@@ -120,6 +126,7 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             case "wave" -> prop != null ? getWaveProperty(prop) : wave;
             case "colorCycle" -> prop != null ? getColorCycleProperty(prop) : colorCycle;
             case "precession" -> prop != null ? getPrecessionProperty(prop) : precession;
+            case "travelEffect" -> prop != null ? getTravelEffectProperty(prop) : travelEffect;
             case "rayFlow" -> prop != null ? getRayFlowProperty(prop) : rayFlow;
             case "rayMotion" -> prop != null ? getRayMotionProperty(prop) : rayMotion;
             case "rayWiggle" -> prop != null ? getRayWiggleProperty(prop) : rayWiggle;
@@ -231,6 +238,7 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             case "wave" -> setWaveProperty(prop, value);
             case "colorCycle" -> setColorCycleProperty(prop, value);
             case "precession" -> setPrecessionProperty(prop, value);
+            case "travelEffect" -> setTravelEffectProperty(prop, value);
             case "rayFlow" -> setRayFlowProperty(prop, value);
             case "rayMotion" -> setRayMotionProperty(prop, value);
             case "rayWiggle" -> setRayWiggleProperty(prop, value);
@@ -337,6 +345,7 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
     }
     
     private float toFloat(Object v) { return v instanceof Number n ? n.floatValue() : 0f; }
+    private int toInt(Object v) { return v instanceof Number n ? n.intValue() : 0; }
     private boolean toBool(Object v) { return v instanceof Boolean b ? b : Boolean.parseBoolean(v.toString()); }
     
     @Override
@@ -348,10 +357,77 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
         this.wave = WaveConfig.NONE;
         this.colorCycle = ColorCycleConfig.NONE;
         this.precession = null;
+        this.travelEffect = null;
         this.rayFlow = null;
         this.rayMotion = null;
         this.rayWiggle = null;
         this.rayTwist = null;
+    }
+    
+    // =========================================================================
+    // Travel Effect Property Accessors (General - any shape)
+    // =========================================================================
+    
+    private Object getTravelEffectProperty(String prop) {
+        if (travelEffect == null) return null;
+        return switch (prop) {
+            case "enabled" -> travelEffect.enabled();
+            case "mode" -> travelEffect.mode();
+            case "speed" -> travelEffect.speed();
+            case "blendMode" -> travelEffect.blendMode();
+            case "minAlpha" -> travelEffect.minAlpha();
+            case "intensity" -> travelEffect.intensity();
+            case "direction" -> travelEffect.direction();
+            case "dirX" -> travelEffect.dirX();
+            case "dirY" -> travelEffect.dirY();
+            case "dirZ" -> travelEffect.dirZ();
+            case "count" -> travelEffect.count();
+            case "width" -> travelEffect.width();
+            default -> null;
+        };
+    }
+    
+    private void setTravelEffectProperty(String prop, Object value) {
+        // If travelEffect is null, create new builder with sensible defaults
+        // (enabled + CHASE mode) so the effect actually works
+        TravelEffectConfig.Builder b;
+        if (travelEffect != null) {
+            b = travelEffect.toBuilder();
+        } else {
+            // Create with defaults that will actually be active
+            b = TravelEffectConfig.builder()
+                .enabled(true)
+                .mode(net.cyberpunk042.visual.energy.EnergyTravel.CHASE);
+        }
+        
+        switch (prop) {
+            case "enabled" -> b.enabled(toBool(value));
+            case "mode" -> {
+                var mode = value instanceof net.cyberpunk042.visual.energy.EnergyTravel et
+                    ? et : net.cyberpunk042.visual.energy.EnergyTravel.fromString(value.toString());
+                b.mode(mode);
+                // Auto-enable when mode is set to something other than NONE
+                b.enabled(mode != null && mode != net.cyberpunk042.visual.energy.EnergyTravel.NONE);
+            }
+            case "speed" -> b.speed(toFloat(value));
+            case "blendMode" -> {
+                var mode = value instanceof net.cyberpunk042.visual.energy.TravelBlendMode tbm
+                    ? tbm : net.cyberpunk042.visual.energy.TravelBlendMode.fromString(value.toString());
+                b.blendMode(mode);
+            }
+            case "minAlpha" -> b.minAlpha(toFloat(value));
+            case "intensity" -> b.intensity(toFloat(value));
+            case "direction" -> {
+                var dir = value instanceof Axis a ? a : Axis.fromId(value.toString());
+                b.direction(dir);
+            }
+            case "dirX" -> b.dirX(toFloat(value));
+            case "dirY" -> b.dirY(toFloat(value));
+            case "dirZ" -> b.dirZ(toFloat(value));
+            case "count" -> b.count(toInt(value));
+            case "width" -> b.width(toFloat(value));
+        }
+        this.travelEffect = b.build();
     }
     
     // =========================================================================
@@ -368,6 +444,9 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             case "travelSpeed" -> rayFlow.travelSpeed();
             case "chaseCount" -> rayFlow.chaseCount();
             case "chaseWidth" -> rayFlow.chaseWidth();
+            case "travelBlendMode" -> rayFlow.travelBlendMode();
+            case "travelMinAlpha" -> rayFlow.travelMinAlpha();
+            case "travelIntensity" -> rayFlow.travelIntensity();
             case "flicker" -> rayFlow.flicker();
             case "flickerEnabled" -> rayFlow.flickerEnabled();
             case "flickerIntensity" -> rayFlow.flickerIntensity();
@@ -406,6 +485,13 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             case "flickerFrequency" -> b.flickerFrequency(toFloat(value));
             case "skipSpawnTransition" -> b.skipSpawnTransition(toBool(value));
             case "pathFollowing" -> b.pathFollowing(toBool(value));
+            case "travelBlendMode" -> {
+                var mode = value instanceof net.cyberpunk042.visual.energy.TravelBlendMode tbm
+                    ? tbm : net.cyberpunk042.visual.energy.TravelBlendMode.fromString(value.toString());
+                b.travelBlendMode(mode);
+            }
+            case "travelMinAlpha" -> b.travelMinAlpha(toFloat(value));
+            case "travelIntensity" -> b.travelIntensity(toFloat(value));
         }
         this.rayFlow = b.build();
     }
@@ -510,6 +596,4 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
         }
         this.rayTwist = b.build();
     }
-    
-    private int toInt(Object v) { return v instanceof Number n ? n.intValue() : 0; }
 }

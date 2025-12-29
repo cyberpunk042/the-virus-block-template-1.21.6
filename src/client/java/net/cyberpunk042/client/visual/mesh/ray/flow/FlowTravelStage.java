@@ -2,6 +2,7 @@ package net.cyberpunk042.client.visual.mesh.ray.flow;
 
 import net.cyberpunk042.visual.animation.RayFlowConfig;
 import net.cyberpunk042.visual.energy.EnergyTravel;
+import net.cyberpunk042.visual.energy.TravelBlendMode;
 
 /**
  * Computes travel alpha for per-vertex modulation.
@@ -161,6 +162,65 @@ public final class FlowTravelStage implements FlowStage {
                 }
                 yield maxAlpha;
             }
+            case BIPOLAR -> {
+                // Bipolar jet: TWO jets traveling from center (t=0.5) outward in both directions
+                // t=0.5 is center, t=0 and t=1 are the extremities
+                // Both jets have SAME phase (synchronized)
+                
+                // Convert t to distance from center (0 at center, 0.5 at extremities)
+                float distFromCenter = Math.abs(t - 0.5f);
+                
+                // Normalize to 0-1 range (0 = center, 1 = extremity)
+                float normalizedDist = distFromCenter * 2f;
+                
+                // Apply chase-like effect based on distance from center
+                float spacing = 1f / count;
+                float maxAlpha = 0f;
+                for (int i = 0; i < count; i++) {
+                    float center = (phase + i * spacing) % 1f;
+                    float dist = Math.min(Math.abs(normalizedDist - center), 
+                        Math.min(Math.abs(normalizedDist - center - 1f), 
+                                 Math.abs(normalizedDist - center + 1f)));
+                    if (dist <= width / 2f) {
+                        float falloff = 1f - (dist / (width / 2f));
+                        maxAlpha = Math.max(maxAlpha, falloff * falloff);
+                    }
+                }
+                yield maxAlpha;
+            }
+            case BIPOLAR_ALTERNATE -> {
+                // Bipolar jet with ALTERNATING phase - one side leads, other trails
+                // Creates a ping-pong effect where the phase on one side is offset
+                
+                // Convert t to signed distance from center (-0.5 to +0.5)
+                float signedDist = t - 0.5f;
+                
+                // Determine which "side" we're on and apply appropriate phase
+                float effectivePhase;
+                if (signedDist >= 0) {
+                    effectivePhase = phase;  // Upper jet uses normal phase
+                } else {
+                    effectivePhase = (phase + 0.5f) % 1f;  // Lower jet is 180° out of phase
+                }
+                
+                // Distance from center normalized to 0-1
+                float normalizedDist = Math.abs(signedDist) * 2f;
+                
+                // Apply chase-like effect
+                float spacing = 1f / count;
+                float maxAlpha = 0f;
+                for (int i = 0; i < count; i++) {
+                    float center = (effectivePhase + i * spacing) % 1f;
+                    float dist = Math.min(Math.abs(normalizedDist - center), 
+                        Math.min(Math.abs(normalizedDist - center - 1f), 
+                                 Math.abs(normalizedDist - center + 1f)));
+                    if (dist <= width / 2f) {
+                        float falloff = 1f - (dist / (width / 2f));
+                        maxAlpha = Math.max(maxAlpha, falloff * falloff);
+                    }
+                }
+                yield maxAlpha;
+            }
         };
     }
     
@@ -171,6 +231,41 @@ public final class FlowTravelStage implements FlowStage {
         int h = a * 374761393 + b * 668265263;
         h = (h ^ (h >> 13)) * 1274126177;
         return (h & 0x7FFFFFFF) / (float)0x7FFFFFFF;
+    }
+    
+    /**
+     * Compute blended alpha using TravelBlendMode.
+     * 
+     * <p>This combines the raw travel alpha with base alpha according to the blend mode,
+     * allowing for OVERLAY, ADDITIVE, and MODULATE effects instead of just REPLACE.</p>
+     * 
+     * @param baseAlpha The base vertex alpha before travel effect
+     * @param t Vertex position along axis (0 = base, 1 = tip)
+     * @param mode EnergyTravel type
+     * @param phase Current animation phase (0-1)
+     * @param chaseCount Number of chase particles
+     * @param chaseWidth Width of each particle
+     * @param blendMode How to blend travel with base alpha
+     * @param intensity Blend intensity (for ADDITIVE and MODULATE modes)
+     * @param minAlpha Minimum alpha floor (0-1), prevents going fully invisible
+     * @return Final blended alpha, guaranteed to be at least minAlpha
+     */
+    public static float computeBlendedAlpha(float baseAlpha, float t, EnergyTravel mode,
+            float phase, int chaseCount, float chaseWidth, 
+            TravelBlendMode blendMode, float intensity, float minAlpha) {
+        
+        // Get raw travel alpha (0-1)
+        float travelAlpha = computeTravelAlpha(t, mode, phase, chaseCount, chaseWidth);
+        
+        // Apply blend mode
+        if (blendMode == null) {
+            blendMode = TravelBlendMode.REPLACE;
+        }
+        
+        float blendedAlpha = blendMode.blend(baseAlpha, travelAlpha, intensity);
+        
+        // Enforce minimum alpha floor
+        return Math.max(minAlpha, blendedAlpha);
     }
     
     @Override

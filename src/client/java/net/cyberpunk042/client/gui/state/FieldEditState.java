@@ -81,6 +81,7 @@ public class FieldEditState {
         map.put("wave", animationAdapter);
         map.put("colorCycle", animationAdapter);
         map.put("precession", animationAdapter);
+        map.put("travelEffect", animationAdapter);
         map.put("rayFlow", animationAdapter);
         map.put("rayMotion", animationAdapter);
         map.put("rayWiggle", animationAdapter);
@@ -389,6 +390,7 @@ public class FieldEditState {
     public net.cyberpunk042.visual.animation.WaveConfig wave() { return animationAdapter.wave(); }
     public net.cyberpunk042.visual.animation.ColorCycleConfig colorCycle() { return animationAdapter.colorCycle(); }
     public net.cyberpunk042.visual.animation.PrecessionConfig precession() { return animationAdapter.precession(); }
+    public net.cyberpunk042.visual.animation.TravelEffectConfig travelEffect() { return animationAdapter.travelEffect(); }
     public net.cyberpunk042.visual.animation.RayFlowConfig rayFlow() { return animationAdapter.rayFlow(); }
     public net.cyberpunk042.visual.animation.RayMotionConfig rayMotion() { return animationAdapter.rayMotion(); }
     public net.cyberpunk042.visual.animation.RayWiggleConfig rayWiggle() { return animationAdapter.rayWiggle(); }

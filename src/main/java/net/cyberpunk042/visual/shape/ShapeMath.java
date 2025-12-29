@@ -484,92 +484,108 @@ public final class ShapeMath {
         float sinPhi = (float) Math.sin(phi);
         float cosPhi = (float) Math.cos(phi);
         
-        // Base position (spheroid)
-        float baseX = radius * sinTheta * cosPhi;
-        float baseY = radius * length * cosTheta;
-        float baseZ = radius * sinTheta * sinPhi;
-        
-        // THE MAGIC FORMULA FOR DRAMATIC CLOUDS
-        // Uses multiple spherical "bulges" at pseudo-random positions
-        // Each bulge creates a distinct lobe like a cumulus cloud
-        
-        // Direction from center (normalized)
-        float nx = sinTheta * cosPhi;
-        float ny = cosTheta;
-        float nz = sinTheta * sinPhi;
-        
-        // Define 8 major bulge positions using golden angle distribution
-        // This creates well-distributed but organic-looking lobes
-        float goldenAngle = 2.399963f;  // ~137.5 degrees in radians
-        float[][] bulgePositions = new float[8][3];
-        for (int i = 0; i < 8; i++) {
-            float t = (float) i / 7.0f;  // 0 to 1
-            float bulgeTheta = (float) Math.acos(1 - 2 * t);  // Even distribution
-            float bulgePhi = goldenAngle * i;
-            bulgePositions[i][0] = (float) Math.sin(bulgeTheta) * (float) Math.cos(bulgePhi);
-            bulgePositions[i][1] = (float) Math.cos(bulgeTheta);
-            bulgePositions[i][2] = (float) Math.sin(bulgeTheta) * (float) Math.sin(bulgePhi);
+        // At intensity 0, return pure sphere
+        if (intensity < 0.05f) {
+            float baseX = radius * sinTheta * cosPhi;
+            float baseY = radius * length * cosTheta;
+            float baseZ = radius * sinTheta * sinPhi;
+            return new float[] { baseX, baseY, baseZ };
         }
         
-        // Calculate bulge factor - cumulative effect of all lobes
-        float totalBulge = 0f;
-        float bulgeWidth = 0.6f + 0.4f * intensity;  // Wider bulges = more overlap = cloudier
+        // ======================================================================
+        // SPHERICAL HARMONICS FORMULA (from research)
+        // r'(θ, φ) = R_base + Σ f_l^m * Y_l^m(θ, φ)
+        // Using Real Spherical Harmonics for easier computation
+        // ======================================================================
         
-        for (int i = 0; i < 8; i++) {
-            // Dot product = similarity to bulge direction (-1 to 1)
-            float dot = nx * bulgePositions[i][0] + 
-                       ny * bulgePositions[i][1] + 
-                       nz * bulgePositions[i][2];
-            
-            // Vary bulge strength per lobe for organic feel
-            float bulgeStrength = 0.5f + 0.5f * (float) Math.sin(i * 1.7f + 0.3f);
-            
-            // Gaussian-like falloff for smooth bulges
-            // Higher dot = closer to bulge center = more displacement
-            float proximity = (dot + 1f) * 0.5f;  // Remap to 0-1
-            float bulge = (float) Math.pow(proximity, 2.0f / bulgeWidth) * bulgeStrength;
-            totalBulge = Math.max(totalBulge, bulge);  // Use max for distinct lobes
-        }
+        // Real Spherical Harmonics Y_l^m(θ, φ)
+        // l=0: Y_0^0 = 0.5 * sqrt(1/π) ≈ 0.282 (constant, just sphere - skip)
         
-        // Add multi-frequency noise for surface detail
-        float detailNoise = 
-            0.15f * (float) Math.sin(5 * theta + 0.3f) * (float) Math.sin(7 * phi + 1.2f) +
-            0.10f * (float) Math.sin(8 * theta + 1.5f) * (float) Math.cos(6 * phi + 0.7f) +
-            0.05f * (float) Math.sin(11 * theta + 2.1f) * (float) Math.sin(9 * phi + 0.9f);
+        // l=1: Dipole terms (large-scale asymmetry)
+        float y1_0 = cosTheta;  // Y_1^0 ∝ cos(θ) - vertical asymmetry
+        float y1_1 = sinTheta * cosPhi;  // Y_1^1 ∝ sin(θ)cos(φ) - x-direction
+        float y1_m1 = sinTheta * sinPhi;  // Y_1^-1 ∝ sin(θ)sin(φ) - z-direction
         
-        // Combine bulges with detail noise
-        // At intensity 0: sphere
-        // At intensity 1: dramatic multi-lobe cloud with up to 80% size variation
-        float displacement = totalBulge + detailNoise * 0.5f;
-        float radiusFactor = 1.0f + displacement * intensity * 0.8f;
+        // l=2: Quadrupole terms (4-lobe patterns)
+        float cos2Theta = 2 * cosTheta * cosTheta - 1;
+        float y2_0 = cos2Theta;  // Y_2^0 ∝ (3cos²θ - 1)
+        float y2_1 = sinTheta * cosTheta * cosPhi;  // Y_2^1
+        float y2_2 = sinTheta * sinTheta * (float) Math.cos(2 * phi);  // Y_2^2
         
-        // Apply displacement outward from center
-        return new float[] {
-            baseX * radiusFactor,
-            baseY * radiusFactor,
-            baseZ * radiusFactor
-        };
+        // l=3: Octupole terms (8-lobe patterns)
+        float y3_0 = cosTheta * (5 * cosTheta * cosTheta - 3) * 0.5f;  // Y_3^0
+        float y3_1 = sinTheta * (5 * cosTheta * cosTheta - 1) * cosPhi * 0.25f;  // Y_3^1
+        float y3_2 = sinTheta * sinTheta * cosTheta * (float) Math.cos(2 * phi);  // Y_3^2
+        float y3_3 = sinTheta * sinTheta * sinTheta * (float) Math.cos(3 * phi);  // Y_3^3
+        
+        // l=4: 16-lobe patterns (fine detail)
+        float y4_0 = (35 * cosTheta * cosTheta * cosTheta * cosTheta 
+                    - 30 * cosTheta * cosTheta + 3) * 0.125f;  // Y_4^0
+        float y4_4 = sinTheta * sinTheta * sinTheta * sinTheta 
+                    * (float) Math.cos(4 * phi);  // Y_4^4
+        
+        // ======================================================================
+        // COEFFICIENTS: Create cloud-like shape with billowing lobes
+        // ======================================================================
+        
+        // Intensity controls the amplitude - higher intensity = more dramatic
+        float amp = intensity * 0.5f;  // Max 50% displacement
+        
+        // Combine harmonics with pseudo-random coefficients for organic look
+        // The coefficients are chosen to create asymmetric, cloud-like bumps
+        float displacement = 
+            // l=1: Large asymmetric bulges
+            amp * 0.3f * (0.8f * y1_0 + 0.6f * y1_1 + 0.4f * y1_m1) +
+            // l=2: Medium 4-lobe pattern
+            amp * 0.4f * (0.5f * y2_0 + 0.7f * y2_1 + 0.3f * y2_2) +
+            // l=3: Smaller 8-lobe bumps
+            amp * 0.5f * (0.4f * y3_0 + 0.5f * y3_1 + 0.6f * y3_2 + 0.3f * y3_3) +
+            // l=4: Fine detail (cauliflower texture)
+            amp * 0.3f * (0.3f * y4_0 + 0.4f * y4_4);
+        
+        // Make displacement always positive (outward bulges only)
+        // This creates the characteristic cumulus "puffiness"
+        displacement = 0.5f + displacement * 0.5f;  // Map to 0.5-1.0 range
+        displacement = Math.max(0.3f, displacement);  // Minimum 30% radius
+        
+        // Add high-frequency noise for surface texture
+        float noise = 
+            0.1f * (float) Math.sin(7 * theta + 0.3f) * (float) Math.sin(11 * phi + 1.2f) +
+            0.05f * (float) Math.sin(13 * theta + 2.1f) * (float) Math.cos(9 * phi + 0.7f);
+        
+        float radiusFactor = displacement + noise * intensity;
+        
+        // Apply to base position
+        float baseX = radius * sinTheta * cosPhi * radiusFactor;
+        float baseY = radius * length * cosTheta * radiusFactor;
+        float baseZ = radius * sinTheta * sinPhi * radiusFactor;
+        
+        return new float[] { baseX, baseY, baseZ };
     }
+
     /**
-     * Molecule vertex position - intensity-controlled branching spheres.
+     * Molecule vertex position using METABALL IMPLICIT SURFACE formula.
      * 
-     * <p><b>MAGIC FORMULA:</b> Creates molecular structures where intensity
-     * controls the number of atomic branches:
+     * <p><b>RESEARCH-BASED MAGIC FORMULA (Jim Blinn, 1982):</b>
+     * Uses the metaball field equation: Influence = R² / distance²
+     * 
+     * <p>Intensity controls number of atomic lobes:
      * <ul>
-     *   <li>0.0 = pure sphere (single atom)</li>
-     *   <li>0.2 = 1 branch (diatomic like H2)</li>
-     *   <li>0.4 = 2 branches (like H2O - water)</li>
-     *   <li>0.6 = 3 branches (like NH3 - ammonia)</li>
-     *   <li>0.8 = 4 branches (like CH4 - methane, tetrahedral)</li>
-     *   <li>1.0 = 5 branches (complex molecule)</li>
+     *   <li>0.0 = pure sphere (center only)</li>
+     *   <li>0.1 = 1 atom (diatomic)</li>
+     *   <li>0.2 = 2 atoms (like H2O)</li>
+     *   <li>0.3 = 3 atoms (like NH3)</li>
+     *   <li>0.4 = 4 atoms (like CH4 - tetrahedral)</li>
+     *   <li>0.5-1.0 = 5-10 atoms (complex molecule)</li>
      * </ul>
-     * Each branch is a distinct spherical lobe with smooth metaball-like
-     * merging at the connection to the central sphere.</p>
+     * 
+     * <p>Each atom creates a spherical influence field that blends
+     * smoothly with neighbors using the metaball equation.</p>
      * 
      * @param theta Polar angle (0 = top, π = bottom)
      * @param phi Azimuthal angle (0 to 2π)
      * @param radius Base radius
-     * @param intensity Branch count control (0 = sphere, 1 = 5 branches)
+     * @param intensity Atom count control (0 = sphere, 1 = 10 atoms)
      * @param length Axial stretch
      * @return {x, y, z} vertex position
      */
@@ -580,87 +596,86 @@ public final class ShapeMath {
         float sinPhi = (float) Math.sin(phi);
         float cosPhi = (float) Math.cos(phi);
         
-        // Base position (spheroid)
-        float baseX = radius * sinTheta * cosPhi;
-        float baseY = radius * length * cosTheta;
-        float baseZ = radius * sinTheta * sinPhi;
-        
-        // At intensity 0, return pure sphere
-        if (intensity < 0.05f) {
-            return new float[] { baseX, baseY, baseZ };
-        }
-        
-        // Direction from center (normalized)
+        // Surface point direction (normalized)
         float nx = sinTheta * cosPhi;
         float ny = cosTheta;
         float nz = sinTheta * sinPhi;
         
-        // Calculate number of active branches based on intensity
-        // 0.2 = 1 branch, 0.4 = 2, 0.6 = 3, 0.8 = 4, 1.0 = 5
-        int maxBranches = (int) Math.ceil(intensity * 5.0f);
-        maxBranches = Math.max(1, Math.min(5, maxBranches));
-        
-        // How "complete" is the current branch (for smooth transitions)
-        float branchCompleteness = (intensity * 5.0f) - (maxBranches - 1);
-        branchCompleteness = Math.clamp(branchCompleteness, 0.0f, 1.0f);
-        
-        // Define branch directions using golden angle spiral for natural distribution
-        // First branch at top, others spiral around
-        float goldenAngle = 2.399963f;  // ~137.5 degrees
-        float[][] branchDirs = new float[5][3];
-        
-        // Branch 1: Top (like H in H2)
-        branchDirs[0] = new float[] { 0f, 1f, 0f };
-        
-        // Branches 2-5: Distributed around using golden angle
-        for (int i = 1; i < 5; i++) {
-            float t = (float) i / 4.0f;  // 0.25, 0.5, 0.75, 1.0
-            float branchTheta = (float) (Math.PI * 0.3 + t * Math.PI * 0.5);  // 54° to 144° from top
-            float branchPhi = goldenAngle * i;
-            branchDirs[i][0] = (float) Math.sin(branchTheta) * (float) Math.cos(branchPhi);
-            branchDirs[i][1] = (float) Math.cos(branchTheta);
-            branchDirs[i][2] = (float) Math.sin(branchTheta) * (float) Math.sin(branchPhi);
+        // At intensity 0, return pure sphere
+        if (intensity < 0.05f) {
+            float baseX = radius * nx;
+            float baseY = radius * length * ny;
+            float baseZ = radius * nz;
+            return new float[] { baseX, baseY, baseZ };
         }
         
-        // Calculate bulge from each active branch
-        float totalBulge = 0f;
-        float branchRadius = 0.6f;  // How far the branch sticks out
-        float branchWidth = 0.5f;   // How wide each branch lobe is
+        // Number of atoms: intensity 0.1 = 1 atom, 1.0 = 10 atoms
+        int numAtoms = (int) Math.ceil(intensity * 10.0f);
+        numAtoms = Math.max(1, Math.min(10, numAtoms));
         
-        for (int i = 0; i < maxBranches; i++) {
-            // Calculate branch strength (last branch fades in based on completeness)
-            float strength = (i == maxBranches - 1) ? branchCompleteness : 1.0f;
+        // Smooth transition for partial atoms
+        float partialAtom = (intensity * 10.0f) - (numAtoms - 1);
+        partialAtom = Math.max(0f, Math.min(1f, partialAtom));
+        
+        // Atom positions: golden angle spiral distribution
+        // Atoms are placed at distance atomOffset from center
+        float goldenAngle = 2.399963f;
+        float atomOffset = 0.6f;  // How far atoms are from center
+        float atomRadius = 0.5f;  // Size of each atom sphere
+        
+        // ==== METABALL FIELD CALCULATION ====
+        // For each point on surface, calculate sum of all atom influences
+        // Influence_i = R² / distance² where distance is from point to atom center
+        
+        float totalField = 0f;
+        float centralField = 1.0f;  // Central sphere always contributes
+        
+        for (int i = 0; i < numAtoms; i++) {
+            // Atom direction using golden angle spiral
+            float t = (float) i / Math.max(1, numAtoms - 1);
+            float atomTheta = (float) Math.acos(1.0 - 1.6 * t);  // 0° to ~100° from top
+            float atomPhi = goldenAngle * i;
             
-            // Dot product = similarity to branch direction (-1 to 1)
-            float dot = nx * branchDirs[i][0] + ny * branchDirs[i][1] + nz * branchDirs[i][2];
+            float ax = (float) Math.sin(atomTheta) * (float) Math.cos(atomPhi);
+            float ay = (float) Math.cos(atomTheta);
+            float az = (float) Math.sin(atomTheta) * (float) Math.sin(atomPhi);
             
-            // Metaball-like field function: r² / d²
-            // Creates smooth bulges that merge nicely at the center
-            float proximity = (dot + 1f) * 0.5f;  // Remap to 0-1
+            // Atom center at offset from origin
+            float acx = ax * atomOffset;
+            float acy = ay * atomOffset;
+            float acz = az * atomOffset;
             
-            // Sharp falloff for distinct spherical lobes
-            float bulge = (float) Math.pow(proximity, 3.0f / branchWidth);
-            bulge = bulge * strength * branchRadius;
+            // Distance from surface point direction to atom center
+            // We use (1 - dot) as proxy for angular distance
+            float dot = nx * ax + ny * ay + nz * az;
+            float angularDist = 1.0f - dot;  // 0 when pointing at atom, 2 when opposite
             
-            // Use max for distinct lobes rather than additive blending
-            totalBulge = Math.max(totalBulge, bulge);
+            // Metaball field: R² / (distance² + epsilon)
+            // Higher value = closer to atom = more "pull"
+            float distSq = angularDist * angularDist + 0.01f;
+            float atomField = (atomRadius * atomRadius) / distSq;
+            
+            // Last atom fades in smoothly
+            if (i == numAtoms - 1) {
+                atomField *= partialAtom;
+            }
+            
+            // ADDITIVE blending for metaball effect
+            totalField += atomField;
         }
         
-        // Add neck/connection region between center and branches
-        // This creates the characteristic molecular bond look
-        float connectionFactor = 1.0f - totalBulge * 0.3f;  // Slight pinching
-        connectionFactor = Math.max(0.7f, connectionFactor);
+        // Surface displacement based on total field
+        // Field threshold: where field >= 1.0, we get surface
+        // Map total field to radius displacement
+        float fieldEffect = Math.min(2.0f, totalField);  // Cap at 2x
+        float radiusFactor = 0.7f + fieldEffect * 0.4f;  // Range 0.7 to 1.5
         
-        // Final radius: base + branch bulge
-        // The sphere contracts slightly where branches connect (neck)
-        // but expands dramatically at branch ends
-        float radiusFactor = connectionFactor + totalBulge * 1.2f;
+        // Apply to base position
+        float baseX = radius * nx * radiusFactor;
+        float baseY = radius * length * ny * radiusFactor;
+        float baseZ = radius * nz * radiusFactor;
         
-        return new float[] {
-            baseX * radiusFactor,
-            baseY * radiusFactor,
-            baseZ * radiusFactor
-        };
+        return new float[] { baseX, baseY, baseZ };
     }
 }
 

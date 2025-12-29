@@ -132,6 +132,12 @@ public class ModifiersSubPanel extends BoundPanel {
             }
         }
         
+        // ═══════════════════════════════════════════════════════════════════════
+        // TRAVEL EFFECT - General travel effect for any shape (non-rays)
+        // ═══════════════════════════════════════════════════════════════════════
+        
+        content.when(!isRaysShape, c -> buildTravelEffectSection(c));
+        
         contentHeight = content.getContentHeight();
         Logging.GUI.topic("panel").debug("ModifiersSubPanel built: {} widgets, isRays={}, warning={}",
             widgets.size(), isRaysShape, currentWarning);
@@ -303,6 +309,84 @@ public class ModifiersSubPanel extends BoundPanel {
     }
     
     // =========================================================================
+    // TRAVEL EFFECT SECTION (Any shape except Rays)
+    // =========================================================================
+    
+    private void buildTravelEffectSection(ContentBuilder c) {
+        int x = GuiConstants.PADDING;
+        int w = panelWidth - GuiConstants.PADDING * 2;
+        int halfW = (w - GuiConstants.PADDING) / 2;
+        
+        // Section header
+        c.gap();
+        c.sectionHeader("Travel Effect");
+        c.infoText("Directional alpha sweep (relativistic jet)");
+        
+        TravelEffectConfig travelEffect = state.travelEffect();
+        
+        // === TRAVEL MODE ===
+        net.cyberpunk042.visual.energy.EnergyTravel curMode = 
+            travelEffect != null ? travelEffect.effectiveMode() : net.cyberpunk042.visual.energy.EnergyTravel.NONE;
+        
+        CyclingButtonWidget<net.cyberpunk042.visual.energy.EnergyTravel> modeDropdown = 
+            CyclingButtonWidget.<net.cyberpunk042.visual.energy.EnergyTravel>builder(
+                    m -> Text.literal("Mode: " + m.displayName()))
+                .values(net.cyberpunk042.visual.energy.EnergyTravel.values())
+                .initially(curMode)
+                .omitKeyText()
+                .build(x, c.getCurrentY(), halfW, COMPACT_H, Text.literal(""),
+                    (btn, val) -> state.set("travelEffect.mode", val));
+        widgets.add(modeDropdown);
+        
+        // Direction axis dropdown
+        Axis curDir = travelEffect != null ? travelEffect.effectiveDirection() : Axis.Y;
+        CyclingButtonWidget<Axis> dirDropdown = CyclingButtonWidget.<Axis>builder(
+                a -> Text.literal("Dir: " + a.name()))
+            .values(Axis.values())
+            .initially(curDir)
+            .omitKeyText()
+            .build(x + halfW + GuiConstants.PADDING, c.getCurrentY(), halfW, COMPACT_H, Text.literal(""),
+                (btn, val) -> state.set("travelEffect.direction", val));
+        widgets.add(dirDropdown);
+        c.advanceRow();
+        
+        // === SPEED + BLEND MODE ===
+        LabeledSlider speedSlider = LabeledSlider.builder("Speed")
+            .position(x, c.getCurrentY()).width(halfW)
+            .range(0.01f, 3f).initial(travelEffect != null ? travelEffect.speed() : 1f).format("%.2f")
+            .onChange(v -> state.set("travelEffect.speed", v))
+            .build();
+        widgets.add(speedSlider);
+        
+        net.cyberpunk042.visual.energy.TravelBlendMode curBlend = 
+            travelEffect != null && travelEffect.blendMode() != null
+                ? travelEffect.blendMode()
+                : net.cyberpunk042.visual.energy.TravelBlendMode.REPLACE;
+        CyclingButtonWidget<net.cyberpunk042.visual.energy.TravelBlendMode> blendDropdown = 
+            CyclingButtonWidget.<net.cyberpunk042.visual.energy.TravelBlendMode>builder(
+                    m -> Text.literal("Blend: " + m.displayName()))
+                .values(net.cyberpunk042.visual.energy.TravelBlendMode.values())
+                .initially(curBlend)
+                .omitKeyText()
+                .build(x + halfW + GuiConstants.PADDING, c.getCurrentY(), halfW, COMPACT_H, Text.literal(""),
+                    (btn, val) -> state.set("travelEffect.blendMode", val));
+        widgets.add(blendDropdown);
+        c.advanceRow();
+        
+        // === MIN ALPHA + INTENSITY ===
+        c.sliderPair(
+            "MinA", "travelEffect.minAlpha", 0f, 1f,
+            "Effect", "travelEffect.intensity", 0f, 1f
+        );
+        
+        // === COUNT + WIDTH ===
+        c.sliderPair(
+            "Count", "travelEffect.count", 1f, 10f,
+            "Width", "travelEffect.width", 0.05f, 0.5f
+        );
+    }
+    
+    // =========================================================================
     // RAY FLOW SECTION (Rays only)
     // =========================================================================
     
@@ -363,6 +447,32 @@ public class ModifiersSubPanel extends BoundPanel {
             "Count", "rayFlow.chaseCount", 1f, 10f,
             "Width", "rayFlow.chaseWidth", 0.05f, 0.5f
         );
+        
+        // === TRAVEL BLEND MODE + CONTROLS ===
+        net.cyberpunk042.visual.energy.TravelBlendMode curBlendMode = 
+            flow != null && flow.travelBlendMode() != null 
+                ? flow.travelBlendMode() 
+                : net.cyberpunk042.visual.energy.TravelBlendMode.REPLACE;
+        
+        CyclingButtonWidget<net.cyberpunk042.visual.energy.TravelBlendMode> blendDropdown = 
+            CyclingButtonWidget.<net.cyberpunk042.visual.energy.TravelBlendMode>builder(
+                    m -> Text.literal("Blend: " + m.displayName()))
+                .values(net.cyberpunk042.visual.energy.TravelBlendMode.values())
+                .initially(curBlendMode)
+                .omitKeyText()
+                .build(x, c.getCurrentY(), halfW, COMPACT_H, Text.literal(""),
+                    (btn, val) -> state.set("rayFlow.travelBlendMode", val));
+        widgets.add(blendDropdown);
+        
+        LabeledSlider minAlphaSlider = LabeledSlider.builder("MinA")
+            .position(x + halfW + GuiConstants.PADDING, c.getCurrentY()).width(halfW)
+            .range(0f, 1f).initial(flow != null ? flow.travelMinAlpha() : 0f).format("%.2f")
+            .onChange(v -> state.set("rayFlow.travelMinAlpha", v))
+            .build();
+        widgets.add(minAlphaSlider);
+        c.advanceRow();
+        
+        c.slider("Effect", "rayFlow.travelIntensity").range(0f, 1f).format("%.2f").add();
         
         // === FLICKER ANIMATION ===
         c.infoText("Flicker (twinkle/strobe effects)");

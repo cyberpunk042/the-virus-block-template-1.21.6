@@ -38,7 +38,15 @@ public enum EnergyTravel {
     PULSE_WAVE("Pulse Wave"),
     
     /** Chase particles moving inward toward center. */
-    REVERSE_CHASE("Reverse Chase");
+    REVERSE_CHASE("Reverse Chase"),
+    
+    /** Bipolar jet - two jets traveling from center outward in opposite directions. 
+     *  Phase is mirrored: when one side peaks, the other peaks too. */
+    BIPOLAR("Bipolar"),
+    
+    /** Bipolar jet but with alternating phase - one side leads while the other trails. 
+     *  Creates a "ping-pong" effect for more dynamic visuals. */
+    BIPOLAR_ALTERNATE("Bipolar Alt");
     
     private final String displayName;
     
@@ -62,6 +70,13 @@ public enum EnergyTravel {
      */
     public boolean isOutward() {
         return this != REVERSE_CHASE && this != NONE;
+    }
+    
+    /**
+     * Whether this is a bipolar mode (two opposing jets from center).
+     */
+    public boolean isBipolar() {
+        return this == BIPOLAR || this == BIPOLAR_ALTERNATE;
     }
     
     /**

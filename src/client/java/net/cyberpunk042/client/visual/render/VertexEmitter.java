@@ -3,7 +3,9 @@ package net.cyberpunk042.client.visual.render;
 import net.cyberpunk042.client.visual.animation.AnimationApplier;
 import net.cyberpunk042.client.visual.mesh.Mesh;
 import net.cyberpunk042.client.visual.mesh.PrimitiveType;
+import net.cyberpunk042.client.visual.mesh.TravelEffectComputer;
 import net.cyberpunk042.client.visual.mesh.Vertex;
+import net.cyberpunk042.visual.animation.TravelEffectConfig;
 import net.cyberpunk042.visual.animation.WaveConfig;
 import net.minecraft.client.render.LightmapTextureManager;
 import net.minecraft.client.render.OverlayTexture;
@@ -40,6 +42,10 @@ public final class VertexEmitter {
     // Wave animation support
     private WaveConfig waveConfig = null;
     private float waveTime = 0f;
+    
+    // Travel effect support (directional alpha animation)
+    private TravelEffectConfig travelEffect = null;
+    private float travelPhase = 0f;
     
     // Per-vertex color support
     private ColorContext colorContext = null;
@@ -170,6 +176,28 @@ public final class VertexEmitter {
         return this;
     }
     
+    /**
+     * Sets travel effect configuration for directional alpha animation.
+     * When set, vertex alpha is modulated based on position along the travel axis.
+     * 
+     * @param config Travel effect configuration
+     * @param phase Current animation phase (0-1, varies over time)
+     * @return this emitter for chaining
+     */
+    public VertexEmitter travelEffect(TravelEffectConfig config, float phase) {
+        this.travelEffect = config;
+        this.travelPhase = phase;
+        return this;
+    }
+    
+    /**
+     * Clears travel effect (no directional alpha modulation).
+     */
+    public VertexEmitter noTravelEffect() {
+        this.travelEffect = null;
+        return this;
+    }
+    
     // =========================================================================
     // Mesh emission
     // =========================================================================
@@ -263,6 +291,25 @@ public final class VertexEmitter {
             vertexColor = colorContext.calculateColor(vertex.x(), vertex.y(), vertex.z(), cellIndex);
         } else {
             vertexColor = this.color;
+        }
+        
+        // Apply travel effect to alpha if configured
+        if (travelEffect != null && travelEffect.isActive()) {
+            // Use vertex normal as direction (works for spheres and any centered shape)
+            float t = TravelEffectComputer.computeTForSphere(
+                vertex.nx(), vertex.ny(), vertex.nz(), travelEffect);
+            
+            // Get base alpha from color
+            int baseAlpha = (vertexColor >> 24) & 0xFF;
+            float baseAlphaF = baseAlpha / 255f;
+            
+            // Compute travel-modified alpha
+            float modifiedAlpha = TravelEffectComputer.computeAlpha(
+                baseAlphaF, t, travelEffect, travelPhase);
+            
+            // Replace alpha in vertexColor
+            int newAlpha = (int)(modifiedAlpha * 255) & 0xFF;
+            vertexColor = (vertexColor & 0x00FFFFFF) | (newAlpha << 24);
         }
         
         // Decompose color

@@ -7,6 +7,7 @@ import net.cyberpunk042.client.visual.mesh.Vertex;
 import net.cyberpunk042.client.visual.render.VertexEmitter;
 import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.visual.animation.Animation;
+import net.cyberpunk042.visual.animation.TravelEffectConfig;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import net.cyberpunk042.visual.appearance.Appearance;
@@ -225,7 +226,7 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
                     float shapeHeight = getShapeHeight(primitive);
                     colorCtx = ColorContext.from(appearance, primaryColor, secondaryColor, time, shapeRadius, shapeHeight);
                 }
-                emitSolid(matrices, consumer, mesh, color, light, waveConfig, time, colorCtx);
+                emitSolid(matrices, consumer, mesh, color, light, waveConfig, time, colorCtx, animation);
             }
             case WIREFRAME -> emitWireframe(matrices, consumer, mesh, color, light, fill, waveConfig, time);
             case CAGE -> emitCage(matrices, consumer, mesh, color, light, fill, primitive, waveConfig, time);
@@ -483,7 +484,7 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
     // =========================================================================
     
     /**
-     * Emits mesh as solid triangles/quads with optional wave animation.
+     * Emits mesh as solid triangles/quads with optional wave animation and travel effect.
      * 
      * @param matrices Transform stack
      * @param consumer Vertex output
@@ -493,6 +494,7 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
      * @param waveConfig Wave animation config (null for no wave)
      * @param time Current time for wave animation
      * @param colorCtx ColorContext for per-vertex coloring (null for uniform color)
+     * @param animation Animation config for travel effects (null for no travel effect)
      */
     protected void emitSolid(
             MatrixStack matrices,
@@ -502,7 +504,8 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
             int light,
             net.cyberpunk042.visual.animation.WaveConfig waveConfig,
             float time,
-            ColorContext colorCtx) {
+            ColorContext colorCtx,
+            Animation animation) {
         
         // CP7: Final vertex emission - ALL segments that reach the vertex stage
         int a = (color >> 24) & 0xFF;
@@ -596,6 +599,15 @@ public abstract class AbstractPrimitiveRenderer implements PrimitiveRenderer {
         // Apply wave animation if configured
         if (waveConfig != null && waveConfig.isActive()) {
             emitter.wave(waveConfig, time);
+        }
+        
+        // Apply travel effect if configured (general travel for any shape)
+        if (animation != null && animation.hasTravelEffect()) {
+            TravelEffectConfig travelEffect = animation.travelEffect();
+            // Calculate travel phase from time and speed
+            float travelSpeed = travelEffect.speed();
+            float travelPhase = (time * travelSpeed * 0.05f) % 1f;  // 0.05 = speed scaling factor
+            emitter.travelEffect(travelEffect, travelPhase);
         }
         
         emitter.emit(mesh);

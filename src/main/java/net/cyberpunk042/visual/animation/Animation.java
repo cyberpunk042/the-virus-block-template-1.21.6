@@ -47,6 +47,7 @@ public record Animation(
     @Nullable @JsonField(skipUnless = "isActive") WobbleConfig wobble,
     @Nullable @JsonField(skipUnless = "isActive") WaveConfig wave,
     @Nullable @JsonField(skipUnless = "isActive") PrecessionConfig precession,
+    @Nullable @JsonField(skipUnless = "isActive") TravelEffectConfig travelEffect,
     @Nullable @JsonField(skipUnless = "isActive") RayFlowConfig rayFlow,
     @Nullable @JsonField(skipUnless = "isActive") RayMotionConfig rayMotion,
     @Nullable @JsonField(skipUnless = "isActive") RayWiggleConfig rayWiggle,
@@ -56,20 +57,20 @@ public record Animation(
     public static Animation none() { return NONE; }
     
     public static final Animation NONE = new Animation(
-        SpinConfig.NONE, PulseConfig.NONE, 0, AlphaPulseConfig.NONE, null, null, null, null, null, null, null, null);
+        SpinConfig.NONE, PulseConfig.NONE, 0, AlphaPulseConfig.NONE, null, null, null, null, null, null, null, null, null);
     
     /** Default animation (slow spin). */
     public static final Animation DEFAULT = new Animation(
-        SpinConfig.DEFAULT, PulseConfig.NONE, 0, AlphaPulseConfig.NONE, null, null, null, null, null, null, null, null);
+        SpinConfig.DEFAULT, PulseConfig.NONE, 0, AlphaPulseConfig.NONE, null, null, null, null, null, null, null, null, null);
 
     
     /** Spinning animation. */
     public static final Animation SPINNING = new Animation(
-        SpinConfig.DEFAULT, PulseConfig.NONE, 0, AlphaPulseConfig.NONE, null, null, null, null, null, null, null, null);
+        SpinConfig.DEFAULT, PulseConfig.NONE, 0, AlphaPulseConfig.NONE, null, null, null, null, null, null, null, null, null);
     
     /** Pulsing animation. */
     public static final Animation PULSING = new Animation(
-        SpinConfig.NONE, PulseConfig.DEFAULT, 0, AlphaPulseConfig.NONE, null, null, null, null, null, null, null, null);
+        SpinConfig.NONE, PulseConfig.DEFAULT, 0, AlphaPulseConfig.NONE, null, null, null, null, null, null, null, null, null);
     
     /**
      * Creates spin animation.
@@ -78,7 +79,7 @@ public record Animation(
     public static Animation spin(float speed) {
         return new Animation(
             SpinConfig.aroundY(speed), PulseConfig.NONE, 0, 
-            AlphaPulseConfig.NONE, null, null, null, null, null, null, null, null);
+            AlphaPulseConfig.NONE, null, null, null, null, null, null, null, null, null);
     }
     
     /**
@@ -89,7 +90,7 @@ public record Animation(
     public static Animation pulse(float amplitude, float speed) {
         return new Animation(
             SpinConfig.NONE, PulseConfig.sine(amplitude, speed), 0,
-            AlphaPulseConfig.NONE, null, null, null, null, null, null, null, null);
+            AlphaPulseConfig.NONE, null, null, null, null, null, null, null, null, null);
     }
     
     /**
@@ -101,7 +102,7 @@ public record Animation(
         return new Animation(
             SpinConfig.aroundY(spinSpeed),
             PulseConfig.sine(pulseAmplitude, 1.0f),
-            0, AlphaPulseConfig.NONE, null, null, null, null, null, null, null, null);
+            0, AlphaPulseConfig.NONE, null, null, null, null, null, null, null, null, null);
     }
     
     /** Whether any animation is active. */
@@ -113,6 +114,7 @@ public record Animation(
                (wobble != null && wobble.isActive()) ||
                (wave != null && wave.isActive()) ||
                (precession != null && precession.isActive()) ||
+               (travelEffect != null && travelEffect.isActive()) ||
                (rayFlow != null && rayFlow.isActive()) ||
                (rayMotion != null && rayMotion.isActive()) ||
                (rayWiggle != null && rayWiggle.isActive()) ||
@@ -139,6 +141,9 @@ public record Animation(
     
     /** Whether precession is active. */
     public boolean hasPrecession() { return precession != null && precession.isActive(); }
+    
+    /** Whether general travel effect is active. */
+    public boolean hasTravelEffect() { return travelEffect != null && travelEffect.isActive(); }
     
     /** Whether ray flow animation is active. */
     public boolean hasRayFlow() { return rayFlow != null && rayFlow.isActive(); }
@@ -204,6 +209,11 @@ public record Animation(
             precession = PrecessionConfig.fromJson(json.getAsJsonObject("precession"));
         }
         
+        TravelEffectConfig travelEffect = null;
+        if (json.has("travelEffect")) {
+            travelEffect = TravelEffectConfig.fromJson(json.getAsJsonObject("travelEffect"));
+        }
+        
         RayFlowConfig rayFlow = null;
         if (json.has("rayFlow")) {
             rayFlow = RayFlowConfig.fromJson(json.getAsJsonObject("rayFlow"));
@@ -224,7 +234,7 @@ public record Animation(
             rayTwist = RayTwistConfig.fromJson(json.getAsJsonObject("rayTwist"));
         }
         
-        Animation result = new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession, rayFlow, rayMotion, rayWiggle, rayTwist);
+        Animation result = new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession, travelEffect, rayFlow, rayMotion, rayWiggle, rayTwist);
         Logging.FIELD.topic("parse").trace("Parsed Animation: hasSpin={}, hasPulse={}, phase={}", 
             result.hasSpin(), result.hasPulse(), phase);
         return result;
@@ -246,6 +256,7 @@ public record Animation(
             .wobble(wobble)
             .wave(wave)
             .precession(precession)
+            .travelEffect(travelEffect)
             .rayFlow(rayFlow)
             .rayMotion(rayMotion)
             .rayWiggle(rayWiggle)
@@ -261,6 +272,7 @@ public record Animation(
         private WobbleConfig wobble = null;
         private WaveConfig wave = null;
         private PrecessionConfig precession = null;
+        private TravelEffectConfig travelEffect = null;
         private RayFlowConfig rayFlow = null;
         private RayMotionConfig rayMotion = null;
         private RayWiggleConfig rayWiggle = null;
@@ -275,13 +287,14 @@ public record Animation(
         public Builder wobble(WobbleConfig w) { this.wobble = w; return this; }
         public Builder wave(WaveConfig w) { this.wave = w; return this; }
         public Builder precession(PrecessionConfig p) { this.precession = p; return this; }
+        public Builder travelEffect(TravelEffectConfig t) { this.travelEffect = t; return this; }
         public Builder rayFlow(RayFlowConfig r) { this.rayFlow = r; return this; }
         public Builder rayMotion(RayMotionConfig r) { this.rayMotion = r; return this; }
         public Builder rayWiggle(RayWiggleConfig r) { this.rayWiggle = r; return this; }
         public Builder rayTwist(RayTwistConfig r) { this.rayTwist = r; return this; }
         
         public Animation build() {
-            return new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession, rayFlow, rayMotion, rayWiggle, rayTwist);
+            return new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession, travelEffect, rayFlow, rayMotion, rayWiggle, rayTwist);
         }
     }
 
@@ -293,56 +306,63 @@ public record Animation(
      * Returns a copy with the specified spin config.
      */
     public Animation withSpin(SpinConfig newSpin) {
-        return new Animation(newSpin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession, rayFlow, rayMotion, rayWiggle, rayTwist);
+        return new Animation(newSpin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession, travelEffect, rayFlow, rayMotion, rayWiggle, rayTwist);
     }
     
     /**
      * Returns a copy with the specified pulse config.
      */
     public Animation withPulse(PulseConfig newPulse) {
-        return new Animation(spin, newPulse, phase, alphaPulse, colorCycle, wobble, wave, precession, rayFlow, rayMotion, rayWiggle, rayTwist);
+        return new Animation(spin, newPulse, phase, alphaPulse, colorCycle, wobble, wave, precession, travelEffect, rayFlow, rayMotion, rayWiggle, rayTwist);
     }
     
     /**
      * Returns a copy with the specified phase.
      */
     public Animation withPhase(float newPhase) {
-        return new Animation(spin, pulse, newPhase, alphaPulse, colorCycle, wobble, wave, precession, rayFlow, rayMotion, rayWiggle, rayTwist);
+        return new Animation(spin, pulse, newPhase, alphaPulse, colorCycle, wobble, wave, precession, travelEffect, rayFlow, rayMotion, rayWiggle, rayTwist);
     }
     
     /**
      * Returns a copy with the specified precession config.
      */
     public Animation withPrecession(PrecessionConfig newPrecession) {
-        return new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, newPrecession, rayFlow, rayMotion, rayWiggle, rayTwist);
+        return new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, newPrecession, travelEffect, rayFlow, rayMotion, rayWiggle, rayTwist);
+    }
+    
+    /**
+     * Returns a copy with the specified travel effect config.
+     */
+    public Animation withTravelEffect(TravelEffectConfig newTravelEffect) {
+        return new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession, newTravelEffect, rayFlow, rayMotion, rayWiggle, rayTwist);
     }
     
     /**
      * Returns a copy with the specified ray flow config.
      */
     public Animation withRayFlow(RayFlowConfig newRayFlow) {
-        return new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession, newRayFlow, rayMotion, rayWiggle, rayTwist);
+        return new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession, travelEffect, newRayFlow, rayMotion, rayWiggle, rayTwist);
     }
     
     /**
      * Returns a copy with the specified ray motion config.
      */
     public Animation withRayMotion(RayMotionConfig newRayMotion) {
-        return new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession, rayFlow, newRayMotion, rayWiggle, rayTwist);
+        return new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession, travelEffect, rayFlow, newRayMotion, rayWiggle, rayTwist);
     }
     
     /**
      * Returns a copy with the specified ray wiggle config.
      */
     public Animation withRayWiggle(RayWiggleConfig newRayWiggle) {
-        return new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession, rayFlow, rayMotion, newRayWiggle, rayTwist);
+        return new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession, travelEffect, rayFlow, rayMotion, newRayWiggle, rayTwist);
     }
     
     /**
      * Returns a copy with the specified ray twist config.
      */
     public Animation withRayTwist(RayTwistConfig newRayTwist) {
-        return new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession, rayFlow, rayMotion, rayWiggle, newRayTwist);
+        return new Animation(spin, pulse, phase, alphaPulse, colorCycle, wobble, wave, precession, travelEffect, rayFlow, rayMotion, rayWiggle, newRayTwist);
     }
     
     /**
