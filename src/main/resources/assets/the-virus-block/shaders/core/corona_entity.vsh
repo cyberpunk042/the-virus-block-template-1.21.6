@@ -15,6 +15,13 @@ in vec3 Normal;
 uniform sampler2D Sampler1;
 uniform sampler2D Sampler2;
 
+// UBO for Corona parameters - needed for vertex displacement
+layout(std140) uniform CoronaParams {
+    vec4 CoronaColorAndPower;      // xyz = color, w = power
+    vec4 CoronaIntensityFalloff;   // x = intensity, y = falloff
+    vec4 CoronaOffsetWidthPad;     // x = offset (displacement), y = width
+};
+
 out float sphericalVertexDistance;
 out float cylindricalVertexDistance;
 out vec4 vertexColor;
@@ -25,11 +32,19 @@ out vec3 vNormal;       // View-space normal for Corona
 out vec3 vViewDir;      // View direction for Corona
 
 void main() {
-    vec4 viewPos = ModelViewMat * vec4(Position, 1.0);
+    // === CORONA VERTEX DISPLACEMENT ===
+    // Push vertices outward along their normals to create a halo shell
+    float coronaOffset = CoronaOffsetWidthPad.x;
+    
+    // Offset is in world units - positive pushes outward, negative inward
+    // Scale by 0.5 so offset of 1.0 = 0.5 units displacement (reasonable for a 1-unit sphere)
+    vec3 displacedPosition = Position + Normal * (coronaOffset * 0.5);
+    
+    vec4 viewPos = ModelViewMat * vec4(displacedPosition, 1.0);
     gl_Position = ProjMat * viewPos;
 
-    sphericalVertexDistance = fog_spherical_distance(Position);
-    cylindricalVertexDistance = fog_cylindrical_distance(Position);
+    sphericalVertexDistance = fog_spherical_distance(displacedPosition);
+    cylindricalVertexDistance = fog_cylindrical_distance(displacedPosition);
     
 #ifdef NO_CARDINAL_LIGHTING
     vertexColor = Color;
@@ -46,7 +61,7 @@ void main() {
     texCoord0 = (TextureMat * vec4(UV0, 0.0, 1.0)).xy;
 #endif
 
-    // Corona-specific: pass view-space normal and view direction
+    // Corona-specific: pass view-space normal and view direction (from displaced pos)
     mat3 normalMat = mat3(ModelViewMat);
     vNormal = normalize(normalMat * Normal);
     vViewDir = normalize(-viewPos.xyz);

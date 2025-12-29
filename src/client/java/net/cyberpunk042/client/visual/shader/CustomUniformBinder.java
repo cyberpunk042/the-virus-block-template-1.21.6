@@ -123,20 +123,25 @@ public final class CustomUniformBinder {
         
         // Bind Corona if set
         if (currentCorona != null) {
-            Logging.FIELD.topic("shader").info(
-                "[MIXIN] bindCustomUniforms: Binding Corona effect!"
+            Logging.FIELD.topic("shader").warn(
+                "[MIXIN] bindCustomUniforms: Binding Corona effect! intensity={}",
+                currentCorona.intensity()
             );
             bindCoronaParams(renderPass, currentCorona);
         }
     }
     
     /**
-     * Binds FresnelParams uniform buffer.
+     * Binds FresnelParams uniform buffer with BOTH Horizon AND Corona parameters.
+     * Since Corona UBO binding doesn't work as a separate pass, we combine them.
      */
     private static void bindFresnelParams(RenderPass renderPass, HorizonEffect effect) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            Std140Builder builder = Std140Builder.onStack(stack, FRESNEL_BUFFER_SIZE);
+            // Combined buffer: 6 x vec4 = 96 bytes
+            // 2 for Horizon + 4 for Corona
+            Std140Builder builder = Std140Builder.onStack(stack, 96);
             
+            // === HORIZON (Rim Lighting) ===
             // vec4 RimColorAndPower (rgb = color, w = power)
             builder.putVec4(
                 effect.red(),
@@ -153,19 +158,61 @@ public final class CustomUniformBinder {
                 0.0f
             );
             
+            // === CORONA (Outer Glow) ===
+            // Get corona params (may be null if not enabled)
+            CoronaEffect corona = currentCorona;
+            if (corona != null && corona.enabled()) {
+                // vec4 CoronaColorAndPower
+                builder.putVec4(
+                    corona.red(),
+                    corona.green(),
+                    corona.blue(),
+                    corona.power()
+                );
+                
+                // vec4 CoronaIntensityFalloff
+                builder.putVec4(
+                    corona.intensity(),
+                    corona.falloff(),
+                    0.0f,
+                    0.0f
+                );
+                
+                // vec4 CoronaOffsetWidthPad
+                builder.putVec4(
+                    corona.offset(),
+                    corona.width(),
+                    0.0f,
+                    0.0f
+                );
+            } else {
+                // Corona disabled - write zeros
+                builder.putVec4(0f, 0f, 0f, 0f);
+                builder.putVec4(0f, 0f, 0f, 0f);
+                builder.putVec4(0f, 0f, 0f, 0f);
+            }
+            
             // Upload buffer to GPU and bind
             GpuBuffer gpuBuffer = RenderSystem.getDevice().createBuffer(
-                () -> "FresnelParams UBO",
+                () -> "FresnelParams UBO (combined)",
                 16, // usage: uniform buffer
                 builder.get()
             );
             renderPass.setUniform("FresnelParams", gpuBuffer);
             
-            Logging.FIELD.topic("shader").info(
-                "[FRESNEL] Bound uniforms: color=({},{},{}), power={}, intensity={}",
-                effect.red(), effect.green(), effect.blue(),
-                effect.power(), effect.intensity()
-            );
+            if (corona != null && corona.enabled()) {
+                Logging.FIELD.topic("shader").info(
+                    "[FRESNEL+CORONA] Bound combined uniforms: horizon=({},{},{}) corona=({},{},{})",
+                    effect.red(), effect.green(), effect.blue(),
+                    corona.red(), corona.green(), corona.blue()
+                );
+            } else {
+                Logging.FIELD.topic("shader").info(
+                    "[FRESNEL] Bound uniforms: color=({},{},{}), power={}, intensity={}",
+                    effect.red(), effect.green(), effect.blue(),
+                    effect.power(), effect.intensity()
+                );
+            }
         } catch (Exception e) {
             Logging.FIELD.topic("shader").warn("[FRESNEL] Failed to bind uniforms: {}", e.getMessage());
         }

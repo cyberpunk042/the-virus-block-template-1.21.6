@@ -24,38 +24,44 @@ in vec3 vViewDir;
 out vec4 fragColor;
 
 void main() {
-    // Extract Corona params from UBO
+    // Extract Corona params from UBO (may be zero if not bound!)
     vec3 coronaColor = CoronaColorAndPower.xyz;
     float coronaPower = CoronaColorAndPower.w;
     float coronaIntensity = CoronaIntensityFalloff.x;
     float coronaFalloff = CoronaIntensityFalloff.y;
-    float coronaOffset = CoronaOffsetWidthPad.x;
     float coronaWidth = CoronaOffsetWidthPad.y;
     
-    // Corona only outputs rim glow, not base texture
-    // Use abs() to handle backfaces correctly
+    // DEBUG: Check if UBO is bound (all zeros = not bound)
+    // If not bound, use hardcoded visible values
+    if (coronaIntensity < 0.001 && coronaPower < 0.001) {
+        // UBO NOT BOUND - use bright cyan debug color
+        coronaColor = vec3(0.0, 1.0, 1.0);  // Cyan
+        coronaPower = 2.0;
+        coronaIntensity = 2.0;  // VERY bright
+        coronaFalloff = 0.3;
+        coronaWidth = 1.0;
+    }
+    
+    // Calculate edge factor - now this shell is DISPLACED outward
     float NdotV = abs(dot(vNormal, vViewDir));
+    float edgeFactor = 1.0 - NdotV;
     
-    // Apply offset: shifts the fresnel curve center
-    // Offset > 0 makes glow appear more towards edges
-    // Offset < 0 makes glow appear more towards center
-    float adjustedNdotV = clamp(NdotV + coronaOffset, 0.0, 1.0);
+    // Apply power for sharpness control
+    float rim = pow(edgeFactor, coronaPower);
     
-    // Base fresnel calculation
-    float fresnel = pow(1.0 - adjustedNdotV, coronaPower);
+    // Apply width
+    rim = pow(rim, 1.0 / max(coronaWidth, 0.1));
     
-    // Apply width: controls the band spread of the glow
-    // Width < 1 makes the glow narrower/sharper
-    // Width > 1 makes the glow wider/softer
-    fresnel = smoothstep(0.0, coronaWidth, fresnel);
+    // Apply intensity
+    float glow = rim * coronaIntensity;
     
-    float glow = fresnel * coronaIntensity;
+    // Apply falloff for soft fade
+    glow *= exp(-coronaFalloff * (1.0 - rim));
     
-    // Apply falloff to control spread
-    glow *= exp(-coronaFalloff * (1.0 - fresnel));
-    
+    // Output corona color
     vec3 coronaRGB = coronaColor * glow;
     
-    // Output with alpha for additive blending
+    // For additive blending
     fragColor = vec4(coronaRGB, glow);
 }
+

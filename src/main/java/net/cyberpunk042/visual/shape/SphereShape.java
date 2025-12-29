@@ -486,7 +486,7 @@ public record SphereShape(
         public Builder coronaRed(float r) { this.coronaRed = Math.max(0f, Math.min(1f, r)); return this; }
         public Builder coronaGreen(float g) { this.coronaGreen = Math.max(0f, Math.min(1f, g)); return this; }
         public Builder coronaBlue(float b) { this.coronaBlue = Math.max(0f, Math.min(1f, b)); return this; }
-        public Builder coronaOffset(float o) { this.coronaOffset = Math.max(-1f, Math.min(1f, o)); return this; }
+        public Builder coronaOffset(float o) { this.coronaOffset = Math.max(0f, Math.min(1f, o)); return this; }
         public Builder coronaWidth(float w) { this.coronaWidth = Math.max(0.1f, Math.min(3f, w)); return this; }
         
         public SphereShape build() {

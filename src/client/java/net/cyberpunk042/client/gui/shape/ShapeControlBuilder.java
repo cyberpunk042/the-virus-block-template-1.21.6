@@ -251,17 +251,21 @@ public class ShapeControlBuilder {
             textRenderer, v -> onChangeWrapper.accept(() -> {
                 state.set(stateKey, v);
                 
-                // SPECIAL: When sphere.horizonEnabled changes, auto-switch quad pattern
-                // Horizon/Fresnel shader requires standard_quad winding, normal rendering uses filled_1
-                if ("sphere.horizonEnabled".equals(stateKey)) {
-                    if (v) {
-                        // Horizon ON → use standard_quad pattern
+                // SPECIAL: When sphere.horizonEnabled OR sphere.coronaEnabled changes, auto-switch quad pattern
+                // Shader effects require standard_quad winding, normal rendering uses filled_1
+                if ("sphere.horizonEnabled".equals(stateKey) || "sphere.coronaEnabled".equals(stateKey)) {
+                    // Check if EITHER effect is now enabled
+                    boolean horizonOn = "sphere.horizonEnabled".equals(stateKey) ? v : state.getBool("sphere.horizonEnabled");
+                    boolean coronaOn = "sphere.coronaEnabled".equals(stateKey) ? v : state.getBool("sphere.coronaEnabled");
+                    
+                    if (horizonOn || coronaOn) {
+                        // Either shader effect ON → use standard_quad pattern
                         state.set("arrangement.defaultPattern", "standard_quad");
-                        Logging.GUI.topic("shape").info("Horizon enabled: switching to standard_quad pattern");
+                        Logging.GUI.topic("shape").info("Shader effect enabled: switching to standard_quad pattern");
                     } else {
-                        // Horizon OFF → use filled_1 pattern
+                        // Both OFF → use filled_1 pattern
                         state.set("arrangement.defaultPattern", "filled_1");
-                        Logging.GUI.topic("shape").info("Horizon disabled: switching to filled_1 pattern");
+                        Logging.GUI.topic("shape").info("Shader effects disabled: switching to filled_1 pattern");
                     }
                 }
             })

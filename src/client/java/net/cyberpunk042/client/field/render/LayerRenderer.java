@@ -197,26 +197,9 @@ public final class LayerRenderer {
                     VertexConsumer consumer = getConsumerForPrimitive(consumers, primitive);
                     renderPrimitive(matrices, consumer, primitive, resolver, light, time, effectiveAlpha, overrides, primitiveIndex);
                     
-                    // === CORONA EFFECT: Second pass for additive overlay ===
-                    // If this is a sphere with Corona enabled, render it again with additive blending
-                    if (primitive.shape() instanceof net.cyberpunk042.visual.shape.SphereShape sphere 
-                            && sphere.hasCoronaEffect()) {
-                        // Set corona uniforms - will be bound by Mixin when RenderLayer draws
-                        net.cyberpunk042.client.visual.shader.CustomUniformBinder.setCoronaParams(sphere.toCoronaEffect());
-                        
-                        // Get corona render layer
-                        boolean doubleSided = fill != null && fill.doubleSided();
-                        net.minecraft.client.render.RenderLayer coronaLayer = doubleSided
-                            ? net.cyberpunk042.client.visual.shader.CoronaRenderLayers.coronaAdditiveNoCull()
-                            : net.cyberpunk042.client.visual.shader.CoronaRenderLayers.coronaAdditive();
-                        
-                        // Render the same primitive again with corona shader
-                        VertexConsumer coronaConsumer = consumers.getBuffer(coronaLayer);
-                        renderPrimitive(matrices, coronaConsumer, primitive, resolver, light, time, effectiveAlpha, overrides, primitiveIndex);
-                        
-                        // Reset corona uniforms
-                        net.cyberpunk042.client.visual.shader.CustomUniformBinder.reset();
-                    }
+                    
+                    // NOTE: Corona effect is now handled in the combined Fresnel shader
+                    // (see getConsumerForPrimitive where both Horizon and Corona params are set)
                     
                     primCount++;
                 }
@@ -297,18 +280,18 @@ public final class LayerRenderer {
         return switch (mode) {
             case WIREFRAME, CAGE -> consumers.getBuffer(FieldRenderLayers.lines(wireThickness));
             case SOLID, POINTS -> {
-                // Check if this is a sphere with Horizon effect enabled
+                // Check if this is a sphere with ANY shader effect (Horizon OR Corona)
                 if (primitive.shape() instanceof net.cyberpunk042.visual.shape.SphereShape sphere 
-                        && sphere.hasHorizonEffect()) {
-                    // Use Fresnel shader for rim lighting
-                    // Uniforms will be bound by the Mixin when the RenderLayer draws
+                        && (sphere.hasHorizonEffect() || sphere.hasCoronaEffect())) {
+                    // Use Fresnel shader for rim lighting and/or corona glow
+                    // Set Horizon params (enabled or disabled - shader handles both)
                     net.cyberpunk042.visual.effect.HorizonEffect horizonEffect = sphere.toHorizonEffect();
-                    net.cyberpunk042.log.Logging.FIELD.topic("shader").info(
-                        "[LayerRenderer] Setting Horizon params: enabled={}, power={}, intensity={}, rgb=({},{},{})",
-                        horizonEffect.enabled(), horizonEffect.power(), horizonEffect.intensity(),
-                        horizonEffect.red(), horizonEffect.green(), horizonEffect.blue()
-                    );
                     net.cyberpunk042.client.visual.shader.CustomUniformBinder.setHorizonParams(horizonEffect);
+                    
+                    // Set Corona params (enabled or disabled - shader handles both)
+                    net.cyberpunk042.visual.effect.CoronaEffect coronaEffect = sphere.toCoronaEffect();
+                    net.cyberpunk042.client.visual.shader.CustomUniformBinder.setCoronaParams(coronaEffect);
+                    
                     RenderLayer fresnelLayer = doubleSided 
                         ? net.cyberpunk042.client.visual.shader.FresnelRenderLayers.fresnelTranslucentNoCull()
                         : net.cyberpunk042.client.visual.shader.FresnelRenderLayers.fresnelTranslucent();
