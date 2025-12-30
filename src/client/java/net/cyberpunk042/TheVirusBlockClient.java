@@ -63,12 +63,9 @@ public class TheVirusBlockClient implements ClientModInitializer {
 		// Client command registration (not in generic nodes)
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
 			// Depth test shader command
-			// /depthtest - cycles through modes
-			// /depthtest <0-4> - sets specific mode
 			dispatcher.register(
 				net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("depthtest")
 					.executes(ctx -> {
-						// No argument = cycle
 						net.cyberpunk042.client.visual.shader.DepthTestShader.cycleMode();
 						int mode = net.cyberpunk042.client.visual.shader.DepthTestShader.getMode();
 						String name = net.cyberpunk042.client.visual.shader.DepthTestShader.getModeName();
@@ -91,9 +88,14 @@ public class TheVirusBlockClient implements ClientModInitializer {
 					)
 			);
 			
-			// Direct depth renderer command (NEW - bypasses PostEffectProcessor)
-			// /directdepth - cycles through modes
-			// /directdepth <0-3> - sets specific mode
+			// Direct depth renderer command
+			// /directdepth - cycles through modes (0-8)
+			// /directdepth <mode> - sets specific mode
+			// /directdepth reversedz - toggles reversed-Z mode
+			// /directdepth ring <distance> <thickness> - sets ring parameters
+			// /directdepth trigger - triggers Mode 8 animation
+			// /directdepth speed <n> - sets animation speed
+			// /directdepth maxradius <n> - sets max animation radius
 			dispatcher.register(
 				net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("directdepth")
 					.executes(ctx -> {
@@ -106,7 +108,7 @@ public class TheVirusBlockClient implements ClientModInitializer {
 						return 1;
 					})
 					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("mode", 
-						com.mojang.brigadier.arguments.IntegerArgumentType.integer(0, 4))
+						com.mojang.brigadier.arguments.IntegerArgumentType.integer(0, 99))
 						.executes(ctx -> {
 							int mode = com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "mode");
 							net.cyberpunk042.client.visual.shader.DirectDepthRenderer.setMode(mode);
@@ -116,6 +118,67 @@ public class TheVirusBlockClient implements ClientModInitializer {
 							);
 							return 1;
 						})
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("reversedz")
+						.executes(ctx -> {
+							net.cyberpunk042.client.visual.shader.DirectDepthRenderer.toggleReversedZ();
+							ctx.getSource().sendFeedback(
+								net.minecraft.text.Text.literal("§bReversed-Z toggled")
+							);
+							return 1;
+						})
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("ring")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("distance",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(1.0f, 500.0f))
+							.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("thickness",
+								com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.5f, 50.0f))
+								.executes(ctx -> {
+									float dist = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "distance");
+									float thick = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "thickness");
+									net.cyberpunk042.client.visual.shader.DirectDepthRenderer.setRingParams(dist, thick);
+									ctx.getSource().sendFeedback(
+										net.minecraft.text.Text.literal("§bRing: §f" + dist + " blocks ±" + (thick/2))
+									);
+									return 1;
+								})
+							)
+						)
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("trigger")
+						.executes(ctx -> {
+							net.cyberpunk042.client.visual.shader.DirectDepthRenderer.triggerAnimation();
+							ctx.getSource().sendFeedback(
+								net.minecraft.text.Text.literal("§bShockwave triggered!")
+							);
+							return 1;
+						})
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("speed")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("speed",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(1.0f, 200.0f))
+							.executes(ctx -> {
+								float speed = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "speed");
+								net.cyberpunk042.client.visual.shader.DirectDepthRenderer.setAnimationSpeed(speed);
+								ctx.getSource().sendFeedback(
+									net.minecraft.text.Text.literal("§bAnimation speed: §f" + speed + " blocks/sec")
+								);
+								return 1;
+							})
+						)
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("maxradius")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("radius",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(10.0f, 500.0f))
+							.executes(ctx -> {
+								float radius = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "radius");
+								net.cyberpunk042.client.visual.shader.DirectDepthRenderer.setMaxRadius(radius);
+								ctx.getSource().sendFeedback(
+									net.minecraft.text.Text.literal("§bMax radius: §f" + radius + " blocks")
+								);
+								return 1;
+							})
+						)
 					)
 			);
 		});
