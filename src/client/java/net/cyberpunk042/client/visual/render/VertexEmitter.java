@@ -394,6 +394,15 @@ public final class VertexEmitter {
             vertexColor = (vertexColor & 0x00FFFFFF) | (newAlpha << 24);
         }
         
+        // Apply per-vertex alpha from tessellator (e.g., Kamehameha alpha gradient)
+        // This multiplies with the existing alpha from color/travel effect
+        float vertexAlpha = vertex.alpha();
+        if (vertexAlpha < 1.0f) {
+            int currentAlpha = (vertexColor >> 24) & 0xFF;
+            int newAlpha = (int)(currentAlpha * vertexAlpha) & 0xFF;
+            vertexColor = (vertexColor & 0x00FFFFFF) | (newAlpha << 24);
+        }
+        
         // Decompose color
         int a = (vertexColor >> 24) & 0xFF;
         int r = (vertexColor >> 16) & 0xFF;

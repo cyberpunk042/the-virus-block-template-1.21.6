@@ -62,6 +62,7 @@ public final class PrimitiveRenderers {
         register(new JetRenderer());
         register(new RaysRenderer());
         register(new KamehamehaRenderer());
+        register(new MoleculeRenderer());
         
         Logging.FIELD.topic("init").debug(
             "Registered {} primitive renderers", RENDERERS.size());
@@ -133,6 +134,7 @@ public final class PrimitiveRenderers {
             case JetShape j -> "jet";
             case RaysShape r -> "rays";
             case KamehamehaShape k -> "kamehameha";
+            case MoleculeShape m -> "molecule";
             default -> null;
         };
         

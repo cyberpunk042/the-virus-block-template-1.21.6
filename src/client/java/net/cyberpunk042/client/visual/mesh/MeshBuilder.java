@@ -506,6 +506,32 @@ public final class MeshBuilder {
     }
     
     /**
+     * Merges another mesh into this builder.
+     * <p>All vertices and indices from the source mesh are added to this builder.
+     * Index values are offset by the current vertex count.
+     * 
+     * @param mesh Source mesh to merge
+     * @return this builder for chaining
+     */
+    public MeshBuilder mergeMesh(Mesh mesh) {
+        if (mesh == null) return this;
+        
+        int vertexOffset = vertices.size();
+        
+        // Add all vertices from source mesh
+        for (Vertex v : mesh.vertices()) {
+            vertices.add(v);
+        }
+        
+        // Add all indices, offset by existing vertex count
+        for (int idx : mesh.indices()) {
+            indices.add(idx + vertexOffset);
+        }
+        
+        return this;
+    }
+    
+    /**
      * Builds and returns the immutable {@link Mesh}.
      * <p>The builder can still be used after this (add more, build again).
      * 

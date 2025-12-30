@@ -57,6 +57,7 @@ public class ShapeTypeAdapter extends TypeAdapter<Shape> {
             case "polyhedron" -> parsePolyhedron(json);
             case "jet" -> parseJet(json);
             case "rays" -> parseRays(json);
+            case "molecule" -> parseMolecule(json);
             default -> SphereShape.builder().radius(1.0f).latSteps(32).lonSteps(64).build();
         };
     }
@@ -144,6 +145,27 @@ public class ShapeTypeAdapter extends TypeAdapter<Shape> {
             .fadeEnd(json.has("fadeEnd") ? json.get("fadeEnd").getAsFloat() : 1.0f)
             .segments(json.has("segments") ? json.get("segments").getAsInt() : 1)
             .segmentGap(json.has("segmentGap") ? json.get("segmentGap").getAsFloat() : 0f)
+            .build();
+    }
+    
+    private static MoleculeShape parseMolecule(JsonObject json) {
+        AtomDistribution distribution = AtomDistribution.FIBONACCI;
+        if (json.has("distribution")) {
+            try {
+                distribution = AtomDistribution.valueOf(json.get("distribution").getAsString().toUpperCase());
+            } catch (IllegalArgumentException ignored) {}
+        }
+        return MoleculeShape.builder()
+            .atomCount(json.has("atomCount") ? json.get("atomCount").getAsInt() : 4)
+            .atomRadius(json.has("atomRadius") ? json.get("atomRadius").getAsFloat() : 0.3f)
+            .atomDistance(json.has("atomDistance") ? json.get("atomDistance").getAsFloat() : 0.8f)
+            .neckRadius(json.has("neckRadius") ? json.get("neckRadius").getAsFloat() : 0.12f)
+            .neckPinch(json.has("neckPinch") ? json.get("neckPinch").getAsFloat() : 0.5f)
+            .connectionDistance(json.has("connectionDistance") ? json.get("connectionDistance").getAsFloat() : 1.2f)
+            .seed(json.has("seed") ? json.get("seed").getAsInt() : 42)
+            .distribution(distribution)
+            .sizeVariation(json.has("sizeVariation") ? json.get("sizeVariation").getAsFloat() : 0.2f)
+            .scale(json.has("scale") ? json.get("scale").getAsFloat() : 1.0f)
             .build();
     }
 }

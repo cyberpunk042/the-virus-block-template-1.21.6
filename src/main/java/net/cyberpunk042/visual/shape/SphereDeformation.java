@@ -52,9 +52,6 @@ public enum SphereDeformation {
     /** Cloud - fluffy, billowing cumulus-like shape. */
     CLOUD("Cloud", "Fluffy cumulus cloud"),
     
-    /** Molecule - clustered spheres like H2O or organic molecules. */
-    MOLECULE("Molecule", "Clustered atomic spheres"),
-    
     // ─── Planetary ───
     /** Planet - procedural terrain with continents, craters, and mountains. */
     PLANET("Planet", "Procedural terrain (continents, craters, mountains)");
@@ -85,7 +82,7 @@ public enum SphereDeformation {
     public float[] computeVertex(float theta, float phi, float radius, 
             float intensity, float length) {
         // Delegate to full version with default parameters
-        return computeVertex(theta, phi, radius, intensity, length, 6, 0.5f, 0.5f, 0.6f);
+        return computeVertex(theta, phi, radius, intensity, length, 6, 0.5f, 0.5f);
     }
     
     /**
@@ -94,18 +91,18 @@ public enum SphereDeformation {
      */
     public float[] computeVertex(float theta, float phi, float radius, 
             float intensity, float length, int count, float smoothness) {
-        return computeVertex(theta, phi, radius, intensity, length, count, smoothness, 0.5f, 0.6f,
+        return computeVertex(theta, phi, radius, intensity, length, count, smoothness, 0.5f,
             2f, 4, 2f, 0.5f, 0f, 0, 42, CloudStyle.GAUSSIAN, 42, 1.0f);
     }
     
     /**
-     * Computes the deformed vertex position with full control for CLOUD/MOLECULE.
+     * Computes the deformed vertex position with full control for CLOUD.
      * Backward compatibility - delegates to full version with planet defaults.
      */
     public float[] computeVertex(float theta, float phi, float radius, 
             float intensity, float length, int count, float smoothness,
-            float bumpSize, float separation) {
-        return computeVertex(theta, phi, radius, intensity, length, count, smoothness, bumpSize, separation,
+            float bumpSize) {
+        return computeVertex(theta, phi, radius, intensity, length, count, smoothness, bumpSize,
             2f, 4, 2f, 0.5f, 0f, 0, 42, CloudStyle.GAUSSIAN, 42, 1.0f);
     }
     
@@ -117,10 +114,9 @@ public enum SphereDeformation {
      * @param radius Base radius
      * @param intensity Deformation intensity (0 = sphere, 1 = full effect)
      * @param length Axial stretch factor
-     * @param count Number of lobes (CLOUD) or atoms (MOLECULE), 1-20
+     * @param count Number of lobes for CLOUD, 1-20
      * @param smoothness Roundness of bumps (0 = sharp, 1 = smooth)
-     * @param bumpSize Size of individual bumps/atoms (0.1-2.0)
-     * @param separation Distance of atoms from center for MOLECULE (0.3-1.5)
+     * @param bumpSize Size of individual bumps (0.1-2.0)
      * @param planetFrequency Base noise frequency for PLANET (0.5-10)
      * @param planetOctaves Noise octaves for PLANET (1-8)
      * @param planetLacunarity Frequency multiplier for PLANET (1.5-3.5)
@@ -135,7 +131,7 @@ public enum SphereDeformation {
      */
     public float[] computeVertex(float theta, float phi, float radius, 
             float intensity, float length, int count, float smoothness,
-            float bumpSize, float separation,
+            float bumpSize,
             float planetFrequency, int planetOctaves, float planetLacunarity, float planetPersistence,
             float planetRidged, int planetCraterCount, int planetSeed, 
             CloudStyle cloudStyle, int cloudSeed, float cloudWidth) {
@@ -191,15 +187,13 @@ public enum SphereDeformation {
             
             case CLOUD -> ShapeMath.cloudVertex(theta, phi, radius, intensity, length, cloudWidth, count, smoothness, bumpSize, cloudStyle, cloudSeed);
             
-            case MOLECULE -> ShapeMath.moleculeVertex(theta, phi, radius, intensity, length, count, smoothness, bumpSize, separation);
-            
             case PLANET -> ShapeMath.planetVertex(theta, phi, radius, intensity, length,
                 planetFrequency, planetOctaves, planetLacunarity, planetPersistence,
                 planetRidged, planetCraterCount, planetSeed);
         };
         
-        // For SPHEROID, CLOUD, MOLECULE, PLANET - intensity is already applied, return directly
-        if (this == SPHEROID || this == CLOUD || this == MOLECULE || this == PLANET) {
+        // For SPHEROID, CLOUD, PLANET - intensity is already applied, return directly
+        if (this == SPHEROID || this == CLOUD || this == PLANET) {
             return shapePos;
         }
         
@@ -216,7 +210,7 @@ public enum SphereDeformation {
      */
     public float[] computeFullVertex(float theta, float phi, float radius, 
             float intensity, float length) {
-        return computeFullVertex(theta, phi, radius, intensity, length, 6, 0.5f, 0.5f, 0.6f,
+        return computeFullVertex(theta, phi, radius, intensity, length, 6, 0.5f, 0.5f,
             2f, 4, 2f, 0.5f, 0f, 0, 42, CloudStyle.GAUSSIAN, 42, 1.0f);
     }
     
@@ -226,7 +220,7 @@ public enum SphereDeformation {
      */
     public float[] computeFullVertex(float theta, float phi, float radius, 
             float intensity, float length, int count, float smoothness) {
-        return computeFullVertex(theta, phi, radius, intensity, length, count, smoothness, 0.5f, 0.6f,
+        return computeFullVertex(theta, phi, radius, intensity, length, count, smoothness, 0.5f,
             2f, 4, 2f, 0.5f, 0f, 0, 42, CloudStyle.GAUSSIAN, 42, 1.0f);
     }
     
@@ -235,8 +229,8 @@ public enum SphereDeformation {
      */
     public float[] computeFullVertex(float theta, float phi, float radius, 
             float intensity, float length, int count, float smoothness,
-            float bumpSize, float separation) {
-        return computeFullVertex(theta, phi, radius, intensity, length, count, smoothness, bumpSize, separation,
+            float bumpSize) {
+        return computeFullVertex(theta, phi, radius, intensity, length, count, smoothness, bumpSize,
             2f, 4, 2f, 0.5f, 0f, 0, 42, CloudStyle.GAUSSIAN, 42, 1.0f);
     }
     
@@ -249,11 +243,11 @@ public enum SphereDeformation {
      */
     public float[] computeFullVertex(float theta, float phi, float radius, 
             float intensity, float length, int count, float smoothness,
-            float bumpSize, float separation,
+            float bumpSize,
             float planetFrequency, int planetOctaves, float planetLacunarity, float planetPersistence,
             float planetRidged, int planetCraterCount, int planetSeed, 
             CloudStyle cloudStyle, int cloudSeed, float cloudWidth) {
-        float[] pos = computeVertex(theta, phi, radius, intensity, length, count, smoothness, bumpSize, separation,
+        float[] pos = computeVertex(theta, phi, radius, intensity, length, count, smoothness, bumpSize,
             planetFrequency, planetOctaves, planetLacunarity, planetPersistence, planetRidged, planetCraterCount, planetSeed, 
             cloudStyle, cloudSeed, cloudWidth);
         
@@ -312,7 +306,6 @@ public enum SphereDeformation {
             case BULLET -> ShapeMath.bullet(theta);
             case CONE -> ShapeMath.blend(ShapeMath.cone(theta), intensity);
             case CLOUD -> 1.0f + intensity * 0.3f;  // Slight average bulge for legacy
-            case MOLECULE -> 1.0f + intensity * 0.25f;  // Average bulge for molecule
             case PLANET -> 1.0f + intensity * 0.15f;  // Average terrain for planet
         };
     }

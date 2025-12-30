@@ -100,6 +100,7 @@ public class FieldEditState {
         map.put("jet", shapeAdapter);
         map.put("rays", shapeAdapter);
         map.put("kamehameha", shapeAdapter);
+        map.put("molecule", shapeAdapter);
         
         // Link properties -> LinkAdapter (panel uses paths like "primitiveId", "radiusOffset")
         map.put("primitiveId", linkAdapter);
@@ -382,6 +383,7 @@ public class FieldEditState {
     public net.cyberpunk042.visual.shape.JetShape jet() { return shapeAdapter.jet(); }
     public net.cyberpunk042.visual.shape.RaysShape rays() { return shapeAdapter.rays(); }
     public net.cyberpunk042.visual.shape.KamehamehaShape kamehameha() { return shapeAdapter.kamehameha(); }
+    public net.cyberpunk042.visual.shape.MoleculeShape molecule() { return shapeAdapter.molecule(); }
     public Shape currentShape() { return shapeAdapter.currentShape(); }
     
     // Animation delegates

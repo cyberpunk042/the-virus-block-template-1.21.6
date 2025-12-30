@@ -39,6 +39,7 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
     @StateField private JetShape jet = JetShape.DEFAULT;
     @StateField private RaysShape rays = RaysShape.DEFAULT;
     @StateField private KamehamehaShape kamehameha = KamehamehaShape.DEFAULT;
+    @StateField private MoleculeShape molecule = MoleculeShape.DEFAULT;
     
     // ═══════════════════════════════════════════════════════════════════════════
     // SHAPE SELECTOR
@@ -84,6 +85,7 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
             case JetShape j -> this.jet = j;
             case RaysShape r -> this.rays = r;
             case KamehamehaShape k -> this.kamehameha = k;
+            case MoleculeShape m -> this.molecule = m;
             default -> Logging.GUI.topic("adapter").warn("Unknown shape type: {}", shape.getClass().getSimpleName());
         }
     }
@@ -119,6 +121,7 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
             case "jet" -> jet;
             case "rays" -> rays;
             case "kamehameha" -> kamehameha;
+            case "molecule" -> molecule;
             default -> {
                 Logging.GUI.topic("adapter").warn("Unknown shapeType '{}', defaulting to sphere", shapeType);
                 yield sphere;
@@ -166,6 +169,9 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
     public KamehamehaShape kamehameha() { return kamehameha; }
     public void setKamehameha(KamehamehaShape kamehameha) { this.kamehameha = kamehameha; }
     
+    public MoleculeShape molecule() { return molecule; }
+    public void setMolecule(MoleculeShape molecule) { this.molecule = molecule; }
+    
     // ═══════════════════════════════════════════════════════════════════════════
     // RESET
     // ═══════════════════════════════════════════════════════════════════════════
@@ -183,6 +189,7 @@ public class ShapeAdapter extends AbstractAdapter implements PrimitiveAdapter {
         this.jet = JetShape.DEFAULT;
         this.rays = RaysShape.DEFAULT;
         this.kamehameha = KamehamehaShape.DEFAULT;
+        this.molecule = MoleculeShape.DEFAULT;
         this.shapeType = "sphere";
     }
 }

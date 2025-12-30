@@ -1,10 +1,11 @@
 package net.cyberpunk042.client.visual.mesh;
 
-import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.visual.pattern.QuadPattern;
 import net.cyberpunk042.visual.pattern.VertexPattern;
 import net.cyberpunk042.visual.shape.EnergyType;
 import net.cyberpunk042.visual.shape.KamehamehaShape;
+import net.cyberpunk042.visual.shape.OrientationAxis;
+import net.cyberpunk042.visual.shape.RingShape;
 import net.cyberpunk042.visual.visibility.VisibilityMask;
 import org.joml.Vector3f;
 
@@ -14,12 +15,8 @@ import org.joml.Vector3f;
  * <h2>Components</h2>
  * <ul>
  *   <li><b>Orb</b> - Spherical energy core at origin</li>
- *   <li><b>OrbCore</b> - Inner intense orb layer (optional)</li>
- *   <li><b>OrbAura</b> - Outer orb glow (optional)</li>
- *   <li><b>Beam</b> - Cylindrical/conical energy stream</li>
- *   <li><b>BeamCore</b> - Inner intense beam (optional)</li>
- *   <li><b>BeamTip</b> - End cap of beam</li>
- *   <li><b>BeamAura</b> - Outer beam glow (optional)</li>
+ *   <li><b>Beam</b> - Tapered tube using Ring tessellation</li>
+ *   <li><b>BeamTip</b> - End cap of beam (dome or flat)</li>
  * </ul>
  * 
  * @see KamehamehaShape
@@ -43,29 +40,14 @@ public final class KamehamehaTessellator {
         
         // Tessellate orb components
         if (shape.isOrbVisible()) {
-            tessellateOrb(builder, shape, time);
-            if (shape.hasCore()) {
-                tessellateOrbCore(builder, shape, time);
-            }
-            if (shape.hasAura()) {
-                tessellateOrbAura(builder, shape, time);
-            }
+            tessellateOrb(builder, shape, time, pattern);
         }
         
         // Tessellate beam components
         if (shape.isBeamVisible()) {
-            tessellateBeam(builder, shape, time);
-            if (shape.hasCore()) {
-                tessellateBeamCore(builder, shape, time);
-            }
-            tessellateBeamTip(builder, shape, time);
-            if (shape.hasAura()) {
-                tessellateBeamAura(builder, shape, time);
-            }
+            tessellateBeam(builder, shape, time, pattern);
+            tessellateBeamTip(builder, shape, time, pattern);
         }
-        
-        Logging.FIELD.topic("tessellate").trace("Kamehameha mesh: {} verts",
-            builder.vertexCount());
         
         return builder.build();
     }
@@ -74,95 +56,94 @@ public final class KamehamehaTessellator {
     // Orb Tessellation
     // =========================================================================
     
-    private static void tessellateOrb(MeshBuilder builder, KamehamehaShape shape, float time) {
+    private static void tessellateOrb(MeshBuilder builder, KamehamehaShape shape, float time, VertexPattern pattern) {
         float radius = shape.effectiveOrbRadius();
         int segments = shape.orbSegments();
         EnergyType type = shape.orbType();
         float alpha = shape.orbAlpha();
-        tessellateSphere(builder, 0, 0, 0, radius, segments, segments / 2, type, time, alpha);
-    }
-    
-    private static void tessellateOrbCore(MeshBuilder builder, KamehamehaShape shape, float time) {
-        float radius = shape.orbCoreRadius();
-        int segments = Math.max(8, shape.orbSegments() / 2);
-        // Core is brighter - use full alpha
-        tessellateSphere(builder, 0, 0, 0, radius, segments, segments / 2, shape.orbType(), time, 1.0f);
-    }
-    
-    private static void tessellateOrbAura(MeshBuilder builder, KamehamehaShape shape, float time) {
-        float radius = shape.orbAuraRadius();
-        int segments = shape.orbSegments();
-        // Aura uses its own alpha multiplier
-        tessellateSphere(builder, 0, 0, 0, radius, segments, segments / 2, shape.orbType(), time, shape.auraAlpha());
+        OrientationAxis axis = shape.orientationAxis() != null ? shape.orientationAxis() : OrientationAxis.POS_Z;
+        float offset = shape.originOffset();
+        tessellateSphere(builder, radius, segments, segments / 2, type, time, alpha, axis, offset, pattern);
     }
     
     // =========================================================================
     // Beam Tessellation
     // =========================================================================
     
-    private static void tessellateBeam(MeshBuilder builder, KamehamehaShape shape, float time) {
+    private static void tessellateBeam(MeshBuilder builder, KamehamehaShape shape, float time, VertexPattern pattern) {
         float baseRadius = shape.effectiveBeamBaseRadius();
         float tipRadius = shape.effectiveBeamTipRadius();
         float length = shape.effectiveBeamLength();
         int segments = shape.beamSegments();
-        int lengthSegments = shape.beamLengthSegments();
-        float startY = shape.effectiveOrbRadius();
-        float baseAlpha = shape.beamBaseAlpha();
-        float tipAlpha = shape.beamTipAlpha();
-        tessellateCylinder(builder, 0, startY, 0, baseRadius, tipRadius, length,
-                           segments, lengthSegments, shape.beamType(), time, baseAlpha, tipAlpha);
+        OrientationAxis axis = shape.orientationAxis() != null ? shape.orientationAxis() : OrientationAxis.POS_Z;
+        float beamStart = shape.effectiveOrbRadius();
+        float offset = shape.originOffset();
+        
+        // Calculate taper ratio (tip radius / base radius)
+        float taper = baseRadius > 0.001f ? tipRadius / baseRadius : 1.0f;
+        
+        // Create a Ring shape for the beam with proper orientation
+        // The ring's Y axis will be transformed to the beam's orientation axis
+        // y = beamStart positions the ring's center along the beam axis
+        RingShape beamRing = RingShape.builder()
+            .innerRadius(0)  // Solid beam (could be > 0 for hollow)
+            .outerRadius(baseRadius)
+            .segments(segments)
+            .height(length)
+            .y(beamStart + length / 2)  // Center of beam along axis
+            .taper(taper)
+            .orientation(axis)
+            .originOffset(offset)
+            .bottomAlpha(shape.beamBaseAlpha())  // Alpha at beam base
+            .topAlpha(shape.beamTipAlpha())      // Alpha at beam tip
+            .build();
+        
+        // Tessellate and merge - RingTessellator now handles orientation internally
+        Mesh beamMesh = RingTessellator.tessellate(beamRing, pattern, null);
+        builder.mergeMesh(beamMesh);
     }
     
-    private static void tessellateBeamCore(MeshBuilder builder, KamehamehaShape shape, float time) {
-        float baseRadius = shape.beamCoreRadius();
-        float tipRadius = baseRadius * (shape.beamTipRadius() / Math.max(0.001f, shape.beamBaseRadius()));
-        float length = shape.effectiveBeamLength();
-        int segments = Math.max(8, shape.beamSegments() / 2);
-        int lengthSegments = Math.max(2, shape.beamLengthSegments() / 2);
-        float startY = shape.effectiveOrbRadius();
-        // Core uses full alpha gradient
-        tessellateCylinder(builder, 0, startY, 0, baseRadius, tipRadius, length,
-                           segments, lengthSegments, shape.beamType(), time, 1.0f, 1.0f);
-    }
-    
-    private static void tessellateBeamTip(MeshBuilder builder, KamehamehaShape shape, float time) {
+    private static void tessellateBeamTip(MeshBuilder builder, KamehamehaShape shape, float time, VertexPattern pattern) {
         float tipRadius = shape.effectiveBeamTipRadius();
-        float startY = shape.effectiveOrbRadius() + shape.effectiveBeamLength();
+        float tipStart = shape.effectiveOrbRadius() + shape.effectiveBeamLength();
         int segments = shape.beamSegments();
         float tipAlpha = shape.beamTipAlpha();
+        OrientationAxis axis = shape.orientationAxis() != null ? shape.orientationAxis() : OrientationAxis.POS_Z;
+        float offset = shape.originOffset();
         
-        switch (shape.tipStyle()) {
-            case POINTED -> tessellateConeTip(builder, 0, startY, 0, tipRadius, tipRadius * 1.5f, segments, tipAlpha);
-            case ROUNDED -> tessellateHemisphere(builder, 0, startY, 0, tipRadius, segments, true, tipAlpha);
-            case FLAT -> tessellateFlatCap(builder, 0, startY, 0, tipRadius, segments, true, tipAlpha);
-            case VORTEX -> tessellateVortexTip(builder, 0, startY, 0, tipRadius, segments, time, tipAlpha);
+        if (shape.hasDomeTip()) {
+            // Dome (hemisphere) tip
+            tessellateHemisphere(builder, tipStart, tipRadius, segments, true, tipAlpha, axis, offset, pattern);
+        } else {
+            // Flat cap
+            tessellateFlatCap(builder, tipStart, tipRadius, segments, true, tipAlpha, axis, offset, pattern);
         }
     }
     
-    private static void tessellateBeamAura(MeshBuilder builder, KamehamehaShape shape, float time) {
-        float baseRadius = shape.effectiveBeamBaseRadius() * shape.auraScale();
-        float tipRadius = shape.effectiveBeamTipRadius() * shape.auraScale();
-        float length = shape.effectiveBeamLength();
-        int segments = shape.beamSegments();
-        int lengthSegments = Math.max(2, shape.beamLengthSegments() / 2);
-        float startY = shape.effectiveOrbRadius();
-        // Aura uses auraAlpha as multiplier
-        float auraAlpha = shape.auraAlpha();
-        tessellateCylinder(builder, 0, startY, 0, baseRadius, tipRadius, length,
-                           segments, lengthSegments, shape.beamType(), time, auraAlpha, auraAlpha * 0.5f);
-    }
-    
     // =========================================================================
-    // Primitive Geometry Helpers
+    // Primitive Geometry Helpers (with Orientation Transform)
     // =========================================================================
     
-    private static void tessellateSphere(MeshBuilder builder,
-                                          float cx, float cy, float cz, float radius,
+    /**
+     * Tessellates a sphere centered at origin, transformed by orientation axis and offset.
+     * 
+     * @param builder Mesh builder
+     * @param radius Sphere radius
+     * @param lonSteps Longitude steps
+     * @param latSteps Latitude steps
+     * @param type Energy type for distortion effects
+     * @param time Animation time
+     * @param alpha Vertex alpha
+     * @param axis Orientation axis for transform
+     * @param offset Offset along beam axis
+     */
+    private static void tessellateSphere(MeshBuilder builder, float radius,
                                           int lonSteps, int latSteps,
-                                          EnergyType type, float time, float alpha) {
+                                          EnergyType type, float time, float alpha,
+                                          OrientationAxis axis, float offset, VertexPattern pattern) {
         float distortion = type.hasDistortion() ? 0.1f * (float)Math.sin(time * 3) : 0;
         
-        // Create vertex grid
+        // Create vertex grid in local space (Y-up), then transform
         int[][] indices = new int[latSteps + 1][lonSteps + 1];
         
         for (int lat = 0; lat <= latSteps; lat++) {
@@ -177,22 +158,29 @@ public final class KamehamehaTessellator {
                 
                 float r = radius + distortion * (float)Math.sin(phi * 4 + time * 5);
                 
-                float x = cx + r * sinTheta * cosPhi;
-                float y = cy + r * cosTheta;
-                float z = cz + r * sinTheta * sinPhi;
+                // Local coordinates (Y-up sphere)
+                float localX = r * sinTheta * cosPhi;
+                float localY = r * cosTheta;  // This becomes beam axis
+                float localZ = r * sinTheta * sinPhi;
                 
-                float nx = sinTheta * cosPhi;
-                float ny = cosTheta;
-                float nz = sinTheta * sinPhi;
+                // Local normal
+                float lnx = sinTheta * cosPhi;
+                float lny = cosTheta;
+                float lnz = sinTheta * sinPhi;
+                
+                // Transform to world space using orientation
+                Vector3f pos = axis.transformVertex(localX, localY, localZ, offset);
+                Vector3f norm = axis.transformNormal(lnx, lny, lnz);
                 
                 float u = (float) lon / lonSteps;
                 float v = (float) lat / latSteps;
                 
-                indices[lat][lon] = builder.addVertex(new Vertex(x, y, z, nx, ny, nz, u, v, alpha));
+                indices[lat][lon] = builder.addVertex(new Vertex(
+                    pos.x, pos.y, pos.z, norm.x, norm.y, norm.z, u, v, alpha));
             }
         }
         
-        // Generate triangles
+        // Generate quads with pattern support
         for (int lat = 0; lat < latSteps; lat++) {
             for (int lon = 0; lon < lonSteps; lon++) {
                 int i00 = indices[lat][lon];
@@ -200,92 +188,15 @@ public final class KamehamehaTessellator {
                 int i11 = indices[lat + 1][lon + 1];
                 int i01 = indices[lat][lon + 1];
                 
-                // Two triangles per quad
-                builder.triangle(i00, i10, i11);
-                builder.triangle(i00, i11, i01);
+                // Quad with pattern: TL=i00, TR=i01, BR=i11, BL=i10
+                builder.quadAsTrianglesFromPattern(i00, i01, i11, i10, pattern);
             }
-        }
-    }
-    
-    private static void tessellateCylinder(MeshBuilder builder,
-                                            float cx, float startY, float cz,
-                                            float baseRadius, float tipRadius, float length,
-                                            int radialSegments, int lengthSegments,
-                                            EnergyType type, float time,
-                                            float baseAlpha, float tipAlpha) {
-        float distortion = type.hasDistortion() ? 0.05f : 0;
-        boolean hasRotation = type.hasRotation();
-        float rotationOffset = hasRotation ? time * 2 : 0;
-        
-        // Create vertex grid
-        int[][] indices = new int[lengthSegments + 1][radialSegments + 1];
-        
-        for (int l = 0; l <= lengthSegments; l++) {
-            float t = (float) l / lengthSegments;
-            float y = startY + length * t;
-            float r = baseRadius + (tipRadius - baseRadius) * t;
-            
-            // Interpolate alpha from base to tip
-            float alpha = baseAlpha + (tipAlpha - baseAlpha) * t;
-            
-            for (int s = 0; s <= radialSegments; s++) {
-                float angle = (float) (2 * Math.PI * s / radialSegments) + rotationOffset;
-                float d = distortion * (float)Math.sin(angle * 3 + time * 4 + y);
-                
-                float x = cx + (float)Math.cos(angle) * (r + d);
-                float z = cz + (float)Math.sin(angle) * (r + d);
-                
-                float nx = (float)Math.cos(angle);
-                float nz = (float)Math.sin(angle);
-                float ny = 0;
-                
-                float u = t;
-                float v = (float) s / radialSegments;
-                
-                indices[l][s] = builder.addVertex(new Vertex(x, y, z, nx, ny, nz, u, v, alpha));
-            }
-        }
-        
-        // Generate triangles
-        for (int l = 0; l < lengthSegments; l++) {
-            for (int s = 0; s < radialSegments; s++) {
-                int i00 = indices[l][s];
-                int i01 = indices[l][s + 1];
-                int i10 = indices[l + 1][s];
-                int i11 = indices[l + 1][s + 1];
-                
-                builder.triangle(i00, i01, i11);
-                builder.triangle(i00, i11, i10);
-            }
-        }
-    }
-    
-    private static void tessellateConeTip(MeshBuilder builder,
-                                           float cx, float baseY, float cz,
-                                           float baseRadius, float height, int segments, float alpha) {
-        float tipY = baseY + height;
-        // Tip fades to 0 alpha at the point
-        int tipIdx = builder.addVertex(new Vertex(cx, tipY, cz, 0, 1, 0, 0.5f, 0.5f, 0f));
-        
-        int[] baseIndices = new int[segments + 1];
-        for (int s = 0; s <= segments; s++) {
-            float angle = (float) (2 * Math.PI * s / segments);
-            float x = cx + (float)Math.cos(angle) * baseRadius;
-            float z = cz + (float)Math.sin(angle) * baseRadius;
-            float nx = (float)Math.cos(angle);
-            float nz = (float)Math.sin(angle);
-            baseIndices[s] = builder.addVertex(new Vertex(x, baseY, z, nx, 0.5f, nz, 
-                    (float)s / segments, 0, alpha));
-        }
-        
-        for (int s = 0; s < segments; s++) {
-            builder.triangle(baseIndices[s], baseIndices[s + 1], tipIdx);
         }
     }
     
     private static void tessellateHemisphere(MeshBuilder builder,
-                                              float cx, float baseY, float cz,
-                                              float radius, int segments, boolean facingUp, float alpha) {
+                                              float basePos, float radius, int segments, boolean facingUp, float alpha,
+                                              OrientationAxis axis, float offset, VertexPattern pattern) {
         int latSteps = segments / 2;
         
         int[][] indices = new int[latSteps + 1][segments + 1];
@@ -304,19 +215,24 @@ public final class KamehamehaTessellator {
                 float sinPhi = (float) Math.sin(phi);
                 float cosPhi = (float) Math.cos(phi);
                 
-                float y = facingUp ? baseY + radius * cosTheta : baseY - radius * cosTheta;
-                float x = cx + radius * sinTheta * cosPhi;
-                float z = cz + radius * sinTheta * sinPhi;
+                // Local coordinates
+                float localY = facingUp ? basePos + radius * cosTheta : basePos - radius * cosTheta;
+                float localX = radius * sinTheta * cosPhi;
+                float localZ = radius * sinTheta * sinPhi;
                 
-                float ny = facingUp ? cosTheta : -cosTheta;
-                float nx = sinTheta * cosPhi;
-                float nz = sinTheta * sinPhi;
+                float lny = facingUp ? cosTheta : -cosTheta;
+                float lnx = sinTheta * cosPhi;
+                float lnz = sinTheta * sinPhi;
                 
-                indices[lat][lon] = builder.addVertex(new Vertex(x, y, z, nx, ny, nz, 
-                        (float)lon / segments, (float)lat / latSteps, vertAlpha));
+                Vector3f pos = axis.transformVertex(localX, localY, localZ, offset);
+                Vector3f norm = axis.transformNormal(lnx, lny, lnz);
+                
+                indices[lat][lon] = builder.addVertex(new Vertex(pos.x, pos.y, pos.z,
+                    norm.x, norm.y, norm.z, (float)lon / segments, (float)lat / latSteps, vertAlpha));
             }
         }
         
+        // Generate quads with pattern support
         for (int lat = 0; lat < latSteps; lat++) {
             for (int lon = 0; lon < segments; lon++) {
                 int i00 = indices[lat][lon];
@@ -324,76 +240,41 @@ public final class KamehamehaTessellator {
                 int i10 = indices[lat + 1][lon];
                 int i11 = indices[lat + 1][lon + 1];
                 
-                builder.triangle(i00, i10, i11);
-                builder.triangle(i00, i11, i01);
+                // Quad with pattern: TL=i00, TR=i01, BR=i11, BL=i10
+                builder.quadAsTrianglesFromPattern(i00, i01, i11, i10, pattern);
             }
         }
     }
     
     private static void tessellateFlatCap(MeshBuilder builder,
-                                           float cx, float y, float cz,
-                                           float radius, int segments, boolean facingUp, float alpha) {
-        float ny = facingUp ? 1.0f : -1.0f;
-        int centerIdx = builder.addVertex(new Vertex(cx, y, cz, 0, ny, 0, 0.5f, 0.5f, alpha));
+                                           float capPos, float radius, int segments, boolean facingUp, float alpha,
+                                           OrientationAxis axis, float offset, VertexPattern pattern) {
+        float lny = facingUp ? 1.0f : -1.0f;
+        
+        Vector3f centerPos = axis.transformVertex(0, capPos, 0, offset);
+        Vector3f centerNorm = axis.transformNormal(0, lny, 0);
+        int centerIdx = builder.addVertex(new Vertex(centerPos.x, centerPos.y, centerPos.z,
+            centerNorm.x, centerNorm.y, centerNorm.z, 0.5f, 0.5f, alpha));
         
         int[] edgeIndices = new int[segments + 1];
         for (int s = 0; s <= segments; s++) {
             float angle = (float) (2 * Math.PI * s / segments);
-            float x = cx + (float)Math.cos(angle) * radius;
-            float z = cz + (float)Math.sin(angle) * radius;
-            edgeIndices[s] = builder.addVertex(new Vertex(x, y, z, 0, ny, 0, 
-                    (float)s / segments, 0, alpha));
+            float localX = (float)Math.cos(angle) * radius;
+            float localZ = (float)Math.sin(angle) * radius;
+            
+            Vector3f pos = axis.transformVertex(localX, capPos, localZ, offset);
+            Vector3f norm = axis.transformNormal(0, lny, 0);
+            
+            edgeIndices[s] = builder.addVertex(new Vertex(pos.x, pos.y, pos.z,
+                norm.x, norm.y, norm.z, (float)s / segments, 0, alpha));
         }
         
+        // Fan pattern - triangles from center (pattern doesn't apply cleanly)
         for (int s = 0; s < segments; s++) {
             if (facingUp) {
                 builder.triangle(centerIdx, edgeIndices[s], edgeIndices[s + 1]);
             } else {
                 builder.triangle(centerIdx, edgeIndices[s + 1], edgeIndices[s]);
-            }
-        }
-    }
-    
-    private static void tessellateVortexTip(MeshBuilder builder,
-                                             float cx, float baseY, float cz,
-                                             float radius, int segments, float time, float alpha) {
-        float height = radius * 1.5f;
-        int lengthSegs = segments / 2;
-        int spirals = 3;
-        
-        int[][] indices = new int[lengthSegs + 1][segments + 1];
-        
-        for (int l = 0; l <= lengthSegs; l++) {
-            float t = (float) l / lengthSegs;
-            float y = baseY + height * t;
-            float r = radius * (1 - t);
-            float twist = t * spirals * (float)Math.PI * 2 + time * 3;
-            
-            // Alpha fades toward the tip
-            float vertAlpha = alpha * (1f - t);
-            
-            for (int s = 0; s <= segments; s++) {
-                float angle = (float) (2 * Math.PI * s / segments) + twist;
-                float x = cx + (float)Math.cos(angle) * r;
-                float z = cz + (float)Math.sin(angle) * r;
-                
-                float nx = (float)Math.cos(angle);
-                float nz = (float)Math.sin(angle);
-                
-                indices[l][s] = builder.addVertex(new Vertex(x, y, z, nx, 0.5f, nz, 
-                        t, (float)s / segments, vertAlpha));
-            }
-        }
-        
-        for (int l = 0; l < lengthSegs; l++) {
-            for (int s = 0; s < segments; s++) {
-                int i00 = indices[l][s];
-                int i01 = indices[l][s + 1];
-                int i10 = indices[l + 1][s];
-                int i11 = indices[l + 1][s + 1];
-                
-                builder.triangle(i00, i01, i11);
-                builder.triangle(i00, i11, i10);
             }
         }
     }

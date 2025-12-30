@@ -5,8 +5,10 @@ import net.cyberpunk042.log.Logging;
 import net.cyberpunk042.visual.animation.WaveConfig;
 import net.cyberpunk042.visual.pattern.VertexPattern;
 import net.cyberpunk042.visual.pattern.SegmentPattern;
+import net.cyberpunk042.visual.shape.OrientationAxis;
 import net.cyberpunk042.visual.shape.RingShape;
 import net.cyberpunk042.visual.visibility.VisibilityMask;
+import org.joml.Vector3f;
 
 /**
  * Tessellates ring shapes into triangle meshes.
@@ -180,6 +182,8 @@ public final class RingTessellator {
         int segments = shape.segments();
         float innerR = shape.innerRadius();
         float outerR = shape.outerRadius();
+        float topInnerR = shape.topInnerRadius();  // May differ from innerR if tapered
+        float topOuterR = shape.topOuterRadius();  // May differ from outerR if tapered
         float height = shape.height();
         float yCenter = shape.y();
         float yBottom = yCenter - height / 2;
@@ -189,6 +193,10 @@ public final class RingTessellator {
         float arcEnd = GeometryMath.toRadians(shape.arcEnd());
         float arcRange = arcEnd - arcStart;
         boolean isFullRing = shape.isFullRing();
+        OrientationAxis orientation = shape.effectiveOrientation();
+        float originOffset = shape.originOffset();
+        float bottomAlpha = shape.bottomAlpha();
+        float topAlpha = shape.topAlpha();
         
         boolean applyWave = wave != null && wave.isActive() && wave.isCpuMode();
         
@@ -200,7 +208,7 @@ public final class RingTessellator {
         int[] bottomInner = new int[segments + 1];
         int[] bottomOuter = new int[segments + 1];
         
-        // Top ring vertices (inner and outer) - with twist applied
+        // Top ring vertices (inner and outer) - with twist and taper applied
         int[] topInner = new int[segments + 1];
         int[] topOuter = new int[segments + 1];
         
@@ -210,11 +218,11 @@ public final class RingTessellator {
             float topAngle = baseAngle + twist;  // Apply twist to top
             
             // Bottom vertices (normal pointing down for bottom face)
-            Vertex bInner = ringVertex(baseAngle, innerR, yBottom, 0, -1, 0);
-            Vertex bOuter = ringVertex(baseAngle, outerR, yBottom, 0, -1, 0);
-            // Top vertices (normal pointing up for top face)
-            Vertex tInner = ringVertex(topAngle, innerR, yTop, 0, 1, 0);
-            Vertex tOuter = ringVertex(topAngle, outerR, yTop, 0, 1, 0);
+            Vertex bInner = ringVertex(baseAngle, innerR, yBottom, 0, -1, 0, orientation, originOffset, bottomAlpha);
+            Vertex bOuter = ringVertex(baseAngle, outerR, yBottom, 0, -1, 0, orientation, originOffset, bottomAlpha);
+            // Top vertices with tapered radii (normal pointing up for top face)
+            Vertex tInner = ringVertex(topAngle, topInnerR, yTop, 0, 1, 0, orientation, originOffset, topAlpha);
+            Vertex tOuter = ringVertex(topAngle, topOuterR, yTop, 0, 1, 0, orientation, originOffset, topAlpha);
             
             // Apply wave deformation
             if (applyWave) {
@@ -269,11 +277,11 @@ public final class RingTessellator {
             // Normal points outward (radial direction)
             float nx = (float) Math.cos(baseAngle);
             float nz = (float) Math.sin(baseAngle);
-            Vertex owBottom = ringVertex(baseAngle, outerR, yBottom, nx, 0, nz);
+            Vertex owBottom = ringVertex(baseAngle, outerR, yBottom, nx, 0, nz, orientation, originOffset, bottomAlpha);
             
             float nxTop = (float) Math.cos(topAngle);
             float nzTop = (float) Math.sin(topAngle);
-            Vertex owTop = ringVertex(topAngle, outerR, yTop, nxTop, 0, nzTop);
+            Vertex owTop = ringVertex(topAngle, topOuterR, yTop, nxTop, 0, nzTop, orientation, originOffset, topAlpha);
             
             if (applyWave) {
                 owBottom = WaveDeformer.applyToVertex(owBottom, wave, time);
@@ -310,11 +318,11 @@ public final class RingTessellator {
             // Normal points inward (negative radial direction)
             float nx = -(float) Math.cos(baseAngle);
             float nz = -(float) Math.sin(baseAngle);
-            Vertex iwBottom = ringVertex(baseAngle, innerR, yBottom, nx, 0, nz);
+            Vertex iwBottom = ringVertex(baseAngle, innerR, yBottom, nx, 0, nz, orientation, originOffset, bottomAlpha);
             
             float nxTop = -(float) Math.cos(topAngle);
             float nzTop = -(float) Math.sin(topAngle);
-            Vertex iwTop = ringVertex(topAngle, innerR, yTop, nxTop, 0, nzTop);
+            Vertex iwTop = ringVertex(topAngle, topInnerR, yTop, nxTop, 0, nzTop, orientation, originOffset, topAlpha);
             
             if (applyWave) {
                 iwBottom = WaveDeformer.applyToVertex(iwBottom, wave, time);
@@ -358,14 +366,38 @@ public final class RingTessellator {
     
     /**
      * Creates a vertex at a ring position with custom normal.
+     * Local space is Y-up (ring plane is XZ, height extends along Y).
      */
     private static Vertex ringVertex(float angle, float radius, float y, 
-                                      float nx, float ny, float nz) {
-        float x = (float) Math.cos(angle) * radius;
-        float z = (float) Math.sin(angle) * radius;
+                                      float nx, float ny, float nz,
+                                      float alpha) {
+        return ringVertex(angle, radius, y, nx, ny, nz, null, 0, alpha);
+    }
+    
+    /**
+     * Creates a vertex at a ring position with custom normal and orientation transform.
+     * Local space is Y-up (ring plane is XZ, height extends along Y).
+     * If orientation is provided, transforms from local space to oriented space.
+     */
+    private static Vertex ringVertex(float angle, float radius, float y, 
+                                      float nx, float ny, float nz,
+                                      OrientationAxis orientation, float originOffset, float alpha) {
+        // Local Y-up coordinates
+        float localX = (float) Math.cos(angle) * radius;
+        float localZ = (float) Math.sin(angle) * radius;
+        float localY = y;
+        
         float u = angle / GeometryMath.TWO_PI;
-        float v = (ny > 0) ? 1 : 0;  // Top = 1, bottom = 0, walls use angle
-        return new Vertex(x, y, z, nx, ny, nz, u, v, 1.0f);
+        float v = (ny > 0) ? 1 : 0;  // Top = 1, bottom = 0
+        
+        // Apply orientation transform if specified
+        if (orientation != null && orientation != OrientationAxis.POS_Y) {
+            Vector3f pos = orientation.transformVertex(localX, localY, localZ, originOffset);
+            Vector3f norm = orientation.transformNormal(nx, ny, nz);
+            return new Vertex(pos.x(), pos.y(), pos.z(), norm.x(), norm.y(), norm.z(), u, v, alpha);
+        }
+        
+        return new Vertex(localX, localY, localZ, nx, ny, nz, u, v, alpha);
     }
     
     /**

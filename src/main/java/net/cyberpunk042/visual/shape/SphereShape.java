@@ -61,14 +61,12 @@ public record SphereShape(
     @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true) float deformationIntensity,
     /** Axial stretch: 1.0 = normal, >1 = elongated (prolate), <1 = squashed (oblate) */
     @JsonField(skipIfDefault = true, defaultValue = "1") float deformationLength,
-    /** Number of lobes/atoms for CLOUD/MOLECULE (1-20, default 6) */
+    /** Number of lobes for CLOUD (1-20, default 6) */
     @JsonField(skipIfDefault = true, defaultValue = "6") int deformationCount,
-    /** Smoothness for rounding spikes in CLOUD/MOLECULE (0 = sharp, 1 = smooth, default 0.5) */
+    /** Smoothness for rounding spikes in CLOUD (0 = sharp, 1 = smooth, default 0.5) */
     @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "0.5") float deformationSmoothness,
-    /** Size of individual bumps/atoms (0.1-2.0, default 0.5). CLOUD: bump prominence. MOLECULE: atom size. */
+    /** Size of individual bumps for CLOUD (0.1-2.0, default 0.5). CLOUD: bump prominence. */
     @JsonField(skipIfDefault = true, defaultValue = "0.5") float deformationBumpSize,
-    /** Distance of atoms from center for MOLECULE (0.3-1.5, default 0.6). Higher = atoms further out. */
-    @JsonField(skipIfDefault = true, defaultValue = "0.6") float deformationSeparation,
     /** CLOUD: Algorithm style (GAUSSIAN, FRACTAL, BILLOWING, WORLEY). Default GAUSSIAN. */
     @JsonField(skipIfEqualsConstant = "GAUSSIAN") CloudStyle cloudStyle,
     /** CLOUD: Random seed for reproducibility (0-999, default 42). */
@@ -129,7 +127,7 @@ public record SphereShape(
     /** Default sphere (1.0 radius, medium detail, full sphere). */
     public static SphereShape of(float radius) { 
         return new SphereShape(radius, 16, 32, 0f, 1f, 0f, 1f, SphereAlgorithm.values()[0], 
-            SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, 0.6f, CloudStyle.GAUSSIAN, 42, 1.0f,
+            SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, CloudStyle.GAUSSIAN, 42, 1.0f,
             2f, 4, 2f, 0.5f, 0f, 0, 42,
             false, 3f, 1.5f, 1f, 1f, 1f,  // horizon defaults
             false, 2f, 1f, 0.5f, 1f, 1f, 1f, 0f, 1f); // corona defaults (+ offset, width)
@@ -138,7 +136,7 @@ public record SphereShape(
     
     public static final SphereShape DEFAULT = new SphereShape(
         1.0f, 32, 64, 0.0f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON,
-        SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, 0.6f, CloudStyle.GAUSSIAN, 42, 1.0f,
+        SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, CloudStyle.GAUSSIAN, 42, 1.0f,
         2f, 4, 2f, 0.5f, 0f, 0, 42,
         false, 3f, 1.5f, 1f, 1f, 1f,
         false, 2f, 1f, 0.5f, 1f, 1f, 1f, 0f, 1f);
@@ -146,7 +144,7 @@ public record SphereShape(
     /** Low-poly sphere for performance. */
     public static final SphereShape LOW_POLY = new SphereShape(
         1.0f, 8, 16, 0.0f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON,
-        SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, 0.6f, CloudStyle.GAUSSIAN, 42, 1.0f,
+        SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, CloudStyle.GAUSSIAN, 42, 1.0f,
         2f, 4, 2f, 0.5f, 0f, 0, 42,
         false, 3f, 1.5f, 1f, 1f, 1f,
         false, 2f, 1f, 0.5f, 1f, 1f, 1f, 0f, 1f);
@@ -154,7 +152,7 @@ public record SphereShape(
     /** High-detail sphere. */
     public static final SphereShape HIGH_DETAIL = new SphereShape(
         1.0f, 64, 128, 0.0f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON,
-        SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, 0.6f, CloudStyle.GAUSSIAN, 42, 1.0f,
+        SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, CloudStyle.GAUSSIAN, 42, 1.0f,
         2f, 4, 2f, 0.5f, 0f, 0, 42,
         false, 3f, 1.5f, 1f, 1f, 1f,
         false, 2f, 1f, 0.5f, 1f, 1f, 1f, 0f, 1f);
@@ -165,7 +163,7 @@ public record SphereShape(
      */
     public static SphereShape ofRadius(@Range(ValueRange.RADIUS) float radius) {
         return new SphereShape(radius, 32, 64, 0.0f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON,
-            SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, 0.6f, CloudStyle.GAUSSIAN, 42, 1.0f,
+            SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, CloudStyle.GAUSSIAN, 42, 1.0f,
             2f, 4, 2f, 0.5f, 0f, 0, 42,
             false, 3f, 1.5f, 1f, 1f, 1f,
             false, 2f, 1f, 0.5f, 1f, 1f, 1f, 0f, 1f);
@@ -177,7 +175,7 @@ public record SphereShape(
      */
     public static SphereShape hemisphereTop(@Range(ValueRange.RADIUS) float radius) {
         return new SphereShape(radius, 16, 64, 0.0f, 0.5f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON,
-            SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, 0.6f, CloudStyle.GAUSSIAN, 42, 1.0f,
+            SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, CloudStyle.GAUSSIAN, 42, 1.0f,
             2f, 4, 2f, 0.5f, 0f, 0, 42,
             false, 3f, 1.5f, 1f, 1f, 1f,
             false, 2f, 1f, 0.5f, 1f, 1f, 1f, 0f, 1f);
@@ -189,7 +187,7 @@ public record SphereShape(
      */
     public static SphereShape hemisphereBottom(@Range(ValueRange.RADIUS) float radius) {
         return new SphereShape(radius, 16, 64, 0.5f, 1.0f, 0.0f, 1.0f, SphereAlgorithm.LAT_LON,
-            SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, 0.6f, CloudStyle.GAUSSIAN, 42, 1.0f,
+            SphereDeformation.NONE, 0f, 1f, 6, 0.5f, 0.5f, CloudStyle.GAUSSIAN, 42, 1.0f,
             2f, 4, 2f, 0.5f, 0f, 0, 42,
             false, 3f, 1.5f, 1f, 1f, 1f,
             false, 2f, 1f, 0.5f, 1f, 1f, 1f, 0f, 1f);
@@ -277,7 +275,6 @@ public record SphereShape(
         int deformationCount = json.has("deformationCount") ? json.get("deformationCount").getAsInt() : 6;
         float deformationSmoothness = json.has("deformationSmoothness") ? json.get("deformationSmoothness").getAsFloat() : 0.5f;
         float deformationBumpSize = json.has("deformationBumpSize") ? json.get("deformationBumpSize").getAsFloat() : 0.5f;
-        float deformationSeparation = json.has("deformationSeparation") ? json.get("deformationSeparation").getAsFloat() : 0.6f;
         
         // Cloud style
         CloudStyle cloudStyle = CloudStyle.GAUSSIAN;
@@ -322,7 +319,7 @@ public record SphereShape(
         
         SphereShape result = new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm, 
             deformation, deformationIntensity, deformationLength, deformationCount, deformationSmoothness,
-            deformationBumpSize, deformationSeparation, cloudStyle, cloudSeed, cloudWidth,
+            deformationBumpSize, cloudStyle, cloudSeed, cloudWidth,
             planetFrequency, planetOctaves, planetLacunarity, planetPersistence, planetRidged, planetCraterCount, planetSeed,
             horizonEnabled, horizonPower, horizonIntensity, horizonRed, horizonGreen, horizonBlue,
             coronaEnabled, coronaPower, coronaIntensity, coronaFalloff, coronaRed, coronaGreen, coronaBlue, coronaOffset, coronaWidth);
@@ -358,7 +355,6 @@ public record SphereShape(
             .deformationCount(deformationCount)
             .deformationSmoothness(deformationSmoothness)
             .deformationBumpSize(deformationBumpSize)
-            .deformationSeparation(deformationSeparation)
             .cloudStyle(cloudStyle)
             .cloudSeed(cloudSeed)
             .cloudWidth(cloudWidth)
@@ -443,7 +439,6 @@ public record SphereShape(
         private int deformationCount = 6;
         private float deformationSmoothness = 0.5f;
         private float deformationBumpSize = 0.5f;
-        private float deformationSeparation = 0.6f;
         private CloudStyle cloudStyle = CloudStyle.GAUSSIAN;
         private int cloudSeed = 42;
         private float cloudWidth = 1.0f;
@@ -487,7 +482,6 @@ public record SphereShape(
         public Builder deformationCount(int c) { this.deformationCount = Math.max(1, Math.min(20, c)); return this; }
         public Builder deformationSmoothness(float s) { this.deformationSmoothness = Math.max(0, Math.min(1, s)); return this; }
         public Builder deformationBumpSize(float s) { this.deformationBumpSize = Math.max(0.1f, Math.min(2f, s)); return this; }
-        public Builder deformationSeparation(float s) { this.deformationSeparation = Math.max(0.3f, Math.min(1.5f, s)); return this; }
         public Builder cloudStyle(CloudStyle s) { this.cloudStyle = s != null ? s : CloudStyle.GAUSSIAN; return this; }
         public Builder cloudSeed(int s) { this.cloudSeed = Math.max(0, Math.min(999, s)); return this; }
         public Builder cloudWidth(float w) { this.cloudWidth = Math.max(0.5f, Math.min(2f, w)); return this; }
@@ -520,7 +514,7 @@ public record SphereShape(
         public SphereShape build() {
             return new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, algorithm,
                 deformation, deformationIntensity, deformationLength, deformationCount, deformationSmoothness,
-                deformationBumpSize, deformationSeparation, cloudStyle, cloudSeed, cloudWidth,
+                deformationBumpSize, cloudStyle, cloudSeed, cloudWidth,
                 planetFrequency, planetOctaves, planetLacunarity, planetPersistence, planetRidged, planetCraterCount, planetSeed,
                 horizonEnabled, horizonPower, horizonIntensity, horizonRed, horizonGreen, horizonBlue,
                 coronaEnabled, coronaPower, coronaIntensity, coronaFalloff, coronaRed, coronaGreen, coronaBlue, coronaOffset, coronaWidth);

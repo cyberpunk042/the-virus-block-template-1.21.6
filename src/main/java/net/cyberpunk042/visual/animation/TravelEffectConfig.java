@@ -40,6 +40,7 @@ public record TravelEffectConfig(
     @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "0.0") float minAlpha,
     @Range(ValueRange.NORMALIZED) @JsonField(skipIfDefault = true, defaultValue = "1.0") float intensity,
     @JsonField(skipIfDefault = true) Axis direction,
+    @JsonField(skipIfDefault = true) TravelDirection travelDirection,
     @Range(ValueRange.UNBOUNDED) @JsonField(skipIfDefault = true, defaultValue = "0.0") float dirX,
     @Range(ValueRange.UNBOUNDED) @JsonField(skipIfDefault = true, defaultValue = "1.0") float dirY,
     @Range(ValueRange.UNBOUNDED) @JsonField(skipIfDefault = true, defaultValue = "0.0") float dirZ,
@@ -53,25 +54,25 @@ public record TravelEffectConfig(
     /** No travel effect. */
     public static final TravelEffectConfig NONE = new TravelEffectConfig(
         false, EnergyTravel.NONE, 1f, TravelBlendMode.REPLACE, 0f, 1f,
-        Axis.Y, 0f, 1f, 0f, 1, 0.3f
+        Axis.Y, TravelDirection.LINEAR, 0f, 1f, 0f, 1, 0.3f
     );
     
     /** Default relativistic jet - vertical chase with overlay blend. */
     public static final TravelEffectConfig RELATIVISTIC_JET = new TravelEffectConfig(
         true, EnergyTravel.COMET, 1.5f, TravelBlendMode.OVERLAY, 0.2f, 0.8f,
-        Axis.Y, 0f, 1f, 0f, 1, 0.3f
+        Axis.Y, TravelDirection.LINEAR, 0f, 1f, 0f, 1, 0.3f
     );
     
     /** Chase particles with replace blend. */
     public static final TravelEffectConfig CHASE = new TravelEffectConfig(
         true, EnergyTravel.CHASE, 1f, TravelBlendMode.REPLACE, 0f, 1f,
-        Axis.Y, 0f, 1f, 0f, 3, 0.2f
+        Axis.Y, TravelDirection.LINEAR, 0f, 1f, 0f, 3, 0.2f
     );
     
     /** Spotlight sweep effect. */
     public static final TravelEffectConfig SPOTLIGHT = new TravelEffectConfig(
         true, EnergyTravel.SCROLL, 0.5f, TravelBlendMode.OVERLAY, 0.3f, 0.7f,
-        Axis.Y, 0f, 1f, 0f, 1, 0.4f
+        Axis.Y, TravelDirection.LINEAR, 0f, 1f, 0f, 1, 0.4f
     );
     
     // =========================================================================
@@ -96,6 +97,11 @@ public record TravelEffectConfig(
     /** Gets effective direction axis, defaulting to Y if not set. */
     public Axis effectiveDirection() {
         return direction != null ? direction : Axis.Y;
+    }
+    
+    /** Gets effective travel direction mode, defaulting to LINEAR if not set. */
+    public TravelDirection effectiveTravelDirection() {
+        return travelDirection != null ? travelDirection : TravelDirection.LINEAR;
     }
     
     /**
@@ -147,6 +153,11 @@ public record TravelEffectConfig(
             direction = Axis.fromId(json.get("direction").getAsString());
         }
         
+        TravelDirection travelDirection = TravelDirection.LINEAR;
+        if (json.has("travelDirection")) {
+            travelDirection = TravelDirection.fromString(json.get("travelDirection").getAsString());
+        }
+        
         float dirX = json.has("dirX") ? json.get("dirX").getAsFloat() : 0f;
         float dirY = json.has("dirY") ? json.get("dirY").getAsFloat() : 1f;
         float dirZ = json.has("dirZ") ? json.get("dirZ").getAsFloat() : 0f;
@@ -156,7 +167,7 @@ public record TravelEffectConfig(
         
         return new TravelEffectConfig(
             enabled, mode, speed, blendMode, minAlpha, intensity,
-            direction, dirX, dirY, dirZ, count, width
+            direction, travelDirection, dirX, dirY, dirZ, count, width
         );
     }
     
@@ -174,7 +185,8 @@ public record TravelEffectConfig(
         return new Builder()
             .enabled(enabled).mode(mode).speed(speed)
             .blendMode(blendMode).minAlpha(minAlpha).intensity(intensity)
-            .direction(direction).dirX(dirX).dirY(dirY).dirZ(dirZ)
+            .direction(direction).travelDirection(travelDirection)
+            .dirX(dirX).dirY(dirY).dirZ(dirZ)
             .count(count).width(width);
     }
     
@@ -186,6 +198,7 @@ public record TravelEffectConfig(
         private float minAlpha = 0f;
         private float intensity = 1f;
         private Axis direction = Axis.Y;
+        private TravelDirection travelDirection = TravelDirection.LINEAR;
         private float dirX = 0f;
         private float dirY = 1f;
         private float dirZ = 0f;
@@ -199,6 +212,7 @@ public record TravelEffectConfig(
         public Builder minAlpha(float a) { this.minAlpha = a; return this; }
         public Builder intensity(float i) { this.intensity = i; return this; }
         public Builder direction(Axis d) { this.direction = d != null ? d : Axis.Y; return this; }
+        public Builder travelDirection(TravelDirection td) { this.travelDirection = td != null ? td : TravelDirection.LINEAR; return this; }
         public Builder dirX(float x) { this.dirX = x; return this; }
         public Builder dirY(float y) { this.dirY = y; return this; }
         public Builder dirZ(float z) { this.dirZ = z; return this; }
@@ -213,7 +227,7 @@ public record TravelEffectConfig(
         public TravelEffectConfig build() {
             return new TravelEffectConfig(
                 enabled, mode, speed, blendMode, minAlpha, intensity,
-                direction, dirX, dirY, dirZ, count, width
+                direction, travelDirection, dirX, dirY, dirZ, count, width
             );
         }
     }

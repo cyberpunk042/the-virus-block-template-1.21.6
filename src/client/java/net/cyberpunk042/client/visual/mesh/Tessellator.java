@@ -163,7 +163,8 @@ public interface Tessellator {
                 .fromShape(polyhedron)
                 .tessellate(detail);
             
-            // === UNKNOWN ===
+            // === MOLECULE ===
+            case MoleculeShape molecule -> MoleculeTessellator.tessellate(molecule);
             default -> {
                 Logging.RENDER.topic("tessellate")
                     .reason("unknown shape type")

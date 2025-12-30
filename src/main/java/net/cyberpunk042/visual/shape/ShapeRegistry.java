@@ -152,7 +152,6 @@ public final class ShapeRegistry {
             int deformCount = getInt(params, "deformationCount", 6);
             float deformSmoothness = getFloat(params, "deformationSmoothness", 0.5f);
             float deformBumpSize = getFloat(params, "deformationBumpSize", 0.5f);
-            float deformSeparation = getFloat(params, "deformationSeparation", 0.6f);
             // Planet parameters
             float planetFrequency = getFloat(params, "planetFrequency", 2f);
             int planetOctaves = getInt(params, "planetOctaves", 4);
@@ -163,7 +162,7 @@ public final class ShapeRegistry {
             int planetSeed = getInt(params, "planetSeed", 42);
             return new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, 
                 algorithm, SphereDeformation.NONE, 0f, 1f, deformCount, deformSmoothness, 
-                deformBumpSize, deformSeparation, CloudStyle.GAUSSIAN, 42, 1.0f,
+                deformBumpSize, CloudStyle.GAUSSIAN, 42, 1.0f,
                 planetFrequency, planetOctaves, planetLacunarity, planetPersistence, 
                 planetRidged, planetCraterCount, planetSeed,
                 false, 3f, 1.5f, 1f, 1f, 1f,  // horizon defaults
@@ -176,7 +175,13 @@ public final class ShapeRegistry {
             float radius = getFloat(params, "radius", 1.0f);
             float thickness = getFloat(params, "thickness", 0.1f);
             int segments = getInt(params, "segments", 48);
-            return new RingShape(radius - thickness/2, radius + thickness/2, segments, y, 0f, 360f, thickness, 0f);
+            return RingShape.builder()
+                .innerRadius(radius - thickness/2)
+                .outerRadius(radius + thickness/2)
+                .segments(segments)
+                .y(y)
+                .height(thickness)
+                .build();
         });
         
         // Prism
@@ -286,6 +291,34 @@ public final class ShapeRegistry {
                 segments, lengthSegments, dualJets, gap, hollow, 
                 innerBaseRadius, innerTipRadius, unifiedInner, innerWallThickness,
                 capBase, capTip, baseAlpha, baseMinAlpha, tipAlpha, tipMinAlpha);
+        });
+        
+        // Molecule (procedural metaball-style shape)
+        register("molecule", params -> {
+            int atomCount = getInt(params, "atomCount", 4);
+            float atomRadius = getFloat(params, "atomRadius", 0.3f);
+            float atomDistance = getFloat(params, "atomDistance", 0.8f);
+            float neckRadius = getFloat(params, "neckRadius", 0.12f);
+            float neckPinch = getFloat(params, "neckPinch", 0.5f);
+            float connectionDistance = getFloat(params, "connectionDistance", 1.2f);
+            int seed = getInt(params, "seed", 42);
+            String distName = getString(params, "distribution", "FIBONACCI");
+            AtomDistribution distribution;
+            try {
+                distribution = AtomDistribution.valueOf(distName.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                distribution = AtomDistribution.FIBONACCI;
+            }
+            return MoleculeShape.builder()
+                .atomCount(atomCount)
+                .atomRadius(atomRadius)
+                .atomDistance(atomDistance)
+                .neckRadius(neckRadius)
+                .neckPinch(neckPinch)
+                .connectionDistance(connectionDistance)
+                .seed(seed)
+                .distribution(distribution)
+                .build();
         });
         
         // Rays (collection of straight line segments)

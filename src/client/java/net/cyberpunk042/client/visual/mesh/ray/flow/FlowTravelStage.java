@@ -64,8 +64,9 @@ public final class FlowTravelStage implements FlowStage {
         
         return switch (mode) {
             case NONE -> 1.0f;
-            case CHASE, BIPOLAR_CHASE_SYNC, BIPOLAR_CHASE_ALT, BIPOLAR -> {
-                // Multiple particles evenly spaced
+            
+            // Unidirectional Chase - animates from base to tip
+            case CHASE -> {
                 float spacing = 1f / count;
                 float maxAlpha = 0f;
                 for (int i = 0; i < count; i++) {
@@ -79,8 +80,8 @@ public final class FlowTravelStage implements FlowStage {
                 }
                 yield maxAlpha;
             }
+            
             case REVERSE_CHASE -> {
-                // Same as CHASE but moves inward (from tip to base)
                 float reverseOffset = 1f - phase;
                 float spacing = 1f / count;
                 for (int i = 0; i < count; i++) {
@@ -94,8 +95,53 @@ public final class FlowTravelStage implements FlowStage {
                 }
                 yield 0f;
             }
-            case SCROLL, BIPOLAR_SCROLL_SYNC, BIPOLAR_SCROLL_ALT -> {
-                // Continuous gradient scrolls along the ray
+            
+            // BIPOLAR CHASE - animates from CENTER OUTWARD toward both extremities
+            case BIPOLAR, BIPOLAR_CHASE_SYNC -> {
+                // Remap t: center (0.5) becomes 0, extremities (0 or 1) become 1
+                float normalizedDist = Math.abs(t - 0.5f) * 2f;  // 0 at center, 1 at edges
+                
+                float spacing = 1f / count;
+                float maxAlpha = 0f;
+                for (int i = 0; i < count; i++) {
+                    float center = (phase + i * spacing) % 1f;
+                    float dist = Math.min(Math.abs(normalizedDist - center), Math.min(
+                        Math.abs(normalizedDist - center - 1f), Math.abs(normalizedDist - center + 1f)));
+                    if (dist <= width / 2f) {
+                        float falloff = 1f - (dist / (width / 2f));
+                        maxAlpha = Math.max(maxAlpha, falloff * falloff);
+                    }
+                }
+                yield maxAlpha;
+            }
+            
+            case BIPOLAR_CHASE_ALT, BIPOLAR_ALTERNATE -> {
+                // Alternating bipolar - one side leads while other trails (ping-pong)
+                float signedDist = t - 0.5f;
+                
+                // Determine phase offset based on which side
+                float effectivePhase = signedDist >= 0 ? phase : (phase + 0.5f) % 1f;
+                
+                // Distance from center normalized to 0-1
+                float normalizedDist = Math.abs(signedDist) * 2f;
+                
+                float spacing = 1f / count;
+                float maxAlpha = 0f;
+                for (int i = 0; i < count; i++) {
+                    float center = (effectivePhase + i * spacing) % 1f;
+                    float dist = Math.min(Math.abs(normalizedDist - center), 
+                        Math.min(Math.abs(normalizedDist - center - 1f), 
+                                 Math.abs(normalizedDist - center + 1f)));
+                    if (dist <= width / 2f) {
+                        float falloff = 1f - (dist / (width / 2f));
+                        maxAlpha = Math.max(maxAlpha, falloff * falloff);
+                    }
+                }
+                yield maxAlpha;
+            }
+            
+            // Unidirectional Scroll
+            case SCROLL -> {
                 float scrolledT = (t + phase) % 1f;
                 yield 1f - Math.abs(scrolledT - 0.5f) * 2f;
             }
@@ -103,8 +149,23 @@ public final class FlowTravelStage implements FlowStage {
                 float scrolledT = (t - phase + 1f) % 1f;
                 yield 1f - Math.abs(scrolledT - 0.5f) * 2f;
             }
-            case COMET, BIPOLAR_COMET_SYNC, BIPOLAR_COMET_ALT -> {
-                // Bright head with fading tail
+            
+            // BIPOLAR SCROLL - scrolls from center outward
+            case BIPOLAR_SCROLL_SYNC -> {
+                float normalizedDist = Math.abs(t - 0.5f) * 2f;
+                float scrolledDist = (normalizedDist + phase) % 1f;
+                yield 1f - Math.abs(scrolledDist - 0.5f) * 2f;
+            }
+            case BIPOLAR_SCROLL_ALT -> {
+                float signedDist = t - 0.5f;
+                float effectivePhase = signedDist >= 0 ? phase : (phase + 0.5f) % 1f;
+                float normalizedDist = Math.abs(signedDist) * 2f;
+                float scrolledDist = (normalizedDist + effectivePhase) % 1f;
+                yield 1f - Math.abs(scrolledDist - 0.5f) * 2f;
+            }
+            
+            // Unidirectional Comet
+            case COMET -> {
                 float headPos = phase;
                 float tailLength = Math.max(0.1f, width);
                 float tailStart = headPos - tailLength;
@@ -135,7 +196,6 @@ public final class FlowTravelStage implements FlowStage {
                 }
             }
             case REVERSE_COMET -> {
-                // Comet traveling inward
                 float headPos = 1f - phase;
                 float tailLength = Math.max(0.1f, width);
                 float tailEnd = headPos + tailLength;
@@ -146,7 +206,6 @@ public final class FlowTravelStage implements FlowStage {
                 } else if (t <= tailEnd || tailEnd > 1f) {
                     distBehind = t - headPos;
                     if (distBehind > tailLength && tailEnd > 1f) {
-                        // Wrapped case
                         if (t < tailEnd - 1f) {
                             distBehind = t + (1f - headPos);
                         } else {
@@ -164,8 +223,39 @@ public final class FlowTravelStage implements FlowStage {
                     yield 0f;
                 }
             }
-            case SPARK, BIPOLAR_SPARK_SYNC, BIPOLAR_SPARK_ALT -> {
-                // Random bright flashes
+            
+            // BIPOLAR COMET - two comets launch from center simultaneously
+            case BIPOLAR_COMET_SYNC -> {
+                float normalizedDist = Math.abs(t - 0.5f) * 2f;  // 0 at center, 1 at edges
+                float headPos = phase;
+                float tailLength = Math.max(0.1f, width);
+                
+                // Comet traveling outward from center
+                float distBehind = headPos - normalizedDist;
+                if (distBehind >= 0 && distBehind <= tailLength) {
+                    float tailAlpha = 1f - (distBehind / tailLength);
+                    yield tailAlpha * tailAlpha;
+                }
+                yield 0f;
+            }
+            case BIPOLAR_COMET_ALT -> {
+                float signedDist = t - 0.5f;
+                float effectivePhase = signedDist >= 0 ? phase : (phase + 0.5f) % 1f;
+                float normalizedDist = Math.abs(signedDist) * 2f;
+                
+                float headPos = effectivePhase;
+                float tailLength = Math.max(0.1f, width);
+                
+                float distBehind = headPos - normalizedDist;
+                if (distBehind >= 0 && distBehind <= tailLength) {
+                    float tailAlpha = 1f - (distBehind / tailLength);
+                    yield tailAlpha * tailAlpha;
+                }
+                yield 0f;
+            }
+            
+            // Unidirectional Spark
+            case SPARK -> {
                 float maxAlpha = 0f;
                 for (int i = 0; i < count; i++) {
                     float sparkPhase = hash(i, (int)(phase * 10));
@@ -180,8 +270,46 @@ public final class FlowTravelStage implements FlowStage {
                 }
                 yield maxAlpha;
             }
-            case PULSE_WAVE, BIPOLAR_PULSE_SYNC, BIPOLAR_PULSE_ALT -> {
-                // Traveling wave of brightness
+            
+            // BIPOLAR SPARK - sparks emanate from center region
+            case BIPOLAR_SPARK_SYNC -> {
+                float normalizedDist = Math.abs(t - 0.5f) * 2f;
+                float maxAlpha = 0f;
+                for (int i = 0; i < count; i++) {
+                    float sparkPhase = hash(i, (int)(phase * 10));
+                    float sparkPos = hash(i + 1000, (int)(phase * 3));
+                    if (sparkPhase > 0.5f) {
+                        float dist = Math.abs(normalizedDist - sparkPos);
+                        if (dist < width) {
+                            float spark = 1f - (dist / width);
+                            maxAlpha = Math.max(maxAlpha, spark * spark);
+                        }
+                    }
+                }
+                yield maxAlpha;
+            }
+            case BIPOLAR_SPARK_ALT -> {
+                float signedDist = t - 0.5f;
+                float effectivePhase = signedDist >= 0 ? phase : (phase + 0.5f) % 1f;
+                float normalizedDist = Math.abs(signedDist) * 2f;
+                
+                float maxAlpha = 0f;
+                for (int i = 0; i < count; i++) {
+                    float sparkPhase = hash(i, (int)(effectivePhase * 10));
+                    float sparkPos = hash(i + 1000, (int)(effectivePhase * 3));
+                    if (sparkPhase > 0.5f) {
+                        float dist = Math.abs(normalizedDist - sparkPos);
+                        if (dist < width) {
+                            float spark = 1f - (dist / width);
+                            maxAlpha = Math.max(maxAlpha, spark * spark);
+                        }
+                    }
+                }
+                yield maxAlpha;
+            }
+            
+            // Unidirectional Pulse
+            case PULSE_WAVE -> {
                 float waveWidth = Math.max(0.1f, width);
                 float maxAlpha = 0f;
                 for (int i = 0; i < count; i++) {
@@ -198,7 +326,6 @@ public final class FlowTravelStage implements FlowStage {
                 yield maxAlpha;
             }
             case REVERSE_PULSE -> {
-                // Pulse wave traveling inward
                 float waveWidth = Math.max(0.1f, width);
                 float maxAlpha = 0f;
                 float reversePhase = 1f - phase;
@@ -215,35 +342,41 @@ public final class FlowTravelStage implements FlowStage {
                 }
                 yield maxAlpha;
             }
-            case BIPOLAR_ALTERNATE -> {
-                // Bipolar jet with ALTERNATING phase - one side leads, other trails
-                // Creates a ping-pong effect where the phase on one side is offset
-                
-                // Convert t to signed distance from center (-0.5 to +0.5)
-                float signedDist = t - 0.5f;
-                
-                // Determine which "side" we're on and apply appropriate phase
-                float effectivePhase;
-                if (signedDist >= 0) {
-                    effectivePhase = phase;  // Upper jet uses normal phase
-                } else {
-                    effectivePhase = (phase + 0.5f) % 1f;  // Lower jet is 180° out of phase
-                }
-                
-                // Distance from center normalized to 0-1
-                float normalizedDist = Math.abs(signedDist) * 2f;
-                
-                // Apply chase-like effect
-                float spacing = 1f / count;
+            
+            // BIPOLAR PULSE - pulses emanate from center
+            case BIPOLAR_PULSE_SYNC -> {
+                float normalizedDist = Math.abs(t - 0.5f) * 2f;
+                float waveWidth = Math.max(0.1f, width);
                 float maxAlpha = 0f;
                 for (int i = 0; i < count; i++) {
-                    float center = (effectivePhase + i * spacing) % 1f;
-                    float dist = Math.min(Math.abs(normalizedDist - center), 
-                        Math.min(Math.abs(normalizedDist - center - 1f), 
-                                 Math.abs(normalizedDist - center + 1f)));
-                    if (dist <= width / 2f) {
-                        float falloff = 1f - (dist / (width / 2f));
-                        maxAlpha = Math.max(maxAlpha, falloff * falloff);
+                    float waveCenter = (phase + (float)i / count) % 1f;
+                    float dist = Math.min(Math.abs(normalizedDist - waveCenter),
+                                 Math.min(Math.abs(normalizedDist - waveCenter - 1f),
+                                          Math.abs(normalizedDist - waveCenter + 1f)));
+                    if (dist < waveWidth) {
+                        float normalized = dist / waveWidth;
+                        float pulse = (float) Math.exp(-normalized * normalized * 4);
+                        maxAlpha = Math.max(maxAlpha, pulse);
+                    }
+                }
+                yield maxAlpha;
+            }
+            case BIPOLAR_PULSE_ALT -> {
+                float signedDist = t - 0.5f;
+                float effectivePhase = signedDist >= 0 ? phase : (phase + 0.5f) % 1f;
+                float normalizedDist = Math.abs(signedDist) * 2f;
+                
+                float waveWidth = Math.max(0.1f, width);
+                float maxAlpha = 0f;
+                for (int i = 0; i < count; i++) {
+                    float waveCenter = (effectivePhase + (float)i / count) % 1f;
+                    float dist = Math.min(Math.abs(normalizedDist - waveCenter),
+                                 Math.min(Math.abs(normalizedDist - waveCenter - 1f),
+                                          Math.abs(normalizedDist - waveCenter + 1f)));
+                    if (dist < waveWidth) {
+                        float normalized = dist / waveWidth;
+                        float pulse = (float) Math.exp(-normalized * normalized * 4);
+                        maxAlpha = Math.max(maxAlpha, pulse);
                     }
                 }
                 yield maxAlpha;

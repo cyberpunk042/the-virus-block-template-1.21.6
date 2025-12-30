@@ -126,16 +126,16 @@ public final class PresetRegistry {
         
         // Primitive presets - using new SimplePrimitive records
         registerPrimitive("default_sphere", 
-            SimplePrimitive.of("default_sphere", "sphere", new SphereShape(1.0f, 32, 16)));
+            SimplePrimitive.of("default_sphere", "sphere", SphereShape.builder().radius(1.0f).latSteps(32).lonSteps(64).build()));
         
         registerPrimitive("high_detail_sphere", 
-            SimplePrimitive.of("high_detail_sphere", "sphere", new SphereShape(1.0f, 64, 32)));
+            SimplePrimitive.of("high_detail_sphere", "sphere", SphereShape.builder().radius(1.0f).latSteps(64).lonSteps(128).build()));
         
         registerPrimitive("low_detail_sphere", 
-            SimplePrimitive.of("low_detail_sphere", "sphere", new SphereShape(1.0f, 16, 8)));
+            SimplePrimitive.of("low_detail_sphere", "sphere", SphereShape.builder().radius(1.0f).latSteps(16).lonSteps(32).build()));
         
         registerPrimitive("equator_ring", 
-            SimplePrimitive.of("equator_ring", "ring", new RingShape(0.9f, 1.0f, 48, 0.1f)));
+            SimplePrimitive.of("equator_ring", "ring", RingShape.at(0.9f, 1.0f, 0.1f)));
         
         Logging.REGISTRY.topic("preset").info(
             "Registered {} layer presets, {} primitive presets",

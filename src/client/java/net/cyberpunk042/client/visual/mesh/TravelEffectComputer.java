@@ -2,6 +2,7 @@ package net.cyberpunk042.client.visual.mesh;
 
 import net.cyberpunk042.client.visual.mesh.ray.flow.FlowTravelStage;
 import net.cyberpunk042.visual.animation.Axis;
+import net.cyberpunk042.visual.animation.TravelDirection;
 import net.cyberpunk042.visual.animation.TravelEffectConfig;
 import net.cyberpunk042.visual.energy.EnergyTravel;
 import net.cyberpunk042.visual.energy.TravelBlendMode;
@@ -69,6 +70,37 @@ public final class TravelEffectComputer {
     public static float computeT(float vx, float vy, float vz,
             TravelEffectConfig config, float[] boundsMin, float[] boundsMax) {
         
+        TravelDirection travelDir = config.effectiveTravelDirection();
+        
+        // Handle non-linear travel directions
+        switch (travelDir) {
+            case RADIAL -> {
+                // Distance from center in XZ plane, normalized to max extent
+                float distXZ = (float) Math.sqrt(vx * vx + vz * vz);
+                // Use the larger of X or Z extent as the outer radius
+                float maxRadius = Math.max(boundsMax[0], boundsMax[2]);
+                if (maxRadius < 0.001f) return 0.5f;
+                return Math.min(1f, distXZ / maxRadius);
+            }
+            case ANGULAR -> {
+                // Angle around Y axis, mapped from [0, 2π] to [0, 1]
+                float angle = (float) Math.atan2(vz, vx);  // -π to π
+                // Normalize to 0-1
+                return (angle + (float) Math.PI) / (2f * (float) Math.PI);
+            }
+            case SPHERICAL -> {
+                // Distance from origin, normalized to max extent
+                float dist = (float) Math.sqrt(vx * vx + vy * vy + vz * vz);
+                float maxDist = Math.max(Math.max(boundsMax[0], boundsMax[1]), boundsMax[2]);
+                if (maxDist < 0.001f) return 0.5f;
+                return Math.min(1f, dist / maxDist);
+            }
+            case LINEAR -> {
+                // Fall through to linear handling below
+            }
+        }
+        
+        // LINEAR mode: use axis-aligned projection
         Axis axis = config.effectiveDirection();
         if (axis == Axis.CUSTOM) {
             // Custom direction: compute projection bounds

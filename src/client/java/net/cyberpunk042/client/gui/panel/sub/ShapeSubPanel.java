@@ -84,7 +84,8 @@ public class ShapeSubPanel extends AbstractPanel {
         CONE("cone", "Cone"),
         JET("jet", "Jet"),
         RAYS("rays", "Rays"),
-        KAMEHAMEHA("kamehameha", "Kamehameha");
+        KAMEHAMEHA("kamehameha", "Kamehameha"),
+        MOLECULE("molecule", "Molecule");
         
         private final String id;
         private final String label;
@@ -224,9 +225,11 @@ public class ShapeSubPanel extends AbstractPanel {
         // SPECIAL: Quad Pattern Dropdown (for shapes that use QUAD cells)
         // ═══════════════════════════════════════════════════════════════════════
         
-        // Sphere, Ring, and 3D Rays all use QUAD cells and need pattern control
+        // Sphere, Ring, Molecule, Kamehameha, and 3D Rays all use QUAD cells and need pattern control
         boolean needsQuadPattern = shapeType.equalsIgnoreCase("sphere") 
-            || shapeType.equalsIgnoreCase("ring");
+            || shapeType.equalsIgnoreCase("ring")
+            || shapeType.equalsIgnoreCase("molecule")
+            || shapeType.equalsIgnoreCase("kamehameha");
         
         // For rays, check if it's a 3D type (which uses QUAD cells)
         if (shapeType.equalsIgnoreCase("rays")) {
@@ -1089,14 +1092,13 @@ public class ShapeSubPanel extends AbstractPanel {
         }
         
         // CLOUD/MOLECULE specific controls
-        boolean isCloudOrMolecule = deformation == net.cyberpunk042.visual.shape.SphereDeformation.CLOUD
-            || deformation == net.cyberpunk042.visual.shape.SphereDeformation.MOLECULE;
+        boolean isCloud = deformation == net.cyberpunk042.visual.shape.SphereDeformation.CLOUD;
         
-        if (isCloudOrMolecule) {
+        if (isCloud) {
             // Count + Smoothness
             int count = state.getInt("sphere.deformationCount");
             var countSlider = GuiWidgets.slider(x, y, halfW,
-                "Count", 1, 20, count, "%d", "Number of lobes/atoms",
+                "Count", 1, 20, count, "%d", "Number of lobes",
                 v -> onUserChange(() -> state.set("sphere.deformationCount", Math.round(v))));
             widgets.add(countSlider);
             
@@ -1107,21 +1109,12 @@ public class ShapeSubPanel extends AbstractPanel {
             widgets.add(smoothSlider);
             y += step;
             
-            // BumpSize
+            // BumpSize (full width since no Separation slider for cloud)
             float bumpSize = state.getFloat("sphere.deformationBumpSize");
-            var bumpSlider = GuiWidgets.slider(x, y, halfW,
-                "BumpSz", 0.1f, 2f, bumpSize, "%.2f", "Individual bump/atom size",
+            var bumpSlider = GuiWidgets.slider(x, y, w,
+                "Bump Size", 0.1f, 2f, bumpSize, "%.2f", "Individual bump size",
                 v -> onUserChange(() -> state.set("sphere.deformationBumpSize", v)));
             widgets.add(bumpSlider);
-            
-            // Separation (MOLECULE only)
-            if (deformation == net.cyberpunk042.visual.shape.SphereDeformation.MOLECULE) {
-                float separation = state.getFloat("sphere.deformationSeparation");
-                var separSlider = GuiWidgets.slider(x + halfW + GuiConstants.PADDING, y, halfW,
-                    "Separ", 0.3f, 1.5f, separation, "%.2f", "Atom distance from center",
-                    v -> onUserChange(() -> state.set("sphere.deformationSeparation", v)));
-                widgets.add(separSlider);
-            }
             y += step;
         }
         

@@ -26,9 +26,29 @@ import net.cyberpunk042.util.json.JsonSerializer;
  *   "arcStart": 0,
  *   "arcEnd": 360,
  *   "height": 0.0,
- *   "twist": 0.0
+ *   "twist": 0.0,
+ *   "taper": 1.0,
+ *   "orientation": "POS_Y",
+ *   "originOffset": 0.0
  * }
  * </pre>
+ * 
+ * <h2>Taper</h2>
+ * <p>When height > 0, taper controls the top radii relative to bottom:</p>
+ * <ul>
+ *   <li>taper = 1.0 → no taper (cylinder)</li>
+ *   <li>taper < 1.0 → narrower at top (cone-like)</li>
+ *   <li>taper > 1.0 → wider at top (flared)</li>
+ *   <li>taper = 0.0 → point at top (full cone)</li>
+ * </ul>
+ * 
+ * <h2>Orientation</h2>
+ * <p>The orientation axis controls which direction the ring's height extends:</p>
+ * <ul>
+ *   <li>POS_Y (default) - Standard vertical ring</li>
+ *   <li>POS_Z - Horizontal ring pointing forward (e.g., beam)</li>
+ *   <li>Other axes as needed</li>
+ * </ul>
  * 
  * <h2>Parts</h2>
  * <ul>
@@ -39,6 +59,7 @@ import net.cyberpunk042.util.json.JsonSerializer;
  * 
  * @see Shape
  * @see CellType
+ * @see OrientationAxis
  */
 public record RingShape(
     @Range(ValueRange.RADIUS) float innerRadius,
@@ -48,20 +69,25 @@ public record RingShape(
     @Range(ValueRange.DEGREES) @JsonField(skipIfDefault = true) float arcStart,
     @Range(ValueRange.DEGREES) @JsonField(skipIfDefault = true, defaultValue = "360") float arcEnd,
     @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true) float height,
-    @Range(ValueRange.DEGREES_FULL) @JsonField(skipIfDefault = true) float twist
+    @Range(ValueRange.DEGREES_FULL) @JsonField(skipIfDefault = true) float twist,
+    @Range(ValueRange.POSITIVE) @JsonField(skipIfDefault = true, defaultValue = "1.0") float taper,
+    @JsonField(skipIfDefault = true) OrientationAxis orientation,
+    @Range(ValueRange.UNBOUNDED) @JsonField(skipIfDefault = true) float originOffset,
+    @Range(ValueRange.ALPHA) @JsonField(skipIfDefault = true, defaultValue = "1.0") float bottomAlpha,
+    @Range(ValueRange.ALPHA) @JsonField(skipIfDefault = true, defaultValue = "1.0") float topAlpha
 )implements Shape {
     
     /** Default ring (0.8 inner, 1.0 outer). */
     public static final RingShape DEFAULT = new RingShape(
-        0.8f, 1.0f, 64, 0, 0, 360, 0, 0);
+        0.8f, 1.0f, 64, 0, 0, 360, 0, 0, 1.0f, null, 0, 1.0f, 1.0f);
     
     /** Thin ring. */
     public static final RingShape THIN = new RingShape(
-        0.95f, 1.0f, 64, 0, 0, 360, 0, 0);
+        0.95f, 1.0f, 64, 0, 0, 360, 0, 0, 1.0f, null, 0, 1.0f, 1.0f);
     
     /** Thick band. */
     public static final RingShape THICK = new RingShape(
-        0.5f, 1.0f, 64, 0, 0, 360, 0, 0);
+        0.5f, 1.0f, 64, 0, 0, 360, 0, 0, 1.0f, null, 0, 1.0f, 1.0f);
     
     /**
      * Creates a ring at the specified Y height.
@@ -70,7 +96,12 @@ public record RingShape(
      * @param y Y offset
      */
     public static RingShape at(@Range(ValueRange.RADIUS) float innerRadius, @Range(ValueRange.RADIUS) float outerRadius, @Range(ValueRange.UNBOUNDED) float y) {
-        return new RingShape(innerRadius, outerRadius, 64, y, 0, 360, 0, 0);
+        return new RingShape(innerRadius, outerRadius, 64, y, 0, 360, 0, 0, 1.0f, null, 0, 1.0f, 1.0f);
+    }
+    
+    /** Effective orientation (defaults to POS_Y if null). */
+    public OrientationAxis effectiveOrientation() {
+        return orientation != null ? orientation : OrientationAxis.POS_Y;
     }
     
     @Override
@@ -80,7 +111,8 @@ public record RingShape(
     
     @Override
     public Vector3f getBounds() {
-        float d = outerRadius * 2;
+        float maxR = Math.max(outerRadius, outerRadius * taper);
+        float d = maxR * 2;
         return new Vector3f(d, Math.max(0.1f, height), d);
     }
     
@@ -100,7 +132,7 @@ public record RingShape(
     
     @Override
     public float getRadius() {
-        return outerRadius;
+        return Math.max(outerRadius, outerRadius * taper);
     }
     
     /** Ring thickness (outer - inner). */
@@ -111,6 +143,21 @@ public record RingShape(
     /** Whether this is a full ring or arc. */
     public boolean isFullRing() {
         return arcStart == 0 && arcEnd == 360;
+    }
+    
+    /** Top inner radius (for 3D tapered rings). */
+    public float topInnerRadius() {
+        return innerRadius * taper;
+    }
+    
+    /** Top outer radius (for 3D tapered rings). */
+    public float topOuterRadius() {
+        return outerRadius * taper;
+    }
+    
+    /** Whether this ring has tapering. */
+    public boolean hasTaper() {
+        return Math.abs(taper - 1.0f) > 0.001f;
     }
     
     @Override
@@ -134,7 +181,12 @@ public record RingShape(
             .arcStart(arcStart)
             .arcEnd(arcEnd)
             .height(height)
-            .twist(twist);
+            .twist(twist)
+            .taper(taper)
+            .orientation(orientation)
+            .originOffset(originOffset)
+            .bottomAlpha(bottomAlpha)
+            .topAlpha(topAlpha);
     }
     
     public static class Builder {
@@ -146,6 +198,11 @@ public record RingShape(
         private @Range(ValueRange.DEGREES) float arcEnd = 360;
         private @Range(ValueRange.POSITIVE) float height = 0;
         private @Range(ValueRange.DEGREES_FULL) float twist = 0;
+        private @Range(ValueRange.POSITIVE) float taper = 1.0f;
+        private OrientationAxis orientation = null;
+        private @Range(ValueRange.UNBOUNDED) float originOffset = 0;
+        private @Range(ValueRange.ALPHA) float bottomAlpha = 1.0f;
+        private @Range(ValueRange.ALPHA) float topAlpha = 1.0f;
         
         public Builder innerRadius(float r) { this.innerRadius = r; return this; }
         public Builder outerRadius(float r) { this.outerRadius = r; return this; }
@@ -155,9 +212,14 @@ public record RingShape(
         public Builder arcEnd(float a) { this.arcEnd = a; return this; }
         public Builder height(float h) { this.height = h; return this; }
         public Builder twist(float t) { this.twist = t; return this; }
+        public Builder taper(float t) { this.taper = Math.max(0, t); return this; }
+        public Builder orientation(OrientationAxis o) { this.orientation = o; return this; }
+        public Builder originOffset(float o) { this.originOffset = o; return this; }
+        public Builder bottomAlpha(float a) { this.bottomAlpha = Math.max(0, Math.min(1, a)); return this; }
+        public Builder topAlpha(float a) { this.topAlpha = Math.max(0, Math.min(1, a)); return this; }
         
         public RingShape build() {
-            return new RingShape(innerRadius, outerRadius, segments, y, arcStart, arcEnd, height, twist);
+            return new RingShape(innerRadius, outerRadius, segments, y, arcStart, arcEnd, height, twist, taper, orientation, originOffset, bottomAlpha, topAlpha);
         }
     }
 }

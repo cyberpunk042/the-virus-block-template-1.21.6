@@ -86,6 +86,17 @@ public class DefaultsProvider {
         jet.addProperty("capTip", true);
         SHAPE_DEFAULTS_JSON.put("jet", jet);
         
+        JsonObject molecule = new JsonObject();
+        molecule.addProperty("atomCount", 4);
+        molecule.addProperty("atomRadius", 0.3f);
+        molecule.addProperty("atomDistance", 0.8f);
+        molecule.addProperty("neckRadius", 0.12f);
+        molecule.addProperty("neckPinch", 0.5f);
+        molecule.addProperty("connectionDistance", 1.2f);
+        molecule.addProperty("seed", 42);
+        molecule.addProperty("distribution", "FIBONACCI");
+        SHAPE_DEFAULTS_JSON.put("molecule", molecule);
+        
         // Transform defaults
         TRANSFORM_DEFAULTS_JSON.addProperty("anchor", "CENTER");
         TRANSFORM_DEFAULTS_JSON.addProperty("scale", 1.0f);
@@ -119,7 +130,7 @@ public class DefaultsProvider {
      */
     public static JsonObject getDefaults(String type) {
         return switch (type.toLowerCase()) {
-            case "sphere", "ring", "prism", "polyhedron", "cylinder", "jet" 
+            case "sphere", "ring", "prism", "polyhedron", "cylinder", "jet", "molecule" 
                 -> SHAPE_DEFAULTS_JSON.getOrDefault(type.toLowerCase(), new JsonObject());
             case "transform" -> TRANSFORM_DEFAULTS_JSON.deepCopy();
             case "fill" -> FILL_DEFAULTS_JSON.deepCopy();
@@ -170,6 +181,7 @@ public class DefaultsProvider {
             case "cylinder" -> CylinderShape.builder()
                 .radius(0.5f).height(10.0f).segments(16).build();
             case "jet" -> JetShape.DEFAULT;
+            case "molecule" -> MoleculeShape.DEFAULT;
             default -> SphereShape.defaults();
         };
     }

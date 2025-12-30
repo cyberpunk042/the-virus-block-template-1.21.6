@@ -341,13 +341,25 @@ public class ModifiersSubPanel extends BoundPanel {
         // Direction axis dropdown
         Axis curDir = travelEffect != null ? travelEffect.effectiveDirection() : Axis.Y;
         CyclingButtonWidget<Axis> dirDropdown = CyclingButtonWidget.<Axis>builder(
-                a -> Text.literal("Dir: " + a.name()))
+                a -> Text.literal("Axis: " + a.name()))
             .values(Axis.values())
             .initially(curDir)
             .omitKeyText()
             .build(x + halfW + GuiConstants.PADDING, c.getCurrentY(), halfW, COMPACT_H, Text.literal(""),
                 (btn, val) -> state.set("travelEffect.direction", val));
         widgets.add(dirDropdown);
+        c.advanceRow();
+        
+        // === TRAVEL DIRECTION MODE (Linear, Radial, Angular, Spherical) ===
+        TravelDirection curTravelDir = travelEffect != null ? travelEffect.effectiveTravelDirection() : TravelDirection.LINEAR;
+        CyclingButtonWidget<TravelDirection> travelDirDropdown = CyclingButtonWidget.<TravelDirection>builder(
+                td -> Text.literal("Type: " + td.displayName()))
+            .values(TravelDirection.values())
+            .initially(curTravelDir)
+            .omitKeyText()
+            .build(x, c.getCurrentY(), w, COMPACT_H, Text.literal(""),
+                (btn, val) -> state.set("travelEffect.travelDirection", val));
+        widgets.add(travelDirDropdown);
         c.advanceRow();
         
         // === SPEED + BLEND MODE ===

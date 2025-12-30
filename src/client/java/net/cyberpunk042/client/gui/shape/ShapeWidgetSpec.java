@@ -162,6 +162,7 @@ public final class ShapeWidgetSpec {
             case "jet" -> JET_SPECS;
             case "rays" -> RAYS_SPECS;
             case "kamehameha" -> KAMEHAMEHA_SPECS;
+            case "molecule" -> MOLECULE_SPECS;
             default -> List.of();
         };
     }
@@ -208,11 +209,15 @@ public final class ShapeWidgetSpec {
         SliderSpec.halfInt("Segs", "ring.segments", 3, 512),
         SliderSpec.half("Height", "ring.height", 0f, 10f, "%.2f"),
         
-        // Row 3: Y Pos + Twist
+        // Row 3: Y Pos + Taper
         SliderSpec.half("Y Pos", "ring.y", -5f, 5f, "%.2f"),
-        SliderSpec.halfDegreeSigned("Twist", "ring.twist"),
+        SliderSpec.half("Taper", "ring.taper", 0f, 2f, "%.2f"),
         
-        // Row 4: Arc Start + End
+        // Row 4: Twist + (break)
+        SliderSpec.halfDegreeSigned("Twist", "ring.twist"),
+        new RowBreak(),
+        
+        // Row 5: Arc Start + End
         SliderSpec.halfDegree("Arc St", "ring.arcStart"),
         SliderSpec.halfDegree("Arc End", "ring.arcEnd")
     );
@@ -471,6 +476,10 @@ public final class ShapeWidgetSpec {
         SliderSpec.half("Base R", "kamehameha.beamBaseRadius", 0.05f, 2f, "%.2f"),
         SliderSpec.half("Tip R", "kamehameha.beamTipRadius", 0f, 2f, "%.2f"),
         
+        // Row: Proportional Sizing - links beam radius to orb
+        CheckboxSpec.half("Proportional", "kamehameha.proportionalBeam", "Auto-size beam from orb"),
+        SliderSpec.half("Beam Ratio", "kamehameha.beamToOrbRatio", 0.1f, 1.5f, "%.2f"),
+        
         // Row: Beam Segments + Length Segments
         SliderSpec.halfInt("Segs", "kamehameha.beamSegments", 4, 48),
         SliderSpec.halfInt("Len Segs", "kamehameha.beamLengthSegments", 1, 32),
@@ -497,30 +506,55 @@ public final class ShapeWidgetSpec {
         SliderSpec.half("Tip α", "kamehameha.beamTipAlpha", 0f, 1f, "%.2f"),
         SliderSpec.half("Tip Min α", "kamehameha.beamTipMinAlpha", 0f, 1f, "%.2f"),
         
+        
         // === TIP STYLE ===
         new SectionHeader("Tip"),
-        EnumDropdownSpec.full("Tip Style", "kamehameha.tipStyle",
-            net.cyberpunk042.visual.shape.KamehamehaShape.TipStyle.class,
-            net.cyberpunk042.visual.shape.KamehamehaShape.TipStyle.ROUNDED),
+        CheckboxSpec.full("Dome Tip", "kamehameha.hasDomeTip", "Use hemisphere dome tip (unchecked = flat cut)"),
         
-        // === CORE CONFIGURATION ===
-        new SectionHeader("Core (inner intense)"),
+        // === ORIENTATION ===
+        new SectionHeader("Orientation"),
         
-        // Row: Has Core checkbox + Core Ratio
-        CheckboxSpec.half("Has Core", "kamehameha.hasCore", "Render inner bright core"),
-        SliderSpec.half("Core Ratio", "kamehameha.coreRatio", 0.1f, 0.9f, "%.2f"),
+        // Row: Orientation Axis + Origin Offset
+        EnumDropdownSpec.half("Axis", "kamehameha.orientationAxis",
+            net.cyberpunk042.visual.shape.OrientationAxis.class,
+            net.cyberpunk042.visual.shape.OrientationAxis.POS_Z),
+        SliderSpec.half("Offset", "kamehameha.originOffset", -5f, 5f, "%.2f")
+    );
+    
+    // ───────────────────────────────────────────────────────────────────────────
+    // MOLECULE (Metaball-style spheres with connecting tubes)
+    // ───────────────────────────────────────────────────────────────────────────
+    
+    private static final List<Object> MOLECULE_SPECS = List.of(
+        // === ATOMS ===
+        new SectionHeader("Atoms"),
         
-        // Row: Core Brightness (full width)
-        SliderSpec.full("Core Bright", "kamehameha.coreBrightness", 0.5f, 3f, "%.2f"),
+        // Row: Atom Count + Distribution
+        SliderSpec.halfInt("Count", "molecule.atomCount", 2, 12),
+        EnumDropdownSpec.half("Layout", "molecule.distribution",
+            net.cyberpunk042.visual.shape.AtomDistribution.class,
+            net.cyberpunk042.visual.shape.AtomDistribution.FIBONACCI),
         
-        // === AURA CONFIGURATION ===
-        new SectionHeader("Aura (outer glow)"),
+        // Row: Atom Radius + Atom Distance
+        SliderSpec.half("Atom R", "molecule.atomRadius", 0.1f, 1f, "%.2f"),
+        SliderSpec.half("Distance", "molecule.atomDistance", 0.3f, 2f, "%.2f"),
         
-        // Row: Has Aura checkbox + Aura Scale
-        CheckboxSpec.half("Has Aura", "kamehameha.hasAura", "Render outer glow aura"),
-        SliderSpec.half("Aura Scale", "kamehameha.auraScale", 1f, 2f, "%.2f"),
+        // Row: Size Variation + Seed
+        SliderSpec.half("Size Var", "molecule.sizeVariation", 0f, 1f, "%.2f"),
+        SliderSpec.halfInt("Seed", "molecule.seed", 0, 999),
         
-        // Row: Aura Alpha (full width)
-        SliderSpec.full("Aura Alpha", "kamehameha.auraAlpha", 0.05f, 1f, "%.2f")
+        // === CONNECTORS ===
+        new SectionHeader("Connectors"),
+        
+        // Row: Neck Radius + Neck Pinch
+        SliderSpec.half("Neck R", "molecule.neckRadius", 0.02f, 0.5f, "%.2f"),
+        SliderSpec.half("Pinch", "molecule.neckPinch", 0f, 1f, "%.2f"),
+        
+        // Row: Connection Distance (full width)
+        SliderSpec.full("Connect Dist", "molecule.connectionDistance", 0.5f, 3f, "%.2f"),
+        
+        // === SCALE ===
+        new SectionHeader("Scale"),
+        SliderSpec.full("Scale", "molecule.scale", 0.1f, 10f, "%.2f")
     );
 }

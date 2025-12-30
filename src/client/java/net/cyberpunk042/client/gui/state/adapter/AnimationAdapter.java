@@ -378,6 +378,7 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             case "minAlpha" -> travelEffect.minAlpha();
             case "intensity" -> travelEffect.intensity();
             case "direction" -> travelEffect.direction();
+            case "travelDirection" -> travelEffect.travelDirection();
             case "dirX" -> travelEffect.dirX();
             case "dirY" -> travelEffect.dirY();
             case "dirZ" -> travelEffect.dirZ();
@@ -420,6 +421,10 @@ public class AnimationAdapter extends AbstractAdapter implements PrimitiveAdapte
             case "direction" -> {
                 var dir = value instanceof Axis a ? a : Axis.fromId(value.toString());
                 b.direction(dir);
+            }
+            case "travelDirection" -> {
+                var td = value instanceof TravelDirection t ? t : TravelDirection.fromString(value.toString());
+                b.travelDirection(td);
             }
             case "dirX" -> b.dirX(toFloat(value));
             case "dirY" -> b.dirY(toFloat(value));

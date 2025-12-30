@@ -46,7 +46,7 @@ public final class KamehamehaRenderer extends AbstractPrimitiveRenderer {
         VertexPattern pattern = null;
         ArrangementConfig arrangement = primitive.arrangement();
         if (arrangement != null) {
-            pattern = arrangement.resolvePattern("orb", CellType.QUAD);
+            pattern = arrangement.resolvePattern("main", CellType.QUAD);
         }
         if (pattern == null) {
             pattern = QuadPattern.DEFAULT;

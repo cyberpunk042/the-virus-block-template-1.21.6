@@ -166,7 +166,6 @@ public final class SphereTessellator {
         int deformCount = shape.deformationCount();
         float deformSmoothness = shape.deformationSmoothness();
         float deformBumpSize = shape.deformationBumpSize();
-        float deformSeparation = shape.deformationSeparation();
         CloudStyle cloudStyle = shape.cloudStyle() != null ? shape.cloudStyle() : CloudStyle.GAUSSIAN;
         int cloudSeed = shape.cloudSeed();
         float cloudWidth = shape.cloudWidth();
@@ -182,7 +181,7 @@ public final class SphereTessellator {
         // Build the FULL vertex function (position + normal) for proper spheroid lighting
         VectorMath.FullVertexFunction fullVertexFunc = (theta, phi, r) -> 
             deformation.computeFullVertex(theta, phi, r, deformIntensity, deformLength, 
-                deformCount, deformSmoothness, deformBumpSize, deformSeparation,
+                deformCount, deformSmoothness, deformBumpSize,
                 planetFrequency, planetOctaves, planetLacunarity, planetPersistence,
                 planetRidged, planetCraterCount, planetSeed, cloudStyle, cloudSeed, cloudWidth);
         
