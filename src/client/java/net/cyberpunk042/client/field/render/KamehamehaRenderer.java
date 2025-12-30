@@ -14,6 +14,7 @@ import net.cyberpunk042.visual.pattern.CellType;
 import net.cyberpunk042.visual.pattern.QuadPattern;
 import net.cyberpunk042.visual.pattern.VertexPattern;
 import net.cyberpunk042.visual.shape.KamehamehaShape;
+import net.cyberpunk042.visual.shape.OrientationAxis;
 import net.cyberpunk042.visual.visibility.VisibilityMask;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.util.math.MatrixStack;
@@ -108,13 +109,17 @@ public final class KamehamehaRenderer extends AbstractPrimitiveRenderer {
         float radius = shape.effectiveOrbRadius();
         if (radius <= 0) return;
         
+        // Get orientation for proper transform
+        OrientationAxis axis = shape.orientationAxis() != null ? shape.orientationAxis() : OrientationAxis.POS_Z;
+        float offset = shape.originOffset();
+        
         int segments = 32;
         
         // Horizontal rings (latitude lines)
         for (int ring = 0; ring <= horzRings; ring++) {
             float t = (float) ring / horzRings;
             float theta = (float) (Math.PI * t);
-            float y = radius * (float) Math.cos(theta);
+            float localY = radius * (float) Math.cos(theta);
             float ringRadius = radius * (float) Math.sin(theta);
             
             if (ringRadius < 0.01f) continue;
@@ -123,13 +128,17 @@ public final class KamehamehaRenderer extends AbstractPrimitiveRenderer {
                 float angle1 = (float) (2 * Math.PI * i / segments);
                 float angle2 = (float) (2 * Math.PI * (i + 1) / segments);
                 
-                float x1 = (float) Math.cos(angle1) * ringRadius;
-                float z1 = (float) Math.sin(angle1) * ringRadius;
-                float x2 = (float) Math.cos(angle2) * ringRadius;
-                float z2 = (float) Math.sin(angle2) * ringRadius;
+                float localX1 = (float) Math.cos(angle1) * ringRadius;
+                float localZ1 = (float) Math.sin(angle1) * ringRadius;
+                float localX2 = (float) Math.cos(angle2) * ringRadius;
+                float localZ2 = (float) Math.sin(angle2) * ringRadius;
                 
-                int idx1 = builder.addVertex(Vertex.pos(x1, y, z1));
-                int idx2 = builder.addVertex(Vertex.pos(x2, y, z2));
+                // Transform to world space
+                org.joml.Vector3f pos1 = axis.transformVertex(localX1, localY, localZ1, offset);
+                org.joml.Vector3f pos2 = axis.transformVertex(localX2, localY, localZ2, offset);
+                
+                int idx1 = builder.addVertex(Vertex.pos(pos1.x, pos1.y, pos1.z));
+                int idx2 = builder.addVertex(Vertex.pos(pos2.x, pos2.y, pos2.z));
                 builder.line(idx1, idx2);
             }
         }
@@ -144,18 +153,22 @@ public final class KamehamehaRenderer extends AbstractPrimitiveRenderer {
                 float theta1 = (float) (Math.PI * lat / horzRings);
                 float theta2 = (float) (Math.PI * (lat + 1) / horzRings);
                 
-                float y1 = radius * (float) Math.cos(theta1);
-                float y2 = radius * (float) Math.cos(theta2);
+                float localY1 = radius * (float) Math.cos(theta1);
+                float localY2 = radius * (float) Math.cos(theta2);
                 float r1 = radius * (float) Math.sin(theta1);
                 float r2 = radius * (float) Math.sin(theta2);
                 
-                float x1 = cosPhi * r1;
-                float z1 = sinPhi * r1;
-                float x2 = cosPhi * r2;
-                float z2 = sinPhi * r2;
+                float localX1 = cosPhi * r1;
+                float localZ1 = sinPhi * r1;
+                float localX2 = cosPhi * r2;
+                float localZ2 = sinPhi * r2;
                 
-                int idx1 = builder.addVertex(Vertex.pos(x1, y1, z1));
-                int idx2 = builder.addVertex(Vertex.pos(x2, y2, z2));
+                // Transform to world space
+                org.joml.Vector3f pos1 = axis.transformVertex(localX1, localY1, localZ1, offset);
+                org.joml.Vector3f pos2 = axis.transformVertex(localX2, localY2, localZ2, offset);
+                
+                int idx1 = builder.addVertex(Vertex.pos(pos1.x, pos1.y, pos1.z));
+                int idx2 = builder.addVertex(Vertex.pos(pos2.x, pos2.y, pos2.z));
                 builder.line(idx1, idx2);
             }
         }
@@ -166,12 +179,17 @@ public final class KamehamehaRenderer extends AbstractPrimitiveRenderer {
      */
     private void tessellateBeamCage(MeshBuilder builder, KamehamehaShape shape,
                                      int vertLines, int horzRings) {
-        float startY = shape.effectiveOrbRadius();
+        // Beam starts at 0 (True Center Anchor - passes through orb center)
+        float startY = 0f;
         float length = shape.effectiveBeamLength();
         float baseRadius = shape.effectiveBeamBaseRadius();
         float tipRadius = shape.effectiveBeamTipRadius();
         
         if (length <= 0 || baseRadius <= 0) return;
+        
+        // Get orientation for proper transform
+        OrientationAxis axis = shape.orientationAxis() != null ? shape.orientationAxis() : OrientationAxis.POS_Z;
+        float offset = shape.originOffset();
         
         int segments = 32;
         
@@ -181,20 +199,24 @@ public final class KamehamehaRenderer extends AbstractPrimitiveRenderer {
             float cos = (float) Math.cos(angle);
             float sin = (float) Math.sin(angle);
             
-            float x1 = cos * baseRadius;
-            float z1 = sin * baseRadius;
-            float x2 = cos * tipRadius;
-            float z2 = sin * tipRadius;
+            float localX1 = cos * baseRadius;
+            float localZ1 = sin * baseRadius;
+            float localX2 = cos * tipRadius;
+            float localZ2 = sin * tipRadius;
             
-            int idx1 = builder.addVertex(Vertex.pos(x1, startY, z1));
-            int idx2 = builder.addVertex(Vertex.pos(x2, startY + length, z2));
+            // Transform to world space
+            org.joml.Vector3f pos1 = axis.transformVertex(localX1, startY, localZ1, offset);
+            org.joml.Vector3f pos2 = axis.transformVertex(localX2, startY + length, localZ2, offset);
+            
+            int idx1 = builder.addVertex(Vertex.pos(pos1.x, pos1.y, pos1.z));
+            int idx2 = builder.addVertex(Vertex.pos(pos2.x, pos2.y, pos2.z));
             builder.line(idx1, idx2);
         }
         
         // Horizontal rings along beam
         for (int ring = 0; ring <= horzRings; ring++) {
             float t = (float) ring / horzRings;
-            float y = startY + length * t;
+            float localY = startY + length * t;
             float r = baseRadius + (tipRadius - baseRadius) * t;
             
             if (r < 0.01f) continue;
@@ -203,13 +225,17 @@ public final class KamehamehaRenderer extends AbstractPrimitiveRenderer {
                 float angle1 = (float) (2 * Math.PI * i / segments);
                 float angle2 = (float) (2 * Math.PI * (i + 1) / segments);
                 
-                float x1 = (float) Math.cos(angle1) * r;
-                float z1 = (float) Math.sin(angle1) * r;
-                float x2 = (float) Math.cos(angle2) * r;
-                float z2 = (float) Math.sin(angle2) * r;
+                float localX1 = (float) Math.cos(angle1) * r;
+                float localZ1 = (float) Math.sin(angle1) * r;
+                float localX2 = (float) Math.cos(angle2) * r;
+                float localZ2 = (float) Math.sin(angle2) * r;
                 
-                int idx1 = builder.addVertex(Vertex.pos(x1, y, z1));
-                int idx2 = builder.addVertex(Vertex.pos(x2, y, z2));
+                // Transform to world space
+                org.joml.Vector3f pos1 = axis.transformVertex(localX1, localY, localZ1, offset);
+                org.joml.Vector3f pos2 = axis.transformVertex(localX2, localY, localZ2, offset);
+                
+                int idx1 = builder.addVertex(Vertex.pos(pos1.x, pos1.y, pos1.z));
+                int idx2 = builder.addVertex(Vertex.pos(pos2.x, pos2.y, pos2.z));
                 builder.line(idx1, idx2);
             }
         }

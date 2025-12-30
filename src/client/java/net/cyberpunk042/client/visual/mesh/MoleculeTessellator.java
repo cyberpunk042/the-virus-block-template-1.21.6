@@ -347,9 +347,9 @@ public final class MoleculeTessellator {
         float length = axis.length();
         axis.normalize();
         
-        // Start and end points on atom surfaces
-        Vector3f start = new Vector3f(p1).add(new Vector3f(axis).mul(r1));
-        Vector3f end = new Vector3f(p2).sub(new Vector3f(axis).mul(r2));
+        // Start and end points INSIDE atoms (not at surface) for visual connection
+        Vector3f start = new Vector3f(p1).add(new Vector3f(axis).mul(r1 * 0.5f));
+        Vector3f end = new Vector3f(p2).sub(new Vector3f(axis).mul(r2 * 0.5f));
         
         // Tube length (between surfaces)
         float tubeLength = start.distance(end);

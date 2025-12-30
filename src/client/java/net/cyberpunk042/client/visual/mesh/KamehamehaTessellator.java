@@ -76,7 +76,7 @@ public final class KamehamehaTessellator {
         float length = shape.effectiveBeamLength();
         int segments = shape.beamSegments();
         OrientationAxis axis = shape.orientationAxis() != null ? shape.orientationAxis() : OrientationAxis.POS_Z;
-        float beamStart = shape.orbRadius() * 0.7f;  // Start INSIDE the orb for visual connection
+        float beamStart = 0f;  // Start at origin - beam passes through orb center
         float offset = shape.originOffset();
         
         // Calculate taper ratio (tip radius / base radius)
@@ -105,7 +105,7 @@ public final class KamehamehaTessellator {
     
     private static void tessellateBeamTip(MeshBuilder builder, KamehamehaShape shape, float time, VertexPattern pattern) {
         float tipRadius = shape.effectiveBeamTipRadius();
-        float tipStart = shape.orbRadius() * 0.7f + shape.effectiveBeamLength();
+        float tipStart = shape.effectiveBeamLength();  // Tip at end of beam (beam starts at 0)
         int segments = shape.beamSegments();
         float tipAlpha = shape.beamTipAlpha();
         OrientationAxis axis = shape.orientationAxis() != null ? shape.orientationAxis() : OrientationAxis.POS_Z;
@@ -239,9 +239,8 @@ public final class KamehamehaTessellator {
                 int i10 = indices[lat + 1][lon];
                 int i11 = indices[lat + 1][lon + 1];
                 
-                // Winding reversed from sphere to face outward from dome
-                // Sphere uses TL,TR,BR,BL but hemisphere needs TL,BL,BR,TR for outward faces
-                builder.quadAsTrianglesFromPattern(i00, i10, i11, i01, pattern);
+                // EXACT same winding as sphere: TL=i00, TR=i01, BR=i11, BL=i10
+                builder.quadAsTrianglesFromPattern(i00, i01, i11, i10, pattern);
             }
         }
     }
