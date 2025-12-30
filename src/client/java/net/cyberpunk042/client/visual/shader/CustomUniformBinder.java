@@ -115,18 +115,11 @@ public final class CustomUniformBinder {
     public static void bindCustomUniforms(RenderPass renderPass) {
         // Bind Fresnel/Horizon if set
         if (currentHorizon != null) {
-            Logging.FIELD.topic("shader").info(
-                "[MIXIN] bindCustomUniforms: Binding Horizon effect!"
-            );
             bindFresnelParams(renderPass, currentHorizon);
         }
         
         // Bind Corona if set
         if (currentCorona != null) {
-            Logging.FIELD.topic("shader").warn(
-                "[MIXIN] bindCustomUniforms: Binding Corona effect! intensity={}",
-                currentCorona.intensity()
-            );
             bindCoronaParams(renderPass, currentCorona);
         }
     }

@@ -163,7 +163,7 @@ public final class ShapeRegistry {
             int planetSeed = getInt(params, "planetSeed", 42);
             return new SphereShape(radius, latSteps, lonSteps, latStart, latEnd, lonStart, lonEnd, 
                 algorithm, SphereDeformation.NONE, 0f, 1f, deformCount, deformSmoothness, 
-                deformBumpSize, deformSeparation,
+                deformBumpSize, deformSeparation, CloudStyle.GAUSSIAN, 42, 1.0f,
                 planetFrequency, planetOctaves, planetLacunarity, planetPersistence, 
                 planetRidged, planetCraterCount, planetSeed,
                 false, 3f, 1.5f, 1f, 1f, 1f,  // horizon defaults

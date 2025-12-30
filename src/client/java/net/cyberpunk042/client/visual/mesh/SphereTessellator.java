@@ -9,6 +9,7 @@ import net.cyberpunk042.visual.shape.ShapeMath;
 import net.cyberpunk042.visual.shape.SphereAlgorithm;
 import net.cyberpunk042.visual.shape.SphereDeformation;
 import net.cyberpunk042.visual.shape.SphereShape;
+import net.cyberpunk042.visual.shape.CloudStyle;
 import net.cyberpunk042.visual.visibility.VisibilityMask;
 import net.cyberpunk042.client.visual.animation.WaveDeformer;
 
@@ -166,6 +167,9 @@ public final class SphereTessellator {
         float deformSmoothness = shape.deformationSmoothness();
         float deformBumpSize = shape.deformationBumpSize();
         float deformSeparation = shape.deformationSeparation();
+        CloudStyle cloudStyle = shape.cloudStyle() != null ? shape.cloudStyle() : CloudStyle.GAUSSIAN;
+        int cloudSeed = shape.cloudSeed();
+        float cloudWidth = shape.cloudWidth();
         // Planet parameters
         float planetFrequency = shape.planetFrequency();
         int planetOctaves = shape.planetOctaves();
@@ -180,7 +184,7 @@ public final class SphereTessellator {
             deformation.computeFullVertex(theta, phi, r, deformIntensity, deformLength, 
                 deformCount, deformSmoothness, deformBumpSize, deformSeparation,
                 planetFrequency, planetOctaves, planetLacunarity, planetPersistence,
-                planetRidged, planetCraterCount, planetSeed);
+                planetRidged, planetCraterCount, planetSeed, cloudStyle, cloudSeed, cloudWidth);
         
         // Generate the entire surface using the shared algorithm with proper vertex positions AND normals
         VectorMath.generateLatLonGridFull(

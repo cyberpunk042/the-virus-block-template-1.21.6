@@ -457,7 +457,7 @@ public final class ShapeMath {
      */
     public static float[] cloudVertex(float theta, float phi, float radius, 
             float intensity, float length) {
-        return cloudVertex(theta, phi, radius, intensity, length, 6, 0.5f, 0.5f);
+        return cloudVertex(theta, phi, radius, intensity, length, 6, 0.5f, 0.5f, CloudStyle.GAUSSIAN);
     }
     
     /**
@@ -466,36 +466,69 @@ public final class ShapeMath {
      */
     public static float[] cloudVertex(float theta, float phi, float radius, 
             float intensity, float length, int count, float smoothness) {
-        return cloudVertex(theta, phi, radius, intensity, length, count, smoothness, 0.5f);
+        return cloudVertex(theta, phi, radius, intensity, length, count, smoothness, 0.5f, CloudStyle.GAUSSIAN);
     }
     
     /**
-     * Cloud vertex position using SPHERICAL GAUSSIAN bumps.
+     * Cloud vertex position (backward compat - GAUSSIAN style).
+     */
+    public static float[] cloudVertex(float theta, float phi, float radius, 
+            float intensity, float length, int count, float smoothness, float bumpSize) {
+        return cloudVertex(theta, phi, radius, intensity, length, count, smoothness, bumpSize, CloudStyle.GAUSSIAN, 42);
+    }
+    
+    /**
+     * Cloud vertex position with style (backward compat - default seed).
+     */
+    public static float[] cloudVertex(float theta, float phi, float radius, 
+            float intensity, float length, int count, float smoothness, float bumpSize,
+            CloudStyle style) {
+        return cloudVertex(theta, phi, radius, intensity, length, count, smoothness, bumpSize, style, 42);
+    }
+    
+    /**
+     * Cloud vertex position with MULTIPLE ALGORITHM STYLES.
      * 
-     * <p><b>Algorithm:</b> Uses Spherical Gaussian (SG) functions to create smooth,
-     * localized bumps on the sphere surface. Each bump is defined by:
-     * G(v) = e^(λ * (v·p - 1)) where v is vertex direction and p is bump center.</p>
-     * 
-     * <p><b>Mathematical Foundation:</b></p>
+     * <p><b>Cloud Styles:</b></p>
      * <ul>
-     *   <li>Bump centers distributed using Fibonacci spiral (golden angle = 2.399963 rad)</li>
-     *   <li>Spherical Gaussian falloff: aligned (v·p=1) → full bump, opposite (v·p=-1) → no bump</li>
-     *   <li>Sharpness λ controls bump width (higher = narrower)</li>
-     *   <li>Bumps are ADDITIVE, not normalized by count</li>
+     *   <li><b>GAUSSIAN:</b> Spherical Gaussian bumps - "grape cluster" (original)</li>
+     *   <li><b>FRACTAL:</b> Multi-octave fBm noise - organic turbulent surface</li>
+     *   <li><b>BILLOWING:</b> Layered puffs + fractal detail - realistic cumulus</li>
+     *   <li><b>WORLEY:</b> Cellular noise - puffy cell-like structure</li>
      * </ul>
+     * 
+     * <p><b>Parameter Meanings by Style:</b></p>
+     * <table>
+     *   <tr><th>Param</th><th>GAUSSIAN</th><th>FRACTAL</th><th>BILLOWING</th><th>WORLEY</th></tr>
+     *   <tr><td>count</td><td>Bump count</td><td>Octaves</td><td>Large puff count</td><td>Cell layers</td></tr>
+     *   <tr><td>smoothness</td><td>Bump width</td><td>Persistence</td><td>Blend smoothness</td><td>Cell softness</td></tr>
+     *   <tr><td>bumpSize</td><td>Bump height</td><td>Amplitude</td><td>Puff size</td><td>Cell size</td></tr>
+     * </table>
      * 
      * @param theta Polar angle (0 = top, π = bottom)
      * @param phi Azimuthal angle (0 to 2π)
      * @param radius Base radius
-     * @param intensity Overall bump prominence (0 = sphere, 1 = very bumpy)
+     * @param intensity Overall effect strength (0 = sphere, 1 = full clouds)
      * @param length Axial stretch (1 = spherical, >1 = elongated)
-     * @param count Number of bumps (1-20), evenly distributed on sphere
-     * @param smoothness Bump roundness (0 = sharp spikes, 1 = soft billows)
-     * @param bumpSize Individual bump amplitude (0.1-2.0)
+     * @param count Primary parameter (meaning depends on style)
+     * @param smoothness Secondary parameter (meaning depends on style)
+     * @param bumpSize Tertiary parameter (meaning depends on style)
+     * @param style Cloud algorithm to use
+     * @param seed Random seed for reproducibility (0-999)
      * @return {x, y, z} vertex position
      */
     public static float[] cloudVertex(float theta, float phi, float radius, 
-            float intensity, float length, int count, float smoothness, float bumpSize) {
+            float intensity, float length, int count, float smoothness, float bumpSize,
+            CloudStyle style, int seed) {
+        return cloudVertex(theta, phi, radius, intensity, length, 1.0f, count, smoothness, bumpSize, style, seed);
+    }
+    
+    /**
+     * Cloud vertex position with FULL PARAMETERS including width for horizontal stretch.
+     */
+    public static float[] cloudVertex(float theta, float phi, float radius, 
+            float intensity, float length, float width, int count, float smoothness, float bumpSize,
+            CloudStyle style, int seed) {
         
         // Base trigonometry
         float sinTheta = (float) Math.sin(theta);
@@ -503,17 +536,20 @@ public final class ShapeMath {
         float sinPhi = (float) Math.sin(phi);
         float cosPhi = (float) Math.cos(phi);
         
-        // Current vertex direction (unit vector on sphere)
+        // Current vertex direction (unit vector)
         float vx = sinTheta * cosPhi;
         float vy = cosTheta;
         float vz = sinTheta * sinPhi;
         
-        // At intensity 0, return pure spheroid
+        // Clamp width
+        width = Math.max(0.5f, Math.min(2.0f, width));
+        
+        // At intensity 0, return pure spheroid with stretch
         if (intensity < 0.01f) {
             return new float[] {
-                radius * vx,
-                radius * length * vy,
-                radius * vz
+                radius * width * vx,   // Width stretches X
+                radius * length * vy,  // Length stretches Y
+                radius * width * vz    // Width stretches Z
             };
         }
         
@@ -523,68 +559,253 @@ public final class ShapeMath {
         bumpSize = Math.max(0.1f, Math.min(2f, bumpSize));
         
         // ======================================================================
-        // SPHERICAL GAUSSIAN ALGORITHM
+        // PROCEDURAL CLOUD GENERATION (like planetVertex but for cumulus)
         // ======================================================================
         
-        // Map smoothness to sharpness (λ)
-        // Low smoothness (0) → high sharpness → narrow, distinct bumps
-        // High smoothness (1) → low sharpness → wide, blended bumps
-        float sharpness = 2.0f + (1.0f - smoothness) * 20.0f;  // Range: 2 to 22
+        float displacement = 0;
         
-        // Golden angle for Fibonacci spiral distribution (even coverage)
-        float goldenAngle = 2.399963f;  // ≈ 137.5°
-        
-        // Accumulate bump displacements
-        float totalDisplacement = 0.0f;
-        
-        for (int i = 0; i < count; i++) {
-            // Distribute bump centers using Fibonacci spiral
-            // This provides near-optimal even distribution on sphere
-            float t = (float) (i + 0.5f) / (float) count;  // 0.5 offset for centering
-            float bumpTheta = (float) Math.acos(1.0f - 2.0f * t);  // 0 to π
-            float bumpPhi = goldenAngle * i;  // Spiral around
-            
-            // Bump center direction (unit vector)
-            float px = (float) Math.sin(bumpTheta) * (float) Math.cos(bumpPhi);
-            float py = (float) Math.cos(bumpTheta);
-            float pz = (float) Math.sin(bumpTheta) * (float) Math.sin(bumpPhi);
-            
-            // Dot product = cos(angular_distance between vertex and bump center)
-            // Range: 1 (aligned) to -1 (opposite)
-            float dot = vx * px + vy * py + vz * pz;
-            
-            // Spherical Gaussian: G(v) = e^(λ * (dot - 1))
-            // When aligned (dot = 1): e^0 = 1 (full bump)
-            // When opposite (dot = -1): e^(-2λ) ≈ 0 (no bump)
-            float gaussian = (float) Math.exp(sharpness * (dot - 1.0f));
-            
-            // Add bump contribution with individual size variation
-            // Slight per-bump size variation for natural look
-            float sizeVariation = 0.8f + 0.4f * (float) Math.sin(i * 1.7f + 0.5f);
-            totalDisplacement += gaussian * bumpSize * sizeVariation;
-        }
+        // Use different algorithms based on style
+        displacement = switch (style) {
+            case GAUSSIAN -> cloudProceduralPuffs(vx, vy, vz, count, smoothness, bumpSize, seed);
+            case FRACTAL -> cloudProceduralFractal(vx, vy, vz, count, smoothness, bumpSize, seed);
+            case BILLOWING -> cloudProceduralBillowing(vx, vy, vz, count, smoothness, bumpSize, seed);
+            case WORLEY -> cloudProceduralCellular(vx, vy, vz, count, smoothness, bumpSize, seed);
+        };
         
         // ======================================================================
         // APPLY DISPLACEMENT
         // ======================================================================
         
-        // Scale displacement by intensity
-        // NO normalization by count - more bumps = bumpier surface (intentional)
-        float displacement = totalDisplacement * intensity * 0.25f;
+        // Scale by intensity
+        displacement *= intensity;
         
-        // Final radius: base + displacement (ADDITIVE, not multiplicative)
+        // Final radius: base + displacement (ADDITIVE like planet)
         float finalRadius = radius * (1.0f + displacement);
         
-        // Apply to position with axial stretch
+        // Apply to position with axial stretches (width for X/Z, length for Y)
         return new float[] {
-            finalRadius * vx,
-            finalRadius * length * vy,
-            finalRadius * vz
+            finalRadius * width * vx,   // Horizontal width stretch
+            finalRadius * length * vy,  // Vertical length stretch
+            finalRadius * width * vz    // Horizontal width stretch
         };
+    }
+    
+    // ─────────────────────────────────────────────────────────────────────────
+    // PROCEDURAL PUFFS: Wyvill metaball-style puffs with Fibonacci distribution
+    // Creates distinct rounded bumps like cauliflower
+    // ─────────────────────────────────────────────────────────────────────────
+    
+    private static float cloudProceduralPuffs(float vx, float vy, float vz,
+            int count, float smoothness, float bumpSize, int seed) {
+        
+        float goldenAngle = 2.399963f;
+        float totalDisp = 0;
+        
+        // Puff angular radius (controls how wide each puff is)
+        // Higher smoothness = larger puffs = more blending
+        float puffAngularRadius = 0.4f + smoothness * 0.5f;  // radians (23° to 51°)
+        
+        for (int i = 0; i < count; i++) {
+            // Fibonacci spiral distribution (even coverage)
+            float t = (float) (i + 0.5f) / (float) count;
+            float puffTheta = (float) Math.acos(1.0f - 2.0f * t);
+            float puffPhi = goldenAngle * i;
+            
+            // Puff center direction
+            float px = (float) Math.sin(puffTheta) * (float) Math.cos(puffPhi);
+            float py = (float) Math.cos(puffTheta);
+            float pz = (float) Math.sin(puffTheta) * (float) Math.sin(puffPhi);
+            
+            // Angular distance using dot product
+            float dot = vx * px + vy * py + vz * pz;
+            float angularDist = (float) Math.acos(Math.max(-1, Math.min(1, dot)));
+            
+            // Size variation per puff (seeded for reproducibility)
+            float sizeVar = 0.6f + 0.8f * (float) Math.pow(Math.sin((i + seed) * 1.3f + 0.7f), 2);
+            float thisPuffRadius = puffAngularRadius * sizeVar;
+            
+            // Wyvill polynomial falloff (smooth, C2-continuous)
+            if (angularDist < thisPuffRadius) {
+                float r = angularDist / thisPuffRadius;
+                float term = 1.0f - r * r;
+                float influence = term * term * term;  // (1 - r²)³
+                totalDisp += influence * bumpSize * sizeVar;
+            }
+        }
+        
+        return totalDisp * 0.3f;
+    }
+    
+    // ─────────────────────────────────────────────────────────────────────────
+    // PROCEDURAL FRACTAL: Multi-octave fBm noise for organic turbulence
+    // Creates rough, natural-looking surface
+    // ─────────────────────────────────────────────────────────────────────────
+    
+    private static float cloudProceduralFractal(float vx, float vy, float vz,
+            int octaves, float persistence, float amplitude, int seed) {
+        
+        // Low frequency base + high frequency detail
+        float frequency = 2.0f + amplitude;
+        
+        // Sample fBm noise at vertex direction
+        float noise = SimplexNoise.fBm(
+            vx * frequency, 
+            vy * frequency, 
+            vz * frequency,
+            octaves,
+            2.0f,           // lacunarity
+            persistence,
+            seed
+        );
+        
+        // fBm returns [-1, 1], convert to positive displacement
+        // Use absolute value for billowy effect (ridges on both sides of zero)
+        float absNoise = Math.abs(noise);
+        
+        // Add a base layer of low-frequency swell
+        float baseNoise = SimplexNoise.fBm(
+            vx * 1.5f, vy * 1.5f, vz * 1.5f,
+            2, 2.0f, 0.5f, seed + 100
+        );
+        float baseSwell = (baseNoise + 1.0f) * 0.5f;  // [0, 1]
+        
+        // Combine: base swell modulates the detail
+        return (baseSwell * 0.5f + absNoise * 0.5f) * amplitude * 0.5f;
+    }
+    
+    // ─────────────────────────────────────────────────────────────────────────
+    // PROCEDURAL BILLOWING: Layered puffs + fractal detail = realistic cumulus
+    // Best for puffy, cauliflower-like clouds
+    // ─────────────────────────────────────────────────────────────────────────
+    
+    private static float cloudProceduralBillowing(float vx, float vy, float vz,
+            int puffCount, float smoothness, float puffSize, int seed) {
+        
+        float goldenAngle = 2.399963f;
+        float totalDisp = 0;
+        
+        // ─── LAYER 1: Primary large puffs ───
+        int primaryCount = Math.max(3, puffCount / 2);
+        float primaryRadius = 0.6f + smoothness * 0.4f;  // Wide puffs
+        
+        for (int i = 0; i < primaryCount; i++) {
+            float t = (float) (i + 0.5f) / (float) primaryCount;
+            float pTheta = (float) Math.acos(1.0f - 2.0f * t);
+            float pPhi = goldenAngle * i;
+            
+            float px = (float) Math.sin(pTheta) * (float) Math.cos(pPhi);
+            float py = (float) Math.cos(pTheta);
+            float pz = (float) Math.sin(pTheta) * (float) Math.sin(pPhi);
+            
+            float dot = vx * px + vy * py + vz * pz;
+            float angularDist = (float) Math.acos(Math.max(-1, Math.min(1, dot)));
+            
+            // Size variation per puff
+            float sizeVar = 0.7f + 0.6f * (float) Math.pow(Math.sin((i + seed) * 1.1f), 2);
+            float thisRadius = primaryRadius * sizeVar;
+            
+            if (angularDist < thisRadius) {
+                float r = angularDist / thisRadius;
+                float term = 1.0f - r * r;
+                float influence = term * term * term;
+                totalDisp += influence * puffSize * sizeVar * 0.8f;
+            }
+        }
+        
+        // ─── LAYER 2: Secondary smaller puffs (fills gaps) ───
+        int secondaryCount = puffCount;
+        float secondaryRadius = 0.3f + smoothness * 0.2f;
+        
+        for (int i = 0; i < secondaryCount; i++) {
+            float t = (float) (i + 0.5f) / (float) secondaryCount;
+            float pTheta = (float) Math.acos(1.0f - 2.0f * t);
+            float pPhi = goldenAngle * i * 1.618f;  // Different spiral
+            
+            float px = (float) Math.sin(pTheta) * (float) Math.cos(pPhi);
+            float py = (float) Math.cos(pTheta);
+            float pz = (float) Math.sin(pTheta) * (float) Math.sin(pPhi);
+            
+            float dot = vx * px + vy * py + vz * pz;
+            float angularDist = (float) Math.acos(Math.max(-1, Math.min(1, dot)));
+            
+            float sizeVar = 0.5f + 0.5f * (float) Math.sin((i + seed + 50) * 2.1f);
+            float thisRadius = secondaryRadius * sizeVar;
+            
+            if (angularDist < thisRadius) {
+                float r = angularDist / thisRadius;
+                float term = 1.0f - r * r;
+                float influence = term * term * term;
+                totalDisp += influence * puffSize * sizeVar * 0.4f;
+            }
+        }
+        
+        // ─── LAYER 3: Fractal surface detail (turbulence) ───
+        float detailFreq = 4.0f + (1.0f - smoothness) * 4.0f;
+        float detailNoise = SimplexNoise.fBm(
+            vx * detailFreq, vy * detailFreq, vz * detailFreq,
+            3, 2.0f, 0.5f, seed + 200
+        );
+        // Add positive bias so detail mostly adds volume, rarely subtracts
+        float detail = (detailNoise * 0.5f + 0.5f) * 0.15f * (1.0f - smoothness);
+        
+        return totalDisp * 0.35f + detail;
+    }
+    
+    // ─────────────────────────────────────────────────────────────────────────
+    // PROCEDURAL CELLULAR: Voronoi/Worley noise for puffy cell structure
+    // Creates soft, cellular texture
+    // ─────────────────────────────────────────────────────────────────────────
+    
+    private static float cloudProceduralCellular(float vx, float vy, float vz,
+            int cellLayers, float softness, float amplitude, int seed) {
+        
+        float goldenAngle = 2.399963f;
+        int cellCount = cellLayers * 6;  // More cells for finer structure
+        
+        float minDist1 = Float.MAX_VALUE;
+        float minDist2 = Float.MAX_VALUE;
+        
+        for (int i = 0; i < cellCount; i++) {
+            // Cell center (Fibonacci spiral)
+            float t = (float) (i + 0.5f) / (float) cellCount;
+            float cTheta = (float) Math.acos(1.0f - 2.0f * t);
+            float cPhi = goldenAngle * i;
+            
+            float cx = (float) Math.sin(cTheta) * (float) Math.cos(cPhi);
+            float cy = (float) Math.cos(cTheta);
+            float cz = (float) Math.sin(cTheta) * (float) Math.sin(cPhi);
+            
+            // Angular distance
+            float dot = vx * cx + vy * cy + vz * cz;
+            float angularDist = (float) Math.acos(Math.max(-1, Math.min(1, dot)));
+            
+            // Track two nearest cells
+            if (angularDist < minDist1) {
+                minDist2 = minDist1;
+                minDist1 = angularDist;
+            } else if (angularDist < minDist2) {
+                minDist2 = angularDist;
+            }
+        }
+        
+        // Cell angular radius
+        float cellRadius = (float) Math.PI / (float) Math.sqrt(cellCount) * 1.5f;
+        
+        // F1 pattern: height based on proximity to cell center (puffy centers)
+        float f1 = 1.0f - Math.min(1.0f, minDist1 / cellRadius);
+        f1 = f1 * f1;  // Square for rounder falloff
+        
+        // F2-F1 pattern: highlights boundaries between cells
+        float f2f1 = Math.min(1.0f, (minDist2 - minDist1) / (cellRadius * 0.5f));
+        
+        // Blend based on softness: high softness = puffy (f1), low = cellular (f2-f1)
+        float pattern = softness * f1 + (1.0f - softness) * (f1 * 0.5f + f2f1 * 0.3f);
+        
+        return pattern * amplitude * 0.4f;
     }
 
     /**
-     * Molecule vertex position using METABALL IMPLICIT SURFACE formula.
+     * Molecule vertex position using METABALL IMPLICIT SURFACE algorithm.
      * Legacy overload - delegates to full version.
      */
     public static float[] moleculeVertex(float theta, float phi, float radius, 
@@ -603,56 +824,63 @@ public final class ShapeMath {
     }
     
     /**
-     * Molecule vertex position using METABALL IMPLICIT SURFACE algorithm.
+     * Molecule vertex position using TRUE 3D METABALL algorithm.
      * 
-     * <p><b>Algorithm (Jim Blinn, 1982):</b> Each atom creates a spherical
-     * influence field with inverse-square falloff. Surface is where total
-     * field exceeds threshold.</p>
+     * <p><b>Algorithm (Proper Implicit Surface):</b></p>
+     * <ol>
+     *   <li>Position atoms at 3D locations around the center (at distance separation × radius)</li>
+     *   <li>For each vertex, calculate TRUE EUCLIDEAN DISTANCE to each atom</li>
+     *   <li>Use Wyvill polynomial falloff: f(r) = (1 - r²/R²)³ when r < R</li>
+     *   <li>Sum influences = metaball field value</li>
+     *   <li>Displace surface outward where field exceeds threshold</li>
+     * </ol>
      * 
      * <p><b>Key difference from CLOUD:</b></p>
      * <ul>
-     *   <li>CLOUD: Bumps are centered ON the sphere surface</li>
-     *   <li>MOLECULE: Atoms are positioned AROUND the center at a distance</li>
+     *   <li>CLOUD: Bumps are centered ON the sphere surface (angular distance)</li>
+     *   <li>MOLECULE: Atoms are positioned IN 3D SPACE around center (Euclidean distance)</li>
      * </ul>
      * 
-     * <p><b>Blending Modes (based on smoothness):</b></p>
+     * <p><b>Visual Effect:</b></p>
      * <ul>
-     *   <li>Low smoothness: MAX blending → distinct, separate atoms</li>
-     *   <li>High smoothness: ADDITIVE blending → merged blob</li>
+     *   <li>Low separation: Atoms merge into central blob</li>
+     *   <li>High separation: Distinct spherical lobes branch out</li>
+     *   <li>Low smoothness: Sharp atom boundaries</li>
+     *   <li>High smoothness: Atoms blend together organically</li>
      * </ul>
      * 
      * @param theta Polar angle (0 = top, π = bottom)
      * @param phi Azimuthal angle (0 to 2π)
-     * @param radius Base radius
-     * @param intensity Overall atom prominence (0 = sphere, 1 = full atoms)
+     * @param radius Base radius of the central sphere
+     * @param intensity Overall effect strength (0 = sphere, 1 = full atoms)
      * @param length Axial stretch
      * @param count Number of atoms (1-12)
-     * @param smoothness Blend mode (0 = distinct spheres, 1 = merged blob)
-     * @param atomSize Size of each atom (0.1-1.0)
-     * @param separation Distance of atoms from center (0.3-1.5)
+     * @param smoothness Blend factor (0 = distinct atoms, 1 = merged blob)
+     * @param atomSize Size of each atom relative to base radius (0.1-1.0)
+     * @param separation How far atoms extend from surface (0.3-1.5)
      * @return {x, y, z} vertex position
      */
     public static float[] moleculeVertex(float theta, float phi, float radius, 
             float intensity, float length, int count, float smoothness, 
             float atomSize, float separation) {
         
-        // Base trigonometry
+        // Base trigonometry - this is our RAY DIRECTION
         float sinTheta = (float) Math.sin(theta);
         float cosTheta = (float) Math.cos(theta);
         float sinPhi = (float) Math.sin(phi);
         float cosPhi = (float) Math.cos(phi);
         
-        // Current vertex direction (unit vector on sphere)
-        float vx = sinTheta * cosPhi;
-        float vy = cosTheta;
-        float vz = sinTheta * sinPhi;
+        // Unit direction vector from origin through this vertex
+        float dx = sinTheta * cosPhi;
+        float dy = cosTheta;
+        float dz = sinTheta * sinPhi;
         
         // At intensity 0, return pure spheroid
         if (intensity < 0.01f) {
             return new float[] {
-                radius * vx,
-                radius * length * vy,
-                radius * vz
+                radius * dx,
+                radius * length * dy,
+                radius * dz
             };
         }
         
@@ -663,89 +891,188 @@ public final class ShapeMath {
         separation = Math.max(0.3f, Math.min(1.5f, separation));
         
         // ======================================================================
-        // METABALL ALGORITHM
+        // ATOM CONFIGURATION (FIXED!)
         // ======================================================================
+        
+        // Atom radius (actual size of each sphere)
+        float atomRadius = radius * atomSize;
+        
+        // Atoms are positioned OUTSIDE the base sphere!
+        // At distance (radius + separation * atomRadius) from center
+        float atomCenterDistance = radius + separation * atomRadius;
         
         // Golden angle for Fibonacci spiral distribution
         float goldenAngle = 2.399963f;
         
-        // Calculate influence from all atoms
-        float maxInfluence = 0.0f;
-        float sumInfluence = 0.0f;
-        
+        // Pre-calculate atom centers
+        float[][] atomCenters = new float[count][3];
         for (int i = 0; i < count; i++) {
-            // Distribute atoms using Fibonacci spiral (even coverage)
             float t = (float) (i + 0.5f) / (float) count;
             float atomTheta = (float) Math.acos(1.0f - 2.0f * t);
             float atomPhi = goldenAngle * i;
             
-            // Atom direction (unit vector)
             float ax = (float) Math.sin(atomTheta) * (float) Math.cos(atomPhi);
             float ay = (float) Math.cos(atomTheta);
             float az = (float) Math.sin(atomTheta) * (float) Math.sin(atomPhi);
             
-            // Atom position in space (at distance 'separation' from center)
-            // Atoms are NOT on the surface, they're orbiting around center
-            float atomDist = separation;
-            float atomX = ax * atomDist;
-            float atomY = ay * atomDist;
-            float atomZ = az * atomDist;
-            
-            // Dot product = cos(angle between vertex direction and atom direction)
-            float dot = vx * ax + vy * ay + vz * az;
-            
-            // Angular distance: 0 when aligned, 2 when opposite
-            // This approximates "how close is this ray to passing through the atom"
-            float angularDist = 1.0f - dot;
-            
-            // Metaball field: inverse-square falloff
-            // Higher atomSize = larger influence radius
-            float influenceRadius = atomSize * 0.8f;
-            float distSq = angularDist * angularDist;
-            float epsilon = 0.05f;  // Prevent division by zero
-            
-            // Classic metaball: R² / (r² + ε)
-            float influence = (influenceRadius * influenceRadius) / (distSq + epsilon);
-            
-            // Track both max and sum for blending modes
-            maxInfluence = Math.max(maxInfluence, influence);
-            sumInfluence += influence;
+            // Position atoms OUTSIDE the sphere
+            atomCenters[i][0] = atomCenterDistance * ax;
+            atomCenters[i][1] = atomCenterDistance * ay;
+            atomCenters[i][2] = atomCenterDistance * az;
         }
         
-        // ======================================================================
-        // BLEND MODE: MAX vs ADDITIVE based on smoothness
-        // ======================================================================
+        // Influence radius controls blending
+        // Higher smoothness = larger influence = more blending
+        float influenceRadius = atomRadius * (1.0f + smoothness * 1.5f);
         
-        // Interpolate between max-blending and additive-blending
-        // Low smoothness (0) → use MAX → distinct atoms
-        // High smoothness (1) → use SUM → merged blob
-        float blendFactor = smoothness;
-        float finalInfluence = maxInfluence * (1.0f - blendFactor) + 
-                               (sumInfluence / count) * blendFactor;
+        // Isosurface threshold
+        float isoThreshold = 0.5f;
         
         // ======================================================================
-        // MAP INFLUENCE TO DISPLACEMENT
+        // RAY-MARCH TO FIND ISOSURFACE
         // ======================================================================
         
-        // Convert influence to a bump displacement
-        // Influence ranges from ~0 to potentially very high near atoms
-        // We want displacement to saturate at a reasonable maximum
+        // March along the ray from origin in direction (dx, dy, dz)
+        // We need to find where the metaball field equals the threshold
         
-        // Normalize influence to 0-1 range using smooth saturation
-        float normalizedInfluence = finalInfluence / (1.0f + finalInfluence);
+        // Search range: from 0.5*radius to radius + 2*atomRadius
+        float minR = radius * 0.3f;
+        float maxR = radius + atomRadius * (1.0f + separation) * 1.5f;
         
-        // Apply intensity
-        float displacement = normalizedInfluence * intensity * 0.6f;
+        // Coarse search to find sign change
+        int steps = 16;
+        float lastField = 0;
+        float rLow = minR, rHigh = maxR;
+        boolean foundCrossing = false;
         
-        // Final radius: base + displacement (ADDITIVE)
-        float finalRadius = radius * (1.0f + displacement);
+        for (int i = 0; i <= steps; i++) {
+            float r = minR + (maxR - minR) * i / steps;
+            float px = r * dx;
+            float py = r * dy;
+            float pz = r * dz;
+            
+            float field = computeMetaballField(px, py, pz, atomCenters, influenceRadius, radius * 0.7f);
+            
+            if (i > 0 && ((lastField < isoThreshold && field >= isoThreshold) ||
+                          (lastField >= isoThreshold && field < isoThreshold))) {
+                // Found a crossing!
+                rLow = minR + (maxR - minR) * (i - 1) / steps;
+                rHigh = r;
+                foundCrossing = true;
+                break;
+            }
+            lastField = field;
+        }
         
-        // Apply to position with axial stretch
+        // Default to base radius if no crossing found
+        float finalR = radius;
+        
+        if (foundCrossing) {
+            // Bisection refinement (6 iterations = 1.5% accuracy)
+            for (int iter = 0; iter < 6; iter++) {
+                float rMid = (rLow + rHigh) * 0.5f;
+                float px = rMid * dx;
+                float py = rMid * dy;
+                float pz = rMid * dz;
+                
+                float field = computeMetaballField(px, py, pz, atomCenters, influenceRadius, radius * 0.7f);
+                
+                if (field < isoThreshold) {
+                    rLow = rMid;
+                } else {
+                    rHigh = rMid;
+                }
+            }
+            finalR = (rLow + rHigh) * 0.5f;
+        } else {
+            // No crossing found - just use highest field value position
+            // This happens when we're in a "gap" between atoms
+            float maxField = 0;
+            float bestR = radius;
+            for (int i = 0; i <= steps; i++) {
+                float r = minR + (maxR - minR) * i / steps;
+                float px = r * dx;
+                float py = r * dy;
+                float pz = r * dz;
+                
+                float field = computeMetaballField(px, py, pz, atomCenters, influenceRadius, radius * 0.7f);
+                if (field > maxField) {
+                    maxField = field;
+                    bestR = r;
+                }
+            }
+            // Position surface based on how close max field is to threshold
+            float fieldRatio = maxField / isoThreshold;
+            finalR = radius * Math.max(0.5f, Math.min(1.0f, fieldRatio));
+        }
+        
+        // Blend with base sphere based on intensity
+        finalR = radius + (finalR - radius) * intensity;
+        
+        // Apply axial stretch on Y
         return new float[] {
-            finalRadius * vx,
-            finalRadius * length * vy,
-            finalRadius * vz
+            finalR * dx,
+            finalR * length * dy,
+            finalR * dz
         };
+    }
+    
+    /**
+     * Wyvill polynomial falloff function.
+     * 
+     * <p>Smooth C2-continuous falloff that reaches exactly zero at the influence radius.
+     * Much smoother than inverse-square and computationally efficient.</p>
+     * 
+     * <p>Formula: f(r, R) = (1 - (r/R)²)³ when r < R, else 0</p>
+     * 
+     * @param distance Distance from point to metaball center
+     * @param influenceRadius Maximum radius of influence
+     * @return Influence value (1 at center, 0 at edge, smooth in between)
+     */
+    private static float wyvill(float distance, float influenceRadius) {
+        if (distance >= influenceRadius) {
+            return 0.0f;
+        }
+        
+        float ratio = distance / influenceRadius;
+        float rSq = ratio * ratio;
+        float term = 1.0f - rSq;
+        
+        // Cube for smooth C2-continuous falloff
+        return term * term * term;
+    }
+    
+    /**
+     * Computes the metaball field at a point in space.
+     * 
+     * @param px, py, pz Sample point position
+     * @param atomCenters Array of [count][3] atom center positions
+     * @param atomInfluenceRadius How far each atom's field extends
+     * @param centralRadius Radius of central sphere contribution
+     * @return Total field value at the sample point
+     */
+    private static float computeMetaballField(float px, float py, float pz,
+            float[][] atomCenters, float atomInfluenceRadius, float centralRadius) {
+        
+        float totalField = 0.0f;
+        
+        // Central sphere contribution (acts as a base)
+        float centerDist = (float) Math.sqrt(px*px + py*py + pz*pz);
+        float centerField = wyvill(centerDist, centralRadius);
+        totalField += centerField * 0.3f;  // Weak center to let atoms dominate
+        
+        // Each atom's contribution
+        for (float[] atom : atomCenters) {
+            float dx = px - atom[0];
+            float dy = py - atom[1];
+            float dz = pz - atom[2];
+            float dist = (float) Math.sqrt(dx*dx + dy*dy + dz*dz);
+            
+            float atomField = wyvill(dist, atomInfluenceRadius);
+            totalField += atomField;
+        }
+        
+        return totalField;
     }
     
     // =========================================================================

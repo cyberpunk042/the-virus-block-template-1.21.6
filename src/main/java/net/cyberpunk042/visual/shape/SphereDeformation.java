@@ -95,7 +95,7 @@ public enum SphereDeformation {
     public float[] computeVertex(float theta, float phi, float radius, 
             float intensity, float length, int count, float smoothness) {
         return computeVertex(theta, phi, radius, intensity, length, count, smoothness, 0.5f, 0.6f,
-            2f, 4, 2f, 0.5f, 0f, 0, 42);
+            2f, 4, 2f, 0.5f, 0f, 0, 42, CloudStyle.GAUSSIAN, 42, 1.0f);
     }
     
     /**
@@ -106,7 +106,7 @@ public enum SphereDeformation {
             float intensity, float length, int count, float smoothness,
             float bumpSize, float separation) {
         return computeVertex(theta, phi, radius, intensity, length, count, smoothness, bumpSize, separation,
-            2f, 4, 2f, 0.5f, 0f, 0, 42);
+            2f, 4, 2f, 0.5f, 0f, 0, 42, CloudStyle.GAUSSIAN, 42, 1.0f);
     }
     
     /**
@@ -128,13 +128,17 @@ public enum SphereDeformation {
      * @param planetRidged Mountain sharpness for PLANET (0-1)
      * @param planetCraterCount Number of craters for PLANET (0-20)
      * @param planetSeed Random seed for PLANET (0-999)
+     * @param cloudStyle Cloud algorithm style (GAUSSIAN, FRACTAL, BILLOWING, WORLEY)
+     * @param cloudSeed Random seed for CLOUD (0-999)
+     * @param cloudWidth Horizontal stretch for CLOUD (0.5-2.0)
      * @return {x, y, z} vertex position
      */
     public float[] computeVertex(float theta, float phi, float radius, 
             float intensity, float length, int count, float smoothness,
             float bumpSize, float separation,
             float planetFrequency, int planetOctaves, float planetLacunarity, float planetPersistence,
-            float planetRidged, int planetCraterCount, int planetSeed) {
+            float planetRidged, int planetCraterCount, int planetSeed, 
+            CloudStyle cloudStyle, int cloudSeed, float cloudWidth) {
         // Get sphere position for blending
         float[] spherePos = ShapeMath.sphereVertex(theta, phi, radius);
         
@@ -185,7 +189,7 @@ public enum SphereDeformation {
             
             case CONE -> ShapeMath.coneVertex(theta, phi, radius, length);
             
-            case CLOUD -> ShapeMath.cloudVertex(theta, phi, radius, intensity, length, count, smoothness, bumpSize);
+            case CLOUD -> ShapeMath.cloudVertex(theta, phi, radius, intensity, length, cloudWidth, count, smoothness, bumpSize, cloudStyle, cloudSeed);
             
             case MOLECULE -> ShapeMath.moleculeVertex(theta, phi, radius, intensity, length, count, smoothness, bumpSize, separation);
             
@@ -213,7 +217,7 @@ public enum SphereDeformation {
     public float[] computeFullVertex(float theta, float phi, float radius, 
             float intensity, float length) {
         return computeFullVertex(theta, phi, radius, intensity, length, 6, 0.5f, 0.5f, 0.6f,
-            2f, 4, 2f, 0.5f, 0f, 0, 42);
+            2f, 4, 2f, 0.5f, 0f, 0, 42, CloudStyle.GAUSSIAN, 42, 1.0f);
     }
     
     /**
@@ -223,7 +227,7 @@ public enum SphereDeformation {
     public float[] computeFullVertex(float theta, float phi, float radius, 
             float intensity, float length, int count, float smoothness) {
         return computeFullVertex(theta, phi, radius, intensity, length, count, smoothness, 0.5f, 0.6f,
-            2f, 4, 2f, 0.5f, 0f, 0, 42);
+            2f, 4, 2f, 0.5f, 0f, 0, 42, CloudStyle.GAUSSIAN, 42, 1.0f);
     }
     
     /**
@@ -233,7 +237,7 @@ public enum SphereDeformation {
             float intensity, float length, int count, float smoothness,
             float bumpSize, float separation) {
         return computeFullVertex(theta, phi, radius, intensity, length, count, smoothness, bumpSize, separation,
-            2f, 4, 2f, 0.5f, 0f, 0, 42);
+            2f, 4, 2f, 0.5f, 0f, 0, 42, CloudStyle.GAUSSIAN, 42, 1.0f);
     }
     
     /**
@@ -247,9 +251,11 @@ public enum SphereDeformation {
             float intensity, float length, int count, float smoothness,
             float bumpSize, float separation,
             float planetFrequency, int planetOctaves, float planetLacunarity, float planetPersistence,
-            float planetRidged, int planetCraterCount, int planetSeed) {
+            float planetRidged, int planetCraterCount, int planetSeed, 
+            CloudStyle cloudStyle, int cloudSeed, float cloudWidth) {
         float[] pos = computeVertex(theta, phi, radius, intensity, length, count, smoothness, bumpSize, separation,
-            planetFrequency, planetOctaves, planetLacunarity, planetPersistence, planetRidged, planetCraterCount, planetSeed);
+            planetFrequency, planetOctaves, planetLacunarity, planetPersistence, planetRidged, planetCraterCount, planetSeed, 
+            cloudStyle, cloudSeed, cloudWidth);
         
         // Compute proper normal based on shape type
         float[] normal;

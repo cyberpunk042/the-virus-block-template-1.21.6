@@ -1047,6 +1047,47 @@ public class ShapeSubPanel extends AbstractPanel {
             y += step;
         }
         
+        // CLOUD-SPECIFIC: CloudStyle dropdown
+        if (deformation == net.cyberpunk042.visual.shape.SphereDeformation.CLOUD) {
+            // Get current cloud style from state
+            String cloudStyleStr = state.getString("sphere.cloudStyle");
+            net.cyberpunk042.visual.shape.CloudStyle currentStyle;
+            try {
+                currentStyle = net.cyberpunk042.visual.shape.CloudStyle.valueOf(
+                    cloudStyleStr != null ? cloudStyleStr : "GAUSSIAN");
+            } catch (IllegalArgumentException e) {
+                currentStyle = net.cyberpunk042.visual.shape.CloudStyle.GAUSSIAN;
+            }
+            
+            var cloudStyleDropdown = GuiWidgets.enumDropdown(
+                x, y, w, GuiConstants.COMPACT_HEIGHT, "Style",
+                net.cyberpunk042.visual.shape.CloudStyle.class,
+                currentStyle, "Cloud algorithm style",
+                v -> {
+                    state.set("sphere.cloudStyle", v.name());
+                    if (shapeChangedCallback != null) {
+                        shapeChangedCallback.run();
+                    }
+                });
+            widgets.add(cloudStyleDropdown);
+            y += step;
+            
+            // Cloud Seed + Width row
+            int cloudSeed = state.getInt("sphere.cloudSeed");
+            var seedSlider = GuiWidgets.slider(x, y, halfW,
+                "Seed", 0, 999, cloudSeed, "%d", "Random seed (changes cloud pattern)",
+                v -> onUserChange(() -> state.set("sphere.cloudSeed", Math.round(v))));
+            widgets.add(seedSlider);
+            
+            float cloudWidth = state.getFloat("sphere.cloudWidth");
+            if (cloudWidth <= 0) cloudWidth = 1.0f; // Default fallback
+            var widthSlider = GuiWidgets.slider(x + halfW + GuiConstants.PADDING, y, halfW,
+                "Width", 0.5f, 2f, cloudWidth, "%.2f", "Horizontal stretch (>1 = wider, <1 = narrower)",
+                v -> onUserChange(() -> state.set("sphere.cloudWidth", v)));
+            widgets.add(widthSlider);
+            y += step;
+        }
+        
         // CLOUD/MOLECULE specific controls
         boolean isCloudOrMolecule = deformation == net.cyberpunk042.visual.shape.SphereDeformation.CLOUD
             || deformation == net.cyberpunk042.visual.shape.SphereDeformation.MOLECULE;
