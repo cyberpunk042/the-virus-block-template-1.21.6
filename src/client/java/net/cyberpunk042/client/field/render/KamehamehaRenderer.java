@@ -62,8 +62,6 @@ public final class KamehamehaRenderer extends AbstractPrimitiveRenderer {
         Logging.RENDER.topic("tessellate")
             .kv("orbRadius", shape.effectiveOrbRadius())
             .kv("beamLength", shape.effectiveBeamLength())
-            .kv("orbType", shape.orbType().name())
-            .kv("beamType", shape.beamType().name())
             .debug("[KAMEHAMEHA] Tessellating shape");
         
         return KamehamehaTessellator.tessellate(shape, pattern, visibility, time);

@@ -37,9 +37,8 @@ public class TheVirusBlockClient implements ClientModInitializer {
 				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.RENDER_WARMUP)
 				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.TEST_RENDERER)
 				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.FRAGMENT_PRESETS)
-				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.WAVE_SHADER)
 				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.FRESNEL_SHADER)
-				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.CORONA_SHADER))
+				.add(net.cyberpunk042.client.init.nodes.ClientFieldNodes.DEPTH_TEST_SHADER))
 			
 			// Stage 4: GUI
 			.stage(net.cyberpunk042.init.InitStage.of("client_gui", "GUI")
@@ -63,7 +62,62 @@ public class TheVirusBlockClient implements ClientModInitializer {
 		
 		// Client command registration (not in generic nodes)
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
-			// Reserved for future client commands
+			// Depth test shader command
+			// /depthtest - cycles through modes
+			// /depthtest <0-4> - sets specific mode
+			dispatcher.register(
+				net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("depthtest")
+					.executes(ctx -> {
+						// No argument = cycle
+						net.cyberpunk042.client.visual.shader.DepthTestShader.cycleMode();
+						int mode = net.cyberpunk042.client.visual.shader.DepthTestShader.getMode();
+						String name = net.cyberpunk042.client.visual.shader.DepthTestShader.getModeName();
+						ctx.getSource().sendFeedback(
+							net.minecraft.text.Text.literal("§eDepth Test Mode " + mode + ": §f" + name)
+						);
+						return 1;
+					})
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("mode", 
+						com.mojang.brigadier.arguments.IntegerArgumentType.integer(0, 5))
+						.executes(ctx -> {
+							int mode = com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "mode");
+							net.cyberpunk042.client.visual.shader.DepthTestShader.setMode(mode);
+							String name = net.cyberpunk042.client.visual.shader.DepthTestShader.getModeName();
+							ctx.getSource().sendFeedback(
+								net.minecraft.text.Text.literal("§eDepth Test Mode " + mode + ": §f" + name)
+							);
+							return 1;
+						})
+					)
+			);
+			
+			// Direct depth renderer command (NEW - bypasses PostEffectProcessor)
+			// /directdepth - cycles through modes
+			// /directdepth <0-3> - sets specific mode
+			dispatcher.register(
+				net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("directdepth")
+					.executes(ctx -> {
+						net.cyberpunk042.client.visual.shader.DirectDepthRenderer.cycleMode();
+						int mode = net.cyberpunk042.client.visual.shader.DirectDepthRenderer.getMode();
+						String name = net.cyberpunk042.client.visual.shader.DirectDepthRenderer.getModeName();
+						ctx.getSource().sendFeedback(
+							net.minecraft.text.Text.literal("§bDirect Depth Mode " + mode + ": §f" + name)
+						);
+						return 1;
+					})
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("mode", 
+						com.mojang.brigadier.arguments.IntegerArgumentType.integer(0, 4))
+						.executes(ctx -> {
+							int mode = com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "mode");
+							net.cyberpunk042.client.visual.shader.DirectDepthRenderer.setMode(mode);
+							String name = net.cyberpunk042.client.visual.shader.DirectDepthRenderer.getModeName();
+							ctx.getSource().sendFeedback(
+								net.minecraft.text.Text.literal("§bDirect Depth Mode " + mode + ": §f" + name)
+							);
+							return 1;
+						})
+					)
+			);
 		});
 	}
 }

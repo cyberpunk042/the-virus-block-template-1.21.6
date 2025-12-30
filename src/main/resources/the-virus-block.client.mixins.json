@@ -18,7 +18,9 @@
     "access.FramebufferAccessor",
     "FramebufferMixin",
     "GameRendererMixin",
-    "RenderSystemMixin"
+    "RenderSystemMixin",
+    "GameRendererDepthTestMixin",
+    "WorldRendererDepthTestMixin"
   ],
   "injectors": {
     "defaultRequire": 1

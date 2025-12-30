@@ -65,6 +65,7 @@ public record RingShape(
     @Range(ValueRange.RADIUS) float innerRadius,
     @Range(ValueRange.RADIUS) float outerRadius,
     @Range(ValueRange.STEPS) int segments,
+    @Range(ValueRange.STEPS) @JsonField(skipIfDefault = true, defaultValue = "1") int heightSegments,
     @Range(ValueRange.UNBOUNDED) @JsonField(skipIfDefault = true) float y,
     @Range(ValueRange.DEGREES) @JsonField(skipIfDefault = true) float arcStart,
     @Range(ValueRange.DEGREES) @JsonField(skipIfDefault = true, defaultValue = "360") float arcEnd,
@@ -79,15 +80,15 @@ public record RingShape(
     
     /** Default ring (0.8 inner, 1.0 outer). */
     public static final RingShape DEFAULT = new RingShape(
-        0.8f, 1.0f, 64, 0, 0, 360, 0, 0, 1.0f, null, 0, 1.0f, 1.0f);
+        0.8f, 1.0f, 64, 1, 0, 0, 360, 0, 0, 1.0f, null, 0, 1.0f, 1.0f);
     
     /** Thin ring. */
     public static final RingShape THIN = new RingShape(
-        0.95f, 1.0f, 64, 0, 0, 360, 0, 0, 1.0f, null, 0, 1.0f, 1.0f);
+        0.95f, 1.0f, 64, 1, 0, 0, 360, 0, 0, 1.0f, null, 0, 1.0f, 1.0f);
     
     /** Thick band. */
     public static final RingShape THICK = new RingShape(
-        0.5f, 1.0f, 64, 0, 0, 360, 0, 0, 1.0f, null, 0, 1.0f, 1.0f);
+        0.5f, 1.0f, 64, 1, 0, 0, 360, 0, 0, 1.0f, null, 0, 1.0f, 1.0f);
     
     /**
      * Creates a ring at the specified Y height.
@@ -96,7 +97,7 @@ public record RingShape(
      * @param y Y offset
      */
     public static RingShape at(@Range(ValueRange.RADIUS) float innerRadius, @Range(ValueRange.RADIUS) float outerRadius, @Range(ValueRange.UNBOUNDED) float y) {
-        return new RingShape(innerRadius, outerRadius, 64, y, 0, 360, 0, 0, 1.0f, null, 0, 1.0f, 1.0f);
+        return new RingShape(innerRadius, outerRadius, 64, 1, y, 0, 360, 0, 0, 1.0f, null, 0, 1.0f, 1.0f);
     }
     
     /** Effective orientation (defaults to POS_Y if null). */
@@ -177,6 +178,7 @@ public record RingShape(
             .innerRadius(innerRadius)
             .outerRadius(outerRadius)
             .segments(segments)
+            .heightSegments(heightSegments)
             .y(y)
             .arcStart(arcStart)
             .arcEnd(arcEnd)
@@ -193,6 +195,7 @@ public record RingShape(
         private @Range(ValueRange.RADIUS) float innerRadius = 0.8f;
         private @Range(ValueRange.RADIUS) float outerRadius = 1.0f;
         private @Range(ValueRange.STEPS) int segments = 64;
+        private @Range(ValueRange.STEPS) int heightSegments = 1;
         private @Range(ValueRange.UNBOUNDED) float y = 0;
         private @Range(ValueRange.DEGREES) float arcStart = 0;
         private @Range(ValueRange.DEGREES) float arcEnd = 360;
@@ -207,6 +210,7 @@ public record RingShape(
         public Builder innerRadius(float r) { this.innerRadius = r; return this; }
         public Builder outerRadius(float r) { this.outerRadius = r; return this; }
         public Builder segments(int s) { this.segments = s; return this; }
+        public Builder heightSegments(int s) { this.heightSegments = Math.max(1, s); return this; }
         public Builder y(@Range(ValueRange.UNBOUNDED) float y) { this.y = y; return this; }
         public Builder arcStart(float a) { this.arcStart = a; return this; }
         public Builder arcEnd(float a) { this.arcEnd = a; return this; }
@@ -219,7 +223,7 @@ public record RingShape(
         public Builder topAlpha(float a) { this.topAlpha = Math.max(0, Math.min(1, a)); return this; }
         
         public RingShape build() {
-            return new RingShape(innerRadius, outerRadius, segments, y, arcStart, arcEnd, height, twist, taper, orientation, originOffset, bottomAlpha, topAlpha);
+            return new RingShape(innerRadius, outerRadius, segments, heightSegments, y, arcStart, arcEnd, height, twist, taper, orientation, originOffset, bottomAlpha, topAlpha);
         }
     }
 }

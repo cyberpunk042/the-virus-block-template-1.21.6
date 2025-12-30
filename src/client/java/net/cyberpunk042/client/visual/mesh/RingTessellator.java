@@ -263,84 +263,103 @@ public final class RingTessellator {
         
         // =====================================================================
         // Outer Wall (connects outer edges of top and bottom)
+        // Now with multiple height segments for smooth alpha gradient
         // =====================================================================
         
-        // Need separate vertices with outward-facing normals
-        int[] outerWallBottom = new int[segments + 1];
-        int[] outerWallTop = new int[segments + 1];
+        int heightSegs = Math.max(1, shape.heightSegments());
         
-        for (int i = 0; i <= segments; i++) {
-            float t = i / (float) segments;
-            float baseAngle = arcStart + t * arcRange;
-            float topAngle = baseAngle + twist;
+        // Create a 2D array of vertex indices: [heightLevel][segment]
+        int[][] outerWall = new int[heightSegs + 1][segments + 1];
+        
+        for (int h = 0; h <= heightSegs; h++) {
+            float hT = h / (float) heightSegs;  // 0 at bottom, 1 at top
+            float y = yBottom + hT * height;
+            float alpha = bottomAlpha + hT * (topAlpha - bottomAlpha);  // Interpolate alpha
+            float twistAtH = hT * twist;  // Interpolate twist
+            float radiusAtH = outerR + hT * (topOuterR - outerR);  // Interpolate radius (taper)
             
-            // Normal points outward (radial direction)
-            float nx = (float) Math.cos(baseAngle);
-            float nz = (float) Math.sin(baseAngle);
-            Vertex owBottom = ringVertex(baseAngle, outerR, yBottom, nx, 0, nz, orientation, originOffset, bottomAlpha);
-            
-            float nxTop = (float) Math.cos(topAngle);
-            float nzTop = (float) Math.sin(topAngle);
-            Vertex owTop = ringVertex(topAngle, topOuterR, yTop, nxTop, 0, nzTop, orientation, originOffset, topAlpha);
-            
-            if (applyWave) {
-                owBottom = WaveDeformer.applyToVertex(owBottom, wave, time);
-                owTop = WaveDeformer.applyToVertex(owTop, wave, time);
+            for (int i = 0; i <= segments; i++) {
+                float t = i / (float) segments;
+                float baseAngle = arcStart + t * arcRange;
+                float angle = baseAngle + twistAtH;
+                
+                // Normal points outward (radial direction)
+                float nx = (float) Math.cos(angle);
+                float nz = (float) Math.sin(angle);
+                Vertex v = ringVertex(angle, radiusAtH, y, nx, 0, nz, orientation, originOffset, alpha);
+                
+                if (applyWave) {
+                    v = WaveDeformer.applyToVertex(v, wave, time);
+                }
+                
+                outerWall[h][i] = builder.addVertex(v);
             }
-            
-            outerWallBottom[i] = builder.addVertex(owBottom);
-            outerWallTop[i] = builder.addVertex(owTop);
         }
         
-        for (int i = 0; i < segments; i++) {
-            float segFrac = i / (float) segments;
-            if (visibility != null && !visibility.isVisible(1.0f, segFrac)) continue;
-            if (!pattern.shouldRender(i, segments)) continue;
-            
-            // Outer wall with pattern support
-            // TL=top[i], TR=top[i+1], BR=bot[i+1], BL=bot[i]
-            builder.quadAsTrianglesFromPattern(outerWallTop[i], outerWallTop[i + 1], outerWallBottom[i + 1], outerWallBottom[i], pattern);
+        // Generate quads between adjacent height levels
+        for (int h = 0; h < heightSegs; h++) {
+            for (int i = 0; i < segments; i++) {
+                float segFrac = i / (float) segments;
+                if (visibility != null && !visibility.isVisible(1.0f, segFrac)) continue;
+                if (!pattern.shouldRender(i, segments)) continue;
+                
+                // Quad: top-left, top-right, bottom-right, bottom-left
+                // TL = outerWall[h+1][i], TR = outerWall[h+1][i+1]
+                // BL = outerWall[h][i], BR = outerWall[h][i+1]
+                builder.quadAsTrianglesFromPattern(
+                    outerWall[h + 1][i], outerWall[h + 1][i + 1], 
+                    outerWall[h][i + 1], outerWall[h][i], pattern);
+            }
         }
         
         // =====================================================================
         // Inner Wall (connects inner edges of top and bottom)
+        // Now with multiple height segments for smooth alpha gradient
         // =====================================================================
         
-        // Need separate vertices with inward-facing normals
-        int[] innerWallBottom = new int[segments + 1];
-        int[] innerWallTop = new int[segments + 1];
-        
-        for (int i = 0; i <= segments; i++) {
-            float t = i / (float) segments;
-            float baseAngle = arcStart + t * arcRange;
-            float topAngle = baseAngle + twist;
+        // Only generate inner wall if there's an inner radius (hollow ring)
+        if (innerR > 0.001f) {
+            // Create a 2D array of vertex indices: [heightLevel][segment]
+            int[][] innerWall = new int[heightSegs + 1][segments + 1];
             
-            // Normal points inward (negative radial direction)
-            float nx = -(float) Math.cos(baseAngle);
-            float nz = -(float) Math.sin(baseAngle);
-            Vertex iwBottom = ringVertex(baseAngle, innerR, yBottom, nx, 0, nz, orientation, originOffset, bottomAlpha);
-            
-            float nxTop = -(float) Math.cos(topAngle);
-            float nzTop = -(float) Math.sin(topAngle);
-            Vertex iwTop = ringVertex(topAngle, topInnerR, yTop, nxTop, 0, nzTop, orientation, originOffset, topAlpha);
-            
-            if (applyWave) {
-                iwBottom = WaveDeformer.applyToVertex(iwBottom, wave, time);
-                iwTop = WaveDeformer.applyToVertex(iwTop, wave, time);
+            for (int h = 0; h <= heightSegs; h++) {
+                float hT = h / (float) heightSegs;  // 0 at bottom, 1 at top
+                float y = yBottom + hT * height;
+                float alpha = bottomAlpha + hT * (topAlpha - bottomAlpha);  // Interpolate alpha
+                float twistAtH = hT * twist;  // Interpolate twist
+                float radiusAtH = innerR + hT * (topInnerR - innerR);  // Interpolate radius (taper)
+                
+                for (int i = 0; i <= segments; i++) {
+                    float t = i / (float) segments;
+                    float baseAngle = arcStart + t * arcRange;
+                    float angle = baseAngle + twistAtH;
+                    
+                    // Normal points inward (negative radial direction)
+                    float nx = -(float) Math.cos(angle);
+                    float nz = -(float) Math.sin(angle);
+                    Vertex v = ringVertex(angle, radiusAtH, y, nx, 0, nz, orientation, originOffset, alpha);
+                    
+                    if (applyWave) {
+                        v = WaveDeformer.applyToVertex(v, wave, time);
+                    }
+                    
+                    innerWall[h][i] = builder.addVertex(v);
+                }
             }
             
-            innerWallBottom[i] = builder.addVertex(iwBottom);
-            innerWallTop[i] = builder.addVertex(iwTop);
-        }
-        
-        for (int i = 0; i < segments; i++) {
-            float segFrac = i / (float) segments;
-            if (visibility != null && !visibility.isVisible(0.0f, segFrac)) continue;
-            if (!pattern.shouldRender(i, segments)) continue;
-            
-            // Inner wall with pattern support
-            // TL=top[i], TR=top[i+1], BR=bot[i+1], BL=bot[i]
-            builder.quadAsTrianglesFromPattern(innerWallTop[i], innerWallTop[i + 1], innerWallBottom[i + 1], innerWallBottom[i], pattern);
+            // Generate quads between adjacent height levels
+            for (int h = 0; h < heightSegs; h++) {
+                for (int i = 0; i < segments; i++) {
+                    float segFrac = i / (float) segments;
+                    if (visibility != null && !visibility.isVisible(0.0f, segFrac)) continue;
+                    if (!pattern.shouldRender(i, segments)) continue;
+                    
+                    // Quad with reversed winding for inner wall (normals face inward)
+                    builder.quadAsTrianglesFromPattern(
+                        innerWall[h + 1][i], innerWall[h + 1][i + 1], 
+                        innerWall[h][i + 1], innerWall[h][i], pattern);
+                }
+            }
         }
         
         // =====================================================================

@@ -2,7 +2,6 @@ package net.cyberpunk042.client.visual.mesh;
 
 import net.cyberpunk042.visual.pattern.QuadPattern;
 import net.cyberpunk042.visual.pattern.VertexPattern;
-import net.cyberpunk042.visual.shape.EnergyType;
 import net.cyberpunk042.visual.shape.KamehamehaShape;
 import net.cyberpunk042.visual.shape.OrientationAxis;
 import net.cyberpunk042.visual.shape.RingShape;
@@ -59,11 +58,10 @@ public final class KamehamehaTessellator {
     private static void tessellateOrb(MeshBuilder builder, KamehamehaShape shape, float time, VertexPattern pattern) {
         float radius = shape.effectiveOrbRadius();
         int segments = shape.orbSegments();
-        EnergyType type = shape.orbType();
-        float alpha = shape.orbAlpha();
+        float alpha = shape.effectiveOrbAlpha();  // Use effective alpha with transition/progress
         OrientationAxis axis = shape.orientationAxis() != null ? shape.orientationAxis() : OrientationAxis.POS_Z;
         float offset = shape.originOffset();
-        tessellateSphere(builder, radius, segments, segments / 2, type, time, alpha, axis, offset, pattern);
+        tessellateSphere(builder, radius, segments, segments / 2, time, alpha, axis, offset, pattern);
     }
     
     // =========================================================================
@@ -89,13 +87,15 @@ public final class KamehamehaTessellator {
             .innerRadius(0)  // Solid beam (could be > 0 for hollow)
             .outerRadius(baseRadius)
             .segments(segments)
+            .heightSegments(shape.beamLengthSegments())  // Segments along the length for alpha gradient
             .height(length)
             .y(beamStart + length / 2)  // Center of beam along axis
             .taper(taper)
+            .twist(shape.beamTwist())    // Spiral twist
             .orientation(axis)
             .originOffset(offset)
-            .bottomAlpha(shape.beamBaseAlpha())  // Alpha at beam base
-            .topAlpha(shape.beamTipAlpha())      // Alpha at beam tip
+            .bottomAlpha(shape.effectiveBeamBaseAlpha())  // Effective alpha at beam base
+            .topAlpha(shape.effectiveBeamTipAlpha())      // Effective alpha at beam tip
             .build();
         
         // Tessellate and merge - RingTessellator now handles orientation internally
@@ -107,7 +107,7 @@ public final class KamehamehaTessellator {
         float tipRadius = shape.effectiveBeamTipRadius();
         float tipStart = shape.effectiveBeamLength();  // Tip at end of beam (beam starts at 0)
         int segments = shape.beamSegments();
-        float tipAlpha = shape.beamTipAlpha();
+        float tipAlpha = shape.effectiveBeamTipAlpha();  // Use effective alpha
         OrientationAxis axis = shape.orientationAxis() != null ? shape.orientationAxis() : OrientationAxis.POS_Z;
         float offset = shape.originOffset();
         
@@ -131,7 +131,6 @@ public final class KamehamehaTessellator {
      * @param radius Sphere radius
      * @param lonSteps Longitude steps
      * @param latSteps Latitude steps
-     * @param type Energy type for distortion effects
      * @param time Animation time
      * @param alpha Vertex alpha
      * @param axis Orientation axis for transform
@@ -139,9 +138,9 @@ public final class KamehamehaTessellator {
      */
     private static void tessellateSphere(MeshBuilder builder, float radius,
                                           int lonSteps, int latSteps,
-                                          EnergyType type, float time, float alpha,
+                                          float time, float alpha,
                                           OrientationAxis axis, float offset, VertexPattern pattern) {
-        float distortion = type.hasDistortion() ? 0.1f * (float)Math.sin(time * 3) : 0;
+        // Distortion removed for now - can be re-added with wave animation
         
         // Create vertex grid in local space (Y-up), then transform
         int[][] indices = new int[latSteps + 1][lonSteps + 1];
@@ -156,7 +155,7 @@ public final class KamehamehaTessellator {
                 float sinPhi = (float) Math.sin(phi);
                 float cosPhi = (float) Math.cos(phi);
                 
-                float r = radius + distortion * (float)Math.sin(phi * 4 + time * 5);
+                float r = radius;
                 
                 // Local coordinates (Y-up sphere)
                 float localX = r * sinTheta * cosPhi;

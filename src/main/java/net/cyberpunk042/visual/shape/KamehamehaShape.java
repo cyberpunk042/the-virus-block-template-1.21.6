@@ -14,33 +14,43 @@ import java.util.Map;
  * Kamehameha shape - energy beam attack with charging orb and extending beam.
  * 
  * <h2>Components</h2>
- * <p>A Kamehameha consists of two main components, each with independent configuration:</p>
+ * <p>A Kamehameha consists of two main components:</p>
  * 
  * <h3>ORB (Charging Sphere)</h3>
  * <ul>
- *   <li>Energy type (CLASSIC, RASENGAN, GHOST, FROST, LIGHTNING, WATER, FIRE, UNSTABLE, SPIKED...)</li>
  *   <li>Transition style (FADE, SCALE, FADE_AND_SCALE)</li>
  *   <li>Size and resolution settings</li>
  * </ul>
  * 
  * <h3>BEAM (Energy Stream)</h3>
+ * <p>Beam is ALWAYS proportional to the orb. Use {@code beamRatio} to control width relative to orb.</p>
  * <ul>
- *   <li>Energy type (can differ from orb)</li>
- *   <li>Transition style</li>
- *   <li>Scale axis (LENGTH, WIDTH, BOTH, staged combinations)</li>
- *   <li>Length, radius, and resolution settings</li>
+ *   <li>{@code beamRatio} (0-1): Base radius = orbRadius × beamRatio</li>
+ *   <li>{@code beamTaper} (0-1.5): Tip radius = baseRadius × beamTaper (jet, cylinder, or flared)</li>
+ *   <li>{@code beamTwist}: Spiral twist in degrees</li>
+ *   <li>{@code beamLengthIntensity}: How fast length scales (0=no scaling, higher=faster)</li>
+ *   <li>{@code beamWidthIntensity}: How fast width scales (0=no scaling, higher=faster)</li>
+ * </ul>
+ * 
+ * <h2>Scale Intensity</h2>
+ * <p>The intensity values control BOTH whether an axis scales AND how fast:</p>
+ * <ul>
+ *   <li>intensity = 0: No scaling (stays at full size)</li>
+ *   <li>intensity = 1: Linear scaling</li>
+ *   <li>intensity &gt; 1: Faster start, levels off (ease-out)</li>
+ *   <li>intensity &lt; 1: Slower start, catches up (ease-in)</li>
  * </ul>
  * 
  * <h2>Geometry</h2>
  * <pre>
  *                    ┌─────────────────────────────────
- *                   ╱                                   ╲  beamTipRadius
+ *                   ╱                                   ╲  tipRadius (derived)
  *     orbRadius    ╱                                     ╲
  *       ╭───╮     ╱ ────────────────────────────────────  ╲
  *      (  ●  )═══<        BEAM (beamLength)                )  → direction
  *       ╰───╯     ╲ ────────────────────────────────────  ╱
  *                  ╲                                     ╱
- *                   ╲                                   ╱  beamTipRadius
+ *                   ╲                                   ╱  tipRadius (derived)
  *                    └─────────────────────────────────
  *        ORB                    BEAM
  * </pre>
@@ -61,19 +71,13 @@ import java.util.Map;
  *   <li><b>beamTip</b> (QUAD) - Beam end cap (dome or flat)</li>
  * </ul>
  * 
- * @see EnergyType
  * @see TransitionStyle
- * @see BeamScaleAxis
  * @see net.cyberpunk042.visual.animation.LifecycleAnimator
  */
 public record KamehamehaShape(
     // =========================================================================
     // ORB CONFIGURATION
     // =========================================================================
-    
-    /** Energy visual type for the charging orb. */
-    @JsonField(skipIfDefault = true)
-    EnergyType orbType,
     
     /** How the orb transitions in/out during lifecycle. */
     @JsonField(skipIfDefault = true)
@@ -98,32 +102,40 @@ public record KamehamehaShape(
     // BEAM CONFIGURATION
     // =========================================================================
     
-    /** Energy visual type for the beam. */
-    @JsonField(skipIfDefault = true)
-    EnergyType beamType,
-    
     /** How the beam transitions in/out during lifecycle. */
     @JsonField(skipIfDefault = true)
     TransitionStyle beamTransition,
-    
-    /** Which dimension(s) scale during beam transition. */
-    @JsonField(skipIfDefault = true)
-    BeamScaleAxis beamScaleAxis,
     
     /** Length of the beam at full extension. */
     @Range(ValueRange.POSITIVE) 
     @JsonField(skipIfDefault = true, defaultValue = "5.0")
     float beamLength,
     
-    /** Radius of the beam at the base (orb connection). */
-    @Range(ValueRange.POSITIVE) 
-    @JsonField(skipIfDefault = true, defaultValue = "0.25")
-    float beamBaseRadius,
+    /** Ratio of beam base radius to orb radius (0.0-1.0). Base radius = orbRadius × beamRatio. */
+    @Range(ValueRange.NORMALIZED)
+    @JsonField(skipIfDefault = true, defaultValue = "0.8")
+    float beamRatio,
     
-    /** Radius of the beam at the far tip. */
-    @Range(ValueRange.POSITIVE) 
-    @JsonField(skipIfDefault = true, defaultValue = "0.2")
-    float beamTipRadius,
+    /** Taper of beam tip relative to base (0.0-1.5). Tip radius = baseRadius × beamTaper. 
+     *  <1 = jet/cone, =1 = cylinder, >1 = flared */
+    @Range(ValueRange.POSITIVE)
+    @JsonField(skipIfDefault = true, defaultValue = "1.0")
+    float beamTaper,
+    
+    /** Twist of beam in degrees (-360 to 360). Creates spiral effect. */
+    @Range(ValueRange.DEGREES_FULL)
+    @JsonField(skipIfDefault = true, defaultValue = "0.0")
+    float beamTwist,
+    
+    /** How fast length scales with progress. 0=no scaling, 1=linear, >1=faster start. */
+    @Range(ValueRange.POSITIVE)
+    @JsonField(skipIfDefault = true, defaultValue = "1.0")
+    float beamLengthIntensity,
+    
+    /** How fast width scales with progress. 0=no scaling, 1=linear, >1=faster start. */
+    @Range(ValueRange.POSITIVE)
+    @JsonField(skipIfDefault = true, defaultValue = "1.0")
+    float beamWidthIntensity,
     
     /** Number of radial segments around the beam. */
     @Range(ValueRange.STEPS) 
@@ -139,19 +151,6 @@ public record KamehamehaShape(
     @Range(ValueRange.NORMALIZED)
     @JsonField(skipIfDefault = true, defaultValue = "1.0")
     float beamProgress,
-    
-    // =========================================================================
-    // PROPORTIONAL SIZING
-    // =========================================================================
-    
-    /** If true, beam base radius is automatically derived from orb radius * beamToOrbRatio. */
-    @JsonField(skipIfDefault = true)
-    boolean proportionalBeam,
-    
-    /** Ratio of beam base radius to orb radius when proportionalBeam is true. */
-    @Range(ValueRange.NORMALIZED)
-    @JsonField(skipIfDefault = true, defaultValue = "0.8")
-    float beamToOrbRatio,
     
     // =========================================================================
     // BEAM TIP STYLE
@@ -209,21 +208,16 @@ public record KamehamehaShape(
     
 ) implements Shape {
     
-    // TipStyle enum removed - use hasDomeTip boolean instead
-    
     // =========================================================================
     // Constants & Presets
     // =========================================================================
     
     /** Default Kamehameha (classic blue energy beam). */
     public static final KamehamehaShape DEFAULT = new KamehamehaShape(
-        // Orb
-        EnergyType.CLASSIC, TransitionStyle.FADE_AND_SCALE, 0.3f, 16, 1.0f,
-        // Beam
-        EnergyType.CLASSIC, TransitionStyle.SCALE, BeamScaleAxis.LENGTH, 
-        5.0f, 0.25f, 0.2f, 16, 8, 1.0f,
-        // Proportional Sizing
-        true, 0.8f,
+        // Orb: transition, radius, segments, progress
+        TransitionStyle.FADE_AND_SCALE, 0.3f, 16, 1.0f,
+        // Beam: transition, length, ratio, taper, twist, lengthIntensity, widthIntensity, segments, lengthSegments, progress
+        TransitionStyle.SCALE, 5.0f, 0.8f, 0.8f, 0f, 1.0f, 1.0f, 16, 8, 1.0f,
         // Tip (true = dome/hemisphere, false = flat)
         true,
         // Alpha gradient
@@ -234,80 +228,30 @@ public record KamehamehaShape(
         OrientationAxis.POS_Z, 0f
     );
     
-    /** Rasengan orb (no beam, just spiraling sphere). */
-    public static final KamehamehaShape RASENGAN = new KamehamehaShape(
-        EnergyType.RASENGAN, TransitionStyle.SCALE, 0.25f, 24, 1.0f,
-        EnergyType.RASENGAN, TransitionStyle.SCALE, BeamScaleAxis.BOTH,
-        0.0f, 0.0f, 0.0f, 16, 1, 0.0f,  // No beam
-        false, 0.8f,
-        true,
-        1.0f, 0.3f, 1.0f, 0.0f, 0.0f, 0.0f,
-        OrientationAxis.POS_Z, 0f
-    );
-    
-    /** Lightning bolt attack. */
-    public static final KamehamehaShape LIGHTNING_BOLT = new KamehamehaShape(
-        EnergyType.LIGHTNING, TransitionStyle.FADE, 0.15f, 12, 1.0f,
-        EnergyType.LIGHTNING, TransitionStyle.FADE, BeamScaleAxis.LENGTH,
-        8.0f, 0.1f, 0.05f, 8, 12, 1.0f,
-        false, 0.8f,
-        false,  // No dome tip (flat cut-off for lightning)
+    /** Thin jet beam (length extends fast, width stays narrow). */
+    public static final KamehamehaShape JET_BEAM = new KamehamehaShape(
+        TransitionStyle.SCALE, 0.15f, 12, 1.0f,
+        TransitionStyle.SCALE, 8.0f, 0.5f, 0.3f, 0f, 2.0f, 0f, 8, 12, 1.0f,  // High length intensity, no width scaling
+        false,  // No dome tip
         0.8f, 0.1f, 1.0f, 0.2f, 0.3f, 0.0f,
         OrientationAxis.POS_Z, 0f
     );
     
-    /** Fire blast. */
-    public static final KamehamehaShape FIRE_BLAST = new KamehamehaShape(
-        EnergyType.FIRE, TransitionStyle.FADE_AND_SCALE, 0.4f, 16, 1.0f,
-        EnergyType.FIRE, TransitionStyle.SCALE, BeamScaleAxis.WIDTH_THEN_LENGTH,
-        4.0f, 0.35f, 0.5f, 16, 6, 1.0f,
-        false, 0.8f,
+    /** Flared beam (width expands faster than length). */
+    public static final KamehamehaShape FLARED_BEAM = new KamehamehaShape(
+        TransitionStyle.FADE_AND_SCALE, 0.4f, 16, 1.0f,
+        TransitionStyle.SCALE, 4.0f, 0.7f, 1.3f, 0f, 0.5f, 2.0f, 16, 6, 1.0f,  // Low length, high width intensity
         true,
         1.0f, 0.3f, 0.9f, 0.2f, 0.7f, 0.1f,
         OrientationAxis.POS_Z, 0f
     );
     
-    /** Frost beam. */
-    public static final KamehamehaShape FROST_BEAM = new KamehamehaShape(
-        EnergyType.FROST, TransitionStyle.SCALE, 0.2f, 8, 1.0f,
-        EnergyType.FROST, TransitionStyle.SCALE, BeamScaleAxis.LENGTH,
-        6.0f, 0.15f, 0.1f, 6, 10, 1.0f,
-        false, 0.8f,
-        false,  // No dome (flat cut)
-        0.9f, 0.1f, 0.8f, 0.1f, 0.4f, 0.0f,
-        OrientationAxis.POS_Z, 0f
-    );
-    
-    /** Unstable overloaded attack. */
-    public static final KamehamehaShape UNSTABLE_OVERLOAD = new KamehamehaShape(
-        EnergyType.UNSTABLE, TransitionStyle.FADE_AND_SCALE, 0.5f, 20, 1.0f,
-        EnergyType.UNSTABLE, TransitionStyle.FADE_AND_SCALE, BeamScaleAxis.BOTH,
-        3.0f, 0.4f, 0.6f, 16, 4, 1.0f,
-        false, 0.8f,
+    /** Twisted beam (spiral effect). */
+    public static final KamehamehaShape TWISTED_BEAM = new KamehamehaShape(
+        TransitionStyle.FADE_AND_SCALE, 0.5f, 20, 1.0f,
+        TransitionStyle.FADE_AND_SCALE, 3.0f, 0.9f, 1.0f, 180f, 1.0f, 1.0f, 16, 4, 1.0f,  // 180° twist
         true,
         1.0f, 0.4f, 1.0f, 0.3f, 0.8f, 0.2f,
-        OrientationAxis.POS_Z, 0f
-    );
-    
-    /** Ghost spirit attack. */
-    public static final KamehamehaShape GHOST_WAVE = new KamehamehaShape(
-        EnergyType.GHOST, TransitionStyle.FADE, 0.35f, 16, 1.0f,
-        EnergyType.GHOST, TransitionStyle.FADE, BeamScaleAxis.LENGTH,
-        7.0f, 0.3f, 0.25f, 16, 10, 1.0f,
-        false, 0.8f,
-        true,
-        0.6f, 0.1f, 0.5f, 0.0f, 0.2f, 0.0f,
-        OrientationAxis.POS_Z, 0f
-    );
-    
-    /** Void/dark energy. */
-    public static final KamehamehaShape VOID_BEAM = new KamehamehaShape(
-        EnergyType.VOID, TransitionStyle.SCALE, 0.4f, 16, 1.0f,
-        EnergyType.VOID, TransitionStyle.SCALE, BeamScaleAxis.BOTH,
-        6.0f, 0.35f, 0.4f, 16, 8, 1.0f,
-        false, 0.8f,
-        true,
-        0.8f, 0.3f, 0.7f, 0.2f, 0.5f, 0.1f,
         OrientationAxis.POS_Z, 0f
     );
     
@@ -350,7 +294,7 @@ public record KamehamehaShape(
         // Beam parts (only if beam has length)
         if (beamLength > 0) {
             parts.put("beam", CellType.QUAD);
-            parts.put("beamTip", hasDomeTip ? CellType.QUAD : CellType.QUAD);
+            parts.put("beamTip", CellType.QUAD);
         }
         
         return parts;
@@ -358,7 +302,7 @@ public record KamehamehaShape(
     
     @Override
     public float getRadius() {
-        return Math.max(orbRadius, beamBaseRadius);
+        return Math.max(orbRadius, effectiveBeamBaseRadius());
     }
     
     // =========================================================================
@@ -367,38 +311,117 @@ public record KamehamehaShape(
     
     /** Effective orb radius after applying progress and transition. */
     public float effectiveOrbRadius() {
-        if (!orbTransition.affectsScale()) return orbRadius;
+        if (orbTransition == null || !orbTransition.affectsScale()) return orbRadius;
         return orbRadius * orbProgress;
     }
     
-    /** Effective orb alpha after applying progress and transition. */
+    /** 
+     * Effective orb alpha after applying progress and transition.
+     * Interpolates from orbMinAlpha to orbAlpha based on progress.
+     */
     public float effectiveOrbAlpha() {
-        float base = orbType.baseAlpha();
-        if (!orbTransition.affectsAlpha()) return base;
-        return base * orbProgress;
+        if (orbTransition == null || !orbTransition.affectsAlpha()) return orbAlpha;
+        // Interpolate from min to max based on progress
+        return orbMinAlpha + (orbAlpha - orbMinAlpha) * orbProgress;
     }
     
-    /** Effective beam length after applying progress and scale axis. */
+    /**
+     * Applies intensity curve to progress.
+     * @param progress Raw 0-1 progress
+     * @param intensity Curve intensity (0=no effect, 1=linear, >1=faster start)
+     * @return Curved progress value
+     */
+    private float applyIntensity(float progress, float intensity) {
+        if (intensity <= 0) return 1.0f;  // No scaling - always full
+        if (intensity == 1.0f) return progress;  // Linear
+        return (float) Math.pow(progress, 1.0 / intensity);
+    }
+    
+    /** 
+     * Effective beam length after applying progress and intensity.
+     * Note: beamLength=0 is treated as infinity (renders to view distance).
+     */
     public float effectiveBeamLength() {
-        return beamLength * beamScaleAxis.lengthScale(beamProgress);
+        // Length 0 = infinity (large value for "infinite" beam)
+        float baseLength = beamLength <= 0 ? 1000f : beamLength;
+        if (beamTransition == null || !beamTransition.affectsScale()) return baseLength;
+        float lengthProgress = applyIntensity(beamProgress, beamLengthIntensity);
+        return baseLength * lengthProgress;
     }
     
-    /** Effective beam base radius after applying progress, scale axis, and proportional sizing. */
+    /** 
+     * Effective beam base radius - ALWAYS proportional to orb.
+     * Base radius = effectiveOrbRadius × beamRatio × widthScale
+     */
     public float effectiveBeamBaseRadius() {
-        float baseR = proportionalBeam ? (orbRadius * beamToOrbRatio) : beamBaseRadius;
-        return baseR * beamScaleAxis.widthScale(beamProgress);
+        float baseR = effectiveOrbRadius() * beamRatio;
+        if (beamTransition == null || !beamTransition.affectsScale()) return baseR;
+        float widthProgress = applyIntensity(beamProgress, beamWidthIntensity);
+        return baseR * widthProgress;
     }
     
-    /** Effective beam tip radius after applying progress and scale axis. */
+    /** 
+     * Effective beam tip radius - derived from base radius and taper.
+     * Tip radius = effectiveBeamBaseRadius × beamTaper
+     */
     public float effectiveBeamTipRadius() {
-        return beamTipRadius * beamScaleAxis.widthScale(beamProgress);
+        return effectiveBeamBaseRadius() * beamTaper;
     }
     
-    /** Effective beam alpha after applying progress and transition. */
+    /** 
+     * Effective beam base alpha after applying progress and both intensity modes.
+     * - widthIntensity: UNIFORM fade (how fast whole beam fades)
+     * - lengthIntensity: PROGRESSIVE wipe (base leads, tip follows)
+     */
+    public float effectiveBeamBaseAlpha() {
+        if (beamTransition == null || !beamTransition.affectsAlpha()) return beamBaseAlpha;
+        
+        // Width intensity = UNIFORM fade (affects whole beam equally)
+        float uniformProgress = applyIntensity(beamProgress, beamWidthIntensity);
+        
+        // Length intensity = PROGRESSIVE wipe (base leads tip)
+        // Calculate wipe position - how far along the beam the "fade front" has traveled
+        float wipePosition = applyIntensity(beamProgress, beamLengthIntensity);
+        
+        // Base is at position 0, so it becomes visible first
+        // baseT = how much of the base is "revealed" by the wipe
+        float baseT = Math.min(1f, wipePosition * 2f);  // Reaches 1 at 50% wipe position
+        
+        // Combine: uniform overall fade * progressive wipe
+        float combinedT = uniformProgress * baseT;
+        
+        return beamBaseMinAlpha + (beamBaseAlpha - beamBaseMinAlpha) * combinedT;
+    }
+    
+    /** 
+     * Effective beam tip alpha after applying progress and both intensity modes.
+     * - widthIntensity: UNIFORM fade (how fast whole beam fades)
+     * - lengthIntensity: PROGRESSIVE wipe (base leads, tip follows)
+     */
+    public float effectiveBeamTipAlpha() {
+        if (beamTransition == null || !beamTransition.affectsAlpha()) return beamTipAlpha;
+        
+        // Width intensity = UNIFORM fade (affects whole beam equally)
+        float uniformProgress = applyIntensity(beamProgress, beamWidthIntensity);
+        
+        // Length intensity = PROGRESSIVE wipe (tip follows base)
+        // Calculate wipe position
+        float wipePosition = applyIntensity(beamProgress, beamLengthIntensity);
+        
+        // Tip is at position 1, so it becomes visible last
+        // tipT = how much of the tip is "revealed" by the wipe
+        float tipT = Math.max(0f, (wipePosition - 0.5f) * 2f);  // Starts at 50%, reaches 1 at 100%
+        
+        // Combine: uniform overall fade * progressive wipe
+        float combinedT = uniformProgress * tipT;
+        
+        return beamTipMinAlpha + (beamTipAlpha - beamTipMinAlpha) * combinedT;
+    }
+    
+    /** @deprecated Use effectiveBeamBaseAlpha() instead */
+    @Deprecated
     public float effectiveBeamAlpha() {
-        float base = beamType.baseAlpha();
-        if (!beamTransition.affectsAlpha()) return base;
-        return base * beamProgress;
+        return effectiveBeamBaseAlpha();
     }
     
     /** Whether the orb is currently visible. */
@@ -406,9 +429,9 @@ public record KamehamehaShape(
         return orbProgress > 0.001f && orbRadius > 0;
     }
     
-    /** Whether the beam is currently visible. */
+    /** Whether the beam is currently visible. beamLength=0 means infinity, so still visible. */
     public boolean isBeamVisible() {
-        return beamProgress > 0.001f && beamLength > 0;
+        return beamProgress > 0.001f;  // beamLength=0 means infinity, not invisible
     }
     
     // =========================================================================
@@ -464,26 +487,64 @@ public record KamehamehaShape(
     public static KamehamehaShape fromJson(JsonObject json) {
         if (json == null) return DEFAULT;
         
+        // Handle legacy migration: convert old beamBaseRadius/beamTipRadius to ratio/taper
+        float orbRadius = json.has("orbRadius") ? json.get("orbRadius").getAsFloat() : 0.3f;
+        float beamRatio = 0.8f;
+        float beamTaper = 1.0f;
+        
+        if (json.has("beamRatio")) {
+            beamRatio = json.get("beamRatio").getAsFloat();
+        } else if (json.has("beamBaseRadius") && orbRadius > 0) {
+            float legacyBaseR = json.get("beamBaseRadius").getAsFloat();
+            beamRatio = Math.min(1.0f, legacyBaseR / orbRadius);
+        } else if (json.has("beamToOrbRatio")) {
+            beamRatio = Math.min(1.0f, json.get("beamToOrbRatio").getAsFloat());
+        }
+        
+        if (json.has("beamTaper")) {
+            beamTaper = json.get("beamTaper").getAsFloat();
+        } else if (json.has("beamTipRadius") && json.has("beamBaseRadius")) {
+            float legacyBaseR = json.get("beamBaseRadius").getAsFloat();
+            float legacyTipR = json.get("beamTipRadius").getAsFloat();
+            if (legacyBaseR > 0.001f) {
+                beamTaper = Math.min(1.5f, legacyTipR / legacyBaseR);
+            }
+        }
+        
+        // Handle legacy BeamScaleAxis migration
+        float lengthIntensity = 1.0f;
+        float widthIntensity = 1.0f;
+        if (json.has("beamScaleAxis")) {
+            String axis = json.get("beamScaleAxis").getAsString();
+            switch (axis) {
+                case "LENGTH" -> { lengthIntensity = 1.0f; widthIntensity = 0f; }
+                case "WIDTH" -> { lengthIntensity = 0f; widthIntensity = 1.0f; }
+                case "BOTH" -> { lengthIntensity = 1.0f; widthIntensity = 1.0f; }
+                case "LENGTH_THEN_WIDTH" -> { lengthIntensity = 2.0f; widthIntensity = 0.5f; }
+                case "WIDTH_THEN_LENGTH" -> { lengthIntensity = 0.5f; widthIntensity = 2.0f; }
+            }
+        } else {
+            lengthIntensity = json.has("beamLengthIntensity") ? json.get("beamLengthIntensity").getAsFloat() : 1.0f;
+            widthIntensity = json.has("beamWidthIntensity") ? json.get("beamWidthIntensity").getAsFloat() : 1.0f;
+        }
+        
         return builder()
             // Orb
-            .orbType(json.has("orbType") ? EnergyType.valueOf(json.get("orbType").getAsString()) : EnergyType.CLASSIC)
             .orbTransition(json.has("orbTransition") ? TransitionStyle.valueOf(json.get("orbTransition").getAsString()) : TransitionStyle.FADE_AND_SCALE)
-            .orbRadius(json.has("orbRadius") ? json.get("orbRadius").getAsFloat() : 0.3f)
+            .orbRadius(orbRadius)
             .orbSegments(json.has("orbSegments") ? json.get("orbSegments").getAsInt() : 16)
             .orbProgress(json.has("orbProgress") ? json.get("orbProgress").getAsFloat() : 1.0f)
             // Beam
-            .beamType(json.has("beamType") ? EnergyType.valueOf(json.get("beamType").getAsString()) : EnergyType.CLASSIC)
             .beamTransition(json.has("beamTransition") ? TransitionStyle.valueOf(json.get("beamTransition").getAsString()) : TransitionStyle.SCALE)
-            .beamScaleAxis(json.has("beamScaleAxis") ? BeamScaleAxis.valueOf(json.get("beamScaleAxis").getAsString()) : BeamScaleAxis.LENGTH)
             .beamLength(json.has("beamLength") ? json.get("beamLength").getAsFloat() : 5.0f)
-            .beamBaseRadius(json.has("beamBaseRadius") ? json.get("beamBaseRadius").getAsFloat() : 0.25f)
-            .beamTipRadius(json.has("beamTipRadius") ? json.get("beamTipRadius").getAsFloat() : 0.2f)
+            .beamRatio(beamRatio)
+            .beamTaper(beamTaper)
+            .beamTwist(json.has("beamTwist") ? json.get("beamTwist").getAsFloat() : 0.0f)
+            .beamLengthIntensity(lengthIntensity)
+            .beamWidthIntensity(widthIntensity)
             .beamSegments(json.has("beamSegments") ? json.get("beamSegments").getAsInt() : 16)
             .beamLengthSegments(json.has("beamLengthSegments") ? json.get("beamLengthSegments").getAsInt() : 8)
             .beamProgress(json.has("beamProgress") ? json.get("beamProgress").getAsFloat() : 1.0f)
-            // Proportional Sizing
-            .proportionalBeam(!json.has("proportionalBeam") || json.get("proportionalBeam").getAsBoolean())
-            .beamToOrbRatio(json.has("beamToOrbRatio") ? json.get("beamToOrbRatio").getAsFloat() : 0.8f)
             // Tip
             .hasDomeTip(!json.has("hasDomeTip") || json.get("hasDomeTip").getAsBoolean())
             // Alpha gradient
@@ -508,14 +569,13 @@ public record KamehamehaShape(
     public Builder toBuilder() {
         return new Builder()
             // Orb
-            .orbType(orbType).orbTransition(orbTransition).orbRadius(orbRadius)
+            .orbTransition(orbTransition).orbRadius(orbRadius)
             .orbSegments(orbSegments).orbProgress(orbProgress)
             // Beam
-            .beamType(beamType).beamTransition(beamTransition).beamScaleAxis(beamScaleAxis)
-            .beamLength(beamLength).beamBaseRadius(beamBaseRadius).beamTipRadius(beamTipRadius)
+            .beamTransition(beamTransition)
+            .beamLength(beamLength).beamRatio(beamRatio).beamTaper(beamTaper).beamTwist(beamTwist)
+            .beamLengthIntensity(beamLengthIntensity).beamWidthIntensity(beamWidthIntensity)
             .beamSegments(beamSegments).beamLengthSegments(beamLengthSegments).beamProgress(beamProgress)
-            // Proportional Sizing
-            .proportionalBeam(proportionalBeam).beamToOrbRatio(beamToOrbRatio)
             // Tip
             .hasDomeTip(hasDomeTip)
             // Alpha gradient
@@ -528,24 +588,21 @@ public record KamehamehaShape(
     
     public static class Builder {
         // Orb
-        private EnergyType orbType = EnergyType.CLASSIC;
         private TransitionStyle orbTransition = TransitionStyle.FADE_AND_SCALE;
         private float orbRadius = 0.3f;
         private int orbSegments = 16;
         private float orbProgress = 1.0f;
         // Beam
-        private EnergyType beamType = EnergyType.CLASSIC;
         private TransitionStyle beamTransition = TransitionStyle.SCALE;
-        private BeamScaleAxis beamScaleAxis = BeamScaleAxis.LENGTH;
         private float beamLength = 5.0f;
-        private float beamBaseRadius = 0.25f;
-        private float beamTipRadius = 0.2f;
+        private float beamRatio = 0.8f;
+        private float beamTaper = 1.0f;
+        private float beamTwist = 0.0f;
+        private float beamLengthIntensity = 1.0f;
+        private float beamWidthIntensity = 1.0f;
         private int beamSegments = 16;
         private int beamLengthSegments = 8;
         private float beamProgress = 1.0f;
-        // Proportional Sizing
-        private boolean proportionalBeam = true;
-        private float beamToOrbRatio = 0.8f;
         // Tip
         private boolean hasDomeTip = true;
         // Alpha gradient
@@ -560,37 +617,33 @@ public record KamehamehaShape(
         private float originOffset = 0.0f;
         
         // Orb setters
-        public Builder orbType(EnergyType v) { this.orbType = v != null ? v : EnergyType.CLASSIC; return this; }
         public Builder orbTransition(TransitionStyle v) { this.orbTransition = v != null ? v : TransitionStyle.FADE_AND_SCALE; return this; }
-        public Builder orbRadius(float v) { this.orbRadius = v; return this; }
-        public Builder orbSegments(int v) { this.orbSegments = v; return this; }
-        public Builder orbProgress(float v) { this.orbProgress = v; return this; }
+        public Builder orbRadius(float v) { this.orbRadius = Math.max(0.01f, v); return this; }
+        public Builder orbSegments(int v) { this.orbSegments = Math.max(4, v); return this; }
+        public Builder orbProgress(float v) { this.orbProgress = Math.max(0, Math.min(1, v)); return this; }
         
         // Beam setters
-        public Builder beamType(EnergyType v) { this.beamType = v != null ? v : EnergyType.CLASSIC; return this; }
         public Builder beamTransition(TransitionStyle v) { this.beamTransition = v != null ? v : TransitionStyle.SCALE; return this; }
-        public Builder beamScaleAxis(BeamScaleAxis v) { this.beamScaleAxis = v != null ? v : BeamScaleAxis.LENGTH; return this; }
-        public Builder beamLength(float v) { this.beamLength = v; return this; }
-        public Builder beamBaseRadius(float v) { this.beamBaseRadius = v; return this; }
-        public Builder beamTipRadius(float v) { this.beamTipRadius = v; return this; }
-        public Builder beamSegments(int v) { this.beamSegments = v; return this; }
-        public Builder beamLengthSegments(int v) { this.beamLengthSegments = v; return this; }
-        public Builder beamProgress(float v) { this.beamProgress = v; return this; }
-        
-        // Proportional Sizing setters
-        public Builder proportionalBeam(boolean v) { this.proportionalBeam = v; return this; }
-        public Builder beamToOrbRatio(float v) { this.beamToOrbRatio = Math.max(0.1f, Math.min(1.5f, v)); return this; }
+        public Builder beamLength(float v) { this.beamLength = Math.max(0, v); return this; }
+        public Builder beamRatio(float v) { this.beamRatio = Math.max(0.05f, Math.min(1.0f, v)); return this; }
+        public Builder beamTaper(float v) { this.beamTaper = Math.max(0.0f, Math.min(1.5f, v)); return this; }
+        public Builder beamTwist(float v) { this.beamTwist = Math.max(-360f, Math.min(360f, v)); return this; }
+        public Builder beamLengthIntensity(float v) { this.beamLengthIntensity = Math.max(0f, Math.min(3f, v)); return this; }
+        public Builder beamWidthIntensity(float v) { this.beamWidthIntensity = Math.max(0f, Math.min(3f, v)); return this; }
+        public Builder beamSegments(int v) { this.beamSegments = Math.max(4, v); return this; }
+        public Builder beamLengthSegments(int v) { this.beamLengthSegments = Math.max(1, v); return this; }
+        public Builder beamProgress(float v) { this.beamProgress = Math.max(0, Math.min(1, v)); return this; }
         
         // Tip setter
         public Builder hasDomeTip(boolean v) { this.hasDomeTip = v; return this; }
         
         // Alpha gradient setters
-        public Builder orbAlpha(float v) { this.orbAlpha = v; return this; }
-        public Builder orbMinAlpha(float v) { this.orbMinAlpha = v; return this; }
-        public Builder beamBaseAlpha(float v) { this.beamBaseAlpha = v; return this; }
-        public Builder beamBaseMinAlpha(float v) { this.beamBaseMinAlpha = v; return this; }
-        public Builder beamTipAlpha(float v) { this.beamTipAlpha = v; return this; }
-        public Builder beamTipMinAlpha(float v) { this.beamTipMinAlpha = v; return this; }
+        public Builder orbAlpha(float v) { this.orbAlpha = Math.max(0, Math.min(1, v)); return this; }
+        public Builder orbMinAlpha(float v) { this.orbMinAlpha = Math.max(0, Math.min(1, v)); return this; }
+        public Builder beamBaseAlpha(float v) { this.beamBaseAlpha = Math.max(0, Math.min(1, v)); return this; }
+        public Builder beamBaseMinAlpha(float v) { this.beamBaseMinAlpha = Math.max(0, Math.min(1, v)); return this; }
+        public Builder beamTipAlpha(float v) { this.beamTipAlpha = Math.max(0, Math.min(1, v)); return this; }
+        public Builder beamTipMinAlpha(float v) { this.beamTipMinAlpha = Math.max(0, Math.min(1, v)); return this; }
         
         // Orientation setters
         public Builder orientationAxis(OrientationAxis v) { this.orientationAxis = v != null ? v : OrientationAxis.POS_Z; return this; }
@@ -598,10 +651,10 @@ public record KamehamehaShape(
         
         public KamehamehaShape build() {
             return new KamehamehaShape(
-                orbType, orbTransition, orbRadius, orbSegments, orbProgress,
-                beamType, beamTransition, beamScaleAxis,
-                beamLength, beamBaseRadius, beamTipRadius, beamSegments, beamLengthSegments, beamProgress,
-                proportionalBeam, beamToOrbRatio,
+                orbTransition, orbRadius, orbSegments, orbProgress,
+                beamTransition, beamLength, beamRatio, beamTaper, beamTwist,
+                beamLengthIntensity, beamWidthIntensity,
+                beamSegments, beamLengthSegments, beamProgress,
                 hasDomeTip,
                 orbAlpha, orbMinAlpha, beamBaseAlpha, beamBaseMinAlpha, beamTipAlpha, beamTipMinAlpha,
                 orientationAxis, originOffset

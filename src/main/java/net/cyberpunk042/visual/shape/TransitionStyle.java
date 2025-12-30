@@ -17,16 +17,7 @@ public enum TransitionStyle {
     SCALE("Scale", "Size transition only"),
     
     /** Both alpha and scale change together. */
-    FADE_AND_SCALE("Fade & Scale", "Combined opacity and size transition"),
-    
-    /** Instant appearance/disappearance (no transition). */
-    INSTANT("Instant", "No transition animation"),
-    
-    /** Dissolve effect (particles scatter). */
-    DISSOLVE("Dissolve", "Particle scatter effect"),
-    
-    /** Wipe effect (edge moves across). */
-    WIPE("Wipe", "Directional wipe animation");
+    FADE_AND_SCALE("Fade & Scale", "Combined opacity and size transition");
     
     private final String displayName;
     private final String description;
@@ -43,7 +34,7 @@ public enum TransitionStyle {
      * Whether this transition affects alpha.
      */
     public boolean affectsAlpha() {
-        return this == FADE || this == FADE_AND_SCALE || this == DISSOLVE;
+        return this == FADE || this == FADE_AND_SCALE;
     }
     
     /**

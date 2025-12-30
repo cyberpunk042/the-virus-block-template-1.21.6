@@ -221,17 +221,6 @@ public final class ClientFieldNodes {
     );
     
     /**
-     * Wave shader for GPU-based wave deformation.
-     */
-    public static final InitNode WAVE_SHADER = InitNode.simple(
-        "wave_shader", "Wave Shader",
-        () -> {
-            net.cyberpunk042.client.visual.render.WaveShaderRegistry.register();
-            return 1;
-        }
-    );
-    
-    /**
      * Fresnel (Horizon) shader for rim lighting effects.
      */
     public static final InitNode FRESNEL_SHADER = InitNode.simple(
@@ -243,12 +232,26 @@ public final class ClientFieldNodes {
     );
     
     /**
-     * Corona shader for additive overlay glow effects.
+     * Depth test shader for post-processing POC (used by Shockwave).
      */
-    public static final InitNode CORONA_SHADER = InitNode.simple(
-        "corona_shader", "Corona Shader",
+    public static final InitNode DEPTH_TEST_SHADER = InitNode.simple(
+        "depth_test_shader", "Depth Test Shader",
         () -> {
-            net.cyberpunk042.client.visual.shader.CoronaPipelines.init();
+            net.cyberpunk042.client.visual.shader.DepthTestShader.init();
+            net.cyberpunk042.client.visual.shader.DirectDepthRenderer.init();
+            
+            // Register HUD overlay for depth visualization
+            net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback.EVENT.register(
+                (context, tickCounter) -> {
+                    var client = net.minecraft.client.MinecraftClient.getInstance();
+                    if (client != null && client.getWindow() != null) {
+                        int width = client.getWindow().getScaledWidth();
+                        int height = client.getWindow().getScaledHeight();
+                        net.cyberpunk042.client.visual.shader.DirectDepthRenderer.renderOverlay(context, width, height);
+                    }
+                }
+            );
+            
             return 1;
         }
     );

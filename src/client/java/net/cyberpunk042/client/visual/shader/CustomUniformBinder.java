@@ -93,13 +93,6 @@ public final class CustomUniformBinder {
             return;
         }
         
-        // Check if this is our Corona pipeline
-        if (pipeline == CoronaPipelines.CORONA_ENTITY_ADDITIVE && currentCorona != null) {
-            Logging.FIELD.topic("shader").info("[MIXIN] Binding Corona uniforms!");
-            bindCoronaParams(renderPass, currentCorona);
-            return;
-        }
-        
         // Not our pipeline - nothing to bind
     }
     

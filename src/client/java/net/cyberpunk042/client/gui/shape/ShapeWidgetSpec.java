@@ -452,46 +452,36 @@ public final class ShapeWidgetSpec {
         SliderSpec.half("Orb R", "kamehameha.orbRadius", 0.1f, 2f, "%.2f"),
         SliderSpec.halfInt("Orb Segs", "kamehameha.orbSegments", 4, 48),
         
-        // Row: Orb Type + Transition
-        EnumDropdownSpec.half("Orb Type", "kamehameha.orbType", 
-            net.cyberpunk042.visual.shape.EnergyType.class, 
-            net.cyberpunk042.visual.shape.EnergyType.CLASSIC),
+        // Row: Orb Transition + Alpha
         EnumDropdownSpec.half("Trans", "kamehameha.orbTransition",
             net.cyberpunk042.visual.shape.TransitionStyle.class,
             net.cyberpunk042.visual.shape.TransitionStyle.FADE_AND_SCALE),
-        
-        // Row: Orb Alpha + Min Alpha
         SliderSpec.half("Orb α", "kamehameha.orbAlpha", 0f, 1f, "%.2f"),
-        SliderSpec.half("Orb Min α", "kamehameha.orbMinAlpha", 0f, 1f, "%.2f"),
         
         // === BEAM CONFIGURATION ===
         new SectionHeader("Beam"),
         
-        // Row: Beam Length + Scale Axis
+        // Row: Beam Length + Transition
         SliderSpec.half("Length", "kamehameha.beamLength", 0f, 20f, "%.1f"),
-        EnumDropdownSpec.half("Scale", "kamehameha.beamScaleAxis",
-            net.cyberpunk042.visual.shape.BeamScaleAxis.class,
-            net.cyberpunk042.visual.shape.BeamScaleAxis.LENGTH),
+        EnumDropdownSpec.half("Trans", "kamehameha.beamTransition",
+            net.cyberpunk042.visual.shape.TransitionStyle.class,
+            net.cyberpunk042.visual.shape.TransitionStyle.SCALE),
         
-        // Row: Base Radius + Tip Radius
-        SliderSpec.half("Base R", "kamehameha.beamBaseRadius", 0.05f, 2f, "%.2f"),
-        SliderSpec.half("Tip R", "kamehameha.beamTipRadius", 0f, 2f, "%.2f"),
+        // Row: Beam Ratio + Taper
+        SliderSpec.half("Ratio", "kamehameha.beamRatio", 0.05f, 1f, "%.2f"),
+        SliderSpec.half("Taper", "kamehameha.beamTaper", 0f, 1.5f, "%.2f"),
         
-        // Row: Proportional Sizing
-        CheckboxSpec.half("Proportional", "kamehameha.proportionalBeam", "Auto-size beam from orb"),
-        SliderSpec.half("Beam Ratio", "kamehameha.beamToOrbRatio", 0.1f, 1.5f, "%.2f"),
+        // Row: Length Intensity + Width Intensity
+        SliderSpec.half("Len Int", "kamehameha.beamLengthIntensity", 0f, 3f, "%.1f"),
+        SliderSpec.half("Wid Int", "kamehameha.beamWidthIntensity", 0f, 3f, "%.1f"),
+        
+        // Row: Twist + (break)
+        SliderSpec.halfDegreeSigned("Twist", "kamehameha.beamTwist"),
+        new RowBreak(),
         
         // Row: Beam Segments + Length Segments
         SliderSpec.halfInt("Segs", "kamehameha.beamSegments", 4, 48),
         SliderSpec.halfInt("Len Segs", "kamehameha.beamLengthSegments", 1, 32),
-        
-        // Row: Beam Type + Transition
-        EnumDropdownSpec.half("Beam Type", "kamehameha.beamType",
-            net.cyberpunk042.visual.shape.EnergyType.class,
-            net.cyberpunk042.visual.shape.EnergyType.CLASSIC),
-        EnumDropdownSpec.half("Beam Trans", "kamehameha.beamTransition",
-            net.cyberpunk042.visual.shape.TransitionStyle.class,
-            net.cyberpunk042.visual.shape.TransitionStyle.SCALE),
         
         // === BEAM ALPHA GRADIENT ===
         new SectionHeader("Beam Alpha"),
