@@ -320,6 +320,13 @@ public final class StateAccessor {
      */
     private static Object updateRecordProperty(Object record, String path, Object value) {
         try {
+            // Special case: KamehamehaShape.combinedProgress uses withCombinedProgress() factory
+            if (record instanceof net.cyberpunk042.visual.shape.KamehamehaShape kamehameha
+                    && path.equals("combinedProgress")) {
+                float combined = (value instanceof Number num) ? num.floatValue() : 0f;
+                return kamehameha.withCombinedProgress(combined);
+            }
+            
             // Get the builder
             var toBuilderMethod = record.getClass().getMethod("toBuilder");
             Object builder = toBuilderMethod.invoke(record);

@@ -441,6 +441,10 @@ public final class ShapeWidgetSpec {
     // ───────────────────────────────────────────────────────────────────────────
     
     private static final List<Object> KAMEHAMEHA_SPECS = List.of(
+        // === COMBINED PROGRESS [0-2] ===
+        // 0.0-1.0 = Orb charges, 1.0-2.0 = Beam extends
+        SliderSpec.full("Progress", "kamehameha.combinedProgress", 0f, 2f, "%.2f"),
+        
         // === ORB CONFIGURATION ===
         new SectionHeader("Orb"),
         
@@ -452,16 +456,13 @@ public final class ShapeWidgetSpec {
         EnumDropdownSpec.half("Orb Type", "kamehameha.orbType", 
             net.cyberpunk042.visual.shape.EnergyType.class, 
             net.cyberpunk042.visual.shape.EnergyType.CLASSIC),
-        EnumDropdownSpec.half("Orb Trans", "kamehameha.orbTransition",
+        EnumDropdownSpec.half("Trans", "kamehameha.orbTransition",
             net.cyberpunk042.visual.shape.TransitionStyle.class,
             net.cyberpunk042.visual.shape.TransitionStyle.FADE_AND_SCALE),
         
         // Row: Orb Alpha + Min Alpha
         SliderSpec.half("Orb α", "kamehameha.orbAlpha", 0f, 1f, "%.2f"),
         SliderSpec.half("Orb Min α", "kamehameha.orbMinAlpha", 0f, 1f, "%.2f"),
-        
-        // Row: Orb Progress (for animation testing)
-        SliderSpec.full("Orb Progress", "kamehameha.orbProgress", 0f, 1f, "%.2f"),
         
         // === BEAM CONFIGURATION ===
         new SectionHeader("Beam"),
@@ -476,7 +477,7 @@ public final class ShapeWidgetSpec {
         SliderSpec.half("Base R", "kamehameha.beamBaseRadius", 0.05f, 2f, "%.2f"),
         SliderSpec.half("Tip R", "kamehameha.beamTipRadius", 0f, 2f, "%.2f"),
         
-        // Row: Proportional Sizing - links beam radius to orb
+        // Row: Proportional Sizing
         CheckboxSpec.half("Proportional", "kamehameha.proportionalBeam", "Auto-size beam from orb"),
         SliderSpec.half("Beam Ratio", "kamehameha.beamToOrbRatio", 0.1f, 1.5f, "%.2f"),
         
@@ -492,9 +493,6 @@ public final class ShapeWidgetSpec {
             net.cyberpunk042.visual.shape.TransitionStyle.class,
             net.cyberpunk042.visual.shape.TransitionStyle.SCALE),
         
-        // Row: Beam Progress (for animation testing)
-        SliderSpec.full("Beam Progress", "kamehameha.beamProgress", 0f, 1f, "%.2f"),
-        
         // === BEAM ALPHA GRADIENT ===
         new SectionHeader("Beam Alpha"),
         
@@ -505,7 +503,6 @@ public final class ShapeWidgetSpec {
         // Row: Tip Alpha + Tip Min Alpha
         SliderSpec.half("Tip α", "kamehameha.beamTipAlpha", 0f, 1f, "%.2f"),
         SliderSpec.half("Tip Min α", "kamehameha.beamTipMinAlpha", 0f, 1f, "%.2f"),
-        
         
         // === TIP STYLE ===
         new SectionHeader("Tip"),

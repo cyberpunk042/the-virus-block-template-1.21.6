@@ -76,7 +76,7 @@ public final class KamehamehaTessellator {
         float length = shape.effectiveBeamLength();
         int segments = shape.beamSegments();
         OrientationAxis axis = shape.orientationAxis() != null ? shape.orientationAxis() : OrientationAxis.POS_Z;
-        float beamStart = shape.effectiveOrbRadius();
+        float beamStart = shape.orbRadius() * 0.7f;  // Start INSIDE the orb for visual connection
         float offset = shape.originOffset();
         
         // Calculate taper ratio (tip radius / base radius)
@@ -105,7 +105,7 @@ public final class KamehamehaTessellator {
     
     private static void tessellateBeamTip(MeshBuilder builder, KamehamehaShape shape, float time, VertexPattern pattern) {
         float tipRadius = shape.effectiveBeamTipRadius();
-        float tipStart = shape.effectiveOrbRadius() + shape.effectiveBeamLength();
+        float tipStart = shape.orbRadius() * 0.7f + shape.effectiveBeamLength();
         int segments = shape.beamSegments();
         float tipAlpha = shape.beamTipAlpha();
         OrientationAxis axis = shape.orientationAxis() != null ? shape.orientationAxis() : OrientationAxis.POS_Z;
@@ -206,9 +206,8 @@ public final class KamehamehaTessellator {
             float sinTheta = (float) Math.sin(theta);
             float cosTheta = (float) Math.cos(theta);
             
-            // Alpha fades toward the pole
-            float latT = (float) lat / latSteps;
-            float vertAlpha = alpha * (1f - latT * 0.5f);
+            // Use constant alpha for the hemisphere (no artificial fade)
+            float vertAlpha = alpha;
             
             for (int lon = 0; lon <= segments; lon++) {
                 float phi = (float) (2 * Math.PI * lon / segments);
@@ -232,7 +231,7 @@ public final class KamehamehaTessellator {
             }
         }
         
-        // Generate quads with pattern support
+        // Generate quads with pattern support - use same winding as sphere
         for (int lat = 0; lat < latSteps; lat++) {
             for (int lon = 0; lon < segments; lon++) {
                 int i00 = indices[lat][lon];
@@ -240,8 +239,9 @@ public final class KamehamehaTessellator {
                 int i10 = indices[lat + 1][lon];
                 int i11 = indices[lat + 1][lon + 1];
                 
-                // Quad with pattern: TL=i00, TR=i01, BR=i11, BL=i10
-                builder.quadAsTrianglesFromPattern(i00, i01, i11, i10, pattern);
+                // Winding reversed from sphere to face outward from dome
+                // Sphere uses TL,TR,BR,BL but hemisphere needs TL,BL,BR,TR for outward faces
+                builder.quadAsTrianglesFromPattern(i00, i10, i11, i01, pattern);
             }
         }
     }

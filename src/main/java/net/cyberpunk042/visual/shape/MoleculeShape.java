@@ -153,7 +153,7 @@ public record MoleculeShape(
     
     @Override
     public CellType primaryCellType() {
-        return CellType.TRIANGLE;  // Spheres and tubes are triangulated
+        return CellType.QUAD;  // Uses quadAsTrianglesFromPattern for sphere tessellation
     }
     
     @Override

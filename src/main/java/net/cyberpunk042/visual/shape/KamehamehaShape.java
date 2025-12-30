@@ -223,7 +223,7 @@ public record KamehamehaShape(
         EnergyType.CLASSIC, TransitionStyle.SCALE, BeamScaleAxis.LENGTH, 
         5.0f, 0.25f, 0.2f, 16, 8, 1.0f,
         // Proportional Sizing
-        false, 0.8f,
+        true, 0.8f,
         // Tip (true = dome/hemisphere, false = flat)
         true,
         // Alpha gradient
@@ -411,6 +411,45 @@ public record KamehamehaShape(
         return beamProgress > 0.001f && beamLength > 0;
     }
     
+    // =========================================================================
+    // Combined Progress (UX Helper)
+    // =========================================================================
+    
+    /**
+     * Gets the combined progress value [0, 2].
+     * <ul>
+     *   <li>0.0 - 1.0: Orb charging (beam invisible)</li>
+     *   <li>1.0 - 2.0: Beam extending (orb at full)</li>
+     * </ul>
+     */
+    public float combinedProgress() {
+        // If orb isn't full yet, progress is just orbProgress
+        if (orbProgress < 1.0f) {
+            return orbProgress;
+        }
+        // Orb is full, add beam progress
+        return 1.0f + beamProgress;
+    }
+    
+    /**
+     * Creates a new shape with the combined progress value applied.
+     * <ul>
+     *   <li>0.0 - 1.0: Sets orbProgress, beamProgress = 0</li>
+     *   <li>1.0 - 2.0: Sets orbProgress = 1, beamProgress = value - 1</li>
+     * </ul>
+     * 
+     * @param combined Progress value from 0 to 2
+     * @return New shape with appropriate orb/beam progress
+     */
+    public KamehamehaShape withCombinedProgress(float combined) {
+        combined = Math.max(0f, Math.min(2f, combined));
+        if (combined <= 1.0f) {
+            return toBuilder().orbProgress(combined).beamProgress(0f).build();
+        } else {
+            return toBuilder().orbProgress(1f).beamProgress(combined - 1f).build();
+        }
+    }
+    
 
     
     // =========================================================================
@@ -443,7 +482,7 @@ public record KamehamehaShape(
             .beamLengthSegments(json.has("beamLengthSegments") ? json.get("beamLengthSegments").getAsInt() : 8)
             .beamProgress(json.has("beamProgress") ? json.get("beamProgress").getAsFloat() : 1.0f)
             // Proportional Sizing
-            .proportionalBeam(json.has("proportionalBeam") && json.get("proportionalBeam").getAsBoolean())
+            .proportionalBeam(!json.has("proportionalBeam") || json.get("proportionalBeam").getAsBoolean())
             .beamToOrbRatio(json.has("beamToOrbRatio") ? json.get("beamToOrbRatio").getAsFloat() : 0.8f)
             // Tip
             .hasDomeTip(!json.has("hasDomeTip") || json.get("hasDomeTip").getAsBoolean())
@@ -505,7 +544,7 @@ public record KamehamehaShape(
         private int beamLengthSegments = 8;
         private float beamProgress = 1.0f;
         // Proportional Sizing
-        private boolean proportionalBeam = false;
+        private boolean proportionalBeam = true;
         private float beamToOrbRatio = 0.8f;
         // Tip
         private boolean hasDomeTip = true;
@@ -514,7 +553,7 @@ public record KamehamehaShape(
         private float orbMinAlpha = 0.0f;
         private float beamBaseAlpha = 1.0f;
         private float beamBaseMinAlpha = 0.0f;
-        private float beamTipAlpha = 0.8f;
+        private float beamTipAlpha = 1.0f;
         private float beamTipMinAlpha = 0.0f;
         // Orientation
         private OrientationAxis orientationAxis = OrientationAxis.POS_Z;
