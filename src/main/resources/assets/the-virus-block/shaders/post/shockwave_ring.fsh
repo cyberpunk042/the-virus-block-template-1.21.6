@@ -73,7 +73,9 @@ out vec4 fragColor;
 // ═══════════════════════════════════════════════════════════════════════════
 
 float linearizeDepth(float depth, float near, float far) {
-    return (2.0 * near * far) / (far + near - depth * (far - near));
+    // Convert depth buffer (0-1) to NDC Z (-1 to 1) first
+    float ndcZ = depth * 2.0 - 1.0;
+    return (2.0 * near * far) / (far + near - ndcZ * (far - near));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -85,21 +87,33 @@ vec3 reconstructWorldPos(vec2 uv, float linearDepth) {
     vec3 camPos = vec3(CameraX, CameraY, CameraZ);
     vec3 forward = normalize(vec3(ForwardX, ForwardY, ForwardZ));
     
-    // Compute camera's LOCAL up (not world up!) - tilts with pitch
+    // Compute camera's LOCAL right and up vectors
+    // Handle gimbal lock: when looking straight up/down, use a fallback
     vec3 worldUp = vec3(0.0, 1.0, 0.0);
-    vec3 right = normalize(cross(forward, worldUp));
-    vec3 up = normalize(cross(right, forward));  // Local up, tilts with camera
+    float upDot = abs(dot(forward, worldUp));
     
-    // Calculate ray direction from UV
-    // UV (0,0) is top-left, (1,1) is bottom-right
+    vec3 right, up;
+    if (upDot > 0.99) {
+        // Near gimbal lock - compute right from the HORIZONTAL component of forward (based on yaw)
+        // When looking down, forward.xz still has the horizontal direction
+        // right = perpendicular to that in horizontal plane
+        right = normalize(vec3(forward.z, 0.0, -forward.x));
+        up = normalize(cross(right, forward));
+    } else {
+        right = normalize(cross(forward, worldUp));
+        up = normalize(cross(right, forward));
+    }
+    
+    // Calculate ray direction from UV using perspective projection
+    // NDC: (0,0) is top-left, (1,1) is bottom-right -> convert to (-1,1) range
     vec2 ndc = uv * 2.0 - 1.0;
     
-    // Calculate half-sizes at unit distance
+    // Calculate half-sizes at unit distance from camera
     float halfFovTan = tan(Fov * 0.5);
     float halfHeight = halfFovTan;
     float halfWidth = halfFovTan * AspectRatio;
     
-    // Build ray direction
+    // Build ray direction: forward + screen offset
     vec3 rayDir = forward + right * (ndc.x * halfWidth) + up * (ndc.y * halfHeight);
     rayDir = normalize(rayDir);
     
