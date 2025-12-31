@@ -332,6 +332,32 @@ public class TheVirusBlockClient implements ClientModInitializer {
 						})
 					)
 			);
+			
+			// TEST: Explicit pipeline shockwave (bypasses PostEffectProcessor)
+			dispatcher.register(
+				net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("shockwavetest")
+					.executes(ctx -> {
+						net.cyberpunk042.client.visual.shader.ShockwaveTestRenderer.toggle();
+						ctx.getSource().sendFeedback(
+							net.minecraft.text.Text.literal("§e§lTEST Shockwave: §f" + 
+								(net.cyberpunk042.client.visual.shader.ShockwaveTestRenderer.isEnabled() ? "ON" : "OFF"))
+						);
+						return 1;
+					})
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("radius")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("radius",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.0f, 500.0f))
+							.executes(ctx -> {
+								float radius = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "radius");
+								net.cyberpunk042.client.visual.shader.ShockwaveTestRenderer.setRadius(radius);
+								ctx.getSource().sendFeedback(
+									net.minecraft.text.Text.literal("§e§lTEST Radius: §f" + radius + " blocks")
+								);
+								return 1;
+							})
+						)
+					)
+			);
 		});
 	}
 }

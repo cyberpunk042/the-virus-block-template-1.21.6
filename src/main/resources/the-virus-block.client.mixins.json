@@ -21,7 +21,8 @@
     "RenderSystemMixin",
     "GameRendererDepthTestMixin",
     "WorldRendererDepthTestMixin",
-    "WorldRendererShockwaveMixin"
+    "WorldRendererShockwaveMixin",
+    "ShockwaveTestMixin"
   ],
   "injectors": {
     "defaultRequire": 1

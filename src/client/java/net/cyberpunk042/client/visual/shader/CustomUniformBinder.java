@@ -125,7 +125,11 @@ public final class CustomUniformBinder {
     /**
      * Binds ShockwaveParams (ShockwaveConfig) uniform block for the shockwave post-effect.
      */
+    private static int shockwaveBindCount = 0;
+    
     private static void bindShockwaveParams(RenderPass renderPass) {
+        shockwaveBindCount++;
+        
         try (MemoryStack stack = MemoryStack.stackPush()) {
             // ShockwaveConfig is 4 floats in std140 = 16 bytes minimum, but we'll use 32 for safety
             Std140Builder builder = Std140Builder.onStack(stack, 32);
@@ -135,6 +139,15 @@ public final class CustomUniformBinder {
             float thickness = ShockwavePostEffect.getThickness();
             float intensity = ShockwavePostEffect.getIntensity();
             float time = (System.currentTimeMillis() % 10000) / 1000.0f;
+            
+            // Log every 60th call to see if this is happening at all
+            if (shockwaveBindCount % 60 == 1) {
+                Logging.RENDER.topic("shockwave_bind")
+                    .kv("radius", String.format("%.1f", radius))
+                    .kv("thickness", String.format("%.1f", thickness))
+                    .kv("bindCount", shockwaveBindCount)
+                    .info("Binding ShockwaveConfig UBO");
+            }
             
             // Pack as vec4: RingRadius, RingThickness, Intensity, Time
             builder.putVec4(radius, thickness, intensity, time);
@@ -151,7 +164,9 @@ public final class CustomUniformBinder {
             renderPass.setUniform("ShockwaveConfig", gpuBuffer);
             
         } catch (Exception e) {
-            Logging.FIELD.topic("shockwave").warn("Failed to bind ShockwaveConfig: {}", e.getMessage());
+            Logging.RENDER.topic("shockwave_bind")
+                .kv("error", e.getMessage())
+                .warn("Failed to bind ShockwaveConfig");
         }
     }
     
