@@ -1,8 +1,8 @@
 #version 150
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TERRAIN-CONFORMING SHOCKWAVE RING - PRODUCTION VERSION
-// GPU shader with proper depth access via FrameGraph integration
+// TERRAIN-CONFORMING SHOCKWAVE RING - DYNAMIC VERSION
+// Uses uniform block for Java-controlled parameters
 // ═══════════════════════════════════════════════════════════════════════════
 
 uniform sampler2D InSampler;
@@ -15,40 +15,29 @@ layout(std140) uniform SamplerInfo {
     vec2 InSize;
 };
 
+// Custom uniform block from JSON
+layout(std140) uniform ShockwaveConfig {
+    float RingRadius;
+    float RingThickness;
+    float Intensity;
+    float Time;
+};
+
 out vec4 fragColor;
-
-// ═══════════════════════════════════════════════════════════════════════════
-// CONFIGURATION - These would ideally be uniforms but we hardcode for now
-// ═══════════════════════════════════════════════════════════════════════════
-
-// Ring parameters
-const float RING_RADIUS = 20.0;           // Distance from camera (blocks)
-const float RING_THICKNESS = 4.0;         // Width of the ring (blocks)
-const float INTENSITY = 1.0;              // Overall intensity (0-2)
-
-// Colors
-const vec3 CORE_COLOR = vec3(1.0, 1.0, 1.0);           // White hot core
-const vec3 RING_COLOR = vec3(0.0, 1.0, 1.0);           // Cyan glow
-const vec3 OUTER_GLOW_COLOR = vec3(0.3, 0.6, 1.0);     // Blue outer glow
-
-// Depth parameters
-const float NEAR_PLANE = 0.05;
-const float FAR_PLANE = 256.0;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DEPTH LINEARIZATION
 // ═══════════════════════════════════════════════════════════════════════════
 
-float linearizeDepth(float depth) {
-    return (2.0 * NEAR_PLANE * FAR_PLANE) / (FAR_PLANE + NEAR_PLANE - depth * (FAR_PLANE - NEAR_PLANE));
+float linearizeDepth(float depth, float near, float far) {
+    return (2.0 * near * far) / (far + near - depth * (far - near));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// GLOW FUNCTION - Multi-layer bloom
+// GLOW FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════
 
 float glowFalloff(float dist, float radius) {
-    // Quadratic falloff for soft glow
     float t = dist / radius;
     return max(0.0, 1.0 - t * t);
 }
@@ -57,62 +46,50 @@ void main() {
     vec4 sceneColor = texture(InSampler, texCoord);
     float rawDepth = texture(DepthSampler, texCoord).r;
     
-    // ═══════════════════════════════════════════════════════════════════════
-    // SKY DETECTION - Skip sky pixels
-    // ═══════════════════════════════════════════════════════════════════════
-    
+    // Sky detection
     if (rawDepth > 0.9999) {
         fragColor = sceneColor;
         return;
     }
     
+    // Linearize depth to world distance
+    float near = 0.05;
+    float far = 256.0;
+    float worldDistance = linearizeDepth(rawDepth, near, far);
+    
     // ═══════════════════════════════════════════════════════════════════════
-    // CONVERT DEPTH TO WORLD DISTANCE
+    // RING CALCULATION using uniforms
     // ═══════════════════════════════════════════════════════════════════════
     
-    float worldDistance = linearizeDepth(rawDepth);
-    
-    // ═══════════════════════════════════════════════════════════════════════
-    // RING CALCULATION
-    // ═══════════════════════════════════════════════════════════════════════
-    
-    float distFromRing = abs(worldDistance - RING_RADIUS);
+    float distFromRing = abs(worldDistance - RingRadius);
     
     // Core mask (sharp center)
-    float coreWidth = RING_THICKNESS * 0.2;
+    float coreWidth = RingThickness * 0.2;
     float coreMask = 1.0 - smoothstep(0.0, coreWidth, distFromRing);
     
     // Inner ring mask
-    float innerMask = 1.0 - smoothstep(0.0, RING_THICKNESS * 0.5, distFromRing);
+    float innerMask = 1.0 - smoothstep(0.0, RingThickness * 0.5, distFromRing);
     
-    // Outer glow mask (extends beyond ring)
-    float outerGlowRadius = RING_THICKNESS * 2.0;
-    float outerMask = glowFalloff(distFromRing, outerGlowRadius);
+    // Outer glow mask
+    float outerMask = glowFalloff(distFromRing, RingThickness * 2.0);
     
     // ═══════════════════════════════════════════════════════════════════════
     // COLOR COMPOSITION
     // ═══════════════════════════════════════════════════════════════════════
     
+    vec3 coreColor = vec3(1.0, 1.0, 1.0);           // White hot
+    vec3 ringColor = vec3(0.0, 1.0, 1.0);           // Cyan
+    vec3 outerGlow = vec3(0.2, 0.5, 1.0);           // Blue
+    
     vec3 finalColor = sceneColor.rgb;
     
-    // Layer 1: Outer glow (subtle, wide)
-    finalColor = mix(finalColor, OUTER_GLOW_COLOR, outerMask * 0.3 * INTENSITY);
+    // Apply layers with intensity
+    finalColor = mix(finalColor, outerGlow, outerMask * 0.4 * Intensity);
+    finalColor = mix(finalColor, ringColor, innerMask * 0.7 * Intensity);
+    finalColor = mix(finalColor, coreColor, coreMask * 0.9 * Intensity);
     
-    // Layer 2: Main ring (medium intensity)
-    finalColor = mix(finalColor, RING_COLOR, innerMask * 0.7 * INTENSITY);
+    // Additive bloom
+    finalColor += ringColor * coreMask * 0.3 * Intensity;
     
-    // Layer 3: Hot core (bright, narrow)
-    finalColor = mix(finalColor, CORE_COLOR, coreMask * 0.9 * INTENSITY);
-    
-    // ═══════════════════════════════════════════════════════════════════════
-    // BLOOM SIMULATION (fake HDR bloom)
-    // ═══════════════════════════════════════════════════════════════════════
-    
-    float bloomIntensity = coreMask * 0.3 * INTENSITY;
-    finalColor += RING_COLOR * bloomIntensity;  // Additive bloom
-    
-    // Clamp to prevent over-saturation
-    finalColor = clamp(finalColor, 0.0, 1.0);
-    
-    fragColor = vec4(finalColor, 1.0);
+    fragColor = vec4(clamp(finalColor, 0.0, 1.0), 1.0);
 }

@@ -2,6 +2,7 @@ package net.cyberpunk042.mixin.client;
 
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import net.cyberpunk042.client.visual.shader.ShockwavePostEffect;
+import net.cyberpunk042.client.visual.shader.ShockwaveRenderer;
 import net.cyberpunk042.log.Logging;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.PostEffectProcessor;
@@ -28,7 +29,7 @@ import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
 /**
  * Mixin to inject the shockwave post-effect into the FrameGraphBuilder.
  * 
- * <p>This uses the CORRECT modern API that properly binds depth:
+ * <p>Uses the CORRECT modern API that properly binds depth:
  * {@code processor.render(FrameGraphBuilder, width, height, FramebufferSet)}
  */
 @Mixin(WorldRenderer.class)
@@ -40,9 +41,6 @@ public abstract class WorldRendererShockwaveMixin {
     /**
      * Inject BEFORE the frame graph runs.
      * We capture the FrameGraphBuilder and add our shockwave pass.
-     * 
-     * LVT at this point (from error):
-     * [F, class_3695 (Profiler), class_243 (Vec3d), D, D, D, Z, class_4604 (Frustum), Z, Matrix4fStack, class_9909 (FrameGraphBuilder)]
      */
     @Inject(
         method = "render",
@@ -82,6 +80,9 @@ public abstract class WorldRendererShockwaveMixin {
             return;
         }
         
+        // Update the current radius for animation
+        float currentRadius = ShockwavePostEffect.getCurrentRadius();
+        
         // Load the processor
         PostEffectProcessor processor = ShockwavePostEffect.loadProcessor();
         if (processor == null) {
@@ -98,8 +99,13 @@ public abstract class WorldRendererShockwaveMixin {
         try {
             // Use the MODERN API that properly binds depth!
             processor.render(frameGraphBuilder, width, height, framebufferSet);
-            Logging.RENDER.topic("shockwave")
-                .debug("Shockwave pass added to frame graph");
+            
+            // Log animation progress
+            if (ShockwavePostEffect.isAnimating()) {
+                Logging.RENDER.topic("shockwave")
+                    .kv("radius", String.format("%.1f", currentRadius))
+                    .debug("Animating...");
+            }
         } catch (Exception e) {
             Logging.RENDER.topic("shockwave")
                 .kv("error", e.getMessage())

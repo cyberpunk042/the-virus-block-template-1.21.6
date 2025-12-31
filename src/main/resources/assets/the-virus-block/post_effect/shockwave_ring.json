@@ -17,6 +17,30 @@
                     "use_depth_buffer": true
                 }
             ],
+            "uniforms": {
+                "ShockwaveConfig": [
+                    {
+                        "name": "RingRadius",
+                        "type": "float",
+                        "value": 20.0
+                    },
+                    {
+                        "name": "RingThickness",
+                        "type": "float",
+                        "value": 4.0
+                    },
+                    {
+                        "name": "Intensity",
+                        "type": "float",
+                        "value": 1.0
+                    },
+                    {
+                        "name": "Time",
+                        "type": "float",
+                        "value": 0.0
+                    }
+                ]
+            },
             "output": "swap"
         },
         {
