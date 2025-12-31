@@ -87,18 +87,11 @@ vec3 reconstructWorldPos(vec2 uv, float linearDepth) {
     vec3 camPos = vec3(CameraX, CameraY, CameraZ);
     vec3 forward = normalize(vec3(ForwardX, ForwardY, ForwardZ));
     
-    // Prevent exact gimbal lock by clamping forward.y
-    // This ensures forward.xz always has SOME horizontal component for computing right
-    // At 0.999, pitch is about 87.4° - close enough but safe
-    float maxAbsY = 0.999;
-    if (abs(forward.y) > maxAbsY) {
-        float sign = forward.y > 0.0 ? 1.0 : -1.0;
-        forward.y = sign * maxAbsY;
-        forward = normalize(forward);
-    }
-    
-    // Now cross product with worldUp is always valid
+    // Compute camera's LOCAL right and up vectors
+    // Note: Java side clamps pitch to ±89° to prevent exact gimbal lock
     vec3 worldUp = vec3(0.0, 1.0, 0.0);
+    
+    // Standard cross product - works because pitch is clamped
     vec3 right = normalize(cross(forward, worldUp));
     vec3 up = normalize(cross(right, forward));
     

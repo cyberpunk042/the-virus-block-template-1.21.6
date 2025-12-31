@@ -86,6 +86,12 @@ public abstract class WorldRendererShockwaveMixin {
         // Compute forward vector from Camera object (consistent with depth buffer)
         float yaw = (float) Math.toRadians(camera.getYaw());
         float pitch = (float) Math.toRadians(camera.getPitch());
+        
+        // Clamp pitch to ±89° to prevent gimbal lock
+        // This ensures forward always has some horizontal component for stable reconstruction
+        float maxPitch = (float) Math.toRadians(89.0);
+        pitch = Math.max(-maxPitch, Math.min(maxPitch, pitch));
+        
         float fwdX = (float) (-Math.sin(yaw) * Math.cos(pitch));
         float fwdY = (float) (-Math.sin(pitch));
         float fwdZ = (float) (Math.cos(yaw) * Math.cos(pitch));
