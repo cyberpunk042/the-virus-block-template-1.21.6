@@ -84,8 +84,11 @@ vec3 reconstructWorldPos(vec2 uv, float linearDepth) {
     // Get camera vectors
     vec3 camPos = vec3(CameraX, CameraY, CameraZ);
     vec3 forward = normalize(vec3(ForwardX, ForwardY, ForwardZ));
-    vec3 up = normalize(vec3(UpX, UpY, UpZ));
-    vec3 right = normalize(cross(forward, up));
+    
+    // Compute camera's LOCAL up (not world up!) - tilts with pitch
+    vec3 worldUp = vec3(0.0, 1.0, 0.0);
+    vec3 right = normalize(cross(forward, worldUp));
+    vec3 up = normalize(cross(right, forward));  // Local up, tilts with camera
     
     // Calculate ray direction from UV
     // UV (0,0) is top-left, (1,1) is bottom-right
