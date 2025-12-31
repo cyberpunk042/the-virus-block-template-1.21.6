@@ -290,6 +290,19 @@ public class ShockwavePostEffect {
         cameraZ = z;
     }
     
+    // Forward vector from actual Camera object (for consistency)
+    private static float forwardX = 0, forwardY = 0, forwardZ = 1;
+    
+    public static void updateCameraForward(float x, float y, float z) {
+        forwardX = x;
+        forwardY = y;
+        forwardZ = z;
+    }
+    
+    public static float getForwardX() { return forwardX; }
+    public static float getForwardY() { return forwardY; }
+    public static float getForwardZ() { return forwardZ; }
+    
     public static float getTargetX() { return targetX; }
     public static float getTargetY() { return targetY; }
     public static float getTargetZ() { return targetZ; }

@@ -93,7 +93,6 @@ vec3 reconstructWorldPos(vec2 uv, float linearDepth) {
     // Calculate ray direction from UV
     // UV (0,0) is top-left, (1,1) is bottom-right
     vec2 ndc = uv * 2.0 - 1.0;
-    // ndc.y = -ndc.y; // Try WITHOUT flip - might be double-inverting
     
     // Calculate half-sizes at unit distance
     float halfFovTan = tan(Fov * 0.5);

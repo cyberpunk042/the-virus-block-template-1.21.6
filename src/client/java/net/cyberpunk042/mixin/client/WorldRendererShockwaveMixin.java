@@ -83,6 +83,14 @@ public abstract class WorldRendererShockwaveMixin {
         // Update camera position for target mode calculations
         ShockwavePostEffect.updateCameraPosition((float)camX, (float)camY, (float)camZ);
         
+        // Compute forward vector from Camera object (consistent with depth buffer)
+        float yaw = (float) Math.toRadians(camera.getYaw());
+        float pitch = (float) Math.toRadians(camera.getPitch());
+        float fwdX = (float) (-Math.sin(yaw) * Math.cos(pitch));
+        float fwdY = (float) (-Math.sin(pitch));
+        float fwdZ = (float) (Math.cos(yaw) * Math.cos(pitch));
+        ShockwavePostEffect.updateCameraForward(fwdX, fwdY, fwdZ);
+        
         // Update the current radius for animation
         float currentRadius = ShockwavePostEffect.getCurrentRadius();
         

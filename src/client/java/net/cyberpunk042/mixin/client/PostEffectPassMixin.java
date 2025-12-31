@@ -104,16 +104,11 @@ public class PostEffectPassMixin {
             builder.putVec4(camX, camY, camZ, aspect);
             
             // Vec4 4: Camera forward direction + FOV
+            // Use forward vector computed from Camera object (in WorldRendererShockwaveMixin)
             float fov = (float) Math.toRadians(client.options.getFov().getValue());
-            float yaw = 0f, pitch = 0f;
-            if (client.player != null) {
-                yaw = (float) Math.toRadians(client.player.getYaw());
-                pitch = (float) Math.toRadians(client.player.getPitch());
-            }
-            // Calculate forward vector from yaw/pitch
-            float forwardX = (float) (-Math.sin(yaw) * Math.cos(pitch));
-            float forwardY = (float) (-Math.sin(pitch));
-            float forwardZ = (float) (Math.cos(yaw) * Math.cos(pitch));
+            float forwardX = ShockwavePostEffect.getForwardX();
+            float forwardY = ShockwavePostEffect.getForwardY();
+            float forwardZ = ShockwavePostEffect.getForwardZ();
             builder.putVec4(forwardX, forwardY, forwardZ, fov);
             
             // Vec4 5: Camera up direction (simplified - always world up)
