@@ -239,15 +239,23 @@ public final class ClientFieldNodes {
         () -> {
             net.cyberpunk042.client.visual.shader.DepthTestShader.init();
             net.cyberpunk042.client.visual.shader.DirectDepthRenderer.init();
+            net.cyberpunk042.client.visual.shader.ShockwaveGlowRenderer.init();
+            net.cyberpunk042.client.visual.shader.ShockwavePostEffect.init();
             
-            // Register HUD overlay for depth visualization
+            // Register HUD overlay for depth visualization and shockwave
+            // NOTE: CAPTURE happens in WorldRenderer mixin, only RENDER here
             net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback.EVENT.register(
                 (context, tickCounter) -> {
                     var client = net.minecraft.client.MinecraftClient.getInstance();
                     if (client != null && client.getWindow() != null) {
                         int width = client.getWindow().getScaledWidth();
                         int height = client.getWindow().getScaledHeight();
+                        
+                        // DirectDepthRenderer overlay (if enabled)
                         net.cyberpunk042.client.visual.shader.DirectDepthRenderer.renderOverlay(context, width, height);
+                        
+                        // ShockwaveGlowRenderer overlay - ONLY RENDER (capture is in WorldRenderer)
+                        net.cyberpunk042.client.visual.shader.ShockwaveGlowRenderer.render(context, client, width, height);
                     }
                 }
             );

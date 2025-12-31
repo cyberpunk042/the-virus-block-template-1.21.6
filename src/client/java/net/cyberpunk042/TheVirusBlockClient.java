@@ -200,6 +200,76 @@ public class TheVirusBlockClient implements ClientModInitializer {
 							})
 						)
 					)
+				);
+			
+			// Shockwave Glow command (new hybrid renderer)
+			dispatcher.register(
+				net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("shockwave")
+					.executes(ctx -> {
+						net.cyberpunk042.client.visual.shader.ShockwaveGlowRenderer.toggle();
+						ctx.getSource().sendFeedback(
+							net.minecraft.text.Text.literal("§bShockwave: §f" + 
+								(net.cyberpunk042.client.visual.shader.ShockwaveGlowRenderer.isEnabled() ? "ON" : "OFF"))
+						);
+						return 1;
+					})
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("trigger")
+						.executes(ctx -> {
+							net.cyberpunk042.client.visual.shader.ShockwaveGlowRenderer.trigger();
+							ctx.getSource().sendFeedback(
+								net.minecraft.text.Text.literal("§bShockwave triggered!")
+							);
+							return 1;
+						})
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("radius")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("radius",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.0f, 500.0f))
+							.executes(ctx -> {
+								float radius = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "radius");
+								net.cyberpunk042.client.visual.shader.ShockwaveGlowRenderer.setRadius(radius);
+								ctx.getSource().sendFeedback(
+									net.minecraft.text.Text.literal("§bShockwave radius: §f" + radius + " blocks")
+								);
+								return 1;
+							})
+						)
+					)
+				);
+			
+			// GPU Shockwave command (proper FrameGraph integration)
+			dispatcher.register(
+				net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("shockwavegpu")
+					.executes(ctx -> {
+						net.cyberpunk042.client.visual.shader.ShockwavePostEffect.toggle();
+						ctx.getSource().sendFeedback(
+							net.minecraft.text.Text.literal("§d§lGPU Shockwave: §f" + 
+								(net.cyberpunk042.client.visual.shader.ShockwavePostEffect.isEnabled() ? "ON" : "OFF"))
+						);
+						return 1;
+					})
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("trigger")
+						.executes(ctx -> {
+							net.cyberpunk042.client.visual.shader.ShockwavePostEffect.trigger();
+							ctx.getSource().sendFeedback(
+								net.minecraft.text.Text.literal("§d§lGPU Shockwave triggered!")
+							);
+							return 1;
+						})
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("radius")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("radius",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.0f, 500.0f))
+							.executes(ctx -> {
+								float radius = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "radius");
+								net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setRadius(radius);
+								ctx.getSource().sendFeedback(
+									net.minecraft.text.Text.literal("§d§lGPU Shockwave radius: §f" + radius + " blocks")
+								);
+								return 1;
+							})
+						)
+					)
 			);
 		});
 	}

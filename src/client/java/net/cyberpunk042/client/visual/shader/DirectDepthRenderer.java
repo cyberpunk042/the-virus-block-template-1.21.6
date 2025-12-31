@@ -81,8 +81,8 @@ public class DirectDepthRenderer {
     private static float maxAnimationRadius = 100.0f;
     private static long animationStartTime = 0;
     
-    // Resolution control (for pixelation effect)
-    private static int resolutionDivisor = 4;  // Default to 1/4 for performance
+    // Resolution control (for Mode 9 overlay only, Mode 7/8 always use full res)
+    private static int resolutionDivisor = 1;  // Default to full resolution
     
     // Mode names
     private static final String[] MODE_NAMES = {
@@ -93,9 +93,10 @@ public class DirectDepthRenderer {
         "Full Depth Image",
         "Distance Visualization",
         "Ring at Fixed Distance",
-        "Ring from World Point",
-        "Animated Expanding Ring",
-        "OVERLAY Ring (Proper)"  // Mode 9 - draws ONLY ring pixels!
+        "Ring from World Point",       // Mode 7 - Grey background (WORKING)
+        "Animated Expanding Ring",     // Mode 8 - Animated (WORKING)
+        "OVERLAY Ring (Experimental)", // Mode 9 - draws ring pixels as overlay
+        "TRANSPARENT Ring (New)"       // Mode 10 - transparent texture overlay
     };
     
     public static void init() {
@@ -173,6 +174,7 @@ public class DirectDepthRenderer {
             case 7 -> captureRingFromWorldPoint(client, width, height);
             case 8 -> captureAnimatedRing(client, width, height);
             case 9 -> captureOverlayRing(client, width, height);
+            case 10 -> captureTransparentRing(client, width, height);
         }
     }
     
@@ -345,6 +347,7 @@ public class DirectDepthRenderer {
                 case 7 -> renderMode7_WorldPointRing(context, client, screenWidth, screenHeight);
                 case 8 -> renderMode8_AnimatedRing(context, client, screenWidth, screenHeight);
                 case 9 -> renderMode9_OverlayRing(context, client, screenWidth, screenHeight);
+                case 10 -> renderMode10_TransparentRing(context, client, screenWidth, screenHeight);
             }
         } catch (Exception e) {
             // Silently fail
@@ -860,8 +863,10 @@ public class DirectDepthRenderer {
     // ═══════════════════════════════════════════════════════════════════════════
     
     private static void captureRingFromWorldPoint(MinecraftClient client, int width, int height) {
-        int captureWidth = Math.max(1, width / resolutionDivisor);
-        int captureHeight = Math.max(1, height / resolutionDivisor);
+        // ALWAYS capture at FULL resolution to get correct coordinates
+        // Use resolutionDivisor to skip pixels during processing for speed
+        int captureWidth = width;
+        int captureHeight = height;
         
         // Get camera position
         var camera = client.gameRenderer.getCamera();
@@ -940,7 +945,7 @@ public class DirectDepthRenderer {
                 
                 if (depth >= 0.9999f) {
                     skyPixels++;
-                    depthImage.setColorArgb(x, y, 0xFF000000);
+                    depthImage.setColorArgb(x, y, 0xFF000000);  // Black for sky
                     continue;
                 }
                 
@@ -971,21 +976,43 @@ public class DirectDepthRenderer {
                 double dz = worldZ - origin.z;
                 float distFromOrigin = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
                 
-                // Check if within ring
-                if (distFromOrigin >= innerRing && distFromOrigin <= outerRing) {
-                    localRingPixels++;
-                    // Calculate intensity (brightest at ring center)
-                    float ringCenter = ringDistance;
-                    float distFromCenter = Math.abs(distFromOrigin - ringCenter);
-                    float intensity = 1.0f - (distFromCenter / (ringThickness / 2));
-                    int alpha = (int)(220 * intensity);
-                    int r = (int)(255 * intensity);
-                    int g = (int)(100 * intensity);
-                    int b = (int)(255 * intensity);
-                    depthImage.setColorArgb(x, y, (alpha << 24) | (r << 16) | (g << 8) | b);
+                // Check if within ring (with expanded glow zone)
+                float glowThickness = ringThickness * 3.0f;  // Glow extends beyond main ring
+                float glowInner = ringDistance - glowThickness / 2.0f;
+                float glowOuter = ringDistance + glowThickness / 2.0f;
+                
+                if (distFromOrigin >= glowInner && distFromOrigin <= glowOuter) {
+                    float distFromCenter = Math.abs(distFromOrigin - ringDistance);
+                    
+                    // Calculate core intensity (sharp center)
+                    float coreIntensity = 0.0f;
+                    if (distFromOrigin >= innerRing && distFromOrigin <= outerRing) {
+                        localRingPixels++;
+                        coreIntensity = 1.0f - (distFromCenter / (ringThickness / 2));
+                        coreIntensity = Math.max(0.0f, coreIntensity);
+                    }
+                    
+                    // Calculate glow intensity (soft outer)
+                    float glowIntensity = 1.0f - (distFromCenter / (glowThickness / 2));
+                    glowIntensity = (float) Math.pow(Math.max(0.0f, glowIntensity), 2.0);  // Square for falloff
+                    
+                    // Color: Cyan glow with white hot core
+                    float r = coreIntensity * 1.0f + glowIntensity * 0.2f;
+                    float g = coreIntensity * 1.0f + glowIntensity * 0.9f;
+                    float b = coreIntensity * 1.0f + glowIntensity * 1.0f;
+                    
+                    // Clamp and convert
+                    int ir = (int) Math.min(255, r * 255);
+                    int ig = (int) Math.min(255, g * 255);
+                    int ib = (int) Math.min(255, b * 255);
+                    int alpha = (int) Math.min(255, (coreIntensity * 255 + glowIntensity * 150));
+                    
+                    depthImage.setColorArgb(x, y, (alpha << 24) | (ir << 16) | (ig << 8) | ib);
                 } else {
-                    // TRANSPARENT - game shows through!
-                    depthImage.setColorArgb(x, y, 0x00000000);
+                    // Dim grey background showing distance
+                    float normalized = Math.min(1.0f, distFromOrigin / 50.0f);
+                    int gray = (int)((1.0f - normalized) * 60);  // Darker background
+                    depthImage.setColorArgb(x, y, (255 << 24) | (gray << 16) | (gray << 8) | gray);
                 }
             }
         }
@@ -1006,11 +1033,7 @@ public class DirectDepthRenderer {
     private static void renderMode7_WorldPointRing(DrawContext context, MinecraftClient client, int sw, int sh) {
         if (!textureRegistered || depthTexture == null) return;
         
-        // Enable blending for transparency
-        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
-        com.mojang.blaze3d.systems.RenderSystem.defaultBlendFunc();
-        
-        // FULLSCREEN stretched display with alpha blending
+        // FULLSCREEN stretched display (pipeline handles alpha blending)
         context.drawTexture(
             RenderPipelines.GUI_TEXTURED,
             DEPTH_TEXTURE_ID,
@@ -1019,8 +1042,6 @@ public class DirectDepthRenderer {
             sw, sh,
             lastWidth, lastHeight
         );
-        
-        com.mojang.blaze3d.systems.RenderSystem.disableBlend();
         
         // Stats overlay
         int statX = 5, statY = 25;
@@ -1069,11 +1090,7 @@ public class DirectDepthRenderer {
     private static void renderMode8_AnimatedRing(DrawContext context, MinecraftClient client, int sw, int sh) {
         if (!textureRegistered || depthTexture == null) return;
         
-        // Enable blending for transparency
-        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
-        com.mojang.blaze3d.systems.RenderSystem.defaultBlendFunc();
-        
-        // FULLSCREEN stretched display with alpha blending
+        // FULLSCREEN stretched display (pipeline handles alpha blending)
         context.drawTexture(
             RenderPipelines.GUI_TEXTURED,
             DEPTH_TEXTURE_ID,
@@ -1082,8 +1099,6 @@ public class DirectDepthRenderer {
             sw, sh,
             lastWidth, lastHeight
         );
-        
-        com.mojang.blaze3d.systems.RenderSystem.disableBlend();
         
         // Stats overlay
         int statX = 5, statY = 25;
@@ -1287,6 +1302,186 @@ public class DirectDepthRenderer {
         context.drawText(client.textRenderer,
             "/directdepth resolution <n> (1=full, 4=fast)",
             statX, statY + 76, 0x666666, true);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MODE 10: TRANSPARENT TEXTURE Ring - Same as Mode 7/8 but with transparency
+    // This is an experimental mode trying to achieve game-visible overlay
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    private static void captureTransparentRing(MinecraftClient client, int width, int height) {
+        // Use FULL resolution always (same as Mode 7/8)
+        int captureWidth = width;
+        int captureHeight = height;
+        
+        // Get camera position
+        var camera = client.gameRenderer.getCamera();
+        if (camera == null) return;
+        
+        var cameraPos = camera.getPos();
+        
+        // Get ring origin (player position)
+        org.joml.Vector3d origin;
+        if (usePlayerAsOrigin && client.player != null) {
+            origin = new org.joml.Vector3d(
+                client.player.getX(),
+                client.player.getY(),
+                client.player.getZ()
+            );
+        } else {
+            origin = new org.joml.Vector3d(cameraPos.x, cameraPos.y, cameraPos.z);
+        }
+        
+        // Animation update
+        if (animating) {
+            float elapsed = (System.currentTimeMillis() - animationStartTime) / 1000.0f;
+            animationRadius = elapsed * animationSpeed;
+            if (animationRadius > maxAnimationRadius) {
+                animating = false;
+            }
+        }
+        
+        // Use animation radius for the ring
+        float currentRingDist = animating || animationRadius > 0 ? animationRadius : ringDistance;
+        
+        // Ensure texture exists at correct size (same pattern as Mode 7)
+        if (depthImage == null || lastWidth != captureWidth || lastHeight != captureHeight) {
+            if (depthImage != null) depthImage.close();
+            depthImage = new NativeImage(NativeImage.Format.RGBA, captureWidth, captureHeight, false);
+            lastWidth = captureWidth;
+            lastHeight = captureHeight;
+            
+            if (depthTexture != null) depthTexture.close();
+            depthTexture = new NativeImageBackedTexture(DEPTH_TEXTURE_ID::toString, depthImage);
+            
+            var client2 = MinecraftClient.getInstance();
+            if (client2.getTextureManager() != null) {
+                client2.getTextureManager().registerTexture(DEPTH_TEXTURE_ID, depthTexture);
+                textureRegistered = true;
+            }
+        }
+        
+        // Read depth buffer
+        FloatBuffer depthBuffer = BufferUtils.createFloatBuffer(captureWidth * captureHeight);
+        GL11.glReadPixels(0, 0, captureWidth, captureHeight, GL11.GL_DEPTH_COMPONENT, GL11.GL_FLOAT, depthBuffer);
+        
+        // Camera orientation (same math as Mode 7)
+        float yaw = camera.getYaw();
+        float pitch = camera.getPitch();
+        double yawRad = Math.toRadians(yaw);
+        double pitchRad = Math.toRadians(pitch);
+        
+        double fx = -Math.sin(yawRad) * Math.cos(pitchRad);
+        double fy = -Math.sin(pitchRad);
+        double fz = Math.cos(yawRad) * Math.cos(pitchRad);
+        
+        double rx = Math.cos(yawRad);
+        double rz = Math.sin(yawRad);
+        
+        double ux = fy * rz;
+        double uy = fz * rx - fx * rz;
+        double uz = -fy * rx;
+        
+        double fov = Math.toRadians(client.options.getFov().getValue());
+        double aspectRatio = (double) captureWidth / captureHeight;
+        
+        int localRingPixels = 0;
+        float innerRing = currentRingDist - ringThickness / 2.0f;
+        float outerRing = currentRingDist + ringThickness / 2.0f;
+        
+        for (int y = 0; y < captureHeight; y++) {
+            for (int x = 0; x < captureWidth; x++) {
+                int srcY = captureHeight - 1 - y;
+                float depth = depthBuffer.get(srcY * captureWidth + x);
+                
+                // Sky = fully transparent
+                if (depth >= 0.9999f) {
+                    depthImage.setColorArgb(x, y, 0x00000000);
+                    continue;
+                }
+                
+                // Convert depth to eye-space distance
+                float eyeDist = depthToDistance(depth);
+                
+                // Calculate ray direction
+                double ndcX = (2.0 * x / captureWidth - 1.0) * aspectRatio * Math.tan(fov / 2);
+                double ndcY = (1.0 - 2.0 * y / captureHeight) * Math.tan(fov / 2);
+                
+                double dirX = fx + ndcX * rx + ndcY * ux;
+                double dirY = fy + ndcY * uy;
+                double dirZ = fz + ndcX * rz + ndcY * uz;
+                
+                double len = Math.sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ);
+                dirX /= len; dirY /= len; dirZ /= len;
+                
+                // World position
+                double worldX = cameraPos.x + dirX * eyeDist;
+                double worldY = cameraPos.y + dirY * eyeDist;
+                double worldZ = cameraPos.z + dirZ * eyeDist;
+                
+                // Distance from origin
+                double dx = worldX - origin.x;
+                double dy = worldY - origin.y;
+                double dz = worldZ - origin.z;
+                float distFromOrigin = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+                
+                // Check if within ring
+                if (distFromOrigin >= innerRing && distFromOrigin <= outerRing) {
+                    localRingPixels++;
+                    // Intensity gradient from ring center
+                    float distFromCenter = Math.abs(distFromOrigin - currentRingDist);
+                    float intensity = 1.0f - (distFromCenter / (ringThickness / 2));
+                    intensity = Math.max(0.0f, Math.min(1.0f, intensity));
+                    
+                    // Magenta with alpha
+                    int alpha = (int)(200 * intensity);
+                    int r = (int)(255 * intensity);
+                    int g = (int)(80 * intensity);
+                    int b = (int)(255 * intensity);
+                    depthImage.setColorArgb(x, y, (alpha << 24) | (r << 16) | (g << 8) | b);
+                } else {
+                    // NOT in ring = fully transparent
+                    depthImage.setColorArgb(x, y, 0x00000000);
+                }
+            }
+        }
+        
+        ringPixelCount = localRingPixels;
+        depthTexture.upload();
+    }
+    
+    private static void renderMode10_TransparentRing(DrawContext context, MinecraftClient client, int sw, int sh) {
+        if (!textureRegistered || depthTexture == null) return;
+        
+        // Draw texture stretched to fullscreen
+        // GUI_TEXTURED should handle alpha blending
+        context.drawTexture(
+            RenderPipelines.GUI_TEXTURED,
+            DEPTH_TEXTURE_ID,
+            0, 0,
+            0.0f, 0.0f,
+            sw, sh,
+            lastWidth, lastHeight
+        );
+        
+        // Stats overlay
+        int statX = 5, statY = 25;
+        context.fill(statX - 2, statY - 2, statX + 260, statY + 80, 0xA0000000);
+        
+        context.drawText(client.textRenderer, "Mode 10: TRANSPARENT Ring (Experimental)", statX, statY, 0xFF00FF, true);
+        context.drawText(client.textRenderer,
+            String.format("Radius: %.1f blocks | Ring pixels: %d", 
+                animating || animationRadius > 0 ? animationRadius : ringDistance, ringPixelCount),
+            statX, statY + 12, 0xAAFFAA, true);
+        context.drawText(client.textRenderer,
+            animating ? "Status: ANIMATING" : "Status: STATIC",
+            statX, statY + 24, animating ? 0x00FF00 : 0xFFFF00, true);
+        context.drawText(client.textRenderer,
+            "/directdepth trigger | radius <n>",
+            statX, statY + 40, 0x666666, true);
+        context.drawText(client.textRenderer,
+            "If broken: /directdepth 8 (working mode)",
+            statX, statY + 52, 0xFF6666, true);
     }
     
     /**

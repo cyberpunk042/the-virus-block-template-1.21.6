@@ -70,6 +70,17 @@ public abstract class WorldRendererDepthTestMixin {
             return;
         }
         
+        // Try new ShockwaveGlowRenderer (hybrid approach)
+        if (net.cyberpunk042.client.visual.shader.ShockwaveGlowRenderer.isEnabled()) {
+            // Capture happens HERE (after frame graph, depth is valid)
+            net.minecraft.client.gl.Framebuffer framebuffer = client.getFramebuffer();
+            if (framebuffer != null) {
+                net.cyberpunk042.client.visual.shader.ShockwaveGlowRenderer.captureAndGenerateMask(
+                    client, framebuffer.textureWidth, framebuffer.textureHeight);
+            }
+            return;  // Don't run legacy DepthTestShader
+        }
+        
         // Fall back to PostEffectProcessor approach if enabled
         if (!DepthTestShader.isEnabled()) {
             return;
