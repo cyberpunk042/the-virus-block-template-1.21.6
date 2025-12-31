@@ -87,22 +87,20 @@ vec3 reconstructWorldPos(vec2 uv, float linearDepth) {
     vec3 camPos = vec3(CameraX, CameraY, CameraZ);
     vec3 forward = normalize(vec3(ForwardX, ForwardY, ForwardZ));
     
-    // Compute camera's LOCAL right and up vectors
-    // Handle gimbal lock: when looking straight up/down, use a fallback
-    vec3 worldUp = vec3(0.0, 1.0, 0.0);
-    float upDot = abs(dot(forward, worldUp));
-    
-    vec3 right, up;
-    if (upDot > 0.99) {
-        // Near gimbal lock - compute right from the HORIZONTAL component of forward (based on yaw)
-        // When looking down, forward.xz still has the horizontal direction
-        // right = perpendicular to that in horizontal plane
-        right = normalize(vec3(forward.z, 0.0, -forward.x));
-        up = normalize(cross(right, forward));
-    } else {
-        right = normalize(cross(forward, worldUp));
-        up = normalize(cross(right, forward));
+    // Prevent exact gimbal lock by clamping forward.y
+    // This ensures forward.xz always has SOME horizontal component for computing right
+    // At 0.999, pitch is about 87.4° - close enough but safe
+    float maxAbsY = 0.999;
+    if (abs(forward.y) > maxAbsY) {
+        float sign = forward.y > 0.0 ? 1.0 : -1.0;
+        forward.y = sign * maxAbsY;
+        forward = normalize(forward);
     }
+    
+    // Now cross product with worldUp is always valid
+    vec3 worldUp = vec3(0.0, 1.0, 0.0);
+    vec3 right = normalize(cross(forward, worldUp));
+    vec3 up = normalize(cross(right, forward));
     
     // Calculate ray direction from UV using perspective projection
     // NDC: (0,0) is top-left, (1,1) is bottom-right -> convert to (-1,1) range
