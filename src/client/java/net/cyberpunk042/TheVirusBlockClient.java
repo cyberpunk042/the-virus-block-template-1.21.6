@@ -541,6 +541,31 @@ public class TheVirusBlockClient implements ClientModInitializer {
 							)
 						)
 					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("orbital")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("count",
+							com.mojang.brigadier.arguments.IntegerArgumentType.integer(1, 8))
+							.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("mainR",
+								com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.5f, 50.0f))
+								.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("orbitalR",
+									com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.5f, 20.0f))
+									.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("orbitDist",
+										com.mojang.brigadier.arguments.FloatArgumentType.floatArg(2.0f, 100.0f))
+										.executes(ctx -> {
+											int count = com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "count");
+											float mainR = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "mainR");
+											float orbR = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "orbitalR");
+											float dist = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "orbitDist");
+											net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setShapeOrbital(mainR, orbR, dist, count);
+											ctx.getSource().sendFeedback(
+												net.minecraft.text.Text.literal("§d§lShape: §fOrbital " + count + "x main=" + mainR + " orb=" + orbR + " dist=" + dist)
+											);
+											return 1;
+										})
+									)
+								)
+							)
+						)
+					)
 			);
 			
 			// SCREEN EFFECTS sub-commands (registered separately due to command tree limits)

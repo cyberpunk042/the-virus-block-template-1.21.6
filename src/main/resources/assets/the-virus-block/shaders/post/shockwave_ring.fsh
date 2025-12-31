@@ -77,11 +77,11 @@ layout(std140) uniform ShockwaveConfig {
     float ShapeMajorR;      // Torus major radius
     float ShapeMinorR;      // Torus minor radius
     
-    // vec4 10: Shape extras
-    float ShapeSideCount;   // Polygon side count
-    float OrbitalRadius;    // Orbital sphere radius (reserved)
-    float OrbitalCount;     // Number of orbitals (reserved)
-    float OrbitalPhase;     // Orbital animation phase (reserved)
+    // vec4 10: Shape extras (polygon sides / orbital params)
+    float ShapeSideCount;   // Polygon sides OR orbital count
+    float OrbitDistance;    // Distance from center to orbital centers
+    float OrbitalPhase;     // Current orbital rotation angle (radians)
+    float ShapeReserved;    // Reserved
 };
 
 out vec4 fragColor;
@@ -160,6 +160,27 @@ float sdfPolygon(vec2 p, int sides, float radius) {
     return d - radius;
 }
 
+// Compute orbital position around center in XZ plane
+vec3 getOrbitalPosition(vec3 center, int index, int count, float distance, float phase) {
+    float angle = phase + (float(index) / float(count)) * 6.28318;
+    return center + vec3(cos(angle) * distance, 0.0, sin(angle) * distance);
+}
+
+// Orbital system: main sphere + N orbiting spheres
+// Returns minimum distance to any surface
+float sdfOrbitalSystem(vec3 p, vec3 center, float mainRadius, float orbitalRadius,
+                       float orbitDistance, int count, float phase) {
+    // Distance to main sphere
+    float d = length(p - center) - mainRadius;
+    
+    // Union with each orbital sphere
+    for (int i = 0; i < count && i < 8; i++) {
+        vec3 orbPos = getOrbitalPosition(center, i, count, orbitDistance, phase);
+        d = min(d, length(p - orbPos) - orbitalRadius);
+    }
+    return d;
+}
+
 // Main dispatch - returns distance from worldPos to the shape surface
 float getShapeDistance(vec3 worldPos, vec3 shapeCenter) {
     int shapeType = int(ShapeType);
@@ -180,9 +201,10 @@ float getShapeDistance(vec3 worldPos, vec3 shapeCenter) {
         return sdfPolygon(planar, int(ShapeSideCount), ShapeRadius);
     }
     else if (shapeType == SHAPE_ORBITAL) {
-        // TODO: Implement orbital system (main + orbiting spheres)
-        // For now, fall back to sphere
-        return sdfSphere(worldPos, shapeCenter, ShapeRadius);
+        // Main sphere (ShapeRadius) + orbiting spheres (ShapeMinorR)
+        // ShapeSideCount = orbital count, OrbitDistance = distance from center
+        return sdfOrbitalSystem(worldPos, shapeCenter, ShapeRadius, ShapeMinorR,
+                                OrbitDistance, int(ShapeSideCount), OrbitalPhase);
     }
     
     // Fallback: point distance

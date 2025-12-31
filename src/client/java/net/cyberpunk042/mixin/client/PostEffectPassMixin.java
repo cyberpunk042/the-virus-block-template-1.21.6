@@ -80,6 +80,9 @@ public class PostEffectPassMixin {
                           (float) client.getWindow().getFramebufferHeight();
             float fov = (float) Math.toRadians(client.options.getFov().getValue());
             
+            // Update orbital animation phase (if orbital shape is active)
+            ShockwavePostEffect.tickOrbitalPhase();
+            
             // Single method call - all buffer logic in ShockwavePostEffect
             ShockwavePostEffect.writeUniformBuffer(builder, aspect, fov);
             

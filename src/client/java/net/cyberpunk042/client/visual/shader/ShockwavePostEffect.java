@@ -109,25 +109,39 @@ public class ShockwavePostEffect {
      */
     public record ShapeConfig(
         ShapeType type,
-        float radius,           // Main radius (all types)
+        float radius,           // Main radius (sphere/polygon)
         float majorRadius,      // Torus major
-        float minorRadius,      // Torus minor
-        int sideCount           // Polygon sides
+        float minorRadius,      // Torus minor / orbital sphere radius
+        int sideCount,          // Polygon sides / orbital count
+        float orbitDistance     // Distance from center to orbital centers
     ) {
         public static final ShapeConfig POINT = new ShapeConfig(
-            ShapeType.POINT, 0f, 0f, 0f, 0
+            ShapeType.POINT, 0f, 0f, 0f, 0, 0f
         );
         
         public static ShapeConfig sphere(float radius) {
-            return new ShapeConfig(ShapeType.SPHERE, radius, 0, 0, 0);
+            return new ShapeConfig(ShapeType.SPHERE, radius, 0, 0, 0, 0);
         }
         
         public static ShapeConfig torus(float major, float minor) {
-            return new ShapeConfig(ShapeType.TORUS, 0, major, minor, 0);
+            return new ShapeConfig(ShapeType.TORUS, 0, major, minor, 0, 0);
         }
         
         public static ShapeConfig polygon(int sides, float radius) {
-            return new ShapeConfig(ShapeType.POLYGON, radius, 0, 0, sides);
+            return new ShapeConfig(ShapeType.POLYGON, radius, 0, 0, sides, 0);
+        }
+        
+        /**
+         * Creates an orbital configuration: main sphere + orbiting spheres.
+         * @param mainRadius Radius of the central sphere
+         * @param orbitalRadius Radius of each orbiting sphere
+         * @param orbitDistance Distance from center to orbital centers
+         * @param count Number of orbiting spheres (1-8)
+         */
+        public static ShapeConfig orbital(float mainRadius, float orbitalRadius, 
+                                          float orbitDistance, int count) {
+            return new ShapeConfig(ShapeType.ORBITAL, mainRadius, 0, orbitalRadius, 
+                                   Math.max(1, Math.min(8, count)), orbitDistance);
         }
     }
     
@@ -149,6 +163,10 @@ public class ShockwavePostEffect {
     private static ScreenEffects screenEffects = ScreenEffects.NONE;
     private static CameraState cameraState = CameraState.ORIGIN;
     private static ShapeConfig shapeConfig = ShapeConfig.POINT;  // Default: current behavior
+    
+    // Orbital animation state
+    private static float orbitalPhase = 0f;      // Current rotation angle (radians)
+    private static float orbitalSpeed = 0.02f;   // Rotation speed (radians per frame, ~1 rev per 5 sec)
     
     // Origin mode: CAMERA = rings around player, TARGET = rings around cursor hit point
     public enum OriginMode { CAMERA, TARGET }
@@ -570,6 +588,25 @@ public class ShockwavePostEffect {
         setShape(ShapeConfig.polygon(sides, radius));
     }
     
+    public static void setShapeOrbital(float mainRadius, float orbitalRadius, 
+                                       float orbitDistance, int count) {
+        setShape(ShapeConfig.orbital(mainRadius, orbitalRadius, orbitDistance, count));
+    }
+    
+    /**
+     * Updates orbital phase each frame. Call from render loop when orbital shape is active.
+     */
+    public static void tickOrbitalPhase() {
+        if (shapeConfig.type() == ShapeType.ORBITAL && enabled) {
+            orbitalPhase += orbitalSpeed;
+            if (orbitalPhase > 6.28318f) orbitalPhase -= 6.28318f;
+        }
+    }
+    
+    public static float getOrbitalPhase() { return orbitalPhase; }
+    public static float getOrbitalSpeed() { return orbitalSpeed; }
+    public static void setOrbitalSpeed(float speed) { orbitalSpeed = speed; }
+    
     // ═══════════════════════════════════════════════════════════════════════════
     // UNIFORM BUFFER CONSTRUCTION - Single source of truth for shader data
     // ═══════════════════════════════════════════════════════════════════════════
@@ -660,12 +697,13 @@ public class ShockwavePostEffect {
             shapeConfig.minorRadius()
         );
         
-        // Vec4 10: Shape extras
+        // Vec4 10: Shape extras (polygon sides / orbital params)
+        // sideCount is reused: for POLYGON = sides, for ORBITAL = count
         builder.putVec4(
-            (float) shapeConfig.sideCount(),
-            0f,  // Reserved for orbital radius
-            0f,  // Reserved for orbital count
-            0f   // Reserved for orbital phase
+            (float) shapeConfig.sideCount(),  // Polygon sides OR orbital count
+            shapeConfig.orbitDistance(),      // Distance from center to orbitals
+            orbitalPhase,                     // Current rotation angle (radians)
+            0f                                // Reserved
         );
     }
     
@@ -701,6 +739,7 @@ public class ShockwavePostEffect {
         "11: SPHERE shape (r=5)",
         "12: TORUS shape (20/3)",
         "13: POLYGON hex (6 sides)",
+        "14: ORBITAL (4 spheres)",
         "RESET: Back to defaults"
     };
     
@@ -795,6 +834,11 @@ public class ShockwavePostEffect {
                 trigger();
             }
             case 14 -> {
+                // Orbital (4 spheres)
+                shapeConfig = ShapeConfig.orbital(5f, 2f, 15f, 4);
+                trigger();
+            }
+            case 15 -> {
                 // Reset to defaults
                 shapeConfig = ShapeConfig.POINT;
                 enabled = false;
