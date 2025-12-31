@@ -124,10 +124,10 @@ vec3 reconstructWorldPos(vec2 uv, float linearDepth) {
     
     // Build ray direction: forward + screen offset
     vec3 rayDir = forward + right * (ndc.x * halfWidth) + up * (ndc.y * halfHeight);
-    rayDir = normalize(rayDir);
-    
-    // World position = camera + direction * depth
-    return camPos + rayDir * linearDepth;
+    // World position = camera + direction * distance
+    // linearDepth is Z-distance (along forward), convert to ray-distance
+    float rayDistance = linearDepth / dot(rayDir, forward);
+    return camPos + rayDir * rayDistance;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
