@@ -83,11 +83,35 @@ layout(std140) uniform ShockwaveConfig {
     float OrbitalPhase;     // Current orbital rotation angle (radians)
     float BeamHeight;       // Current beam height (0 = no beam, grows when active)
     
-    // vec4 11: Orbital visual config
+    // vec4 11: Corona/blend config
     float CoronaWidth;      // Glow spread (blocks)
     float CoronaIntensity;  // Brightness multiplier
     float RimPower;         // Rim sharpness (1-5)
     float BlendRadius;      // Smooth min blend (0=sharp, 5+=unified)
+    
+    // vec4 12: Orbital body color (RGB) + rim falloff
+    float OrbitalBodyR;
+    float OrbitalBodyG;
+    float OrbitalBodyB;
+    float OrbitalRimFalloff;
+    
+    // vec4 13: Orbital corona color (RGBA)
+    float OrbitalCoronaR;
+    float OrbitalCoronaG;
+    float OrbitalCoronaB;
+    float OrbitalCoronaA;
+    
+    // vec4 14: Beam body color (RGB) + beam width scale
+    float BeamBodyR;
+    float BeamBodyG;
+    float BeamBodyB;
+    float BeamWidthScale;
+    
+    // vec4 15: Beam corona color (RGBA)
+    float BeamCoronaR;
+    float BeamCoronaG;
+    float BeamCoronaB;
+    float BeamCoronaA;
 };
 
 out vec4 fragColor;
@@ -261,7 +285,7 @@ float sdfBeams(vec3 p, vec3 center, float orbitalRadius, float orbitDistance,
     if (beamHeight < 0.1) return 1e10;  // No beam
     
     float d = 1e10;
-    float beamRadius = orbitalRadius * 0.3;  // Beams are thinner than orbs
+    float beamRadius = orbitalRadius * BeamWidthScale;  // Use uniform for width
     
     for (int i = 0; i < count && i < 8; i++) {
         vec3 orbPos = getOrbitalPosition(center, i, count, orbitDistance, phase);
@@ -388,8 +412,9 @@ void main() {
         baseColor *= (1.0 - BlackoutAmount);
     }
     
-    // For sky pixels, output now (no rings on sky)
-    if (isSky) {
+    // For sky pixels with NON-ORBITAL shapes, output now (no rings on sky)
+    // BUT for ORBITAL shapes, we need to continue to raymarch the orbitals!
+    if (isSky && int(ShapeType) != SHAPE_ORBITAL) {
         fragColor = vec4(baseColor, 1.0);
         return;
     }
@@ -455,8 +480,14 @@ void main() {
             vec3 rayDir = normalize(forward + right * (ndc.x * halfWidth) + up * (ndc.y * halfHeight));
             
             // Raymarch for orbital spheres and beams
-            // Use larger distance when at far plane (sky/fog) to render beams beyond terrain
-            float maxRaymarchDist = isAtFarPlane ? 500.0 : (linearDepth + 50.0);
+            // Calculate max possible reach: distance to target + orbit + beam height
+            float distToTarget = length(targetPos - camPos);
+            float maxEffectReach = distToTarget + OrbitDistance + BeamHeight + 100.0;  // +100 safety margin
+            
+            // When looking at terrain, limit to terrain depth + margin
+            // When looking at sky, use full reach to catch distant beams
+            float maxRaymarchDist = isAtFarPlane ? maxEffectReach : max(linearDepth + 50.0, maxEffectReach);
+            
             vec4 hitInfo = raymarchOrbitalSpheres(
                 camPos, rayDir, maxRaymarchDist,
                 targetPos, ShapeMinorR, OrbitDistance,
@@ -464,21 +495,35 @@ void main() {
             );
         
             if (hitInfo.w > 0.5) {
-                // HIT! - Draw black sphere with rim corona
-                float rimAmount = hitInfo.y;
-                vec3 coronaColor = vec3(RingR, RingG, RingB);  // Use ring color for corona
+                // HIT! Check if orbital is in front of scene geometry (depth test)
+                float hitDist = hitInfo.x;
                 
-                // Black center with colored rim
-                orbitalColor = coronaColor * rimAmount * 2.0 * CoronaIntensity;
-                orbitalAlpha = 1.0;
+                // Only render if orbital is closer than scene OR we're looking at sky
+                bool inFrontOfScene = isAtFarPlane || (hitDist < linearDepth);
                 
-                // Override base color with black (sphere body)
-                baseColor = mix(vec3(0.0), coronaColor, rimAmount * 0.8);
+                if (inFrontOfScene) {
+                    // Draw sphere/beam with body color and rim corona
+                    float rimAmount = hitInfo.y;
+                    
+                    // Use orbital corona color
+                    vec3 orbBodyColor = vec3(OrbitalBodyR, OrbitalBodyG, OrbitalBodyB);
+                    vec3 orbCoronaColor = vec3(OrbitalCoronaR, OrbitalCoronaG, OrbitalCoronaB);
+                    
+                    // Body color with corona rim
+                    orbitalColor = orbCoronaColor * rimAmount * 2.0 * CoronaIntensity;
+                    orbitalAlpha = 1.0;
+                    
+                    // Override base color with body color (default black)
+                    baseColor = mix(orbBodyColor, orbCoronaColor, rimAmount * 0.8);
+                }
             } else if (hitInfo.y > 0.01) {
-                // Near miss - add corona glow
-                vec3 coronaColor = vec3(RingR, RingG, RingB);
-                orbitalColor = coronaColor * hitInfo.y * CoronaIntensity;  // Use intensity uniform
-                orbitalAlpha = hitInfo.y;
+                // Near miss corona glow - also needs depth check
+                // Corona glow should only show if we're at sky or the glow area is in front
+                if (isAtFarPlane) {
+                    vec3 orbCoronaColor = vec3(OrbitalCoronaR, OrbitalCoronaG, OrbitalCoronaB);
+                    orbitalColor = orbCoronaColor * hitInfo.y * CoronaIntensity;
+                    orbitalAlpha = hitInfo.y * OrbitalCoronaA;
+                }
             }
         }  // end safeguard if
     }  // end SHAPE_ORBITAL if
