@@ -70,9 +70,9 @@ public class PostEffectPassMixin {
         }
         
         // Create new buffer with current Java values
-        // Layout: 6 vec4s = 96 bytes (full world-anchored support)
+        // Layout: 9 vec4s = 144 bytes (full feature set)
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            Std140Builder builder = Std140Builder.onStack(stack, 128);
+            Std140Builder builder = Std140Builder.onStack(stack, 160);
             
             // Vec4 0: Basic params
             float radius = ShockwavePostEffect.getCurrentRadius();
@@ -81,11 +81,12 @@ public class PostEffectPassMixin {
             float time = (System.currentTimeMillis() % 10000) / 1000.0f;
             builder.putVec4(radius, thickness, intensity, time);
             
-            // Vec4 1: Ring count, spacing, contract mode
+            // Vec4 1: Ring count, spacing, contract mode, glow width
             float ringCount = (float) ShockwavePostEffect.getRingCount();
             float ringSpacing = ShockwavePostEffect.getRingSpacing();
             float contractMode = ShockwavePostEffect.isContractMode() ? 1.0f : 0.0f;
-            builder.putVec4(ringCount, ringSpacing, contractMode, 0f);
+            float glowWidth = ShockwavePostEffect.getGlowWidth();
+            builder.putVec4(ringCount, ringSpacing, contractMode, glowWidth);
             
             // Vec4 2: Target world position + UseWorldOrigin flag
             float useWorldOrigin = ShockwavePostEffect.isTargetMode() ? 1.0f : 0.0f;
@@ -95,9 +96,17 @@ public class PostEffectPassMixin {
             builder.putVec4(targetX, targetY, targetZ, useWorldOrigin);
             
             // Vec4 3: Camera world position + aspect ratio
-            float camX = ShockwavePostEffect.getCameraX();
-            float camY = ShockwavePostEffect.getCameraY();
-            float camZ = ShockwavePostEffect.getCameraZ();
+            // In TARGET mode, use FROZEN camera position from raycast time
+            float camX, camY, camZ;
+            if (ShockwavePostEffect.isTargetMode()) {
+                camX = ShockwavePostEffect.getFrozenCamX();
+                camY = ShockwavePostEffect.getFrozenCamY();
+                camZ = ShockwavePostEffect.getFrozenCamZ();
+            } else {
+                camX = ShockwavePostEffect.getCameraX();
+                camY = ShockwavePostEffect.getCameraY();
+                camZ = ShockwavePostEffect.getCameraZ();
+            }
             var client = net.minecraft.client.MinecraftClient.getInstance();
             float aspect = (float) client.getWindow().getFramebufferWidth() / 
                           (float) client.getWindow().getFramebufferHeight();
@@ -128,6 +137,14 @@ public class PostEffectPassMixin {
                 ShockwavePostEffect.getTintG(),
                 ShockwavePostEffect.getTintB(),
                 ShockwavePostEffect.getTintAmount()
+            );
+            
+            // Vec4 8: Ring color
+            builder.putVec4(
+                ShockwavePostEffect.getRingR(),
+                ShockwavePostEffect.getRingG(),
+                ShockwavePostEffect.getRingB(),
+                ShockwavePostEffect.getRingOpacity()
             );
             
             GpuBuffer newBuffer = RenderSystem.getDevice().createBuffer(

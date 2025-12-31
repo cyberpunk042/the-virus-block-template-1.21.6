@@ -57,6 +57,7 @@ public class ShockwavePostEffect {
     private static int ringCount = 10;               // Number of concentric rings
     private static float ringSpacing = 8.0f;         // Distance between rings (blocks)
     private static boolean contractMode = false;     // false = expand, true = contract
+    private static float glowWidth = 8.0f;           // Glow falloff width (blocks)
     
     // Origin mode: CAMERA = rings around player, TARGET = rings around cursor hit point
     public enum OriginMode { CAMERA, TARGET }
@@ -66,12 +67,20 @@ public class ShockwavePostEffect {
     private static float targetX = 0, targetY = 0, targetZ = 0;
     private static float cameraX = 0, cameraY = 0, cameraZ = 0;
     
+    // FROZEN camera state at time of raycast (for TARGET mode)
+    private static float frozenCamX = 0, frozenCamY = 0, frozenCamZ = 0;
+    private static float frozenYaw = 0, frozenPitch = 0;
+    
     // Screen effects
     private static float blackoutAmount = 0.0f;      // 0 = no blackout, 1 = full black
     private static float vignetteAmount = 0.0f;      // 0 = no vignette, 1 = strong
     private static float vignetteRadius = 0.5f;      // Inner radius of vignette
     private static float tintR = 1.0f, tintG = 1.0f, tintB = 1.0f;  // Tint color
     private static float tintAmount = 0.0f;          // 0 = no tint, 1 = full tint
+    
+    // Ring color
+    private static float ringR = 0.0f, ringG = 1.0f, ringB = 1.0f;  // Default cyan
+    private static float ringOpacity = 1.0f;
     
     // ═══════════════════════════════════════════════════════════════════════════
     // INITIALIZATION
@@ -247,6 +256,15 @@ public class ShockwavePostEffect {
             .info("Contract mode set");
     }
     
+    public static float getGlowWidth() { return glowWidth; }
+    
+    public static void setGlowWidth(float width) {
+        glowWidth = Math.max(1f, width);
+        Logging.RENDER.topic("shockwave_gpu")
+            .kv("glowWidth", glowWidth)
+            .info("Glow width set");
+    }
+    
     // Contracting animation
     public static void triggerContract() {
         enabled = true;
@@ -279,9 +297,24 @@ public class ShockwavePostEffect {
         targetY = y;
         targetZ = z;
         originMode = OriginMode.TARGET;
+        
+        // FREEZE camera state at this moment
+        var client = net.minecraft.client.MinecraftClient.getInstance();
+        if (client != null && client.player != null) {
+            var camEntity = client.getCameraEntity();
+            if (camEntity == null) camEntity = client.player;
+            var camPos = camEntity.getCameraPosVec(1.0f);
+            frozenCamX = (float) camPos.x;
+            frozenCamY = (float) camPos.y;
+            frozenCamZ = (float) camPos.z;
+            frozenYaw = camEntity.getYaw();
+            frozenPitch = camEntity.getPitch();
+        }
+        
         Logging.RENDER.topic("shockwave_gpu")
             .kv("target", String.format("%.1f, %.1f, %.1f", x, y, z))
-            .info("Target position set");
+            .kv("frozenCam", String.format("%.1f, %.1f, %.1f", frozenCamX, frozenCamY, frozenCamZ))
+            .info("Target position set with frozen camera");
     }
     
     public static void updateCameraPosition(float x, float y, float z) {
@@ -309,6 +342,9 @@ public class ShockwavePostEffect {
     public static float getCameraX() { return cameraX; }
     public static float getCameraY() { return cameraY; }
     public static float getCameraZ() { return cameraZ; }
+    public static float getFrozenCamX() { return frozenCamX; }
+    public static float getFrozenCamY() { return frozenCamY; }
+    public static float getFrozenCamZ() { return frozenCamZ; }
     public static boolean isTargetMode() { return originMode == OriginMode.TARGET; }
     
     /**
@@ -371,6 +407,22 @@ public class ShockwavePostEffect {
         tintAmount = 0f;
         Logging.RENDER.topic("shockwave_gpu")
             .info("Screen effects cleared");
+    }
+    
+    // Ring color
+    public static float getRingR() { return ringR; }
+    public static float getRingG() { return ringG; }
+    public static float getRingB() { return ringB; }
+    public static float getRingOpacity() { return ringOpacity; }
+    
+    public static void setRingColor(float r, float g, float b, float opacity) {
+        ringR = Math.max(0f, Math.min(1f, r));
+        ringG = Math.max(0f, Math.min(1f, g));
+        ringB = Math.max(0f, Math.min(1f, b));
+        ringOpacity = Math.max(0f, Math.min(1f, opacity));
+        Logging.RENDER.topic("shockwave_gpu")
+            .kv("ringColor", String.format("%.1f,%.1f,%.1f @ %.0f%%", r, g, b, opacity * 100))
+            .info("Ring color set");
     }
     
     // STATUS STRING (for HUD display)

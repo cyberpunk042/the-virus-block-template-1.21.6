@@ -357,6 +357,19 @@ public class TheVirusBlockClient implements ClientModInitializer {
 							})
 						)
 					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("glow")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("width",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(1.0f, 50.0f))
+							.executes(ctx -> {
+								float width = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "width");
+								net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setGlowWidth(width);
+								ctx.getSource().sendFeedback(
+									net.minecraft.text.Text.literal("§d§lGlow Width: §f" + width + " blocks")
+								);
+								return 1;
+							})
+						)
+					)
 					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("contract")
 						.executes(ctx -> {
 							net.cyberpunk042.client.visual.shader.ShockwavePostEffect.triggerContract();
@@ -524,6 +537,32 @@ public class TheVirusBlockClient implements ClientModInitializer {
 							);
 							return 1;
 						})
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("ringcolor")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("r",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.0f, 1.0f))
+							.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("g",
+								com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.0f, 1.0f))
+								.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("b",
+									com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.0f, 1.0f))
+									.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("opacity",
+										com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.0f, 1.0f))
+										.executes(ctx -> {
+											float r = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "r");
+											float g = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "g");
+											float b = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "b");
+											float opacity = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "opacity");
+											net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setRingColor(r, g, b, opacity);
+											ctx.getSource().sendFeedback(
+												net.minecraft.text.Text.literal(String.format(
+													"§d§lRing Color: §f(%.1f, %.1f, %.1f) @ %.0f%%", r, g, b, opacity * 100))
+											);
+											return 1;
+										})
+									)
+								)
+							)
+						)
 					)
 			);
 			

@@ -109,8 +109,12 @@ Minecraft's vanilla post-effect system loads uniform values once from JSON and d
 
 ```java
 // Critical: Compute forward vector from Camera object, not player
+// Clamp pitch to ±89° to prevent gimbal lock
 float yaw = (float) Math.toRadians(camera.getYaw());
 float pitch = (float) Math.toRadians(camera.getPitch());
+float maxPitch = (float) Math.toRadians(89.0);
+pitch = Math.max(-maxPitch, Math.min(maxPitch, pitch));
+
 float fwdX = (float) (-Math.sin(yaw) * Math.cos(pitch));
 float fwdY = (float) (-Math.sin(pitch));
 float fwdZ = (float) (Math.cos(yaw) * Math.cos(pitch));
@@ -152,18 +156,19 @@ uniformBuffers.put("ShockwaveConfig", newBuffer);  // Replace with fresh data!
 
 ## Uniform Buffer Layout (ShockwaveConfig)
 
-The shader receives data via a **std140 uniform block**. Total: 8 vec4 = 128 bytes.
+The shader receives data via a **std140 uniform block**. Total: 9 vec4 = 144 bytes.
 
 | Vec4 | Offset | Components | Description |
 |------|--------|------------|-------------|
 | 0 | 0 | RingRadius, RingThickness, Intensity, Time | Basic ring parameters |
-| 1 | 16 | RingCount, RingSpacing, ContractMode, Reserved | Multi-ring settings |
+| 1 | 16 | RingCount, RingSpacing, ContractMode, GlowWidth | Multi-ring settings |
 | 2 | 32 | TargetX, TargetY, TargetZ, UseWorldOrigin | Target world position |
 | 3 | 48 | CameraX, CameraY, CameraZ, AspectRatio | Camera world position |
 | 4 | 64 | ForwardX, ForwardY, ForwardZ, Fov | Camera forward direction |
 | 5 | 80 | UpX, UpY, UpZ, Reserved | Camera up direction |
 | 6 | 96 | BlackoutAmount, VignetteAmount, VignetteRadius, Reserved | Screen effects |
 | 7 | 112 | TintR, TintG, TintB, TintAmount | Color tint overlay |
+| 8 | 128 | RingR, RingG, RingB, RingOpacity | Ring color override |
 
 **Important**: The JSON configuration must define these uniforms, but their values are overwritten by the mixin every frame.
 
@@ -239,15 +244,32 @@ vec3 up = normalize(cross(right, forward));  // Tilts with pitch
 
 ### 3. Gimbal Lock at Extreme Pitch
 
-**Problem**: When looking straight up/down, `cross(forward, worldUp)` produces zero.
+**Problem**: When looking straight up/down (±90° pitch), `cross(forward, worldUp)` produces a zero vector because forward becomes parallel to worldUp.
 
-**Solution**: Detect and fallback to horizontal forward components:
-```glsl
-float upDot = abs(dot(forward, worldUp));
-if (upDot > 0.99) {
-    right = normalize(vec3(forward.z, 0.0, -forward.x));
-}
+**Root Cause Analysis**:
+- At pitch = 90°, forward = (0, -1, 0)
+- forward.xz = (0, 0) - NO horizontal component
+- `cross(forward, worldUp) = 0` - undefined result
+- The yaw information is completely lost in the forward vector at this angle
+
+**Failed Approaches**:
+1. Shader-side fallback with threshold switching - caused abrupt 180° flip when crossing threshold
+2. Smooth blending between methods - still produced glitches at certain yaw angles  
+3. Fixed fallback direction - worked for one yaw but flipped at other angles
+4. Forward.y clamping in shader - didn't help when forward.xz was already zero
+
+**Final Solution**: Clamp pitch in Java BEFORE computing forward vector:
+```java
+// Clamp pitch to ±89° to prevent gimbal lock
+float maxPitch = (float) Math.toRadians(89.0);
+pitch = Math.max(-maxPitch, Math.min(maxPitch, pitch));
 ```
+
+This ensures:
+- forward always has horizontal component: cos(89°) ≈ 0.017
+- `cross(forward, worldUp)` is always well-defined
+- Works at ALL yaw angles
+- Visually indistinguishable from exact 90°
 
 ### 4. Horizontal Offset/Drift
 
@@ -283,10 +305,11 @@ if (upDot > 0.99) {
 - [x] **Target Mode (Cursor)**: `/shockwavegpu cursor` - ring stays at hit point
 - [x] **Yaw Stability**: Look left/right - ring doesn't drift
 - [x] **Pitch Stability**: Look up/down - ring doesn't drift
-- [ ] **Extreme Pitch**: Look straight up/down - smooth transition (needs improvement)
+- [x] **Extreme Pitch**: Look straight up/down - smooth transition ✓ (pitch clamped in Java)
 - [x] **Depth Accuracy**: Ring conforms to terrain at correct distance
 - [x] **Animation**: Ring expands/contracts smoothly
 - [x] **Screen Effects**: Blackout, vignette, tint work correctly
+- [x] **Ring Colors**: Custom RGB + opacity work correctly
 
 ---
 
@@ -308,7 +331,7 @@ if (upDot > 0.99) {
 
 ## Future Improvements
 
-1. Smoother gimbal lock transition at extreme pitch
-2. Pass inverse view-projection matrix instead of manual reconstruction
-3. Support for reversed-Z depth buffers
-4. Memory pooling for uniform buffers (avoid per-frame allocation)
+1. Pass inverse view-projection matrix instead of manual reconstruction
+2. Support for reversed-Z depth buffers
+3. Memory pooling for uniform buffers (avoid per-frame allocation)
+4. Segment/arc rendering mode

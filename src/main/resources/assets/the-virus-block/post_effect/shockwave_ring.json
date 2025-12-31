@@ -55,9 +55,9 @@
                         "value": 0.0
                     },
                     {
-                        "name": "Reserved1",
+                        "name": "GlowWidth",
                         "type": "float",
-                        "value": 0.0
+                        "value": 8.0
                     },
                     {
                         "name": "TargetX",
@@ -178,6 +178,26 @@
                         "name": "TintAmount",
                         "type": "float",
                         "value": 0.0
+                    },
+                    {
+                        "name": "RingR",
+                        "type": "float",
+                        "value": 0.0
+                    },
+                    {
+                        "name": "RingG",
+                        "type": "float",
+                        "value": 1.0
+                    },
+                    {
+                        "name": "RingB",
+                        "type": "float",
+                        "value": 1.0
+                    },
+                    {
+                        "name": "RingOpacity",
+                        "type": "float",
+                        "value": 1.0
                     }
                 ]
             },
