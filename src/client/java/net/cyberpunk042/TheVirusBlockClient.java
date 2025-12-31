@@ -357,6 +357,15 @@ public class TheVirusBlockClient implements ClientModInitializer {
 							})
 						)
 					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("mode")
+						.executes(ctx -> {
+							net.cyberpunk042.client.visual.shader.ShockwaveTestRenderer.toggleMode();
+							ctx.getSource().sendFeedback(
+								net.minecraft.text.Text.literal("§e§lMode toggled - check logs for [shockwave_bind]")
+							);
+							return 1;
+						})
+					)
 			);
 		});
 	}
