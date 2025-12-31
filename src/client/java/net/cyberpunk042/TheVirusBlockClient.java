@@ -60,7 +60,7 @@ public class TheVirusBlockClient implements ClientModInitializer {
 			
 			.execute();
 		
-		// Client command registration (not in generic nodes)
+		// Client command registration
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
 			// Depth test shader command
 			dispatcher.register(
@@ -89,13 +89,6 @@ public class TheVirusBlockClient implements ClientModInitializer {
 			);
 			
 			// Direct depth renderer command
-			// /directdepth - cycles through modes (0-8)
-			// /directdepth <mode> - sets specific mode
-			// /directdepth reversedz - toggles reversed-Z mode
-			// /directdepth ring <distance> <thickness> - sets ring parameters
-			// /directdepth trigger - triggers Mode 8 animation
-			// /directdepth speed <n> - sets animation speed
-			// /directdepth maxradius <n> - sets max animation radius
 			dispatcher.register(
 				net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("directdepth")
 					.executes(ctx -> {
@@ -175,6 +168,33 @@ public class TheVirusBlockClient implements ClientModInitializer {
 								net.cyberpunk042.client.visual.shader.DirectDepthRenderer.setMaxRadius(radius);
 								ctx.getSource().sendFeedback(
 									net.minecraft.text.Text.literal("§bMax radius: §f" + radius + " blocks")
+								);
+								return 1;
+							})
+						)
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("resolution")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("divisor",
+							com.mojang.brigadier.arguments.IntegerArgumentType.integer(1, 32))
+							.executes(ctx -> {
+								int divisor = com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "divisor");
+								net.cyberpunk042.client.visual.shader.DirectDepthRenderer.setResolution(divisor);
+								String quality = divisor == 1 ? "FULL" : "1/" + divisor;
+								ctx.getSource().sendFeedback(
+									net.minecraft.text.Text.literal("§bResolution: §f" + quality)
+								);
+								return 1;
+							})
+						)
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("radius")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("radius",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.0f, 500.0f))
+							.executes(ctx -> {
+								float radius = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "radius");
+								net.cyberpunk042.client.visual.shader.DirectDepthRenderer.setRadius(radius);
+								ctx.getSource().sendFeedback(
+									net.minecraft.text.Text.literal("§bStatic radius: §f" + radius + " blocks (no animation)")
 								);
 								return 1;
 							})

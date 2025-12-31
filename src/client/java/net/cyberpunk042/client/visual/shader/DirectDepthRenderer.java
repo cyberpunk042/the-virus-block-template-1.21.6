@@ -77,9 +77,12 @@ public class DirectDepthRenderer {
     // Mode 8: Animation state
     private static boolean animating = false;
     private static float animationRadius = 0.0f;
-    private static float animationSpeed = 20.0f;  // blocks per second
+    private static float animationSpeed = 5.0f;  // blocks per second (slower to see)
     private static float maxAnimationRadius = 100.0f;
     private static long animationStartTime = 0;
+    
+    // Resolution control (for pixelation effect)
+    private static int resolutionDivisor = 4;  // Default to 1/4 for performance
     
     // Mode names
     private static final String[] MODE_NAMES = {
@@ -91,7 +94,8 @@ public class DirectDepthRenderer {
         "Distance Visualization",
         "Ring at Fixed Distance",
         "Ring from World Point",
-        "Animated Expanding Ring"
+        "Animated Expanding Ring",
+        "OVERLAY Ring (Proper)"  // Mode 9 - draws ONLY ring pixels!
     };
     
     public static void init() {
@@ -168,6 +172,7 @@ public class DirectDepthRenderer {
             case 6 -> captureRingAtDistance(width, height);
             case 7 -> captureRingFromWorldPoint(client, width, height);
             case 8 -> captureAnimatedRing(client, width, height);
+            case 9 -> captureOverlayRing(client, width, height);
         }
     }
     
@@ -339,6 +344,7 @@ public class DirectDepthRenderer {
                 case 6 -> renderMode6_RingAtDistance(context, client, screenWidth, screenHeight);
                 case 7 -> renderMode7_WorldPointRing(context, client, screenWidth, screenHeight);
                 case 8 -> renderMode8_AnimatedRing(context, client, screenWidth, screenHeight);
+                case 9 -> renderMode9_OverlayRing(context, client, screenWidth, screenHeight);
             }
         } catch (Exception e) {
             // Silently fail
@@ -504,8 +510,8 @@ public class DirectDepthRenderer {
     // ═══════════════════════════════════════════════════════════════════════════
     
     private static void captureDistanceVisualization(int width, int height) {
-        int captureWidth = width / 4;
-        int captureHeight = height / 4;
+        int captureWidth = Math.max(1, width / resolutionDivisor);
+        int captureHeight = Math.max(1, height / resolutionDivisor);
         
         // Ensure texture exists
         if (depthImage == null || lastWidth != captureWidth || lastHeight != captureHeight) {
@@ -667,47 +673,40 @@ public class DirectDepthRenderer {
         int displayWidth = lastWidth;
         int displayHeight = lastHeight;
         
-        // Background
-        context.fill(x - 2, y - 2, x + displayWidth + 2, y + displayHeight + 80, 0xC0000000);
-        
-        // Distance image
+        // FULLSCREEN stretched display
         context.drawTexture(
             RenderPipelines.GUI_TEXTURED,
             DEPTH_TEXTURE_ID,
-            x, y,
+            0, 0,  // No margin
             0.0f, 0.0f,
-            displayWidth, displayHeight,
-            displayWidth, displayHeight
+            sw, sh,  // Stretch to screen size
+            lastWidth, lastHeight  // Texture size
         );
         
-        // Stats text
+        // Stats overlay in top-left corner
+        int statX = 5, statY = 25;
+        context.fill(statX - 2, statY - 2, statX + 180, statY + 85, 0xA0000000);
+        
+        context.drawText(client.textRenderer, "Mode 5: Distance", statX, statY, 0x00FFFF, true);
         context.drawText(client.textRenderer,
             String.format("Center: %.1f blocks", lastCenterDistance),
-            x, y + displayHeight + 4, 0xFFFFFF, true);
+            statX, statY + 12, 0xFFFFFF, true);
         context.drawText(client.textRenderer,
-            String.format("Range: %.1f - %.1f blocks", lastMinDistance, lastMaxDistance),
-            x, y + displayHeight + 16, 0xAAFFAA, true);
+            String.format("Range: %.1f - %.1f", lastMinDistance, lastMaxDistance),
+            statX, statY + 24, 0xAAFFAA, true);
         context.drawText(client.textRenderer,
-            String.format("Sky pixels: %d | Far: %.0f | RevZ: %s", lastSkyPixels, farPlane, reversedZ ? "ON" : "OFF"),
-            x, y + displayHeight + 28, 0xAAAAFF, true);
+            String.format("Sky: %d | Far: %.0f", lastSkyPixels, farPlane),
+            statX, statY + 36, 0xAAAAFF, true);
         
-        // Legend (color scale)
-        int legendX = x;
-        int legendY = y + displayHeight + 44;
-        int legendWidth = 150;
-        int legendHeight = 12;
-        
-        // Draw gradient legend
-        for (int i = 0; i < legendWidth; i++) {
-            float dist = (i / (float)legendWidth) * 100.0f;
-            int color = distanceToColor(dist);
-            context.fill(legendX + i, legendY, legendX + i + 1, legendY + legendHeight, color);
+        // Legend
+        int legendY = statY + 50;
+        for (int i = 0; i < 150; i++) {
+            int color = distanceToColor((i / 150.0f) * 100.0f);
+            context.fill(statX + i, legendY, statX + i + 1, legendY + 10, color);
         }
-        
-        // Legend labels
-        context.drawText(client.textRenderer, "0", legendX, legendY + legendHeight + 2, 0xFFFFFF, true);
-        context.drawText(client.textRenderer, "50", legendX + legendWidth/2 - 6, legendY + legendHeight + 2, 0xFFFFFF, true);
-        context.drawText(client.textRenderer, "100+", legendX + legendWidth - 20, legendY + legendHeight + 2, 0xFFFFFF, true);
+        context.drawText(client.textRenderer, "0", statX, legendY + 12, 0xFFFFFF, true);
+        context.drawText(client.textRenderer, "50", statX + 70, legendY + 12, 0xFFFFFF, true);
+        context.drawText(client.textRenderer, "100+", statX + 130, legendY + 12, 0xFFFFFF, true);
     }
     
     /**
@@ -726,8 +725,8 @@ public class DirectDepthRenderer {
     // ═══════════════════════════════════════════════════════════════════════════
     
     private static void captureRingAtDistance(int width, int height) {
-        int captureWidth = width / 4;
-        int captureHeight = height / 4;
+        int captureWidth = Math.max(1, width / resolutionDivisor);
+        int captureHeight = Math.max(1, height / resolutionDivisor);
         
         // Ensure texture exists
         if (depthImage == null || lastWidth != captureWidth || lastHeight != captureHeight) {
@@ -809,38 +808,30 @@ public class DirectDepthRenderer {
     private static void renderMode6_RingAtDistance(DrawContext context, MinecraftClient client, int sw, int sh) {
         if (!textureRegistered || depthTexture == null) return;
         
-        int x = 10, y = 10;
-        int displayWidth = lastWidth;
-        int displayHeight = lastHeight;
-        
-        // Background
-        context.fill(x - 2, y - 2, x + displayWidth + 2, y + displayHeight + 65, 0xC0000000);
-        
-        // Ring image
+        // FULLSCREEN stretched display
         context.drawTexture(
             RenderPipelines.GUI_TEXTURED,
             DEPTH_TEXTURE_ID,
-            x, y,
+            0, 0,
             0.0f, 0.0f,
-            displayWidth, displayHeight,
-            displayWidth, displayHeight
+            sw, sh,
+            lastWidth, lastHeight
         );
         
-        // Stats
+        // Stats overlay
+        int statX = 5, statY = 25;
+        context.fill(statX - 2, statY - 2, statX + 200, statY + 60, 0xA0000000);
+        
+        context.drawText(client.textRenderer, "Mode 6: Ring (Camera Dist)", statX, statY, 0x00FFFF, true);
         context.drawText(client.textRenderer,
-            String.format("Ring at %.1f blocks (±%.1f)", ringDistance, ringThickness / 2),
-            x, y + displayHeight + 4, 0x00FFFF, true);
+            String.format("Ring: %.1f blocks (±%.1f)", ringDistance, ringThickness / 2),
+            statX, statY + 12, 0x00FFFF, true);
         context.drawText(client.textRenderer,
             String.format("Ring pixels: %d", ringPixelCount),
-            x, y + displayHeight + 16, 0xAAFFAA, true);
-        context.drawText(client.textRenderer,
-            String.format("Sky: %d | Far: %.0f", lastSkyPixels, farPlane),
-            x, y + displayHeight + 28, 0xAAAAFF, true);
-        
-        // Instructions
+            statX, statY + 24, 0xAAFFAA, true);
         context.drawText(client.textRenderer,
             "/directdepth ring <dist> <thick>",
-            x, y + displayHeight + 44, 0x888888, true);
+            statX, statY + 40, 0x888888, true);
     }
     
     /**
@@ -869,8 +860,8 @@ public class DirectDepthRenderer {
     // ═══════════════════════════════════════════════════════════════════════════
     
     private static void captureRingFromWorldPoint(MinecraftClient client, int width, int height) {
-        int captureWidth = width / 4;
-        int captureHeight = height / 4;
+        int captureWidth = Math.max(1, width / resolutionDivisor);
+        int captureHeight = Math.max(1, height / resolutionDivisor);
         
         // Get camera position
         var camera = client.gameRenderer.getCamera();
@@ -983,12 +974,18 @@ public class DirectDepthRenderer {
                 // Check if within ring
                 if (distFromOrigin >= innerRing && distFromOrigin <= outerRing) {
                     localRingPixels++;
-                    depthImage.setColorArgb(x, y, 0xFFFF00FF);  // Magenta ring
+                    // Calculate intensity (brightest at ring center)
+                    float ringCenter = ringDistance;
+                    float distFromCenter = Math.abs(distFromOrigin - ringCenter);
+                    float intensity = 1.0f - (distFromCenter / (ringThickness / 2));
+                    int alpha = (int)(220 * intensity);
+                    int r = (int)(255 * intensity);
+                    int g = (int)(100 * intensity);
+                    int b = (int)(255 * intensity);
+                    depthImage.setColorArgb(x, y, (alpha << 24) | (r << 16) | (g << 8) | b);
                 } else {
-                    // Dim coloring based on distance from origin
-                    float normalized = Math.min(1.0f, distFromOrigin / 50.0f);
-                    int gray = (int)((1.0f - normalized) * 100);
-                    depthImage.setColorArgb(x, y, (255 << 24) | (gray << 16) | (gray << 8) | gray);
+                    // TRANSPARENT - game shows through!
+                    depthImage.setColorArgb(x, y, 0x00000000);
                 }
             }
         }
@@ -1009,36 +1006,37 @@ public class DirectDepthRenderer {
     private static void renderMode7_WorldPointRing(DrawContext context, MinecraftClient client, int sw, int sh) {
         if (!textureRegistered || depthTexture == null) return;
         
-        int x = 10, y = 10;
-        int displayWidth = lastWidth;
-        int displayHeight = lastHeight;
+        // Enable blending for transparency
+        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+        com.mojang.blaze3d.systems.RenderSystem.defaultBlendFunc();
         
-        context.fill(x - 2, y - 2, x + displayWidth + 2, y + displayHeight + 80, 0xC0000000);
-        
+        // FULLSCREEN stretched display with alpha blending
         context.drawTexture(
             RenderPipelines.GUI_TEXTURED,
             DEPTH_TEXTURE_ID,
-            x, y,
+            0, 0,
             0.0f, 0.0f,
-            displayWidth, displayHeight,
-            displayWidth, displayHeight
+            sw, sh,
+            lastWidth, lastHeight
         );
         
-        String originStr = usePlayerAsOrigin ? "Player Position" : 
-            String.format("%.1f, %.1f, %.1f", ringWorldOrigin.x, ringWorldOrigin.y, ringWorldOrigin.z);
+        com.mojang.blaze3d.systems.RenderSystem.disableBlend();
         
+        // Stats overlay
+        int statX = 5, statY = 25;
+        context.fill(statX - 2, statY - 2, statX + 200, statY + 70, 0xA0000000);
+        
+        context.drawText(client.textRenderer, "Mode 7: Ring (World Point)", statX, statY, 0xFF00FF, true);
+        context.drawText(client.textRenderer, "Origin: Player Position", statX, statY + 12, 0xFF00FF, true);
         context.drawText(client.textRenderer,
-            "Origin: " + originStr,
-            x, y + displayHeight + 4, 0xFF00FF, true);
+            String.format("Ring: %.1f blocks (±%.1f)", ringDistance, ringThickness / 2),
+            statX, statY + 24, 0xFFFFFF, true);
         context.drawText(client.textRenderer,
-            String.format("Ring at %.1f blocks (±%.1f)", ringDistance, ringThickness / 2),
-            x, y + displayHeight + 16, 0xFFFFFF, true);
-        context.drawText(client.textRenderer,
-            String.format("Ring pixels: %d | Sky: %d", ringPixelCount, lastSkyPixels),
-            x, y + displayHeight + 28, 0xAAFFAA, true);
+            String.format("Ring pixels: %d", ringPixelCount),
+            statX, statY + 36, 0xAAFFAA, true);
         context.drawText(client.textRenderer,
             "Magenta = Ring | Gray = World",
-            x, y + displayHeight + 44, 0x888888, true);
+            statX, statY + 52, 0x888888, true);
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -1071,44 +1069,224 @@ public class DirectDepthRenderer {
     private static void renderMode8_AnimatedRing(DrawContext context, MinecraftClient client, int sw, int sh) {
         if (!textureRegistered || depthTexture == null) return;
         
-        int x = 10, y = 10;
-        int displayWidth = lastWidth;
-        int displayHeight = lastHeight;
+        // Enable blending for transparency
+        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+        com.mojang.blaze3d.systems.RenderSystem.defaultBlendFunc();
         
-        context.fill(x - 2, y - 2, x + displayWidth + 2, y + displayHeight + 95, 0xC0000000);
-        
+        // FULLSCREEN stretched display with alpha blending
         context.drawTexture(
             RenderPipelines.GUI_TEXTURED,
             DEPTH_TEXTURE_ID,
-            x, y,
+            0, 0,
             0.0f, 0.0f,
-            displayWidth, displayHeight,
-            displayWidth, displayHeight
+            sw, sh,
+            lastWidth, lastHeight
         );
         
-        String originStr = usePlayerAsOrigin ? "Player Position" : 
-            String.format("%.1f, %.1f, %.1f", ringWorldOrigin.x, ringWorldOrigin.y, ringWorldOrigin.z);
+        com.mojang.blaze3d.systems.RenderSystem.disableBlend();
         
-        context.drawText(client.textRenderer,
-            "Origin: " + originStr,
-            x, y + displayHeight + 4, 0xFF00FF, true);
+        // Stats overlay
+        int statX = 5, statY = 25;
+        context.fill(statX - 2, statY - 2, statX + 220, statY + 90, 0xA0000000);
+        
+        context.drawText(client.textRenderer, "Mode 8: SHOCKWAVE", statX, statY, 0xFF00FF, true);
         context.drawText(client.textRenderer,
             String.format("Radius: %.1f / %.1f blocks", animationRadius, maxAnimationRadius),
-            x, y + displayHeight + 16, animating ? 0x00FF00 : 0xFFFF00, true);
+            statX, statY + 12, animating ? 0x00FF00 : 0xFFFF00, true);
         context.drawText(client.textRenderer,
             String.format("Speed: %.1f blocks/sec", animationSpeed),
-            x, y + displayHeight + 28, 0xAAAAFF, true);
+            statX, statY + 24, 0xAAAAFF, true);
         context.drawText(client.textRenderer,
             String.format("Status: %s", animating ? "EXPANDING" : "STOPPED"),
-            x, y + displayHeight + 40, animating ? 0x00FF00 : 0xFF0000, true);
+            statX, statY + 36, animating ? 0x00FF00 : 0xFF0000, true);
         context.drawText(client.textRenderer,
             String.format("Ring pixels: %d", ringPixelCount),
-            x, y + displayHeight + 52, 0xAAFFAA, true);
-        
-        // Instructions
+            statX, statY + 48, 0xAAFFAA, true);
         context.drawText(client.textRenderer,
-            "/directdepth trigger | /directdepth speed <n>",
-            x, y + displayHeight + 68, 0x888888, true);
+            "/directdepth trigger | speed <n>",
+            statX, statY + 64, 0x888888, true);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MODE 9: OVERLAY Ring - Draws ONLY ring pixels, game visible behind!
+    // This is the proper shockwave effect
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    // Store ring pixel positions instead of generating a texture
+    private static int[] overlayRingX = new int[50000];
+    private static int[] overlayRingY = new int[50000];
+    private static float[] overlayRingIntensity = new float[50000];
+    private static int overlayRingCount = 0;
+    private static int lastSampleDiv = 4;  // Store for render function
+    
+    private static void captureOverlayRing(MinecraftClient client, int width, int height) {
+        // Update animation (if animating)
+        if (animating) {
+            float elapsed = (System.currentTimeMillis() - animationStartTime) / 1000.0f;
+            animationRadius = elapsed * animationSpeed;
+            if (animationRadius > maxAnimationRadius) {
+                animating = false;
+                // Don't reset to 0 - keep at max so user can see it
+            }
+        }
+        
+        // If no radius set, nothing to show
+        if (animationRadius <= 0) {
+            overlayRingCount = 0;
+            return;
+        }
+        
+        // Use the configurable resolution divisor
+        // Default 1 = full res, higher = faster but blockier
+        int sampleDiv = Math.max(1, resolutionDivisor);
+        lastSampleDiv = sampleDiv;  // Save for render function
+        int sampleWidth = width / sampleDiv;
+        int sampleHeight = height / sampleDiv;
+        
+        // Get camera
+        var camera = client.gameRenderer.getCamera();
+        if (camera == null) {
+            overlayRingCount = 0;
+            return;
+        }
+        
+        var cameraPos = camera.getPos();
+        org.joml.Vector3d origin = new org.joml.Vector3d(
+            client.player != null ? client.player.getX() : cameraPos.x,
+            client.player != null ? client.player.getY() : cameraPos.y,
+            client.player != null ? client.player.getZ() : cameraPos.z
+        );
+        
+        // Camera orientation
+        float yaw = camera.getYaw();
+        float pitch = camera.getPitch();
+        float fov = client.options.getFov().getValue();
+        float aspect = (float)width / height;
+        
+        // Read depth at sample resolution
+        FloatBuffer depthBuffer = BufferUtils.createFloatBuffer(sampleWidth * sampleHeight);
+        GL11.glReadPixels(0, 0, sampleWidth, sampleHeight, GL11.GL_DEPTH_COMPONENT, GL11.GL_FLOAT, depthBuffer);
+        
+        float currentRadius = animationRadius;
+        float innerRing = currentRadius - ringThickness / 2;
+        float outerRing = currentRadius + ringThickness / 2;
+        
+        int count = 0;
+        int maxPixels = overlayRingX.length;
+        
+        for (int sy = 0; sy < sampleHeight && count < maxPixels; sy++) {
+            for (int sx = 0; sx < sampleWidth && count < maxPixels; sx++) {
+                float depth = depthBuffer.get(sy * sampleWidth + sx);
+                if (depth > 0.9999f) continue;  // Skip sky
+                
+                // Convert to NDC
+                float ndcX = (sx / (float)sampleWidth) * 2.0f - 1.0f;
+                float ndcY = (sy / (float)sampleHeight) * 2.0f - 1.0f;
+                
+                // Linearize depth
+                float near = 0.05f;
+                float eyeDist = (2.0f * near * farPlane) / (farPlane + near - depth * (farPlane - near));
+                
+                // Calculate world position
+                float tanHalfFov = (float) Math.tan(Math.toRadians(fov / 2.0));
+                float yawRad = (float) Math.toRadians(-yaw);
+                float pitchRad = (float) Math.toRadians(-pitch);
+                
+                float localX = ndcX * tanHalfFov * aspect;
+                float localY = ndcY * tanHalfFov;
+                float localZ = -1.0f;
+                
+                float cosPitch = (float) Math.cos(pitchRad);
+                float sinPitch = (float) Math.sin(pitchRad);
+                float cosYaw = (float) Math.cos(yawRad);
+                float sinYaw = (float) Math.sin(yawRad);
+                
+                float tempY = localY * cosPitch - localZ * sinPitch;
+                float tempZ = localY * sinPitch + localZ * cosPitch;
+                localY = tempY;
+                localZ = tempZ;
+                
+                float tempX = localX * cosYaw + localZ * sinYaw;
+                tempZ = -localX * sinYaw + localZ * cosYaw;
+                localX = tempX;
+                localZ = tempZ;
+                
+                float len = (float) Math.sqrt(localX * localX + localY * localY + localZ * localZ);
+                float dirX = localX / len;
+                float dirY = localY / len;
+                float dirZ = localZ / len;
+                
+                double worldX = cameraPos.x + dirX * eyeDist;
+                double worldY = cameraPos.y + dirY * eyeDist;
+                double worldZ = cameraPos.z + dirZ * eyeDist;
+                
+                // Distance from origin
+                double dx = worldX - origin.x;
+                double dy = worldY - origin.y;
+                double dz = worldZ - origin.z;
+                float distFromOrigin = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+                
+                // Check if within ring
+                if (distFromOrigin >= innerRing && distFromOrigin <= outerRing) {
+                    // Map sample position to SCREEN position (scale by sampleDiv)
+                    overlayRingX[count] = sx * sampleDiv;
+                    overlayRingY[count] = height - (sy * sampleDiv) - sampleDiv;  // Flip Y
+                    
+                    // Calculate intensity (brightest at ring center)
+                    float ringCenter = currentRadius;
+                    float distFromCenter = Math.abs(distFromOrigin - ringCenter);
+                    overlayRingIntensity[count] = 1.0f - (distFromCenter / (ringThickness / 2));
+                    
+                    count++;
+                }
+            }
+        }
+        
+        overlayRingCount = count;
+    }
+    
+    private static void renderMode9_OverlayRing(DrawContext context, MinecraftClient client, int sw, int sh) {
+        // DON'T draw a texture - draw individual rectangles for ring pixels!
+        
+        int pixelSize = Math.max(1, lastSampleDiv);  // Match what capture used
+        
+        for (int i = 0; i < overlayRingCount; i++) {
+            int x = overlayRingX[i];
+            int y = overlayRingY[i];
+            float intensity = overlayRingIntensity[i];
+            
+            // Color: Magenta with intensity-based brightness
+            int r = (int)(255 * intensity);
+            int g = (int)(50 * intensity);
+            int b = (int)(255 * intensity);
+            int alpha = (int)(220 * intensity);  // More opaque
+            int color = (alpha << 24) | (r << 16) | (g << 8) | b;
+            
+            context.fill(x, y, x + pixelSize, y + pixelSize, color);
+        }
+        
+        // Stats overlay
+        int statX = 5, statY = 25;
+        context.fill(statX - 2, statY - 2, statX + 260, statY + 100, 0xA0000000);
+        
+        context.drawText(client.textRenderer, "Mode 9: OVERLAY SHOCKWAVE", statX, statY, 0xFF00FF, true);
+        context.drawText(client.textRenderer,
+            String.format("Radius: %.1f / %.1f blocks", animationRadius, maxAnimationRadius),
+            statX, statY + 12, animating ? 0x00FF00 : 0xFFFF00, true);
+        context.drawText(client.textRenderer,
+            String.format("Speed: %.1f | Resolution: 1/%d", animationSpeed, resolutionDivisor),
+            statX, statY + 24, 0xAAAAFF, true);
+        context.drawText(client.textRenderer,
+            String.format("Ring pixels: %d | Status: %s", overlayRingCount, animating ? "ANIMATING" : "STATIC"),
+            statX, statY + 36, 0xAAFFAA, true);
+        context.drawText(client.textRenderer,
+            "Commands:", statX, statY + 52, 0x888888, true);
+        context.drawText(client.textRenderer,
+            "/directdepth trigger | radius <n> | speed <n>",
+            statX, statY + 64, 0x666666, true);
+        context.drawText(client.textRenderer,
+            "/directdepth resolution <n> (1=full, 4=fast)",
+            statX, statY + 76, 0x666666, true);
     }
     
     /**
@@ -1142,6 +1320,35 @@ public class DirectDepthRenderer {
         Logging.RENDER.topic("direct_depth")
             .kv("maxAnimationRadius", maxAnimationRadius)
             .info("Max radius updated");
+    }
+    
+    /**
+     * Set current radius directly (static mode - no animation).
+     */
+    public static void setRadius(float radius) {
+        animating = false;  // Stop any animation
+        animationRadius = Math.max(0.0f, radius);
+        Logging.RENDER.topic("direct_depth")
+            .kv("radius", animationRadius)
+            .info("Static radius set");
+    }
+    
+    /**
+     * Set resolution divisor for pixelation effect.
+     * 1 = full resolution, 2 = half, 4 = quarter, etc.
+     */
+    public static void setResolution(int divisor) {
+        resolutionDivisor = Math.max(1, Math.min(32, divisor));
+        // Force texture recreation on next frame
+        lastWidth = 0;
+        lastHeight = 0;
+        Logging.RENDER.topic("direct_depth")
+            .kv("resolutionDivisor", resolutionDivisor)
+            .info("Resolution updated");
+    }
+    
+    public static int getResolution() {
+        return resolutionDivisor;
     }
     
     public static void dispose() {

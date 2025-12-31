@@ -1,11 +1,14 @@
 #version 150
 
-// SHOCKWAVE RING - uses depth to conform to terrain
+// ═══════════════════════════════════════════════════════════════════════════
+// TERRAIN-CONFORMING SHOCKWAVE RING
+// Fixed for Minecraft's compressed depth buffer (0.997 - 1.0 range)
+// ═══════════════════════════════════════════════════════════════════════════
+
 uniform sampler2D InSampler;
 uniform sampler2D DepthSampler;
 
 in vec2 texCoord;
-in vec2 oneTexel;
 
 layout(std140) uniform SamplerInfo {
     vec2 OutSize;
@@ -14,69 +17,82 @@ layout(std140) uniform SamplerInfo {
 
 out vec4 fragColor;
 
-// Animation time (we'll use fragment position as hacky animation)
-// In production, this would be a uniform passed from Java
+// ═══════════════════════════════════════════════════════════════════════════
+// MINECRAFT DEPTH HANDLING
+// Minecraft depth buffer uses a very compressed range (0.997 - 1.0)
+// We need to remap this to get usable distance values
+// ═══════════════════════════════════════════════════════════════════════════
+
+float depthToDistance(float depth) {
+    // Minecraft uses: near = 0.05, far = varies by render distance
+    // The depth buffer is non-linear and very compressed
+    
+    // Standard perspective depth linearization with Minecraft values
+    float near = 0.05;
+    float far = 256.0;
+    
+    // Linearize depth
+    float z = (2.0 * near * far) / (far + near - depth * (far - near));
+    
+    return z;
+}
 
 void main() {
     vec4 sceneColor = texture(InSampler, texCoord);
-    float depth = texture(DepthSampler, texCoord).r;
+    float rawDepth = texture(DepthSampler, texCoord).r;
     
-    // Invert depth (1.0 = near, 0.0 = far)
-    float invDepth = 1.0 - depth;
+    // ═══════════════════════════════════════════════════════════════════════
+    // SKY DETECTION
+    // Sky has depth exactly 1.0 or very close
+    // ═══════════════════════════════════════════════════════════════════════
     
-    // ========================================================
-    // SHOCKWAVE RING EFFECT
-    // ========================================================
+    if (rawDepth > 0.9999) {
+        // Sky - pass through unchanged
+        fragColor = sceneColor;
+        return;
+    }
     
-    // Ring center (screen center for now - would be uniform in production)
-    vec2 center = vec2(0.5, 0.5);
+    // ═══════════════════════════════════════════════════════════════════════
+    // CONVERT DEPTH TO WORLD DISTANCE
+    // ═══════════════════════════════════════════════════════════════════════
     
-    // Distance from center in screen space
-    vec2 screenDist = texCoord - center;
-    // Correct for aspect ratio
-    float aspect = OutSize.x / OutSize.y;
-    screenDist.x *= aspect;
-    float dist = length(screenDist);
+    float worldDistance = depthToDistance(rawDepth);
     
-    // Ring parameters (would be uniforms in production)
-    float ringRadius = 0.3;      // Current ring radius (0-1 screen space)
-    float ringWidth = 0.05;      // Ring thickness
-    float glowFalloff = 0.1;     // Glow extends beyond ring
+    // ═══════════════════════════════════════════════════════════════════════
+    // RING PARAMETERS
+    // Ring at specific distance from camera
+    // ═══════════════════════════════════════════════════════════════════════
     
-    // Calculate ring mask
-    float ringDist = abs(dist - ringRadius);
-    float ringMask = 1.0 - smoothstep(0.0, ringWidth, ringDist);
+    float ringRadius = 15.0;      // 15 blocks from camera
+    float ringThickness = 3.0;    // 3 blocks thick
     
-    // Extended glow
-    float glowMask = 1.0 - smoothstep(ringWidth, ringWidth + glowFalloff, ringDist);
+    // How far is this pixel from the ring?
+    float distFromRing = abs(worldDistance - ringRadius);
     
-    // ========================================================
-    // DEPTH-BASED TERRAIN CONFORMITY
-    // ========================================================
+    // Create smooth ring mask
+    float ringMask = 1.0 - smoothstep(0.0, ringThickness, distFromRing);
     
-    // Only show ring where there's geometry (not sky)
-    // Sky has depth ~1.0, terrain has depth < 1.0
-    float terrainMask = smoothstep(0.99, 0.95, depth);
+    // ═══════════════════════════════════════════════════════════════════════
+    // COLORING
+    // ═══════════════════════════════════════════════════════════════════════
     
-    // Modulate ring intensity by depth (closer = brighter)
-    float depthIntensity = pow(invDepth, 0.3);
-    
-    // Combine masks
-    float finalRing = ringMask * terrainMask;
-    float finalGlow = glowMask * terrainMask * 0.5;
-    
-    // Ring color (cyan-white energy)
-    vec3 ringColor = vec3(0.3, 0.9, 1.0);
-    vec3 glowColor = vec3(0.1, 0.5, 0.8);
-    
-    // Mix
     vec3 finalColor = sceneColor.rgb;
-    finalColor = mix(finalColor, glowColor, finalGlow * depthIntensity);
-    finalColor = mix(finalColor, ringColor, finalRing * depthIntensity);
     
-    // Add bright white core
-    float coreMask = 1.0 - smoothstep(0.0, ringWidth * 0.3, ringDist);
-    finalColor = mix(finalColor, vec3(1.0), coreMask * terrainMask * 0.7);
+    // Ring effect - BRIGHT CYAN
+    if (ringMask > 0.01) {
+        vec3 ringColor = vec3(0.0, 1.0, 1.0);  // Cyan
+        finalColor = mix(finalColor, ringColor, ringMask * 0.8);
+        
+        // White hot core
+        float coreMask = 1.0 - smoothstep(0.0, ringThickness * 0.3, distFromRing);
+        finalColor = mix(finalColor, vec3(1.0), coreMask * 0.9);
+    }
+    
+    // DEBUG: Show distance as subtle color tint
+    // Close = green tint, Far = blue tint
+    float normalizedDist = clamp(worldDistance / 50.0, 0.0, 1.0);
+    vec3 distTint = mix(vec3(0.2, 0.5, 0.0), vec3(0.0, 0.2, 0.5), normalizedDist);
+    finalColor = mix(finalColor, distTint, 0.1);  // Very subtle
     
     fragColor = vec4(finalColor, 1.0);
 }
