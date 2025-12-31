@@ -27,7 +27,7 @@ layout(std140) uniform ShockwaveConfig {
     float RingCount;        // Number of concentric rings (1-10)
     float RingSpacing;      // Distance between rings (blocks)
     float ContractMode;     // 0 = expand outward, 1 = contract inward
-    float Reserved1;
+    float GlowWidth;        // Glow falloff width (blocks)
     
     // vec4 2: Target world position (for world-anchored mode)
     float TargetX;
@@ -64,6 +64,12 @@ layout(std140) uniform ShockwaveConfig {
     float TintG;            // Tint color green (0-1)
     float TintB;            // Tint color blue (0-1)
     float TintAmount;       // 0 = no tint, 1 = full tint
+    
+    // vec4 8: Custom ring color
+    float RingR;            // Ring color red (0-1)
+    float RingG;            // Ring color green (0-1)
+    float RingB;            // Ring color blue (0-1)
+    float RingOpacity;      // Ring opacity (0-1)
 };
 
 out vec4 fragColor;
@@ -121,24 +127,56 @@ float glowFalloff(float dist, float radius) {
     return max(0.0, 1.0 - t * t);
 }
 
-float ringContribution(float dist, float ringDist, float thickness, float intensity) {
+// Core thickness = sharp center line width
+// Glow width = soft falloff around the core
+float ringContribution(float dist, float ringDist, float coreThickness, float glowWidth, float intensity) {
     float distFromRing = abs(dist - ringDist);
     
-    float coreWidth = thickness * 0.2;
-    float coreMask = 1.0 - smoothstep(0.0, coreWidth, distFromRing);
-    float innerMask = 1.0 - smoothstep(0.0, thickness * 0.5, distFromRing);
-    float outerMask = glowFalloff(distFromRing, thickness * 2.0);
+    // Core - the bright sharp center (uses coreThickness)
+    float coreMask = 1.0 - smoothstep(0.0, coreThickness * 0.5, distFromRing);
     
-    return (coreMask * 0.9 + innerMask * 0.5 + outerMask * 0.3) * intensity;
+    // Inner glow - medium falloff (uses glowWidth)
+    float innerMask = 1.0 - smoothstep(0.0, glowWidth * 0.5, distFromRing);
+    
+    // Outer glow - soft falloff (uses glowWidth)
+    float outerMask = glowFalloff(distFromRing, glowWidth);
+    
+    return (coreMask * 0.9 + innerMask * 0.4 + outerMask * 0.2) * intensity;
 }
 
 void main() {
     vec4 sceneColor = texture(InSampler, texCoord);
     float rawDepth = texture(DepthSampler, texCoord).r;
+    bool isSky = (rawDepth > 0.9999);
     
-    // Sky detection
-    if (rawDepth > 0.9999) {
-        fragColor = sceneColor;
+    // ═══════════════════════════════════════════════════════════════════════
+    // SCREEN EFFECTS - Apply to ALL pixels including sky
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    vec3 baseColor = sceneColor.rgb;
+    
+    // Apply color tint (multiplicative blend)
+    if (TintAmount > 0.001) {
+        vec3 tintColor = vec3(TintR, TintG, TintB);
+        baseColor = mix(baseColor, baseColor * tintColor, TintAmount);
+    }
+    
+    // Apply vignette
+    if (VignetteAmount > 0.001) {
+        vec2 uv = texCoord * 2.0 - 1.0;
+        float dist = length(uv);
+        float vignette = 1.0 - smoothstep(VignetteRadius, 1.0 + VignetteRadius, dist);
+        baseColor *= mix(1.0, vignette, VignetteAmount);
+    }
+    
+    // Apply blackout (darken everything)
+    if (BlackoutAmount > 0.001) {
+        baseColor *= (1.0 - BlackoutAmount);
+    }
+    
+    // For sky pixels, output now (no rings on sky)
+    if (isSky) {
+        fragColor = vec4(baseColor, 1.0);
         return;
     }
     
@@ -170,6 +208,7 @@ void main() {
     float totalMask = 0.0;
     int ringCountInt = clamp(int(RingCount), 1, 10);
     float spacing = max(1.0, RingSpacing);
+    float glowW = max(1.0, GlowWidth);  // Glow width from uniform
     
     for (int i = 0; i < ringCountInt; i++) {
         float ringOffset = float(i) * spacing;
@@ -178,47 +217,30 @@ void main() {
         if (thisRingRadius <= 0.0) continue;
         
         float ringFade = 1.0 - (float(i) / float(ringCountInt)) * 0.7;
-        totalMask += ringContribution(distanceFromOrigin, thisRingRadius, RingThickness, Intensity * ringFade);
+        totalMask += ringContribution(distanceFromOrigin, thisRingRadius, RingThickness, glowW, Intensity * ringFade);
     }
     
     totalMask = clamp(totalMask, 0.0, 1.0);
     
     // ═══════════════════════════════════════════════════════════════════════
     // COLOR COMPOSITION
+    // (Screen effects already applied to baseColor above)
     // ═══════════════════════════════════════════════════════════════════════
     
-    // Start with scene color
-    vec3 baseColor = sceneColor.rgb;
-    
-    // Apply color tint
-    if (TintAmount > 0.0) {
-        vec3 tintColor = vec3(TintR, TintG, TintB);
-        baseColor = mix(baseColor, baseColor * tintColor, TintAmount);
-    }
-    
-    // Apply vignette
-    if (VignetteAmount > 0.0) {
-        vec2 uv = texCoord * 2.0 - 1.0;
-        float vignette = 1.0 - smoothstep(VignetteRadius, 1.0, length(uv));
-        baseColor *= mix(1.0, vignette, VignetteAmount);
-    }
-    
-    // Apply blackout
-    if (BlackoutAmount > 0.0) {
-        baseColor *= (1.0 - BlackoutAmount);
-    }
-    
-    // Ring colors
-    vec3 coreColor = vec3(1.0, 1.0, 1.0);
-    vec3 ringColor = vec3(0.0, 1.0, 1.0);
-    vec3 outerGlow = vec3(0.2, 0.5, 1.0);
+    // Ring colors - use custom colors from uniforms
+    vec3 ringColor = vec3(RingR, RingG, RingB);
+    vec3 coreColor = vec3(1.0, 1.0, 1.0);  // Core is always white-hot
+    vec3 outerGlow = ringColor * 0.5;      // Outer glow is dimmer version
     
     vec3 effectColor = mix(outerGlow, ringColor, totalMask);
     effectColor = mix(effectColor, coreColor, totalMask * totalMask);
     
+    // Apply ring opacity
+    float ringAlpha = totalMask * RingOpacity;
+    
     // Composite rings on top of processed scene
-    vec3 finalColor = mix(baseColor, effectColor, totalMask);
-    finalColor += ringColor * totalMask * 0.2;
+    vec3 finalColor = mix(baseColor, effectColor, ringAlpha);
+    finalColor += ringColor * ringAlpha * 0.2;  // Additive bloom
     
     fragColor = vec4(clamp(finalColor, 0.0, 1.0), 1.0);
 }
