@@ -166,14 +166,22 @@ public class ShockwavePostEffect {
     
     // Orbital animation state
     private static float orbitalPhase = 0f;      // Current rotation angle (radians)
-    private static float orbitalSpeed = 0.02f;   // Rotation speed (radians per frame, ~1 rev per 5 sec)
+    private static float orbitalSpeed = 0.008f;  // Rotation speed (radians per frame, ~1 rev per ~13 sec)
     
     // Orbital spawn/retract animation
-    private static float orbitalSpawnProgress = 1f;    // 0 = at center, 1 = at full distance
-    private static float orbitalSpawnDuration = 1000f; // ms to reach full distance
-    private static float orbitalRetractDuration = 500f;// ms to retract back to center
-    private static long orbitalSpawnStartTime = 0;     // When spawn started
-    private static boolean orbitalRetracting = false;  // Are we retracting?
+    private static float orbitalSpawnProgress = 0f;     // 0 = at center/hidden, 1 = at full distance
+    private static float orbitalSpawnDuration = 2500f;  // ms to reach full distance (2.5 sec)
+    private static float orbitalRetractDuration = 1500f;// ms to retract back to center
+    private static long orbitalSpawnStartTime = 0;      // When spawn started
+    private static boolean orbitalRetracting = false;   // Are we retracting?
+    
+    // Beam animation state (beams from orbitals to sky)
+    private static float beamProgress = 0f;           // 0 = no beam, 1 = full height
+    private static float beamGrowDuration = 1500f;    // ms to grow to full height
+    private static float beamShrinkDuration = 800f;   // ms to shrink before retract
+    private static float beamHeight = 100f;           // How high beams go (blocks)
+    private static long beamStartTime = 0;            // When beam started growing
+    private static boolean beamShrinking = false;     // Is beam shrinking?
     
     // Origin mode: CAMERA = rings around player, TARGET = rings around cursor hit point
     public enum OriginMode { CAMERA, TARGET }
@@ -316,7 +324,14 @@ public class ShockwavePostEffect {
                 animRadius = elapsed * speed;
                 if (animRadius >= maxR) {
                     animating = false;
-                    enabled = false;
+                    // For orbital, start beam shrink (which will then trigger retract)
+                    if (shapeConfig.type() == ShapeType.ORBITAL && !orbitalRetracting && !beamShrinking) {
+                        beamShrinking = true;
+                        beamStartTime = System.currentTimeMillis();
+                        // Keep enabled for beam shrink + retract
+                    } else if (shapeConfig.type() != ShapeType.ORBITAL) {
+                        enabled = false;
+                    }
                     return maxR;
                 }
             }
@@ -619,18 +634,52 @@ public class ShockwavePostEffect {
             if (orbitalPhase > 6.28318f) orbitalPhase -= 6.28318f;
             if (orbitalPhase < 0f) orbitalPhase += 6.28318f;
             
-            // Spawn/retract animation
             long now = System.currentTimeMillis();
+            
+            // Spawn/retract animation
             if (orbitalRetracting) {
                 float elapsed = now - orbitalSpawnStartTime;
-                orbitalSpawnProgress = 1f - Math.min(1f, elapsed / orbitalRetractDuration);
-                // Ease out
-                orbitalSpawnProgress = orbitalSpawnProgress * orbitalSpawnProgress;
+                float linear = Math.min(1f, elapsed / orbitalRetractDuration);
+                // Ease in (accelerate as approaching center)
+                orbitalSpawnProgress = 1f - linear * linear;
+                
+                // Retract complete - disable effect
+                if (orbitalSpawnProgress <= 0.01f) {
+                    orbitalSpawnProgress = 0f;
+                    orbitalRetracting = false;
+                    enabled = false;
+                }
             } else if (orbitalSpawnProgress < 1f) {
                 float elapsed = now - orbitalSpawnStartTime;
                 float linear = Math.min(1f, elapsed / orbitalSpawnDuration);
                 // Ease out (smooth deceleration)
                 orbitalSpawnProgress = 1f - (1f - linear) * (1f - linear);
+                
+                // Start beam when spawn completes
+                if (orbitalSpawnProgress >= 0.99f && beamProgress == 0f && !beamShrinking) {
+                    beamStartTime = now;
+                }
+            }
+            
+            // Beam animation
+            if (beamShrinking) {
+                // Shrinking beam
+                float elapsed = now - beamStartTime;
+                float linear = Math.min(1f, elapsed / beamShrinkDuration);
+                beamProgress = 1f - linear;
+                
+                // Beam shrink complete - start retract
+                if (beamProgress <= 0.01f) {
+                    beamProgress = 0f;
+                    beamShrinking = false;
+                    startOrbitalRetract();
+                }
+            } else if (orbitalSpawnProgress >= 0.99f && beamProgress < 1f && !orbitalRetracting) {
+                // Growing beam (spawn complete, not yet full, not retracting)
+                float elapsed = now - beamStartTime;
+                float linear = Math.min(1f, elapsed / beamGrowDuration);
+                // Ease out
+                beamProgress = 1f - (1f - linear) * (1f - linear);
             }
         }
     }
@@ -757,7 +806,7 @@ public class ShockwavePostEffect {
             (float) shapeConfig.sideCount(),  // Polygon sides OR orbital count
             animatedOrbitDistance,            // Animated distance (0 at spawn, full at end)
             orbitalPhase,                     // Current rotation angle (radians)
-            0f                                // Reserved
+            beamProgress * beamHeight         // Beam height (0 when hidden, full when grown)
         );
     }
     

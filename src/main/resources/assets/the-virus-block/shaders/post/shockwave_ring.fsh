@@ -81,7 +81,7 @@ layout(std140) uniform ShockwaveConfig {
     float ShapeSideCount;   // Polygon sides OR orbital count
     float OrbitDistance;    // Distance from center to orbital centers
     float OrbitalPhase;     // Current orbital rotation angle (radians)
-    float ShapeReserved;    // Reserved
+    float BeamHeight;       // Current beam height (0 = no beam, grows when active)
 };
 
 out vec4 fragColor;
@@ -231,35 +231,69 @@ float sdfOrbitalSpheresOnly(vec3 p, vec3 center, float orbitalRadius,
     return d;
 }
 
-// Calculate surface normal from SDF gradient
+// Capsule SDF (line segment with radius) - for beams
+float sdfCapsule(vec3 p, vec3 a, vec3 b, float r) {
+    vec3 ab = b - a;
+    vec3 ap = p - a;
+    float t = clamp(dot(ap, ab) / dot(ab, ab), 0.0, 1.0);
+    vec3 closest = a + t * ab;
+    return length(p - closest) - r;
+}
+
+// SDF for beams from orbitals to sky
+float sdfBeams(vec3 p, vec3 center, float orbitalRadius, float orbitDistance,
+               int count, float phase, float beamHeight) {
+    if (beamHeight < 0.1) return 1e10;  // No beam
+    
+    float d = 1e10;
+    float beamRadius = orbitalRadius * 0.3;  // Beams are thinner than orbs
+    
+    for (int i = 0; i < count && i < 8; i++) {
+        vec3 orbPos = getOrbitalPosition(center, i, count, orbitDistance, phase);
+        vec3 beamStart = orbPos;
+        vec3 beamEnd = orbPos + vec3(0.0, beamHeight, 0.0);  // Straight up
+        d = min(d, sdfCapsule(p, beamStart, beamEnd, beamRadius));
+    }
+    return d;
+}
+
+// Combined SDF for orbitals + beams
+float sdfOrbitalAndBeams(vec3 p, vec3 center, float orbitalRadius, float orbitDistance,
+                         int count, float phase, float beamHeight) {
+    float orbDist = sdfOrbitalSpheresOnly(p, center, orbitalRadius, orbitDistance, count, phase);
+    float beamDist = sdfBeams(p, center, orbitalRadius, orbitDistance, count, phase, beamHeight);
+    return min(orbDist, beamDist);
+}
+
+// Calculate surface normal from SDF gradient (for orbitals + beams)
 vec3 calcNormal(vec3 p, vec3 center, float orbitalRadius, 
-                float orbitDistance, int count, float phase) {
+                float orbitDistance, int count, float phase, float beamHeight) {
     float eps = 0.01;
-    float d = sdfOrbitalSpheresOnly(p, center, orbitalRadius, orbitDistance, count, phase);
+    float d = sdfOrbitalAndBeams(p, center, orbitalRadius, orbitDistance, count, phase, beamHeight);
     vec3 grad = vec3(
-        sdfOrbitalSpheresOnly(p + vec3(eps,0,0), center, orbitalRadius, orbitDistance, count, phase) - d,
-        sdfOrbitalSpheresOnly(p + vec3(0,eps,0), center, orbitalRadius, orbitDistance, count, phase) - d,
-        sdfOrbitalSpheresOnly(p + vec3(0,0,eps), center, orbitalRadius, orbitDistance, count, phase) - d
+        sdfOrbitalAndBeams(p + vec3(eps,0,0), center, orbitalRadius, orbitDistance, count, phase, beamHeight) - d,
+        sdfOrbitalAndBeams(p + vec3(0,eps,0), center, orbitalRadius, orbitDistance, count, phase, beamHeight) - d,
+        sdfOrbitalAndBeams(p + vec3(0,0,eps), center, orbitalRadius, orbitDistance, count, phase, beamHeight) - d
     );
     float len = length(grad);
     return len > 0.0001 ? grad / len : vec3(0.0, 1.0, 0.0);  // Fallback to up if zero gradient
 }
 
-// Raymarch to find orbital sphere hit
+// Raymarch to find orbital/beam hit
 // Returns: vec4(hitDist, rimAmount, 0, 0) - hitDist < 0 means no hit
 vec4 raymarchOrbitalSpheres(vec3 rayOrigin, vec3 rayDir, float maxDist,
                             vec3 center, float orbitalRadius, float orbitDistance,
-                            int count, float phase) {
+                            int count, float phase, float beamHeight) {
     float t = 0.0;
     
     for (int i = 0; i < MAX_RAYMARCH_STEPS; i++) {
         vec3 p = rayOrigin + rayDir * t;
-        float d = sdfOrbitalSpheresOnly(p, center, orbitalRadius, orbitDistance, count, phase);
+        float d = sdfOrbitalAndBeams(p, center, orbitalRadius, orbitDistance, count, phase, beamHeight);
         
         // Hit surface
         if (d < RAYMARCH_EPSILON) {
             // Calculate rim/corona based on view angle to normal
-            vec3 normal = calcNormal(p, center, orbitalRadius, orbitDistance, count, phase);
+            vec3 normal = calcNormal(p, center, orbitalRadius, orbitDistance, count, phase, beamHeight);
             float rim = 1.0 - abs(dot(normal, -rayDir));
             rim = pow(rim, 2.0);  // Sharpen the rim
             return vec4(t, rim, 0.0, 1.0);
@@ -271,9 +305,9 @@ vec4 raymarchOrbitalSpheres(vec3 rayOrigin, vec3 rayDir, float maxDist,
         t += d * 0.8;  // Step forward (0.8 for safety)
     }
     
-    // Check if we're NEAR an orbital sphere even without hitting (for corona glow)
-    float nearestDist = sdfOrbitalSpheresOnly(rayOrigin + rayDir * min(t, maxDist * 0.5), 
-                                              center, orbitalRadius, orbitDistance, count, phase);
+    // Check if we're NEAR an orbital/beam even without hitting (for corona glow)
+    float nearestDist = sdfOrbitalAndBeams(rayOrigin + rayDir * min(t, maxDist * 0.5), 
+                                           center, orbitalRadius, orbitDistance, count, phase, beamHeight);
     if (nearestDist < CORONA_WIDTH) {
         float coronaAmount = 1.0 - (nearestDist / CORONA_WIDTH);
         return vec4(-1.0, coronaAmount * 0.5, 0.0, 0.0);  // No hit, but corona glow
@@ -401,11 +435,11 @@ void main() {
             vec3 up = cross(right, forward);
             vec3 rayDir = normalize(forward + right * (ndc.x * halfWidth) + up * (ndc.y * halfHeight));
             
-            // Raymarch for orbital spheres
+            // Raymarch for orbital spheres and beams
             vec4 hitInfo = raymarchOrbitalSpheres(
                 camPos, rayDir, linearDepth + 10.0,
                 targetPos, ShapeMinorR, OrbitDistance,
-                int(ShapeSideCount), OrbitalPhase
+                int(ShapeSideCount), OrbitalPhase, BeamHeight
             );
         
             if (hitInfo.w > 0.5) {
