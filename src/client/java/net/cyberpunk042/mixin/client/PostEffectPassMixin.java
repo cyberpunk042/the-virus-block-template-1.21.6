@@ -70,19 +70,71 @@ public class PostEffectPassMixin {
         }
         
         // Create new buffer with current Java values
+        // Layout: 6 vec4s = 96 bytes (full world-anchored support)
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            Std140Builder builder = Std140Builder.onStack(stack, 32);
+            Std140Builder builder = Std140Builder.onStack(stack, 128);
             
+            // Vec4 0: Basic params
             float radius = ShockwavePostEffect.getCurrentRadius();
             float thickness = ShockwavePostEffect.getThickness();
             float intensity = ShockwavePostEffect.getIntensity();
             float time = (System.currentTimeMillis() % 10000) / 1000.0f;
-            
-            // Pack as vec4
             builder.putVec4(radius, thickness, intensity, time);
-            builder.putVec4(0f, 0f, 0f, 0f); // padding
             
-            // Create new GPU buffer
+            // Vec4 1: Ring count, spacing, contract mode
+            float ringCount = (float) ShockwavePostEffect.getRingCount();
+            float ringSpacing = ShockwavePostEffect.getRingSpacing();
+            float contractMode = ShockwavePostEffect.isContractMode() ? 1.0f : 0.0f;
+            builder.putVec4(ringCount, ringSpacing, contractMode, 0f);
+            
+            // Vec4 2: Target world position + UseWorldOrigin flag
+            float useWorldOrigin = ShockwavePostEffect.isTargetMode() ? 1.0f : 0.0f;
+            float targetX = ShockwavePostEffect.getTargetX();
+            float targetY = ShockwavePostEffect.getTargetY();
+            float targetZ = ShockwavePostEffect.getTargetZ();
+            builder.putVec4(targetX, targetY, targetZ, useWorldOrigin);
+            
+            // Vec4 3: Camera world position + aspect ratio
+            float camX = ShockwavePostEffect.getCameraX();
+            float camY = ShockwavePostEffect.getCameraY();
+            float camZ = ShockwavePostEffect.getCameraZ();
+            var client = net.minecraft.client.MinecraftClient.getInstance();
+            float aspect = (float) client.getWindow().getFramebufferWidth() / 
+                          (float) client.getWindow().getFramebufferHeight();
+            builder.putVec4(camX, camY, camZ, aspect);
+            
+            // Vec4 4: Camera forward direction + FOV
+            float fov = (float) Math.toRadians(client.options.getFov().getValue());
+            float yaw = 0f, pitch = 0f;
+            if (client.player != null) {
+                yaw = (float) Math.toRadians(client.player.getYaw());
+                pitch = (float) Math.toRadians(client.player.getPitch());
+            }
+            // Calculate forward vector from yaw/pitch
+            float forwardX = (float) (-Math.sin(yaw) * Math.cos(pitch));
+            float forwardY = (float) (-Math.sin(pitch));
+            float forwardZ = (float) (Math.cos(yaw) * Math.cos(pitch));
+            builder.putVec4(forwardX, forwardY, forwardZ, fov);
+            
+            // Vec4 5: Camera up direction (simplified - always world up)
+            builder.putVec4(0f, 1f, 0f, 0f);
+            
+            // Vec4 6: Screen blackout / vignette
+            builder.putVec4(
+                ShockwavePostEffect.getBlackoutAmount(),
+                ShockwavePostEffect.getVignetteAmount(),
+                ShockwavePostEffect.getVignetteRadius(),
+                0f
+            );
+            
+            // Vec4 7: Color tint
+            builder.putVec4(
+                ShockwavePostEffect.getTintR(),
+                ShockwavePostEffect.getTintG(),
+                ShockwavePostEffect.getTintB(),
+                ShockwavePostEffect.getTintAmount()
+            );
+            
             GpuBuffer newBuffer = RenderSystem.getDevice().createBuffer(
                 () -> "ShockwaveConfig Dynamic",
                 16, // uniform buffer usage
@@ -95,7 +147,8 @@ public class PostEffectPassMixin {
             if (injectCount % 60 == 1) {
                 Logging.RENDER.topic("posteffect_inject")
                     .kv("radius", String.format("%.1f", radius))
-                    .kv("replaced", oldBuffer != null)
+                    .kv("worldMode", useWorldOrigin > 0.5f)
+                    .kv("target", String.format("%.0f,%.0f,%.0f", targetX, targetY, targetZ))
                     .info("Updated ShockwaveConfig UBO!");
             }
             

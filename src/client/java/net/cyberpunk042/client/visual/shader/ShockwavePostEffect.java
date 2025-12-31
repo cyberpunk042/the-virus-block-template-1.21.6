@@ -46,11 +46,32 @@ public class ShockwavePostEffect {
     // CONFIGURABLE PARAMETERS
     // ═══════════════════════════════════════════════════════════════════════════
     
+    // Basic params
     private static float currentRadius = 20.0f;      // Current ring distance (blocks)
     private static float ringThickness = 4.0f;       // Ring width (blocks)
     private static float intensity = 1.0f;           // Glow intensity (0-2)
     private static float animationSpeed = 15.0f;     // Blocks per second
-    private static float maxRadius = 100.0f;         // Auto-stop radius
+    private static float maxRadius = 400.0f;         // Auto-stop radius
+    
+    // Advanced params
+    private static int ringCount = 10;               // Number of concentric rings
+    private static float ringSpacing = 8.0f;         // Distance between rings (blocks)
+    private static boolean contractMode = false;     // false = expand, true = contract
+    
+    // Origin mode: CAMERA = rings around player, TARGET = rings around cursor hit point
+    public enum OriginMode { CAMERA, TARGET }
+    private static OriginMode originMode = OriginMode.CAMERA;
+    
+    // Target world position (for TARGET mode)
+    private static float targetX = 0, targetY = 0, targetZ = 0;
+    private static float cameraX = 0, cameraY = 0, cameraZ = 0;
+    
+    // Screen effects
+    private static float blackoutAmount = 0.0f;      // 0 = no blackout, 1 = full black
+    private static float vignetteAmount = 0.0f;      // 0 = no vignette, 1 = strong
+    private static float vignetteRadius = 0.5f;      // Inner radius of vignette
+    private static float tintR = 1.0f, tintG = 1.0f, tintB = 1.0f;  // Tint color
+    private static float tintAmount = 0.0f;          // 0 = no tint, 1 = full tint
     
     // ═══════════════════════════════════════════════════════════════════════════
     // INITIALIZATION
@@ -151,13 +172,24 @@ public class ShockwavePostEffect {
     public static float getCurrentRadius() {
         if (animating) {
             float elapsed = (System.currentTimeMillis() - animationStartTime) / 1000.0f;
-            float animRadius = elapsed * animationSpeed;
+            float animRadius;
             
-            // Auto-stop when reaching max radius
-            if (animRadius >= maxRadius) {
-                animating = false;
-                enabled = false;
-                return maxRadius;
+            if (contractMode) {
+                // Contract: start from max, go to 0
+                animRadius = maxRadius - (elapsed * animationSpeed);
+                if (animRadius <= 0.0f) {
+                    animating = false;
+                    enabled = false;
+                    return 0.0f;
+                }
+            } else {
+                // Expand: start from 0, go to max
+                animRadius = elapsed * animationSpeed;
+                if (animRadius >= maxRadius) {
+                    animating = false;
+                    enabled = false;
+                    return maxRadius;
+                }
             }
             return animRadius;
         }
@@ -180,7 +212,154 @@ public class ShockwavePostEffect {
         return maxRadius;
     }
     
+    // Advanced param getters
+    public static int getRingCount() {
+        return ringCount;
+    }
+    
+    public static float getRingSpacing() {
+        return ringSpacing;
+    }
+    
+    public static boolean isContractMode() {
+        return contractMode;
+    }
+    
+    // Advanced param setters
+    public static void setRingCount(int count) {
+        ringCount = Math.max(1, Math.min(10, count));
+        Logging.RENDER.topic("shockwave_gpu")
+            .kv("ringCount", ringCount)
+            .info("Ring count set");
+    }
+    
+    public static void setRingSpacing(float spacing) {
+        ringSpacing = Math.max(1.0f, Math.min(50.0f, spacing));
+        Logging.RENDER.topic("shockwave_gpu")
+            .kv("ringSpacing", ringSpacing)
+            .info("Ring spacing set");
+    }
+    
+    public static void setContractMode(boolean contract) {
+        contractMode = contract;
+        Logging.RENDER.topic("shockwave_gpu")
+            .kv("contractMode", contractMode)
+            .info("Contract mode set");
+    }
+    
+    // Contracting animation
+    public static void triggerContract() {
+        enabled = true;
+        animating = true;
+        contractMode = true;
+        currentRadius = maxRadius;  // Start from max
+        animationStartTime = System.currentTimeMillis();
+        Logging.RENDER.topic("shockwave_gpu")
+            .kv("from", maxRadius)
+            .info("Contract animation triggered");
+    }
+    
     // ═══════════════════════════════════════════════════════════════════════════
+    // ORIGIN MODE
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    public static OriginMode getOriginMode() {
+        return originMode;
+    }
+    
+    public static void setOriginMode(OriginMode mode) {
+        originMode = mode;
+        Logging.RENDER.topic("shockwave_gpu")
+            .kv("mode", mode)
+            .info("Origin mode set");
+    }
+    
+    public static void setTargetPosition(float x, float y, float z) {
+        targetX = x;
+        targetY = y;
+        targetZ = z;
+        originMode = OriginMode.TARGET;
+        Logging.RENDER.topic("shockwave_gpu")
+            .kv("target", String.format("%.1f, %.1f, %.1f", x, y, z))
+            .info("Target position set");
+    }
+    
+    public static void updateCameraPosition(float x, float y, float z) {
+        cameraX = x;
+        cameraY = y;
+        cameraZ = z;
+    }
+    
+    public static float getTargetX() { return targetX; }
+    public static float getTargetY() { return targetY; }
+    public static float getTargetZ() { return targetZ; }
+    public static float getCameraX() { return cameraX; }
+    public static float getCameraY() { return cameraY; }
+    public static float getCameraZ() { return cameraZ; }
+    public static boolean isTargetMode() { return originMode == OriginMode.TARGET; }
+    
+    /**
+     * Trigger at cursor - performs raycast and sets target position.
+     * Should be called from command handler with raycast result.
+     */
+    public static void triggerAtCursor(net.minecraft.util.hit.HitResult hit) {
+        if (hit != null && hit.getType() != net.minecraft.util.hit.HitResult.Type.MISS) {
+            var pos = hit.getPos();
+            setTargetPosition((float)pos.x, (float)pos.y, (float)pos.z);
+            trigger();
+        } else {
+            // No hit - use camera mode
+            originMode = OriginMode.CAMERA;
+            trigger();
+        }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SCREEN EFFECTS
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    public static float getBlackoutAmount() { return blackoutAmount; }
+    public static float getVignetteAmount() { return vignetteAmount; }
+    public static float getVignetteRadius() { return vignetteRadius; }
+    public static float getTintR() { return tintR; }
+    public static float getTintG() { return tintG; }
+    public static float getTintB() { return tintB; }
+    public static float getTintAmount() { return tintAmount; }
+    
+    public static void setBlackout(float amount) {
+        blackoutAmount = Math.max(0f, Math.min(1f, amount));
+        Logging.RENDER.topic("shockwave_gpu")
+            .kv("blackout", blackoutAmount)
+            .info("Blackout set");
+    }
+    
+    public static void setVignette(float amount, float radius) {
+        vignetteAmount = Math.max(0f, Math.min(1f, amount));
+        vignetteRadius = Math.max(0f, Math.min(1f, radius));
+        Logging.RENDER.topic("shockwave_gpu")
+            .kv("vignette", vignetteAmount)
+            .kv("radius", vignetteRadius)
+            .info("Vignette set");
+    }
+    
+    public static void setTint(float r, float g, float b, float amount) {
+        tintR = Math.max(0f, Math.min(2f, r));
+        tintG = Math.max(0f, Math.min(2f, g));
+        tintB = Math.max(0f, Math.min(2f, b));
+        tintAmount = Math.max(0f, Math.min(1f, amount));
+        Logging.RENDER.topic("shockwave_gpu")
+            .kv("tint", String.format("%.1f,%.1f,%.1f @ %.1f", tintR, tintG, tintB, tintAmount))
+            .info("Tint set");
+    }
+    
+    public static void clearScreenEffects() {
+        blackoutAmount = 0f;
+        vignetteAmount = 0f;
+        tintAmount = 0f;
+        Logging.RENDER.topic("shockwave_gpu")
+            .info("Screen effects cleared");
+    }
+    
     // STATUS STRING (for HUD display)
     // ═══════════════════════════════════════════════════════════════════════════
     

@@ -331,9 +331,202 @@ public class TheVirusBlockClient implements ClientModInitializer {
 							return 1;
 						})
 					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("rings")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("count",
+							com.mojang.brigadier.arguments.IntegerArgumentType.integer(1, 10))
+							.executes(ctx -> {
+								int count = com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "count");
+								net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setRingCount(count);
+								ctx.getSource().sendFeedback(
+									net.minecraft.text.Text.literal("§d§lRing Count: §f" + count)
+								);
+								return 1;
+							})
+						)
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("spacing")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("spacing",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(1.0f, 50.0f))
+							.executes(ctx -> {
+								float spacing = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "spacing");
+								net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setRingSpacing(spacing);
+								ctx.getSource().sendFeedback(
+									net.minecraft.text.Text.literal("§d§lRing Spacing: §f" + spacing + " blocks")
+								);
+								return 1;
+							})
+						)
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("contract")
+						.executes(ctx -> {
+							net.cyberpunk042.client.visual.shader.ShockwavePostEffect.triggerContract();
+							ctx.getSource().sendFeedback(
+								net.minecraft.text.Text.literal("§d§lContract animation triggered!")
+							);
+							return 1;
+						})
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("cursor")
+						.executes(ctx -> {
+							var client = net.minecraft.client.MinecraftClient.getInstance();
+							if (client != null && client.player != null && client.world != null) {
+								// Perform long-range raycast (256 blocks)
+								double maxDistance = 256.0;
+								var cameraEntity = client.getCameraEntity();
+								if (cameraEntity == null) cameraEntity = client.player;
+								
+								net.minecraft.util.math.Vec3d start = cameraEntity.getCameraPosVec(1.0f);
+								net.minecraft.util.math.Vec3d look = cameraEntity.getRotationVec(1.0f);
+								net.minecraft.util.math.Vec3d end = start.add(look.multiply(maxDistance));
+								
+								// Raycast against blocks only
+								var hit = client.world.raycast(new net.minecraft.world.RaycastContext(
+									start, end,
+									net.minecraft.world.RaycastContext.ShapeType.OUTLINE,
+									net.minecraft.world.RaycastContext.FluidHandling.NONE,
+									cameraEntity
+								));
+								
+								if (hit != null && hit.getType() == net.minecraft.util.hit.HitResult.Type.BLOCK) {
+									var pos = hit.getPos();
+									net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setTargetPosition(
+										(float)pos.x, (float)pos.y, (float)pos.z);
+									net.cyberpunk042.client.visual.shader.ShockwavePostEffect.trigger();
+									ctx.getSource().sendFeedback(
+										net.minecraft.text.Text.literal(String.format(
+											"§d§lShockwave at: §f%.1f, %.1f, %.1f (%.0f blocks away)", 
+											pos.x, pos.y, pos.z, start.distanceTo(pos)))
+									);
+								} else {
+									// No hit - use camera mode
+									net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setOriginMode(
+										net.cyberpunk042.client.visual.shader.ShockwavePostEffect.OriginMode.CAMERA);
+									net.cyberpunk042.client.visual.shader.ShockwavePostEffect.trigger();
+									ctx.getSource().sendFeedback(
+										net.minecraft.text.Text.literal("§d§lShockwave from camera (no block in range)")
+									);
+								}
+							}
+							return 1;
+						})
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("mode")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("camera")
+							.executes(ctx -> {
+								net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setOriginMode(
+									net.cyberpunk042.client.visual.shader.ShockwavePostEffect.OriginMode.CAMERA);
+								ctx.getSource().sendFeedback(
+									net.minecraft.text.Text.literal("§d§lOrigin mode: §fCAMERA (around you)")
+								);
+								return 1;
+							})
+						)
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("target")
+							.executes(ctx -> {
+								net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setOriginMode(
+									net.cyberpunk042.client.visual.shader.ShockwavePostEffect.OriginMode.TARGET);
+								ctx.getSource().sendFeedback(
+									net.minecraft.text.Text.literal("§d§lOrigin mode: §fTARGET (use /shockwavegpu cursor)")
+								);
+								return 1;
+							})
+						)
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("pos")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("x",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg())
+							.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("y",
+								com.mojang.brigadier.arguments.FloatArgumentType.floatArg())
+								.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("z",
+									com.mojang.brigadier.arguments.FloatArgumentType.floatArg())
+									.executes(ctx -> {
+										float x = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "x");
+										float y = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "y");
+										float z = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "z");
+										net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setTargetPosition(x, y, z);
+										net.cyberpunk042.client.visual.shader.ShockwavePostEffect.trigger();
+										ctx.getSource().sendFeedback(
+											net.minecraft.text.Text.literal(String.format(
+												"§d§lShockwave at position: §f%.1f, %.1f, %.1f", x, y, z))
+										);
+										return 1;
+									})
+								)
+							)
+						)
+					)
 			);
 			
-			// TEST: Explicit pipeline shockwave (bypasses PostEffectProcessor)
+			// SCREEN EFFECTS sub-commands (registered separately due to command tree limits)
+			dispatcher.register(
+				net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("shockwavefx")
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("blackout")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("amount",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.0f, 1.0f))
+							.executes(ctx -> {
+								float amount = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "amount");
+								net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setBlackout(amount);
+								ctx.getSource().sendFeedback(
+									net.minecraft.text.Text.literal("§d§lBlackout: §f" + (int)(amount * 100) + "%")
+								);
+								return 1;
+							})
+						)
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("vignette")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("amount",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.0f, 1.0f))
+							.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("radius",
+								com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.0f, 1.0f))
+								.executes(ctx -> {
+									float amount = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "amount");
+									float radius = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "radius");
+									net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setVignette(amount, radius);
+									ctx.getSource().sendFeedback(
+										net.minecraft.text.Text.literal("§d§lVignette: §f" + (int)(amount * 100) + "% radius=" + radius)
+									);
+									return 1;
+								})
+							)
+						)
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("tint")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("r",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.0f, 2.0f))
+							.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("g",
+								com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.0f, 2.0f))
+								.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("b",
+									com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.0f, 2.0f))
+									.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("amount",
+										com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.0f, 1.0f))
+										.executes(ctx -> {
+											float r = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "r");
+											float g = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "g");
+											float b = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "b");
+											float amount = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "amount");
+											net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setTint(r, g, b, amount);
+											ctx.getSource().sendFeedback(
+												net.minecraft.text.Text.literal(String.format(
+													"§d§lTint: §f(%.1f, %.1f, %.1f) @ %d%%", r, g, b, (int)(amount * 100)))
+											);
+											return 1;
+										})
+									)
+								)
+							)
+						)
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("clear")
+						.executes(ctx -> {
+							net.cyberpunk042.client.visual.shader.ShockwavePostEffect.clearScreenEffects();
+							ctx.getSource().sendFeedback(
+								net.minecraft.text.Text.literal("§d§lScreen effects cleared")
+							);
+							return 1;
+						})
+					)
+			);
+			
 			dispatcher.register(
 				net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("shockwavetest")
 					.executes(ctx -> {

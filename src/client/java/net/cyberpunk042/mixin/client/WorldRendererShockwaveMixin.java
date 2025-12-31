@@ -80,6 +80,9 @@ public abstract class WorldRendererShockwaveMixin {
             return;
         }
         
+        // Update camera position for target mode calculations
+        ShockwavePostEffect.updateCameraPosition((float)camX, (float)camY, (float)camZ);
+        
         // Update the current radius for animation
         float currentRadius = ShockwavePostEffect.getCurrentRadius();
         

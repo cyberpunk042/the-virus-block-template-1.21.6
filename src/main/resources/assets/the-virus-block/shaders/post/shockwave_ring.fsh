@@ -1,8 +1,8 @@
 #version 150
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TERRAIN-CONFORMING SHOCKWAVE RING - DYNAMIC VERSION
-// Uses uniform block for Java-controlled parameters
+// TERRAIN-CONFORMING SHOCKWAVE RING - WORLD-ANCHORED VERSION
+// Supports: Fixed world position, multiple rings, expand/contract
 // ═══════════════════════════════════════════════════════════════════════════
 
 uniform sampler2D InSampler;
@@ -15,12 +15,55 @@ layout(std140) uniform SamplerInfo {
     vec2 InSize;
 };
 
-// Custom uniform block from JSON
+// Custom uniform block - Layout: 8 vec4s = 128 bytes
 layout(std140) uniform ShockwaveConfig {
-    float RingRadius;
-    float RingThickness;
-    float Intensity;
-    float Time;
+    // vec4 0: Basic params
+    float RingRadius;       // Current ring radius (blocks)
+    float RingThickness;    // Thickness of each ring
+    float Intensity;        // Glow intensity (0-2)
+    float Time;             // Animation time
+    
+    // vec4 1: Ring count and spacing
+    float RingCount;        // Number of concentric rings (1-10)
+    float RingSpacing;      // Distance between rings (blocks)
+    float ContractMode;     // 0 = expand outward, 1 = contract inward
+    float Reserved1;
+    
+    // vec4 2: Target world position (for world-anchored mode)
+    float TargetX;
+    float TargetY;
+    float TargetZ;
+    float UseWorldOrigin;   // 0 = camera-centered, 1 = world-anchored
+    
+    // vec4 3: Camera world position
+    float CameraX;
+    float CameraY;
+    float CameraZ;
+    float AspectRatio;      // width / height
+    
+    // vec4 4: Camera forward direction (normalized)
+    float ForwardX;
+    float ForwardY;
+    float ForwardZ;
+    float Fov;              // Field of view in radians
+    
+    // vec4 5: Camera up direction (normalized)
+    float UpX;
+    float UpY;
+    float UpZ;
+    float Reserved2;
+    
+    // vec4 6: Screen blackout / vignette
+    float BlackoutAmount;   // 0 = no blackout, 1 = full black
+    float VignetteAmount;   // 0 = no vignette, 1 = strong vignette
+    float VignetteRadius;   // Inner radius of vignette (0-1)
+    float Reserved3;
+    
+    // vec4 7: Color tint / filter
+    float TintR;            // Tint color red (0-1)
+    float TintG;            // Tint color green (0-1)
+    float TintB;            // Tint color blue (0-1)
+    float TintAmount;       // 0 = no tint, 1 = full tint
 };
 
 out vec4 fragColor;
@@ -34,12 +77,52 @@ float linearizeDepth(float depth, float near, float far) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// WORLD POSITION RECONSTRUCTION
+// ═══════════════════════════════════════════════════════════════════════════
+
+vec3 reconstructWorldPos(vec2 uv, float linearDepth) {
+    // Get camera vectors
+    vec3 camPos = vec3(CameraX, CameraY, CameraZ);
+    vec3 forward = normalize(vec3(ForwardX, ForwardY, ForwardZ));
+    vec3 up = normalize(vec3(UpX, UpY, UpZ));
+    vec3 right = normalize(cross(forward, up));
+    
+    // Calculate ray direction from UV
+    // UV (0,0) is top-left, (1,1) is bottom-right
+    vec2 ndc = uv * 2.0 - 1.0;
+    ndc.y = -ndc.y; // Flip Y for OpenGL convention
+    
+    // Calculate half-sizes at unit distance
+    float halfFovTan = tan(Fov * 0.5);
+    float halfHeight = halfFovTan;
+    float halfWidth = halfFovTan * AspectRatio;
+    
+    // Build ray direction
+    vec3 rayDir = forward + right * (ndc.x * halfWidth) + up * (ndc.y * halfHeight);
+    rayDir = normalize(rayDir);
+    
+    // World position = camera + direction * depth
+    return camPos + rayDir * linearDepth;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // GLOW FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════
 
 float glowFalloff(float dist, float radius) {
     float t = dist / radius;
     return max(0.0, 1.0 - t * t);
+}
+
+float ringContribution(float dist, float ringDist, float thickness, float intensity) {
+    float distFromRing = abs(dist - ringDist);
+    
+    float coreWidth = thickness * 0.2;
+    float coreMask = 1.0 - smoothstep(0.0, coreWidth, distFromRing);
+    float innerMask = 1.0 - smoothstep(0.0, thickness * 0.5, distFromRing);
+    float outerMask = glowFalloff(distFromRing, thickness * 2.0);
+    
+    return (coreMask * 0.9 + innerMask * 0.5 + outerMask * 0.3) * intensity;
 }
 
 void main() {
@@ -52,44 +135,83 @@ void main() {
         return;
     }
     
-    // Linearize depth to world distance
+    // Linearize depth
     float near = 0.05;
     float far = 256.0;
-    float worldDistance = linearizeDepth(rawDepth, near, far);
+    float linearDepth = linearizeDepth(rawDepth, near, far);
     
     // ═══════════════════════════════════════════════════════════════════════
-    // RING CALCULATION using uniforms
+    // CALCULATE DISTANCE TO RING ORIGIN
     // ═══════════════════════════════════════════════════════════════════════
     
-    float distFromRing = abs(worldDistance - RingRadius);
+    float distanceFromOrigin;
     
-    // Core mask (sharp center)
-    float coreWidth = RingThickness * 0.2;
-    float coreMask = 1.0 - smoothstep(0.0, coreWidth, distFromRing);
+    if (UseWorldOrigin > 0.5) {
+        // WORLD-ANCHORED MODE: Calculate distance from target world position
+        vec3 worldPos = reconstructWorldPos(texCoord, linearDepth);
+        vec3 targetPos = vec3(TargetX, TargetY, TargetZ);
+        distanceFromOrigin = length(worldPos - targetPos);
+    } else {
+        // CAMERA MODE: Distance is just the linear depth
+        distanceFromOrigin = linearDepth;
+    }
     
-    // Inner ring mask
-    float innerMask = 1.0 - smoothstep(0.0, RingThickness * 0.5, distFromRing);
+    // ═══════════════════════════════════════════════════════════════════════
+    // MULTI-RING CALCULATION
+    // ═══════════════════════════════════════════════════════════════════════
     
-    // Outer glow mask
-    float outerMask = glowFalloff(distFromRing, RingThickness * 2.0);
+    float totalMask = 0.0;
+    int ringCountInt = clamp(int(RingCount), 1, 10);
+    float spacing = max(1.0, RingSpacing);
+    
+    for (int i = 0; i < ringCountInt; i++) {
+        float ringOffset = float(i) * spacing;
+        float thisRingRadius = RingRadius - ringOffset;
+        
+        if (thisRingRadius <= 0.0) continue;
+        
+        float ringFade = 1.0 - (float(i) / float(ringCountInt)) * 0.7;
+        totalMask += ringContribution(distanceFromOrigin, thisRingRadius, RingThickness, Intensity * ringFade);
+    }
+    
+    totalMask = clamp(totalMask, 0.0, 1.0);
     
     // ═══════════════════════════════════════════════════════════════════════
     // COLOR COMPOSITION
     // ═══════════════════════════════════════════════════════════════════════
     
-    vec3 coreColor = vec3(1.0, 1.0, 1.0);           // White hot
-    vec3 ringColor = vec3(0.0, 1.0, 1.0);           // Cyan
-    vec3 outerGlow = vec3(0.2, 0.5, 1.0);           // Blue
+    // Start with scene color
+    vec3 baseColor = sceneColor.rgb;
     
-    vec3 finalColor = sceneColor.rgb;
+    // Apply color tint
+    if (TintAmount > 0.0) {
+        vec3 tintColor = vec3(TintR, TintG, TintB);
+        baseColor = mix(baseColor, baseColor * tintColor, TintAmount);
+    }
     
-    // Apply layers with intensity
-    finalColor = mix(finalColor, outerGlow, outerMask * 0.4 * Intensity);
-    finalColor = mix(finalColor, ringColor, innerMask * 0.7 * Intensity);
-    finalColor = mix(finalColor, coreColor, coreMask * 0.9 * Intensity);
+    // Apply vignette
+    if (VignetteAmount > 0.0) {
+        vec2 uv = texCoord * 2.0 - 1.0;
+        float vignette = 1.0 - smoothstep(VignetteRadius, 1.0, length(uv));
+        baseColor *= mix(1.0, vignette, VignetteAmount);
+    }
     
-    // Additive bloom
-    finalColor += ringColor * coreMask * 0.3 * Intensity;
+    // Apply blackout
+    if (BlackoutAmount > 0.0) {
+        baseColor *= (1.0 - BlackoutAmount);
+    }
+    
+    // Ring colors
+    vec3 coreColor = vec3(1.0, 1.0, 1.0);
+    vec3 ringColor = vec3(0.0, 1.0, 1.0);
+    vec3 outerGlow = vec3(0.2, 0.5, 1.0);
+    
+    vec3 effectColor = mix(outerGlow, ringColor, totalMask);
+    effectColor = mix(effectColor, coreColor, totalMask * totalMask);
+    
+    // Composite rings on top of processed scene
+    vec3 finalColor = mix(baseColor, effectColor, totalMask);
+    finalColor += ringColor * totalMask * 0.2;
     
     fragColor = vec4(clamp(finalColor, 0.0, 1.0), 1.0);
 }

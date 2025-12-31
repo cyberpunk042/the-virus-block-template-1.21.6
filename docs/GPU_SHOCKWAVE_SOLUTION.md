@@ -1,71 +1,136 @@
-# GPU Shockwave - Solution Summary
+# GPU Shockwave - SOLUTION FOUND ✅
 
-## The Answer Was Already Documented (KI Section 12-13)
-
-From `framegraph_post_processing.md`:
-
-> **"The PostEffectProcessor does not automatically 'listen' to external UBO binders. 
-> It creates its own internal state, which is strictly governed by the static defaults 
-> in its JSON definition."**
-
-> **"Managed processors maintain a private uniform binding lifecycle that 
-> bypasses `bindDefaultUniforms`."**
+## Date: 2024-12-30
 
 ---
 
-## WHY Fresnel/Corona WORKS but Shockwave DOESN'T
+## 🎉 THE SAINT GRAAL: PostEffectPassMixin
 
-| Feature | Fresnel/Corona | Shockwave |
-|---------|----------------|-----------|
-| Uses | `RenderPipeline` (via RenderLayer) | `PostEffectProcessor` |
-| Uniform Source | `CustomUniformBinder` via mixin | JSON file |
-| `bindDefaultUniforms` called? | ✅ YES | ❌ NO |
-| Dynamic updates work? | ✅ YES | ❌ NO |
+The solution was to **mixin into `PostEffectPass.render()`** and replace the uniform buffer
+in the `uniformBuffers` map BEFORE the pass executes.
 
-**Fresnel draws geometry** → Goes through RenderPipeline → Mixin catches it → Uniforms updated
+### The Key Discovery
 
-**Shockwave uses PostEffectProcessor** → Has its own internal uniform binding → Ignores our mixin
+`PostEffectPass` has a field:
+```java
+private final Map<String, GpuBuffer> uniformBuffers;
+```
+
+This map holds the GPU buffers for all uniform blocks declared in the JSON.
+By replacing the buffer for `ShockwaveConfig` with a new one containing our
+current Java values, the shader receives dynamic data every frame!
 
 ---
 
-## THE SOLUTION (from KI Section 9)
-
-> "The ultimate solution for high-fidelity interactive VFX in the 1.21.6 architecture 
-> is the **Explicit Custom Pipeline** pattern."
-
-### What We Need To Do:
-
-1. **Don't use PostEffectProcessor**
-2. **Create a custom RenderPipeline** (like FresnelPipelines)
-3. **Draw a fullscreen quad** with that pipeline
-4. **Bind depth texture** manually as a sampler
-5. **Use CustomUniformBinder** - it will work because we're using RenderPipeline
-
-### Code Pattern (from KI):
+## The Solution: PostEffectPassMixin
 
 ```java
-public static final RenderPipeline SHOCKWAVE = RenderPipelines.register(
-    RenderPipeline.builder(RenderPipelines.POST_EFFECT_PROCESSOR_SNIPPET)
-        .withVertexShader(ID).withFragmentShader(ID)
-        .withSampler("InSampler").withSampler("DepthSampler")
-        .withUniform("ShockwaveParams", UniformType.UNIFORM_BUFFER)
-        .build()
-);
+@Mixin(PostEffectPass.class)
+public class PostEffectPassMixin {
+    
+    @Shadow @Final private Map<String, GpuBuffer> uniformBuffers;
+    @Shadow @Final private String id;
+    
+    @Inject(method = "render", at = @At("HEAD"))
+    private void updateShockwaveUniforms(...) {
+        if (!ShockwavePostEffect.isEnabled()) return;
+        if (!id.contains("shockwave")) return;
+        if (!uniformBuffers.containsKey("ShockwaveConfig")) return;
+        
+        // Create new buffer with current Java values
+        GpuBuffer newBuffer = RenderSystem.getDevice().createBuffer(
+            () -> "ShockwaveConfig Dynamic",
+            16,
+            builder.get()
+        );
+        
+        // Replace in map - THE KEY!
+        uniformBuffers.put("ShockwaveConfig", newBuffer);
+    }
+}
 ```
 
 ---
 
-## NEXT STEPS
+## Why This Works
 
-1. Delete the `WorldRendererShockwaveMixin` PostEffectProcessor injection (it's the wrong approach)
-2. Create `ShockwavePipelines` properly with fullscreen quad support
-3. Hook rendering at `WorldRenderer.render` RETURN point
-4. Draw fullscreen quad with our pipeline
-5. Uniforms will work automatically via existing `CustomUniformBinder`
+1. `PostEffectProcessor` loads passes from JSON with static uniform values
+2. Each pass has a `uniformBuffers` map with pre-created GPU buffers
+3. Our mixin intercepts `render()` BEFORE the pass uses those buffers
+4. We replace the buffer with fresh data from Java
+5. The shader receives our dynamic values!
 
 ---
 
-## File Reference
+## Architecture Summary
 
-Full documentation in:
-`C:\Users\Jean\.gemini\antigravity\knowledge\field_visual_system_architecture\artifacts\rendering_architecture\framegraph_post_processing.md`
+```
+/shockwavegpu radius 50
+         │
+         ▼
+┌─────────────────────────────┐
+│ ShockwavePostEffect         │
+│   currentRadius = 50        │  
+│   getCurrentRadius() → 50   │
+└─────────────────────────────┘
+         │
+         ▼ (each frame)
+┌─────────────────────────────┐
+│ PostEffectPassMixin         │ ◄── THE KEY MIXIN!
+│   uniformBuffers.put(       │
+│     "ShockwaveConfig",      │
+│     newBufferWithRadius50   │
+│   )                         │
+└─────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────┐
+│ PostEffectPass.render()     │
+│   Uses updated buffer!      │
+└─────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────┐
+│ shockwave_ring.fsh          │
+│   RingRadius = 50.0 ✅      │
+└─────────────────────────────┘
+```
+
+---
+
+## Commands Working
+
+- `/shockwavegpu` - Toggle effect
+- `/shockwavegpu trigger` - Start animation (ring expands from 0)
+- `/shockwavegpu radius <n>` - Set static radius
+- `/shockwavegpu thickness <n>` - Set ring thickness
+- `/shockwavegpu intensity <n>` - Set glow intensity
+- `/shockwavegpu speed <n>` - Set animation speed
+- `/shockwavegpu maxradius <n>` - Set max animation radius
+- `/shockwavegpu status` - Show current state
+
+---
+
+## Files Changed
+
+| File | Purpose |
+|------|---------|
+| `PostEffectPassMixin.java` | **THE KEY** - Injects dynamic uniforms into PostEffectPass |
+| `ShockwavePostEffect.java` | Manages state and animation |
+| `shockwave_ring.fsh` | GPU shader with depth-aware ring |
+| `shockwave_ring.json` | PostEffect configuration |
+| `WorldRendererShockwaveMixin.java` | Injects pass into FrameGraph |
+
+---
+
+## Learnings for Future
+
+This pattern can be applied to ANY PostEffectProcessor to make its uniforms dynamic:
+
+1. Declare uniform block in JSON
+2. Use `layout(std140) uniform BlockName { ... }` in shader
+3. Create mixin into `PostEffectPass.render()`
+4. Shadow `uniformBuffers` map
+5. Replace buffer with dynamic values at HEAD of render()
+
+This is the general solution for **dynamic post-processing uniforms in Minecraft 1.21.6**!
