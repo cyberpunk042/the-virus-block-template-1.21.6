@@ -162,7 +162,8 @@ float sdfPolygon(vec2 p, int sides, float radius) {
 
 // Compute orbital position around center in XZ plane
 vec3 getOrbitalPosition(vec3 center, int index, int count, float distance, float phase) {
-    float angle = phase + (float(index) / float(count)) * 6.28318;
+    int safeCount = max(1, count);  // Prevent division by zero
+    float angle = phase + (float(index) / float(safeCount)) * 6.28318;
     return center + vec3(cos(angle) * distance, 0.0, sin(angle) * distance);
 }
 
@@ -209,6 +210,76 @@ float getShapeDistance(vec3 worldPos, vec3 shapeCenter) {
     
     // Fallback: point distance
     return length(worldPos - shapeCenter);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RAYMARCHING - Render solid shapes with corona effect
+// ═══════════════════════════════════════════════════════════════════════════
+
+#define MAX_RAYMARCH_STEPS 48
+#define RAYMARCH_EPSILON 0.05
+#define CORONA_WIDTH 2.0
+
+// SDF for orbital spheres only (for raymarching the visible orbs)
+float sdfOrbitalSpheresOnly(vec3 p, vec3 center, float orbitalRadius,
+                            float orbitDistance, int count, float phase) {
+    float d = 1e10;  // Start far away
+    for (int i = 0; i < count && i < 8; i++) {
+        vec3 orbPos = getOrbitalPosition(center, i, count, orbitDistance, phase);
+        d = min(d, length(p - orbPos) - orbitalRadius);
+    }
+    return d;
+}
+
+// Calculate surface normal from SDF gradient
+vec3 calcNormal(vec3 p, vec3 center, float orbitalRadius, 
+                float orbitDistance, int count, float phase) {
+    float eps = 0.01;
+    float d = sdfOrbitalSpheresOnly(p, center, orbitalRadius, orbitDistance, count, phase);
+    vec3 grad = vec3(
+        sdfOrbitalSpheresOnly(p + vec3(eps,0,0), center, orbitalRadius, orbitDistance, count, phase) - d,
+        sdfOrbitalSpheresOnly(p + vec3(0,eps,0), center, orbitalRadius, orbitDistance, count, phase) - d,
+        sdfOrbitalSpheresOnly(p + vec3(0,0,eps), center, orbitalRadius, orbitDistance, count, phase) - d
+    );
+    float len = length(grad);
+    return len > 0.0001 ? grad / len : vec3(0.0, 1.0, 0.0);  // Fallback to up if zero gradient
+}
+
+// Raymarch to find orbital sphere hit
+// Returns: vec4(hitDist, rimAmount, 0, 0) - hitDist < 0 means no hit
+vec4 raymarchOrbitalSpheres(vec3 rayOrigin, vec3 rayDir, float maxDist,
+                            vec3 center, float orbitalRadius, float orbitDistance,
+                            int count, float phase) {
+    float t = 0.0;
+    
+    for (int i = 0; i < MAX_RAYMARCH_STEPS; i++) {
+        vec3 p = rayOrigin + rayDir * t;
+        float d = sdfOrbitalSpheresOnly(p, center, orbitalRadius, orbitDistance, count, phase);
+        
+        // Hit surface
+        if (d < RAYMARCH_EPSILON) {
+            // Calculate rim/corona based on view angle to normal
+            vec3 normal = calcNormal(p, center, orbitalRadius, orbitDistance, count, phase);
+            float rim = 1.0 - abs(dot(normal, -rayDir));
+            rim = pow(rim, 2.0);  // Sharpen the rim
+            return vec4(t, rim, 0.0, 1.0);
+        }
+        
+        // Too far
+        if (t > maxDist) break;
+        
+        t += d * 0.8;  // Step forward (0.8 for safety)
+    }
+    
+    // Check if we're NEAR an orbital sphere even without hitting (for corona glow)
+    float nearestDist = sdfOrbitalSpheresOnly(rayOrigin + rayDir * min(t, maxDist * 0.5), 
+                                              center, orbitalRadius, orbitDistance, count, phase);
+    if (nearestDist < CORONA_WIDTH) {
+        float coronaAmount = 1.0 - (nearestDist / CORONA_WIDTH);
+        return vec4(-1.0, coronaAmount * 0.5, 0.0, 0.0);  // No hit, but corona glow
+    }
+    
+    return vec4(-1.0, 0.0, 0.0, 0.0);  // No hit
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -296,6 +367,68 @@ void main() {
     }
     
     // ═══════════════════════════════════════════════════════════════════════
+    // ORBITAL SPHERE RAYMARCHING - Render solid black spheres with corona
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    vec3 orbitalColor = vec3(0.0);
+    float orbitalAlpha = 0.0;
+    
+    if (int(ShapeType) == SHAPE_ORBITAL && UseWorldOrigin > 0.5) {
+        // Get camera info for raymarching
+        vec3 camPos = vec3(CameraX, CameraY, CameraZ);
+        vec3 rawForward = vec3(ForwardX, ForwardY, ForwardZ);
+        float fwdLen = length(rawForward);
+        
+        // Skip raymarching if we have invalid data
+        if (fwdLen > 0.001 && OrbitDistance > 0.1 && ShapeSideCount > 0.5) {
+            vec3 forward = rawForward / fwdLen;
+            vec3 targetPos = vec3(TargetX, TargetY, TargetZ);
+            
+            // Reconstruct ray direction for this pixel
+            vec2 ndc = texCoord * 2.0 - 1.0;
+            float halfHeight = tan(Fov * 0.5);
+            float halfWidth = halfHeight * AspectRatio;
+            vec3 worldUp = vec3(0.0, 1.0, 0.0);
+            
+            // Handle case where forward is parallel to worldUp
+            vec3 right = cross(forward, worldUp);
+            float rightLen = length(right);
+            if (rightLen < 0.001) {
+                right = vec3(1.0, 0.0, 0.0);
+            } else {
+                right = right / rightLen;
+            }
+            vec3 up = cross(right, forward);
+            vec3 rayDir = normalize(forward + right * (ndc.x * halfWidth) + up * (ndc.y * halfHeight));
+            
+            // Raymarch for orbital spheres
+            vec4 hitInfo = raymarchOrbitalSpheres(
+                camPos, rayDir, linearDepth + 10.0,
+                targetPos, ShapeMinorR, OrbitDistance,
+                int(ShapeSideCount), OrbitalPhase
+            );
+        
+            if (hitInfo.w > 0.5) {
+                // HIT! - Draw black sphere with rim corona
+                float rimAmount = hitInfo.y;
+                vec3 coronaColor = vec3(RingR, RingG, RingB);  // Use ring color for corona
+                
+                // Black center with colored rim
+                orbitalColor = coronaColor * rimAmount * 2.0;
+                orbitalAlpha = 1.0;
+                
+                // Override base color with black (sphere body)
+                baseColor = mix(vec3(0.0), coronaColor, rimAmount * 0.8);
+            } else if (hitInfo.y > 0.01) {
+                // Near miss - add corona glow
+                vec3 coronaColor = vec3(RingR, RingG, RingB);
+                orbitalColor = coronaColor * hitInfo.y;
+                orbitalAlpha = hitInfo.y;
+            }
+        }  // end safeguard if
+    }  // end SHAPE_ORBITAL if
+    
+    // ═══════════════════════════════════════════════════════════════════════
     // MULTI-RING CALCULATION
     // ═══════════════════════════════════════════════════════════════════════
     
@@ -335,6 +468,11 @@ void main() {
     // Composite rings on top of processed scene
     vec3 finalColor = mix(baseColor, effectColor, ringAlpha);
     finalColor += ringColor * ringAlpha * 0.2;  // Additive bloom
+    
+    // Add orbital sphere corona glow
+    if (orbitalAlpha > 0.01) {
+        finalColor += orbitalColor * orbitalAlpha;
+    }
     
     fragColor = vec4(clamp(finalColor, 0.0, 1.0), 1.0);
 }

@@ -168,6 +168,13 @@ public class ShockwavePostEffect {
     private static float orbitalPhase = 0f;      // Current rotation angle (radians)
     private static float orbitalSpeed = 0.02f;   // Rotation speed (radians per frame, ~1 rev per 5 sec)
     
+    // Orbital spawn/retract animation
+    private static float orbitalSpawnProgress = 1f;    // 0 = at center, 1 = at full distance
+    private static float orbitalSpawnDuration = 1000f; // ms to reach full distance
+    private static float orbitalRetractDuration = 500f;// ms to retract back to center
+    private static long orbitalSpawnStartTime = 0;     // When spawn started
+    private static boolean orbitalRetracting = false;  // Are we retracting?
+    
     // Origin mode: CAMERA = rings around player, TARGET = rings around cursor hit point
     public enum OriginMode { CAMERA, TARGET }
     private static OriginMode originMode = OriginMode.CAMERA;
@@ -212,6 +219,12 @@ public class ShockwavePostEffect {
         animating = true;
         currentRadius = 0.0f;
         animationStartTime = System.currentTimeMillis();
+        
+        // Start orbital spawn animation if using orbital shape
+        if (shapeConfig.type() == ShapeType.ORBITAL) {
+            startOrbitalSpawn();
+        }
+        
         Logging.RENDER.topic("shockwave_gpu")
             .kv("speed", ringParams.animationSpeed())
             .kv("maxRadius", ringParams.maxRadius())
@@ -594,18 +607,57 @@ public class ShockwavePostEffect {
     }
     
     /**
-     * Updates orbital phase each frame. Call from render loop when orbital shape is active.
+     * Updates orbital animations each frame. Call from render loop.
+     * Handles: phase rotation, spawn progress, retract progress.
      */
     public static void tickOrbitalPhase() {
-        if (shapeConfig.type() == ShapeType.ORBITAL && enabled) {
+        if (!enabled) return;
+        
+        // Orbital rotation (always ticks when orbital shape active)
+        if (shapeConfig.type() == ShapeType.ORBITAL) {
             orbitalPhase += orbitalSpeed;
             if (orbitalPhase > 6.28318f) orbitalPhase -= 6.28318f;
+            if (orbitalPhase < 0f) orbitalPhase += 6.28318f;
+            
+            // Spawn/retract animation
+            long now = System.currentTimeMillis();
+            if (orbitalRetracting) {
+                float elapsed = now - orbitalSpawnStartTime;
+                orbitalSpawnProgress = 1f - Math.min(1f, elapsed / orbitalRetractDuration);
+                // Ease out
+                orbitalSpawnProgress = orbitalSpawnProgress * orbitalSpawnProgress;
+            } else if (orbitalSpawnProgress < 1f) {
+                float elapsed = now - orbitalSpawnStartTime;
+                float linear = Math.min(1f, elapsed / orbitalSpawnDuration);
+                // Ease out (smooth deceleration)
+                orbitalSpawnProgress = 1f - (1f - linear) * (1f - linear);
+            }
         }
+    }
+    
+    /**
+     * Starts orbital spawn animation (orbitals emerge from center).
+     */
+    public static void startOrbitalSpawn() {
+        orbitalSpawnProgress = 0f;
+        orbitalRetracting = false;
+        orbitalSpawnStartTime = System.currentTimeMillis();
+    }
+    
+    /**
+     * Starts orbital retract animation (orbitals return to center).
+     */
+    public static void startOrbitalRetract() {
+        orbitalRetracting = true;
+        orbitalSpawnStartTime = System.currentTimeMillis();
     }
     
     public static float getOrbitalPhase() { return orbitalPhase; }
     public static float getOrbitalSpeed() { return orbitalSpeed; }
     public static void setOrbitalSpeed(float speed) { orbitalSpeed = speed; }
+    public static float getOrbitalSpawnProgress() { return orbitalSpawnProgress; }
+    public static void setOrbitalSpawnDuration(float ms) { orbitalSpawnDuration = ms; }
+    public static void setOrbitalRetractDuration(float ms) { orbitalRetractDuration = ms; }
     
     // ═══════════════════════════════════════════════════════════════════════════
     // UNIFORM BUFFER CONSTRUCTION - Single source of truth for shader data
@@ -699,9 +751,11 @@ public class ShockwavePostEffect {
         
         // Vec4 10: Shape extras (polygon sides / orbital params)
         // sideCount is reused: for POLYGON = sides, for ORBITAL = count
+        // orbitDistance is animated by spawnProgress for spawn/retract effect
+        float animatedOrbitDistance = shapeConfig.orbitDistance() * orbitalSpawnProgress;
         builder.putVec4(
             (float) shapeConfig.sideCount(),  // Polygon sides OR orbital count
-            shapeConfig.orbitDistance(),      // Distance from center to orbitals
+            animatedOrbitDistance,            // Animated distance (0 at spawn, full at end)
             orbitalPhase,                     // Current rotation angle (radians)
             0f                                // Reserved
         );
@@ -756,6 +810,7 @@ public class ShockwavePostEffect {
         ringParams = RingParams.DEFAULT;
         ringColor = RingColor.DEFAULT;
         screenEffects = ScreenEffects.NONE;
+        shapeConfig = ShapeConfig.POINT;  // Reset shape so each test starts fresh
         
         switch (testStep) {
             case 0 -> {
