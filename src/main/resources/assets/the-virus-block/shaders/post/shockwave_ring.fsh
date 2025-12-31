@@ -82,6 +82,12 @@ layout(std140) uniform ShockwaveConfig {
     float OrbitDistance;    // Distance from center to orbital centers
     float OrbitalPhase;     // Current orbital rotation angle (radians)
     float BeamHeight;       // Current beam height (0 = no beam, grows when active)
+    
+    // vec4 11: Orbital visual config
+    float CoronaWidth;      // Glow spread (blocks)
+    float CoronaIntensity;  // Brightness multiplier
+    float RimPower;         // Rim sharpness (1-5)
+    float BlendRadius;      // Smooth min blend (0=sharp, 5+=unified)
 };
 
 out vec4 fragColor;
@@ -140,6 +146,14 @@ vec3 reconstructWorldPos(vec2 uv, float linearDepth) {
 #define SHAPE_POLYGON  3
 #define SHAPE_ORBITAL  4
 
+// Smooth minimum - creates unified flowing shapes instead of discrete circles
+// k = blend radius (0 = sharp min, larger = more blending)
+float smin(float a, float b, float k) {
+    if (k < 0.001) return min(a, b);  // Fallback to hard min
+    float h = clamp(0.5 + 0.5*(b-a)/k, 0.0, 1.0);
+    return mix(b, a, h) - k*h*(1.0-h);
+}
+
 // Point/Sphere: distance from center (POINT has radius=0, SPHERE has radius>0)
 float sdfSphere(vec3 p, vec3 center, float radius) {
     return length(p - center) - radius;
@@ -168,16 +182,17 @@ vec3 getOrbitalPosition(vec3 center, int index, int count, float distance, float
 }
 
 // Orbital system: main sphere + N orbiting spheres
-// Returns minimum distance to any surface
+// Uses smin with BlendRadius for unified flowing rings
 float sdfOrbitalSystem(vec3 p, vec3 center, float mainRadius, float orbitalRadius,
                        float orbitDistance, int count, float phase) {
     // Distance to main sphere
     float d = length(p - center) - mainRadius;
     
-    // Union with each orbital sphere
+    // Union with each orbital sphere using smooth min for unified flow
     for (int i = 0; i < count && i < 8; i++) {
         vec3 orbPos = getOrbitalPosition(center, i, count, orbitDistance, phase);
-        d = min(d, length(p - orbPos) - orbitalRadius);
+        float orbDist = length(p - orbPos) - orbitalRadius;
+        d = smin(d, orbDist, BlendRadius);  // Smooth blend creates unified pattern
     }
     return d;
 }
@@ -218,7 +233,7 @@ float getShapeDistance(vec3 worldPos, vec3 shapeCenter) {
 
 #define MAX_RAYMARCH_STEPS 48
 #define RAYMARCH_EPSILON 0.05
-#define CORONA_WIDTH 2.0
+// CORONA_WIDTH is now a uniform (CoronaWidth)
 
 // SDF for orbital spheres only (for raymarching the visible orbs)
 float sdfOrbitalSpheresOnly(vec3 p, vec3 center, float orbitalRadius,
@@ -295,7 +310,7 @@ vec4 raymarchOrbitalSpheres(vec3 rayOrigin, vec3 rayDir, float maxDist,
             // Calculate rim/corona based on view angle to normal
             vec3 normal = calcNormal(p, center, orbitalRadius, orbitDistance, count, phase, beamHeight);
             float rim = 1.0 - abs(dot(normal, -rayDir));
-            rim = pow(rim, 2.0);  // Sharpen the rim
+            rim = pow(rim, RimPower);  // Use configurable rim sharpness
             return vec4(t, rim, 0.0, 1.0);
         }
         
@@ -308,8 +323,9 @@ vec4 raymarchOrbitalSpheres(vec3 rayOrigin, vec3 rayDir, float maxDist,
     // Check if we're NEAR an orbital/beam even without hitting (for corona glow)
     float nearestDist = sdfOrbitalAndBeams(rayOrigin + rayDir * min(t, maxDist * 0.5), 
                                            center, orbitalRadius, orbitDistance, count, phase, beamHeight);
-    if (nearestDist < CORONA_WIDTH) {
-        float coronaAmount = 1.0 - (nearestDist / CORONA_WIDTH);
+    float cWidth = max(0.1, CoronaWidth);  // Use uniform, minimum 0.1 to avoid div by zero
+    if (nearestDist < cWidth) {
+        float coronaAmount = 1.0 - (nearestDist / cWidth);
         return vec4(-1.0, coronaAmount * 0.5, 0.0, 0.0);  // No hit, but corona glow
     }
     
@@ -378,10 +394,13 @@ void main() {
         return;
     }
     
-    // Linearize depth
+    // Linearize depth - use large far value to handle fog/distant terrain
     float near = 0.05;
-    float far = 256.0;
+    float far = 1000.0;  // Increased from 256 to handle beams beyond fog
     float linearDepth = linearizeDepth(rawDepth, near, far);
+    
+    // Detect if we're looking at sky/far distance (depth at or near far plane)
+    bool isAtFarPlane = rawDepth > 0.9999;
     
     // ═══════════════════════════════════════════════════════════════════════
     // CALCULATE DISTANCE TO RING ORIGIN
@@ -436,8 +455,10 @@ void main() {
             vec3 rayDir = normalize(forward + right * (ndc.x * halfWidth) + up * (ndc.y * halfHeight));
             
             // Raymarch for orbital spheres and beams
+            // Use larger distance when at far plane (sky/fog) to render beams beyond terrain
+            float maxRaymarchDist = isAtFarPlane ? 500.0 : (linearDepth + 50.0);
             vec4 hitInfo = raymarchOrbitalSpheres(
-                camPos, rayDir, linearDepth + 10.0,
+                camPos, rayDir, maxRaymarchDist,
                 targetPos, ShapeMinorR, OrbitDistance,
                 int(ShapeSideCount), OrbitalPhase, BeamHeight
             );
@@ -448,7 +469,7 @@ void main() {
                 vec3 coronaColor = vec3(RingR, RingG, RingB);  // Use ring color for corona
                 
                 // Black center with colored rim
-                orbitalColor = coronaColor * rimAmount * 2.0;
+                orbitalColor = coronaColor * rimAmount * 2.0 * CoronaIntensity;
                 orbitalAlpha = 1.0;
                 
                 // Override base color with black (sphere body)
@@ -456,7 +477,7 @@ void main() {
             } else if (hitInfo.y > 0.01) {
                 // Near miss - add corona glow
                 vec3 coronaColor = vec3(RingR, RingG, RingB);
-                orbitalColor = coronaColor * hitInfo.y;
+                orbitalColor = coronaColor * hitInfo.y * CoronaIntensity;  // Use intensity uniform
                 orbitalAlpha = hitInfo.y;
             }
         }  // end safeguard if

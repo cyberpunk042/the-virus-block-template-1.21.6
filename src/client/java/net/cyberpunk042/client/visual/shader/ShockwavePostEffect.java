@@ -164,24 +164,60 @@ public class ShockwavePostEffect {
     private static CameraState cameraState = CameraState.ORIGIN;
     private static ShapeConfig shapeConfig = ShapeConfig.POINT;  // Default: current behavior
     
-    // Orbital animation state
-    private static float orbitalPhase = 0f;      // Current rotation angle (radians)
-    private static float orbitalSpeed = 0.008f;  // Rotation speed (radians per frame, ~1 rev per ~13 sec)
+    /**
+     * Comprehensive orbital effect configuration.
+     * All parameters for orbitals, beams, corona, and animation.
+     */
+    public record OrbitalConfig(
+        // Orbital Animation
+        float orbitalSpeed,           // Rotation speed (rad/frame, negative=reverse)
+        float orbitalSpawnDuration,   // ms to spawn from center
+        float orbitalRetractDuration, // ms to retract to center
+        
+        // Beam Geometry
+        float beamHeight,             // Max beam height (blocks)
+        float beamWidthScale,         // Beam width as ratio of orbital radius (0.1-1.0)
+        
+        // Beam Animation
+        float beamGrowDuration,       // ms to grow
+        float beamShrinkDuration,     // ms to shrink
+        
+        // Corona/Visual
+        float coronaWidth,            // Glow spread (blocks)
+        float coronaIntensity,        // Brightness multiplier
+        float rimPower,               // Rim sharpness (1-5)
+        
+        // Shape Blending (FIXES the ring separation issue)
+        float blendRadius             // Smooth min blend (0=sharp, 5+=unified)
+    ) {
+        public static final OrbitalConfig DEFAULT = new OrbitalConfig(
+            0.008f,   // orbitalSpeed
+            2500f,    // orbitalSpawnDuration
+            1500f,    // orbitalRetractDuration
+            100f,     // beamHeight
+            0.3f,     // beamWidthScale
+            1500f,    // beamGrowDuration
+            800f,     // beamShrinkDuration
+            2.0f,     // coronaWidth
+            1.0f,     // coronaIntensity
+            2.0f,     // rimPower
+            3.0f      // blendRadius (unified shape)
+        );
+    }
     
-    // Orbital spawn/retract animation
-    private static float orbitalSpawnProgress = 0f;     // 0 = at center/hidden, 1 = at full distance
-    private static float orbitalSpawnDuration = 2500f;  // ms to reach full distance (2.5 sec)
-    private static float orbitalRetractDuration = 1500f;// ms to retract back to center
-    private static long orbitalSpawnStartTime = 0;      // When spawn started
-    private static boolean orbitalRetracting = false;   // Are we retracting?
+    // Current orbital config
+    private static OrbitalConfig orbitalConfig = OrbitalConfig.DEFAULT;
     
-    // Beam animation state (beams from orbitals to sky)
-    private static float beamProgress = 0f;           // 0 = no beam, 1 = full height
-    private static float beamGrowDuration = 1500f;    // ms to grow to full height
-    private static float beamShrinkDuration = 800f;   // ms to shrink before retract
-    private static float beamHeight = 100f;           // How high beams go (blocks)
-    private static long beamStartTime = 0;            // When beam started growing
-    private static boolean beamShrinking = false;     // Is beam shrinking?
+    // Orbital animation state (runtime, not config)
+    private static float orbitalPhase = 0f;           // Current rotation angle
+    private static float orbitalSpawnProgress = 0f;   // 0 = hidden, 1 = full
+    private static long orbitalSpawnStartTime = 0;
+    private static boolean orbitalRetracting = false;
+    
+    // Beam animation state (runtime, not config)
+    private static float beamProgress = 0f;
+    private static long beamStartTime = 0;
+    private static boolean beamShrinking = false;
     
     // Origin mode: CAMERA = rings around player, TARGET = rings around cursor hit point
     public enum OriginMode { CAMERA, TARGET }
@@ -630,7 +666,7 @@ public class ShockwavePostEffect {
         
         // Orbital rotation (always ticks when orbital shape active)
         if (shapeConfig.type() == ShapeType.ORBITAL) {
-            orbitalPhase += orbitalSpeed;
+            orbitalPhase += orbitalConfig.orbitalSpeed();
             if (orbitalPhase > 6.28318f) orbitalPhase -= 6.28318f;
             if (orbitalPhase < 0f) orbitalPhase += 6.28318f;
             
@@ -639,7 +675,7 @@ public class ShockwavePostEffect {
             // Spawn/retract animation
             if (orbitalRetracting) {
                 float elapsed = now - orbitalSpawnStartTime;
-                float linear = Math.min(1f, elapsed / orbitalRetractDuration);
+                float linear = Math.min(1f, elapsed / orbitalConfig.orbitalRetractDuration());
                 // Ease in (accelerate as approaching center)
                 orbitalSpawnProgress = 1f - linear * linear;
                 
@@ -651,7 +687,7 @@ public class ShockwavePostEffect {
                 }
             } else if (orbitalSpawnProgress < 1f) {
                 float elapsed = now - orbitalSpawnStartTime;
-                float linear = Math.min(1f, elapsed / orbitalSpawnDuration);
+                float linear = Math.min(1f, elapsed / orbitalConfig.orbitalSpawnDuration());
                 // Ease out (smooth deceleration)
                 orbitalSpawnProgress = 1f - (1f - linear) * (1f - linear);
                 
@@ -665,7 +701,7 @@ public class ShockwavePostEffect {
             if (beamShrinking) {
                 // Shrinking beam
                 float elapsed = now - beamStartTime;
-                float linear = Math.min(1f, elapsed / beamShrinkDuration);
+                float linear = Math.min(1f, elapsed / orbitalConfig.beamShrinkDuration());
                 beamProgress = 1f - linear;
                 
                 // Beam shrink complete - start retract
@@ -677,7 +713,7 @@ public class ShockwavePostEffect {
             } else if (orbitalSpawnProgress >= 0.99f && beamProgress < 1f && !orbitalRetracting) {
                 // Growing beam (spawn complete, not yet full, not retracting)
                 float elapsed = now - beamStartTime;
-                float linear = Math.min(1f, elapsed / beamGrowDuration);
+                float linear = Math.min(1f, elapsed / orbitalConfig.beamGrowDuration());
                 // Ease out
                 beamProgress = 1f - (1f - linear) * (1f - linear);
             }
@@ -701,19 +737,92 @@ public class ShockwavePostEffect {
         orbitalSpawnStartTime = System.currentTimeMillis();
     }
     
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ORBITAL CONFIG ACCESSORS - Full control over all orbital parameters
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    public static OrbitalConfig getOrbitalConfig() { return orbitalConfig; }
+    public static void setOrbitalConfig(OrbitalConfig config) { orbitalConfig = config; }
+    
+    // Individual parameter setters (create new record with updated value)
+    public static void setOrbitalSpeed(float v) {
+        orbitalConfig = new OrbitalConfig(v, orbitalConfig.orbitalSpawnDuration(), orbitalConfig.orbitalRetractDuration(),
+            orbitalConfig.beamHeight(), orbitalConfig.beamWidthScale(), orbitalConfig.beamGrowDuration(),
+            orbitalConfig.beamShrinkDuration(), orbitalConfig.coronaWidth(), orbitalConfig.coronaIntensity(),
+            orbitalConfig.rimPower(), orbitalConfig.blendRadius());
+    }
+    public static void setOrbitalSpawnDuration(float v) {
+        orbitalConfig = new OrbitalConfig(orbitalConfig.orbitalSpeed(), v, orbitalConfig.orbitalRetractDuration(),
+            orbitalConfig.beamHeight(), orbitalConfig.beamWidthScale(), orbitalConfig.beamGrowDuration(),
+            orbitalConfig.beamShrinkDuration(), orbitalConfig.coronaWidth(), orbitalConfig.coronaIntensity(),
+            orbitalConfig.rimPower(), orbitalConfig.blendRadius());
+    }
+    public static void setOrbitalRetractDuration(float v) {
+        orbitalConfig = new OrbitalConfig(orbitalConfig.orbitalSpeed(), orbitalConfig.orbitalSpawnDuration(), v,
+            orbitalConfig.beamHeight(), orbitalConfig.beamWidthScale(), orbitalConfig.beamGrowDuration(),
+            orbitalConfig.beamShrinkDuration(), orbitalConfig.coronaWidth(), orbitalConfig.coronaIntensity(),
+            orbitalConfig.rimPower(), orbitalConfig.blendRadius());
+    }
+    public static void setBeamHeight(float v) {
+        orbitalConfig = new OrbitalConfig(orbitalConfig.orbitalSpeed(), orbitalConfig.orbitalSpawnDuration(), 
+            orbitalConfig.orbitalRetractDuration(), v, orbitalConfig.beamWidthScale(), orbitalConfig.beamGrowDuration(),
+            orbitalConfig.beamShrinkDuration(), orbitalConfig.coronaWidth(), orbitalConfig.coronaIntensity(),
+            orbitalConfig.rimPower(), orbitalConfig.blendRadius());
+    }
+    public static void setBeamWidthScale(float v) {
+        orbitalConfig = new OrbitalConfig(orbitalConfig.orbitalSpeed(), orbitalConfig.orbitalSpawnDuration(), 
+            orbitalConfig.orbitalRetractDuration(), orbitalConfig.beamHeight(), v, orbitalConfig.beamGrowDuration(),
+            orbitalConfig.beamShrinkDuration(), orbitalConfig.coronaWidth(), orbitalConfig.coronaIntensity(),
+            orbitalConfig.rimPower(), orbitalConfig.blendRadius());
+    }
+    public static void setBeamGrowDuration(float v) {
+        orbitalConfig = new OrbitalConfig(orbitalConfig.orbitalSpeed(), orbitalConfig.orbitalSpawnDuration(), 
+            orbitalConfig.orbitalRetractDuration(), orbitalConfig.beamHeight(), orbitalConfig.beamWidthScale(), v,
+            orbitalConfig.beamShrinkDuration(), orbitalConfig.coronaWidth(), orbitalConfig.coronaIntensity(),
+            orbitalConfig.rimPower(), orbitalConfig.blendRadius());
+    }
+    public static void setBeamShrinkDuration(float v) {
+        orbitalConfig = new OrbitalConfig(orbitalConfig.orbitalSpeed(), orbitalConfig.orbitalSpawnDuration(), 
+            orbitalConfig.orbitalRetractDuration(), orbitalConfig.beamHeight(), orbitalConfig.beamWidthScale(), 
+            orbitalConfig.beamGrowDuration(), v, orbitalConfig.coronaWidth(), orbitalConfig.coronaIntensity(),
+            orbitalConfig.rimPower(), orbitalConfig.blendRadius());
+    }
+    public static void setCoronaWidth(float v) {
+        orbitalConfig = new OrbitalConfig(orbitalConfig.orbitalSpeed(), orbitalConfig.orbitalSpawnDuration(), 
+            orbitalConfig.orbitalRetractDuration(), orbitalConfig.beamHeight(), orbitalConfig.beamWidthScale(), 
+            orbitalConfig.beamGrowDuration(), orbitalConfig.beamShrinkDuration(), v, orbitalConfig.coronaIntensity(),
+            orbitalConfig.rimPower(), orbitalConfig.blendRadius());
+    }
+    public static void setCoronaIntensity(float v) {
+        orbitalConfig = new OrbitalConfig(orbitalConfig.orbitalSpeed(), orbitalConfig.orbitalSpawnDuration(), 
+            orbitalConfig.orbitalRetractDuration(), orbitalConfig.beamHeight(), orbitalConfig.beamWidthScale(), 
+            orbitalConfig.beamGrowDuration(), orbitalConfig.beamShrinkDuration(), orbitalConfig.coronaWidth(), v,
+            orbitalConfig.rimPower(), orbitalConfig.blendRadius());
+    }
+    public static void setRimPower(float v) {
+        orbitalConfig = new OrbitalConfig(orbitalConfig.orbitalSpeed(), orbitalConfig.orbitalSpawnDuration(), 
+            orbitalConfig.orbitalRetractDuration(), orbitalConfig.beamHeight(), orbitalConfig.beamWidthScale(), 
+            orbitalConfig.beamGrowDuration(), orbitalConfig.beamShrinkDuration(), orbitalConfig.coronaWidth(), 
+            orbitalConfig.coronaIntensity(), v, orbitalConfig.blendRadius());
+    }
+    public static void setBlendRadius(float v) {
+        orbitalConfig = new OrbitalConfig(orbitalConfig.orbitalSpeed(), orbitalConfig.orbitalSpawnDuration(), 
+            orbitalConfig.orbitalRetractDuration(), orbitalConfig.beamHeight(), orbitalConfig.beamWidthScale(), 
+            orbitalConfig.beamGrowDuration(), orbitalConfig.beamShrinkDuration(), orbitalConfig.coronaWidth(), 
+            orbitalConfig.coronaIntensity(), orbitalConfig.rimPower(), v);
+    }
+    
+    // Runtime state getters
     public static float getOrbitalPhase() { return orbitalPhase; }
-    public static float getOrbitalSpeed() { return orbitalSpeed; }
-    public static void setOrbitalSpeed(float speed) { orbitalSpeed = speed; }
     public static float getOrbitalSpawnProgress() { return orbitalSpawnProgress; }
-    public static void setOrbitalSpawnDuration(float ms) { orbitalSpawnDuration = ms; }
-    public static void setOrbitalRetractDuration(float ms) { orbitalRetractDuration = ms; }
+    public static float getBeamProgress() { return beamProgress; }
     
     // ═══════════════════════════════════════════════════════════════════════════
     // UNIFORM BUFFER CONSTRUCTION - Single source of truth for shader data
     // ═══════════════════════════════════════════════════════════════════════════
     
-    /** Buffer layout: 11 vec4s = 176 bytes (extended for shapes) */
-    public static final int VEC4_COUNT = 11;
+    /** Buffer layout: 12 vec4s = 192 bytes (extended for orbital config) */
+    public static final int VEC4_COUNT = 12;
     public static final int BUFFER_SIZE = VEC4_COUNT * 16;
     
     /**
@@ -802,11 +911,20 @@ public class ShockwavePostEffect {
         // sideCount is reused: for POLYGON = sides, for ORBITAL = count
         // orbitDistance is animated by spawnProgress for spawn/retract effect
         float animatedOrbitDistance = shapeConfig.orbitDistance() * orbitalSpawnProgress;
+        float animatedBeamHeight = beamProgress * orbitalConfig.beamHeight();
         builder.putVec4(
             (float) shapeConfig.sideCount(),  // Polygon sides OR orbital count
             animatedOrbitDistance,            // Animated distance (0 at spawn, full at end)
             orbitalPhase,                     // Current rotation angle (radians)
-            beamProgress * beamHeight         // Beam height (0 when hidden, full when grown)
+            animatedBeamHeight                // Beam height (0 when hidden, full when grown)
+        );
+        
+        // Vec4 11: Orbital visual config
+        builder.putVec4(
+            orbitalConfig.coronaWidth(),      // Glow spread
+            orbitalConfig.coronaIntensity(),  // Brightness multiplier
+            orbitalConfig.rimPower(),         // Rim sharpness
+            orbitalConfig.blendRadius()       // Smooth min blend (0=sharp, 5+=unified)
         );
     }
     
