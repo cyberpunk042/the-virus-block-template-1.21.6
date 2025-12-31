@@ -698,6 +698,9 @@ public class ShockwavePostEffect {
         "8: Vignette effect",
         "9: Red tint",
         "10: All screen effects",
+        "11: SPHERE shape (r=5)",
+        "12: TORUS shape (20/3)",
+        "13: POLYGON hex (6 sides)",
         "RESET: Back to defaults"
     };
     
@@ -752,19 +755,19 @@ public class ShockwavePostEffect {
                 trigger();
             }
             case 6 -> {
-                // Blackout
+                // Blackout with animation
                 screenEffects = new ScreenEffects(0.5f, 0f, 0.5f, 1f, 1f, 1f, 0f);
-                setRadius(50f);
+                trigger();
             }
             case 7 -> {
-                // Vignette
+                // Vignette with animation
                 screenEffects = new ScreenEffects(0f, 0.8f, 0.3f, 1f, 1f, 1f, 0f);
-                setRadius(50f);
+                trigger();
             }
             case 8 -> {
-                // Red tint
+                // Red tint with animation
                 screenEffects = new ScreenEffects(0f, 0f, 0.5f, 1f, 0.3f, 0.3f, 0.7f);
-                setRadius(50f);
+                trigger();
             }
             case 9 -> {
                 // All screen effects
@@ -774,6 +777,26 @@ public class ShockwavePostEffect {
             }
             case 10 -> {
                 // Reset to defaults
+                enabled = false;
+            }
+            case 11 -> {
+                // Sphere shape
+                shapeConfig = ShapeConfig.sphere(5f);
+                trigger();
+            }
+            case 12 -> {
+                // Torus shape
+                shapeConfig = ShapeConfig.torus(20f, 3f);
+                trigger();
+            }
+            case 13 -> {
+                // Polygon (hexagon)
+                shapeConfig = ShapeConfig.polygon(6, 15f);
+                trigger();
+            }
+            case 14 -> {
+                // Reset to defaults
+                shapeConfig = ShapeConfig.POINT;
                 enabled = false;
             }
         }

@@ -481,6 +481,67 @@ public class TheVirusBlockClient implements ClientModInitializer {
 						return 1;
 					})
 			);
+
+						// SHAPE sub-commands
+			dispatcher.register(
+				net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("shockwaveshape")
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("point")
+						.executes(ctx -> {
+							net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setShapePoint();
+							ctx.getSource().sendFeedback(
+								net.minecraft.text.Text.literal("§d§lShape: §fPoint (default)")
+							);
+							return 1;
+						})
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("sphere")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("radius",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.1f, 200.0f))
+							.executes(ctx -> {
+								float r = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "radius");
+								net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setShapeSphere(r);
+								ctx.getSource().sendFeedback(
+									net.minecraft.text.Text.literal("§d§lShape: §fSphere r=" + r)
+								);
+								return 1;
+							})
+						)
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("torus")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("major",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(1.0f, 100.0f))
+							.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("minor",
+								com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.1f, 20.0f))
+								.executes(ctx -> {
+									float major = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "major");
+									float minor = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "minor");
+									net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setShapeTorus(major, minor);
+									ctx.getSource().sendFeedback(
+										net.minecraft.text.Text.literal("§d§lShape: §fTorus major=" + major + " minor=" + minor)
+									);
+									return 1;
+								})
+							)
+						)
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("polygon")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("sides",
+							com.mojang.brigadier.arguments.IntegerArgumentType.integer(3, 12))
+							.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("radius",
+								com.mojang.brigadier.arguments.FloatArgumentType.floatArg(1.0f, 100.0f))
+								.executes(ctx -> {
+									int sides = com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "sides");
+									float r = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "radius");
+									net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setShapePolygon(sides, r);
+									ctx.getSource().sendFeedback(
+										net.minecraft.text.Text.literal("§d§lShape: §fPolygon sides=" + sides + " r=" + r)
+									);
+									return 1;
+								})
+							)
+						)
+					)
+			);
 			
 			// SCREEN EFFECTS sub-commands (registered separately due to command tree limits)
 			dispatcher.register(
@@ -575,40 +636,6 @@ public class TheVirusBlockClient implements ClientModInitializer {
 								)
 							)
 						)
-					)
-			);
-			
-			dispatcher.register(
-				net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("shockwavetest")
-					.executes(ctx -> {
-						net.cyberpunk042.client.visual.shader.ShockwaveTestRenderer.toggle();
-						ctx.getSource().sendFeedback(
-							net.minecraft.text.Text.literal("§e§lTEST Shockwave: §f" + 
-								(net.cyberpunk042.client.visual.shader.ShockwaveTestRenderer.isEnabled() ? "ON" : "OFF"))
-						);
-						return 1;
-					})
-					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("radius")
-						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("radius",
-							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.0f, 500.0f))
-							.executes(ctx -> {
-								float radius = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "radius");
-								net.cyberpunk042.client.visual.shader.ShockwaveTestRenderer.setRadius(radius);
-								ctx.getSource().sendFeedback(
-									net.minecraft.text.Text.literal("§e§lTEST Radius: §f" + radius + " blocks")
-								);
-								return 1;
-							})
-						)
-					)
-					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("mode")
-						.executes(ctx -> {
-							net.cyberpunk042.client.visual.shader.ShockwaveTestRenderer.toggleMode();
-							ctx.getSource().sendFeedback(
-								net.minecraft.text.Text.literal("§e§lMode toggled - check logs for [shockwave_bind]")
-							);
-							return 1;
-						})
 					)
 			);
 		});

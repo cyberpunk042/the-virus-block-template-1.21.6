@@ -131,6 +131,65 @@ vec3 reconstructWorldPos(vec2 uv, float linearDepth) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// SDF LIBRARY - Distance functions for all shape types
+// ═══════════════════════════════════════════════════════════════════════════
+
+#define SHAPE_POINT    0
+#define SHAPE_SPHERE   1
+#define SHAPE_TORUS    2
+#define SHAPE_POLYGON  3
+#define SHAPE_ORBITAL  4
+
+// Point/Sphere: distance from center (POINT has radius=0, SPHERE has radius>0)
+float sdfSphere(vec3 p, vec3 center, float radius) {
+    return length(p - center) - radius;
+}
+
+// Torus: donut shape in XZ plane
+float sdfTorus(vec3 p, vec3 center, float majorR, float minorR) {
+    vec3 q = p - center;
+    vec2 t = vec2(length(q.xz) - majorR, q.y);
+    return length(t) - minorR;
+}
+
+// Polygon: n-sided shape in XZ plane (distance to edges)
+float sdfPolygon(vec2 p, int sides, float radius) {
+    float angle = atan(p.y, p.x);
+    float segmentAngle = 6.28318 / float(sides);
+    float d = cos(floor(0.5 + angle / segmentAngle) * segmentAngle - angle) * length(p);
+    return d - radius;
+}
+
+// Main dispatch - returns distance from worldPos to the shape surface
+float getShapeDistance(vec3 worldPos, vec3 shapeCenter) {
+    int shapeType = int(ShapeType);
+    
+    if (shapeType == SHAPE_POINT) {
+        // Point: just distance to center (no surface offset)
+        return length(worldPos - shapeCenter);
+    }
+    else if (shapeType == SHAPE_SPHERE) {
+        return sdfSphere(worldPos, shapeCenter, ShapeRadius);
+    }
+    else if (shapeType == SHAPE_TORUS) {
+        return sdfTorus(worldPos, shapeCenter, ShapeMajorR, ShapeMinorR);
+    }
+    else if (shapeType == SHAPE_POLYGON) {
+        // Project to XZ plane relative to center
+        vec2 planar = worldPos.xz - shapeCenter.xz;
+        return sdfPolygon(planar, int(ShapeSideCount), ShapeRadius);
+    }
+    else if (shapeType == SHAPE_ORBITAL) {
+        // TODO: Implement orbital system (main + orbiting spheres)
+        // For now, fall back to sphere
+        return sdfSphere(worldPos, shapeCenter, ShapeRadius);
+    }
+    
+    // Fallback: point distance
+    return length(worldPos - shapeCenter);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // GLOW FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -207,9 +266,10 @@ void main() {
         // WORLD-ANCHORED MODE: Calculate distance from target world position
         vec3 worldPos = reconstructWorldPos(texCoord, linearDepth);
         vec3 targetPos = vec3(TargetX, TargetY, TargetZ);
-        distanceFromOrigin = length(worldPos - targetPos);
+        // Use SDF library for shape-aware distance calculation
+        distanceFromOrigin = getShapeDistance(worldPos, targetPos);
     } else {
-        // CAMERA MODE: Distance is just the linear depth
+        // CAMERA MODE: Distance is just the linear depth (always point-based)
         distanceFromOrigin = linearDepth;
     }
     
