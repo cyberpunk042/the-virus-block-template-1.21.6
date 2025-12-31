@@ -468,6 +468,18 @@ public class TheVirusBlockClient implements ClientModInitializer {
 							)
 						)
 					)
+				);
+			
+			// TEST CYCLE command - quickly cycle through all features for testing
+			dispatcher.register(
+				net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("shockwavetest")
+					.executes(ctx -> {
+						String testName = net.cyberpunk042.client.visual.shader.ShockwavePostEffect.cycleTest();
+						ctx.getSource().sendFeedback(
+							net.minecraft.text.Text.literal("§d§lTest: §f" + testName + " §7(run again to cycle)")
+						);
+						return 1;
+					})
 			);
 			
 			// SCREEN EFFECTS sub-commands (registered separately due to command tree limits)
@@ -488,9 +500,9 @@ public class TheVirusBlockClient implements ClientModInitializer {
 					)
 					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("vignette")
 						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("amount",
-							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.0f, 1.0f))
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.0f, 10.0f))
 							.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("radius",
-								com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.0f, 1.0f))
+								com.mojang.brigadier.arguments.FloatArgumentType.floatArg(-5.0f, 10.0f))
 								.executes(ctx -> {
 									float amount = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "amount");
 									float radius = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "radius");

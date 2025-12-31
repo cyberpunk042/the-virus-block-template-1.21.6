@@ -35,29 +35,75 @@ public class ShockwavePostEffect {
     private static final Set<Identifier> REQUIRED_TARGETS = DefaultFramebufferSet.STAGES;
     
     // ═══════════════════════════════════════════════════════════════════════════
+    // STATE RECORDS - Group related parameters for cleaner code
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Ring appearance and animation parameters.
+     */
+    public record RingParams(
+        float thickness,      // Ring width (blocks)
+        float intensity,      // Glow intensity (0-2)
+        float animationSpeed, // Blocks per second
+        float maxRadius,      // Auto-stop radius
+        int count,            // Number of concentric rings
+        float spacing,        // Distance between rings (blocks)
+        float glowWidth,      // Glow falloff width (blocks)
+        boolean contractMode  // false = expand, true = contract
+    ) {
+        public static final RingParams DEFAULT = new RingParams(
+            4.0f, 1.0f, 15.0f, 400.0f, 10, 8.0f, 8.0f, false
+        );
+    }
+    
+    /**
+     * Ring coloring (RGB + opacity).
+     */
+    public record RingColor(float r, float g, float b, float opacity) {
+        public static final RingColor DEFAULT = new RingColor(0f, 1f, 1f, 1f); // Cyan
+    }
+    
+    /**
+     * Screen-wide post-processing effects.
+     */
+    public record ScreenEffects(
+        float blackout,        // 0 = no blackout, 1 = full black
+        float vignetteAmount,  // 0 = no vignette, 1 = strong
+        float vignetteRadius,  // Inner radius of vignette
+        float tintR, float tintG, float tintB,
+        float tintAmount       // 0 = no tint, 1 = full tint
+    ) {
+        public static final ScreenEffects NONE = new ScreenEffects(0f, 0f, 0.5f, 1f, 1f, 1f, 0f);
+    }
+    
+    /**
+     * Camera position and orientation state.
+     */
+    public record CameraState(
+        float x, float y, float z,             // Current camera position
+        float forwardX, float forwardY, float forwardZ,  // View direction
+        float frozenX, float frozenY, float frozenZ      // Frozen at raycast time
+    ) {
+        public static final CameraState ORIGIN = new CameraState(0,0,0, 0,0,1, 0,0,0);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
     // STATE
     // ═══════════════════════════════════════════════════════════════════════════
+
     
     private static boolean enabled = false;
     private static boolean animating = false;
     private static long animationStartTime = 0;
     
-    // ═══════════════════════════════════════════════════════════════════════════
-    // CONFIGURABLE PARAMETERS
-    // ═══════════════════════════════════════════════════════════════════════════
+    // Current animated radius (separate from params because it changes during animation)
+    private static float currentRadius = 20.0f;
     
-    // Basic params
-    private static float currentRadius = 20.0f;      // Current ring distance (blocks)
-    private static float ringThickness = 4.0f;       // Ring width (blocks)
-    private static float intensity = 1.0f;           // Glow intensity (0-2)
-    private static float animationSpeed = 15.0f;     // Blocks per second
-    private static float maxRadius = 400.0f;         // Auto-stop radius
-    
-    // Advanced params
-    private static int ringCount = 10;               // Number of concentric rings
-    private static float ringSpacing = 8.0f;         // Distance between rings (blocks)
-    private static boolean contractMode = false;     // false = expand, true = contract
-    private static float glowWidth = 8.0f;           // Glow falloff width (blocks)
+    // State records - the primary state storage
+    private static RingParams ringParams = RingParams.DEFAULT;
+    private static RingColor ringColor = RingColor.DEFAULT;
+    private static ScreenEffects screenEffects = ScreenEffects.NONE;
+    private static CameraState cameraState = CameraState.ORIGIN;
     
     // Origin mode: CAMERA = rings around player, TARGET = rings around cursor hit point
     public enum OriginMode { CAMERA, TARGET }
@@ -65,22 +111,6 @@ public class ShockwavePostEffect {
     
     // Target world position (for TARGET mode)
     private static float targetX = 0, targetY = 0, targetZ = 0;
-    private static float cameraX = 0, cameraY = 0, cameraZ = 0;
-    
-    // FROZEN camera state at time of raycast (for TARGET mode)
-    private static float frozenCamX = 0, frozenCamY = 0, frozenCamZ = 0;
-    private static float frozenYaw = 0, frozenPitch = 0;
-    
-    // Screen effects
-    private static float blackoutAmount = 0.0f;      // 0 = no blackout, 1 = full black
-    private static float vignetteAmount = 0.0f;      // 0 = no vignette, 1 = strong
-    private static float vignetteRadius = 0.5f;      // Inner radius of vignette
-    private static float tintR = 1.0f, tintG = 1.0f, tintB = 1.0f;  // Tint color
-    private static float tintAmount = 0.0f;          // 0 = no tint, 1 = full tint
-    
-    // Ring color
-    private static float ringR = 0.0f, ringG = 1.0f, ringB = 1.0f;  // Default cyan
-    private static float ringOpacity = 1.0f;
     
     // ═══════════════════════════════════════════════════════════════════════════
     // INITIALIZATION
@@ -120,8 +150,8 @@ public class ShockwavePostEffect {
         currentRadius = 0.0f;
         animationStartTime = System.currentTimeMillis();
         Logging.RENDER.topic("shockwave_gpu")
-            .kv("speed", animationSpeed)
-            .kv("maxRadius", maxRadius)
+            .kv("speed", ringParams.animationSpeed())
+            .kv("maxRadius", ringParams.maxRadius())
             .info("Shockwave triggered");
     }
     
@@ -147,30 +177,42 @@ public class ShockwavePostEffect {
     }
     
     public static void setThickness(float thickness) {
-        ringThickness = Math.max(0.5f, Math.min(50.0f, thickness));
+        float t = Math.max(0.5f, Math.min(50.0f, thickness));
+        ringParams = new RingParams(t, ringParams.intensity(), ringParams.animationSpeed(),
+            ringParams.maxRadius(), ringParams.count(), ringParams.spacing(),
+            ringParams.glowWidth(), ringParams.contractMode());
         Logging.RENDER.topic("shockwave_gpu")
-            .kv("thickness", ringThickness)
+            .kv("thickness", t)
             .info("Thickness set");
     }
     
     public static void setIntensity(float value) {
-        intensity = Math.max(0.0f, Math.min(3.0f, value));
+        float i = Math.max(0.0f, Math.min(3.0f, value));
+        ringParams = new RingParams(ringParams.thickness(), i, ringParams.animationSpeed(),
+            ringParams.maxRadius(), ringParams.count(), ringParams.spacing(),
+            ringParams.glowWidth(), ringParams.contractMode());
         Logging.RENDER.topic("shockwave_gpu")
-            .kv("intensity", intensity)
+            .kv("intensity", i)
             .info("Intensity set");
     }
     
     public static void setSpeed(float speed) {
-        animationSpeed = Math.max(1.0f, Math.min(200.0f, speed));
+        float s = Math.max(1.0f, Math.min(200.0f, speed));
+        ringParams = new RingParams(ringParams.thickness(), ringParams.intensity(), s,
+            ringParams.maxRadius(), ringParams.count(), ringParams.spacing(),
+            ringParams.glowWidth(), ringParams.contractMode());
         Logging.RENDER.topic("shockwave_gpu")
-            .kv("speed", animationSpeed)
+            .kv("speed", s)
             .info("Animation speed set");
     }
     
     public static void setMaxRadius(float max) {
-        maxRadius = Math.max(10.0f, Math.min(500.0f, max));
+        float m = Math.max(10.0f, Math.min(500.0f, max));
+        ringParams = new RingParams(ringParams.thickness(), ringParams.intensity(), 
+            ringParams.animationSpeed(), m, ringParams.count(), ringParams.spacing(),
+            ringParams.glowWidth(), ringParams.contractMode());
         Logging.RENDER.topic("shockwave_gpu")
-            .kv("maxRadius", maxRadius)
+            .kv("maxRadius", m)
             .info("Max radius set");
     }
     
@@ -182,10 +224,12 @@ public class ShockwavePostEffect {
         if (animating) {
             float elapsed = (System.currentTimeMillis() - animationStartTime) / 1000.0f;
             float animRadius;
+            float maxR = ringParams.maxRadius();
+            float speed = ringParams.animationSpeed();
             
-            if (contractMode) {
+            if (ringParams.contractMode()) {
                 // Contract: start from max, go to 0
-                animRadius = maxRadius - (elapsed * animationSpeed);
+                animRadius = maxR - (elapsed * speed);
                 if (animRadius <= 0.0f) {
                     animating = false;
                     enabled = false;
@@ -193,11 +237,11 @@ public class ShockwavePostEffect {
                 }
             } else {
                 // Expand: start from 0, go to max
-                animRadius = elapsed * animationSpeed;
-                if (animRadius >= maxRadius) {
+                animRadius = elapsed * speed;
+                if (animRadius >= maxR) {
                     animating = false;
                     enabled = false;
-                    return maxRadius;
+                    return maxR;
                 }
             }
             return animRadius;
@@ -206,62 +250,73 @@ public class ShockwavePostEffect {
     }
     
     public static float getThickness() {
-        return ringThickness;
+        return ringParams.thickness();
     }
     
     public static float getIntensity() {
-        return intensity;
+        return ringParams.intensity();
     }
     
     public static float getSpeed() {
-        return animationSpeed;
+        return ringParams.animationSpeed();
     }
     
     public static float getMaxRadius() {
-        return maxRadius;
+        return ringParams.maxRadius();
     }
     
     // Advanced param getters
     public static int getRingCount() {
-        return ringCount;
+        return ringParams.count();
     }
     
     public static float getRingSpacing() {
-        return ringSpacing;
+        return ringParams.spacing();
     }
     
     public static boolean isContractMode() {
-        return contractMode;
+        return ringParams.contractMode();
     }
     
     // Advanced param setters
     public static void setRingCount(int count) {
-        ringCount = Math.max(1, Math.min(10, count));
+        int c = Math.max(1, Math.min(10, count));
+        ringParams = new RingParams(ringParams.thickness(), ringParams.intensity(),
+            ringParams.animationSpeed(), ringParams.maxRadius(), c, ringParams.spacing(),
+            ringParams.glowWidth(), ringParams.contractMode());
         Logging.RENDER.topic("shockwave_gpu")
-            .kv("ringCount", ringCount)
+            .kv("ringCount", c)
             .info("Ring count set");
     }
     
     public static void setRingSpacing(float spacing) {
-        ringSpacing = Math.max(1.0f, Math.min(50.0f, spacing));
+        float s = Math.max(1.0f, Math.min(50.0f, spacing));
+        ringParams = new RingParams(ringParams.thickness(), ringParams.intensity(),
+            ringParams.animationSpeed(), ringParams.maxRadius(), ringParams.count(), s,
+            ringParams.glowWidth(), ringParams.contractMode());
         Logging.RENDER.topic("shockwave_gpu")
-            .kv("ringSpacing", ringSpacing)
+            .kv("ringSpacing", s)
             .info("Ring spacing set");
     }
     
     public static void setContractMode(boolean contract) {
-        contractMode = contract;
+        ringParams = new RingParams(ringParams.thickness(), ringParams.intensity(),
+            ringParams.animationSpeed(), ringParams.maxRadius(), ringParams.count(), 
+            ringParams.spacing(), ringParams.glowWidth(), contract);
         Logging.RENDER.topic("shockwave_gpu")
-            .kv("contractMode", contractMode)
+            .kv("contractMode", contract)
             .info("Contract mode set");
     }
     
-    public static float getGlowWidth() { return glowWidth; }
+    public static float getGlowWidth() { return ringParams.glowWidth(); }
     
     public static void setGlowWidth(float width) {
-        glowWidth = Math.max(1f, width);
+        float w = Math.max(1f, width);
+        ringParams = new RingParams(ringParams.thickness(), ringParams.intensity(),
+            ringParams.animationSpeed(), ringParams.maxRadius(), ringParams.count(), 
+            ringParams.spacing(), w, ringParams.contractMode());
         Logging.RENDER.topic("shockwave_gpu")
-            .kv("glowWidth", glowWidth)
+            .kv("glowWidth", w)
             .info("Glow width set");
     }
     
@@ -269,11 +324,14 @@ public class ShockwavePostEffect {
     public static void triggerContract() {
         enabled = true;
         animating = true;
-        contractMode = true;
-        currentRadius = maxRadius;  // Start from max
+        // Set contract mode via record
+        ringParams = new RingParams(ringParams.thickness(), ringParams.intensity(),
+            ringParams.animationSpeed(), ringParams.maxRadius(), ringParams.count(), 
+            ringParams.spacing(), ringParams.glowWidth(), true);
+        currentRadius = ringParams.maxRadius();  // Start from max
         animationStartTime = System.currentTimeMillis();
         Logging.RENDER.topic("shockwave_gpu")
-            .kv("from", maxRadius)
+            .kv("from", ringParams.maxRadius())
             .info("Contract animation triggered");
     }
     
@@ -304,47 +362,50 @@ public class ShockwavePostEffect {
             var camEntity = client.getCameraEntity();
             if (camEntity == null) camEntity = client.player;
             var camPos = camEntity.getCameraPosVec(1.0f);
-            frozenCamX = (float) camPos.x;
-            frozenCamY = (float) camPos.y;
-            frozenCamZ = (float) camPos.z;
-            frozenYaw = camEntity.getYaw();
-            frozenPitch = camEntity.getPitch();
+            // Update cameraState with frozen position
+            cameraState = new CameraState(
+                cameraState.x(), cameraState.y(), cameraState.z(),
+                cameraState.forwardX(), cameraState.forwardY(), cameraState.forwardZ(),
+                (float) camPos.x, (float) camPos.y, (float) camPos.z
+            );
         }
         
         Logging.RENDER.topic("shockwave_gpu")
             .kv("target", String.format("%.1f, %.1f, %.1f", x, y, z))
-            .kv("frozenCam", String.format("%.1f, %.1f, %.1f", frozenCamX, frozenCamY, frozenCamZ))
+            .kv("frozenCam", String.format("%.1f, %.1f, %.1f", 
+                cameraState.frozenX(), cameraState.frozenY(), cameraState.frozenZ()))
             .info("Target position set with frozen camera");
     }
     
     public static void updateCameraPosition(float x, float y, float z) {
-        cameraX = x;
-        cameraY = y;
-        cameraZ = z;
+        cameraState = new CameraState(
+            x, y, z,
+            cameraState.forwardX(), cameraState.forwardY(), cameraState.forwardZ(),
+            cameraState.frozenX(), cameraState.frozenY(), cameraState.frozenZ()
+        );
     }
-    
-    // Forward vector from actual Camera object (for consistency)
-    private static float forwardX = 0, forwardY = 0, forwardZ = 1;
     
     public static void updateCameraForward(float x, float y, float z) {
-        forwardX = x;
-        forwardY = y;
-        forwardZ = z;
+        cameraState = new CameraState(
+            cameraState.x(), cameraState.y(), cameraState.z(),
+            x, y, z,
+            cameraState.frozenX(), cameraState.frozenY(), cameraState.frozenZ()
+        );
     }
     
-    public static float getForwardX() { return forwardX; }
-    public static float getForwardY() { return forwardY; }
-    public static float getForwardZ() { return forwardZ; }
+    public static float getForwardX() { return cameraState.forwardX(); }
+    public static float getForwardY() { return cameraState.forwardY(); }
+    public static float getForwardZ() { return cameraState.forwardZ(); }
     
     public static float getTargetX() { return targetX; }
     public static float getTargetY() { return targetY; }
     public static float getTargetZ() { return targetZ; }
-    public static float getCameraX() { return cameraX; }
-    public static float getCameraY() { return cameraY; }
-    public static float getCameraZ() { return cameraZ; }
-    public static float getFrozenCamX() { return frozenCamX; }
-    public static float getFrozenCamY() { return frozenCamY; }
-    public static float getFrozenCamZ() { return frozenCamZ; }
+    public static float getCameraX() { return cameraState.x(); }
+    public static float getCameraY() { return cameraState.y(); }
+    public static float getCameraZ() { return cameraState.z(); }
+    public static float getFrozenCamX() { return cameraState.frozenX(); }
+    public static float getFrozenCamY() { return cameraState.frozenY(); }
+    public static float getFrozenCamZ() { return cameraState.frozenZ(); }
     public static boolean isTargetMode() { return originMode == OriginMode.TARGET; }
     
     /**
@@ -367,59 +428,68 @@ public class ShockwavePostEffect {
     // SCREEN EFFECTS
     // ═══════════════════════════════════════════════════════════════════════════
     
-    public static float getBlackoutAmount() { return blackoutAmount; }
-    public static float getVignetteAmount() { return vignetteAmount; }
-    public static float getVignetteRadius() { return vignetteRadius; }
-    public static float getTintR() { return tintR; }
-    public static float getTintG() { return tintG; }
-    public static float getTintB() { return tintB; }
-    public static float getTintAmount() { return tintAmount; }
+    public static float getBlackoutAmount() { return screenEffects.blackout(); }
+    public static float getVignetteAmount() { return screenEffects.vignetteAmount(); }
+    public static float getVignetteRadius() { return screenEffects.vignetteRadius(); }
+    public static float getTintR() { return screenEffects.tintR(); }
+    public static float getTintG() { return screenEffects.tintG(); }
+    public static float getTintB() { return screenEffects.tintB(); }
+    public static float getTintAmount() { return screenEffects.tintAmount(); }
     
     public static void setBlackout(float amount) {
-        blackoutAmount = Math.max(0f, Math.min(1f, amount));
+        float v = Math.max(0f, Math.min(1f, amount));
+        screenEffects = new ScreenEffects(v, screenEffects.vignetteAmount(), 
+            screenEffects.vignetteRadius(), screenEffects.tintR(), 
+            screenEffects.tintG(), screenEffects.tintB(), screenEffects.tintAmount());
         Logging.RENDER.topic("shockwave_gpu")
-            .kv("blackout", blackoutAmount)
+            .kv("blackout", v)
             .info("Blackout set");
     }
     
     public static void setVignette(float amount, float radius) {
-        vignetteAmount = Math.max(0f, Math.min(1f, amount));
-        vignetteRadius = Math.max(0f, Math.min(1f, radius));
+        float a = Math.max(0f, Math.min(10f, amount));
+        float r = Math.max(-5f, Math.min(10f, radius));
+        screenEffects = new ScreenEffects(screenEffects.blackout(), a, r,
+            screenEffects.tintR(), screenEffects.tintG(), screenEffects.tintB(), 
+            screenEffects.tintAmount());
         Logging.RENDER.topic("shockwave_gpu")
-            .kv("vignette", vignetteAmount)
-            .kv("radius", vignetteRadius)
+            .kv("vignette", a)
+            .kv("radius", r)
             .info("Vignette set");
     }
     
     public static void setTint(float r, float g, float b, float amount) {
-        tintR = Math.max(0f, Math.min(2f, r));
-        tintG = Math.max(0f, Math.min(2f, g));
-        tintB = Math.max(0f, Math.min(2f, b));
-        tintAmount = Math.max(0f, Math.min(1f, amount));
+        float rr = Math.max(0f, Math.min(2f, r));
+        float gg = Math.max(0f, Math.min(2f, g));
+        float bb = Math.max(0f, Math.min(2f, b));
+        float aa = Math.max(0f, Math.min(1f, amount));
+        screenEffects = new ScreenEffects(screenEffects.blackout(), 
+            screenEffects.vignetteAmount(), screenEffects.vignetteRadius(),
+            rr, gg, bb, aa);
         Logging.RENDER.topic("shockwave_gpu")
-            .kv("tint", String.format("%.1f,%.1f,%.1f @ %.1f", tintR, tintG, tintB, tintAmount))
+            .kv("tint", String.format("%.1f,%.1f,%.1f @ %.1f", rr, gg, bb, aa))
             .info("Tint set");
     }
     
     public static void clearScreenEffects() {
-        blackoutAmount = 0f;
-        vignetteAmount = 0f;
-        tintAmount = 0f;
+        screenEffects = ScreenEffects.NONE;
         Logging.RENDER.topic("shockwave_gpu")
             .info("Screen effects cleared");
     }
     
     // Ring color
-    public static float getRingR() { return ringR; }
-    public static float getRingG() { return ringG; }
-    public static float getRingB() { return ringB; }
-    public static float getRingOpacity() { return ringOpacity; }
+    public static float getRingR() { return ringColor.r(); }
+    public static float getRingG() { return ringColor.g(); }
+    public static float getRingB() { return ringColor.b(); }
+    public static float getRingOpacity() { return ringColor.opacity(); }
     
     public static void setRingColor(float r, float g, float b, float opacity) {
-        ringR = Math.max(0f, Math.min(1f, r));
-        ringG = Math.max(0f, Math.min(1f, g));
-        ringB = Math.max(0f, Math.min(1f, b));
-        ringOpacity = Math.max(0f, Math.min(1f, opacity));
+        ringColor = new RingColor(
+            Math.max(0f, Math.min(1f, r)),
+            Math.max(0f, Math.min(1f, g)),
+            Math.max(0f, Math.min(1f, b)),
+            Math.max(0f, Math.min(1f, opacity))
+        );
         Logging.RENDER.topic("shockwave_gpu")
             .kv("ringColor", String.format("%.1f,%.1f,%.1f @ %.0f%%", r, g, b, opacity * 100))
             .info("Ring color set");
@@ -432,10 +502,117 @@ public class ShockwavePostEffect {
         if (!enabled) return "OFF";
         if (animating) {
             return String.format("ANIM r=%.1f spd=%.1f max=%.1f", 
-                getCurrentRadius(), animationSpeed, maxRadius);
+                getCurrentRadius(), ringParams.animationSpeed(), ringParams.maxRadius());
         }
         return String.format("STATIC r=%.1f t=%.1f i=%.1f", 
-            currentRadius, ringThickness, intensity);
+            currentRadius, ringParams.thickness(), ringParams.intensity());
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // TEST SEQUENCE - Cycle through configurations to verify all features
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    private static int testStep = -1;
+    private static final String[] TEST_NAMES = {
+        "1: Basic trigger (cyan)",
+        "2: Red rings",
+        "3: Green rings",
+        "4: Multiple rings (5)",
+        "5: Thick rings",
+        "6: High intensity",
+        "7: Blackout 50%",
+        "8: Vignette effect",
+        "9: Red tint",
+        "10: All screen effects",
+        "RESET: Back to defaults"
+    };
+    
+    /**
+     * Cycles to the next test configuration.
+     * Call repeatedly with /shockwavegpu test
+     * @return Description of current test step
+     */
+    public static String cycleTest() {
+        testStep++;
+        if (testStep >= TEST_NAMES.length) testStep = 0;
+        
+        // Reset to defaults first
+        ringParams = RingParams.DEFAULT;
+        ringColor = RingColor.DEFAULT;
+        screenEffects = ScreenEffects.NONE;
+        
+        switch (testStep) {
+            case 0 -> {
+                // Basic trigger - default cyan
+                trigger();
+            }
+            case 1 -> {
+                // Red rings
+                ringColor = new RingColor(1f, 0f, 0f, 1f);
+                trigger();
+            }
+            case 2 -> {
+                // Green rings
+                ringColor = new RingColor(0f, 1f, 0f, 1f);
+                trigger();
+            }
+            case 3 -> {
+                // Multiple rings
+                ringParams = new RingParams(ringParams.thickness(), ringParams.intensity(),
+                    ringParams.animationSpeed(), ringParams.maxRadius(), 5, 15f,
+                    ringParams.glowWidth(), ringParams.contractMode());
+                trigger();
+            }
+            case 4 -> {
+                // Thick rings
+                ringParams = new RingParams(10f, ringParams.intensity(),
+                    ringParams.animationSpeed(), ringParams.maxRadius(), ringParams.count(), 
+                    ringParams.spacing(), 15f, ringParams.contractMode());
+                trigger();
+            }
+            case 5 -> {
+                // High intensity
+                ringParams = new RingParams(ringParams.thickness(), 2.5f,
+                    ringParams.animationSpeed(), ringParams.maxRadius(), ringParams.count(), 
+                    ringParams.spacing(), ringParams.glowWidth(), ringParams.contractMode());
+                trigger();
+            }
+            case 6 -> {
+                // Blackout
+                screenEffects = new ScreenEffects(0.5f, 0f, 0.5f, 1f, 1f, 1f, 0f);
+                setRadius(50f);
+            }
+            case 7 -> {
+                // Vignette
+                screenEffects = new ScreenEffects(0f, 0.8f, 0.3f, 1f, 1f, 1f, 0f);
+                setRadius(50f);
+            }
+            case 8 -> {
+                // Red tint
+                screenEffects = new ScreenEffects(0f, 0f, 0.5f, 1f, 0.3f, 0.3f, 0.7f);
+                setRadius(50f);
+            }
+            case 9 -> {
+                // All screen effects
+                screenEffects = new ScreenEffects(0.3f, 0.5f, 0.4f, 1f, 0.5f, 0.8f, 0.5f);
+                ringColor = new RingColor(1f, 0.5f, 0f, 1f); // Orange
+                trigger();
+            }
+            case 10 -> {
+                // Reset to defaults
+                enabled = false;
+            }
+        }
+        
+        return TEST_NAMES[testStep];
+    }
+    
+    /**
+     * Gets current test step name without cycling.
+     */
+    public static String getCurrentTestName() {
+        if (testStep < 0 || testStep >= TEST_NAMES.length) return "Use /shockwavegpu test to start";
+        return TEST_NAMES[testStep];
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
