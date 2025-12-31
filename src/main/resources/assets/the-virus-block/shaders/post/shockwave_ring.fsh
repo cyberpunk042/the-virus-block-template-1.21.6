@@ -70,6 +70,18 @@ layout(std140) uniform ShockwaveConfig {
     float RingG;            // Ring color green (0-1)
     float RingB;            // Ring color blue (0-1)
     float RingOpacity;      // Ring opacity (0-1)
+    
+    // vec4 9: Shape configuration
+    float ShapeType;        // 0=point, 1=sphere, 2=torus, 3=polygon, 4=orbital
+    float ShapeRadius;      // Main radius for sphere/polygon
+    float ShapeMajorR;      // Torus major radius
+    float ShapeMinorR;      // Torus minor radius
+    
+    // vec4 10: Shape extras
+    float ShapeSideCount;   // Polygon side count
+    float OrbitalRadius;    // Orbital sphere radius (reserved)
+    float OrbitalCount;     // Number of orbitals (reserved)
+    float OrbitalPhase;     // Orbital animation phase (reserved)
 };
 
 out vec4 fragColor;

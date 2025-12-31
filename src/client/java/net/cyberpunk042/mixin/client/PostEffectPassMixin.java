@@ -70,82 +70,18 @@ public class PostEffectPassMixin {
         }
         
         // Create new buffer with current Java values
-        // Layout: 9 vec4s = 144 bytes (full feature set)
+        // Layout is now centralized in ShockwavePostEffect.writeUniformBuffer()
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            Std140Builder builder = Std140Builder.onStack(stack, 160);
+            Std140Builder builder = Std140Builder.onStack(stack, ShockwavePostEffect.BUFFER_SIZE + 16);
             
-            // Vec4 0: Basic params
-            float radius = ShockwavePostEffect.getCurrentRadius();
-            float thickness = ShockwavePostEffect.getThickness();
-            float intensity = ShockwavePostEffect.getIntensity();
-            float time = (System.currentTimeMillis() % 10000) / 1000.0f;
-            builder.putVec4(radius, thickness, intensity, time);
-            
-            // Vec4 1: Ring count, spacing, contract mode, glow width
-            float ringCount = (float) ShockwavePostEffect.getRingCount();
-            float ringSpacing = ShockwavePostEffect.getRingSpacing();
-            float contractMode = ShockwavePostEffect.isContractMode() ? 1.0f : 0.0f;
-            float glowWidth = ShockwavePostEffect.getGlowWidth();
-            builder.putVec4(ringCount, ringSpacing, contractMode, glowWidth);
-            
-            // Vec4 2: Target world position + UseWorldOrigin flag
-            float useWorldOrigin = ShockwavePostEffect.isTargetMode() ? 1.0f : 0.0f;
-            float targetX = ShockwavePostEffect.getTargetX();
-            float targetY = ShockwavePostEffect.getTargetY();
-            float targetZ = ShockwavePostEffect.getTargetZ();
-            builder.putVec4(targetX, targetY, targetZ, useWorldOrigin);
-            
-            // Vec4 3: Camera world position + aspect ratio
-            // In TARGET mode, use FROZEN camera position from raycast time
-            float camX, camY, camZ;
-            if (ShockwavePostEffect.isTargetMode()) {
-                camX = ShockwavePostEffect.getFrozenCamX();
-                camY = ShockwavePostEffect.getFrozenCamY();
-                camZ = ShockwavePostEffect.getFrozenCamZ();
-            } else {
-                camX = ShockwavePostEffect.getCameraX();
-                camY = ShockwavePostEffect.getCameraY();
-                camZ = ShockwavePostEffect.getCameraZ();
-            }
+            // Get aspect ratio and FOV from client
             var client = net.minecraft.client.MinecraftClient.getInstance();
             float aspect = (float) client.getWindow().getFramebufferWidth() / 
                           (float) client.getWindow().getFramebufferHeight();
-            builder.putVec4(camX, camY, camZ, aspect);
-            
-            // Vec4 4: Camera forward direction + FOV
-            // Use forward vector computed from Camera object (in WorldRendererShockwaveMixin)
             float fov = (float) Math.toRadians(client.options.getFov().getValue());
-            float forwardX = ShockwavePostEffect.getForwardX();
-            float forwardY = ShockwavePostEffect.getForwardY();
-            float forwardZ = ShockwavePostEffect.getForwardZ();
-            builder.putVec4(forwardX, forwardY, forwardZ, fov);
             
-            // Vec4 5: Camera up direction (simplified - always world up)
-            builder.putVec4(0f, 1f, 0f, 0f);
-            
-            // Vec4 6: Screen blackout / vignette
-            builder.putVec4(
-                ShockwavePostEffect.getBlackoutAmount(),
-                ShockwavePostEffect.getVignetteAmount(),
-                ShockwavePostEffect.getVignetteRadius(),
-                0f
-            );
-            
-            // Vec4 7: Color tint
-            builder.putVec4(
-                ShockwavePostEffect.getTintR(),
-                ShockwavePostEffect.getTintG(),
-                ShockwavePostEffect.getTintB(),
-                ShockwavePostEffect.getTintAmount()
-            );
-            
-            // Vec4 8: Ring color
-            builder.putVec4(
-                ShockwavePostEffect.getRingR(),
-                ShockwavePostEffect.getRingG(),
-                ShockwavePostEffect.getRingB(),
-                ShockwavePostEffect.getRingOpacity()
-            );
+            // Single method call - all buffer logic in ShockwavePostEffect
+            ShockwavePostEffect.writeUniformBuffer(builder, aspect, fov);
             
             GpuBuffer newBuffer = RenderSystem.getDevice().createBuffer(
                 () -> "ShockwaveConfig Dynamic",
@@ -154,14 +90,13 @@ public class PostEffectPassMixin {
             );
             
             // Replace in map
-            GpuBuffer oldBuffer = uniformBuffers.put("ShockwaveConfig", newBuffer);
+            uniformBuffers.put("ShockwaveConfig", newBuffer);
             
             if (injectCount % 60 == 1) {
                 Logging.RENDER.topic("posteffect_inject")
-                    .kv("radius", String.format("%.1f", radius))
-                    .kv("worldMode", useWorldOrigin > 0.5f)
-                    .kv("target", String.format("%.0f,%.0f,%.0f", targetX, targetY, targetZ))
-                    .info("Updated ShockwaveConfig UBO!");
+                    .kv("radius", String.format("%.1f", ShockwavePostEffect.getCurrentRadius()))
+                    .kv("worldMode", ShockwavePostEffect.isTargetMode())
+                    .info("Updated ShockwaveConfig UBO");
             }
             
         } catch (Exception e) {

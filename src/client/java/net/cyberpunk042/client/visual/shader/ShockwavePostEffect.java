@@ -4,6 +4,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.PostEffectProcessor;
 import net.minecraft.client.gl.ShaderLoader;
 import net.minecraft.client.render.DefaultFramebufferSet;
+import com.mojang.blaze3d.buffers.Std140Builder;
 import net.minecraft.util.Identifier;
 import net.cyberpunk042.log.Logging;
 
@@ -87,6 +88,49 @@ public class ShockwavePostEffect {
         public static final CameraState ORIGIN = new CameraState(0,0,0, 0,0,1, 0,0,0);
     }
     
+    /**
+     * Shape type for shockwave emission source.
+     * POINT is the current/default behavior.
+     */
+    public enum ShapeType {
+        POINT(0),      // Current behavior - rings from single point
+        SPHERE(1),     // Rings from sphere surface  
+        TORUS(2),      // Rings from torus (donut) surface
+        POLYGON(3),    // N-sided polygon rings (triangle, square, hex...)
+        ORBITAL(4);    // Main sphere + orbiting spheres
+        
+        private final int shaderCode;
+        ShapeType(int code) { this.shaderCode = code; }
+        public int getShaderCode() { return shaderCode; }
+    }
+    
+    /**
+     * Shape configuration for advanced shockwave emission.
+     */
+    public record ShapeConfig(
+        ShapeType type,
+        float radius,           // Main radius (all types)
+        float majorRadius,      // Torus major
+        float minorRadius,      // Torus minor
+        int sideCount           // Polygon sides
+    ) {
+        public static final ShapeConfig POINT = new ShapeConfig(
+            ShapeType.POINT, 0f, 0f, 0f, 0
+        );
+        
+        public static ShapeConfig sphere(float radius) {
+            return new ShapeConfig(ShapeType.SPHERE, radius, 0, 0, 0);
+        }
+        
+        public static ShapeConfig torus(float major, float minor) {
+            return new ShapeConfig(ShapeType.TORUS, 0, major, minor, 0);
+        }
+        
+        public static ShapeConfig polygon(int sides, float radius) {
+            return new ShapeConfig(ShapeType.POLYGON, radius, 0, 0, sides);
+        }
+    }
+    
     // ═══════════════════════════════════════════════════════════════════════════
     // STATE
     // ═══════════════════════════════════════════════════════════════════════════
@@ -104,6 +148,7 @@ public class ShockwavePostEffect {
     private static RingColor ringColor = RingColor.DEFAULT;
     private static ScreenEffects screenEffects = ScreenEffects.NONE;
     private static CameraState cameraState = CameraState.ORIGIN;
+    private static ShapeConfig shapeConfig = ShapeConfig.POINT;  // Default: current behavior
     
     // Origin mode: CAMERA = rings around player, TARGET = rings around cursor hit point
     public enum OriginMode { CAMERA, TARGET }
@@ -493,6 +538,135 @@ public class ShockwavePostEffect {
         Logging.RENDER.topic("shockwave_gpu")
             .kv("ringColor", String.format("%.1f,%.1f,%.1f @ %.0f%%", r, g, b, opacity * 100))
             .info("Ring color set");
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SHAPE CONFIGURATION - For future shape types
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    public static ShapeConfig getShapeConfig() { return shapeConfig; }
+    
+    public static void setShape(ShapeConfig config) {
+        shapeConfig = config;
+        Logging.RENDER.topic("shockwave_gpu")
+            .kv("shapeType", config.type())
+            .kv("radius", config.radius())
+            .info("Shape config set");
+    }
+    
+    public static void setShapePoint() {
+        setShape(ShapeConfig.POINT);
+    }
+    
+    public static void setShapeSphere(float radius) {
+        setShape(ShapeConfig.sphere(radius));
+    }
+    
+    public static void setShapeTorus(float major, float minor) {
+        setShape(ShapeConfig.torus(major, minor));
+    }
+    
+    public static void setShapePolygon(int sides, float radius) {
+        setShape(ShapeConfig.polygon(sides, radius));
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // UNIFORM BUFFER CONSTRUCTION - Single source of truth for shader data
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /** Buffer layout: 11 vec4s = 176 bytes (extended for shapes) */
+    public static final int VEC4_COUNT = 11;
+    public static final int BUFFER_SIZE = VEC4_COUNT * 16;
+    
+    /**
+     * Writes all shockwave state to a Std140 uniform buffer.
+     * This is the SINGLE SOURCE OF TRUTH for buffer layout.
+     * 
+     * @param builder The Std140Builder to write to
+     * @param aspectRatio Screen aspect ratio (width/height)  
+     * @param fovRadians Field of view in radians
+     */
+    public static void writeUniformBuffer(Std140Builder builder, float aspectRatio, float fovRadians) {
+        // Vec4 0: Basic params
+        float time = (System.currentTimeMillis() % 10000) / 1000.0f;
+        builder.putVec4(getCurrentRadius(), ringParams.thickness(), ringParams.intensity(), time);
+        
+        // Vec4 1: Ring count, spacing, contract mode, glow width
+        builder.putVec4(
+            (float) ringParams.count(), 
+            ringParams.spacing(),
+            ringParams.contractMode() ? 1.0f : 0.0f, 
+            ringParams.glowWidth()
+        );
+        
+        // Vec4 2: Target world position + UseWorldOrigin flag
+        float useWorldOrigin = isTargetMode() ? 1.0f : 0.0f;
+        builder.putVec4(targetX, targetY, targetZ, useWorldOrigin);
+        
+        // Vec4 3: Camera world position + aspect ratio
+        // In TARGET mode, use FROZEN camera position from raycast time
+        float camX, camY, camZ;
+        if (isTargetMode()) {
+            camX = cameraState.frozenX();
+            camY = cameraState.frozenY();
+            camZ = cameraState.frozenZ();
+        } else {
+            camX = cameraState.x();
+            camY = cameraState.y();
+            camZ = cameraState.z();
+        }
+        builder.putVec4(camX, camY, camZ, aspectRatio);
+        
+        // Vec4 4: Camera forward direction + FOV
+        builder.putVec4(
+            cameraState.forwardX(), 
+            cameraState.forwardY(), 
+            cameraState.forwardZ(), 
+            fovRadians
+        );
+        
+        // Vec4 5: Camera up direction (simplified - always world up)
+        builder.putVec4(0f, 1f, 0f, 0f);
+        
+        // Vec4 6: Screen blackout / vignette
+        builder.putVec4(
+            screenEffects.blackout(),
+            screenEffects.vignetteAmount(),
+            screenEffects.vignetteRadius(),
+            0f
+        );
+        
+        // Vec4 7: Color tint
+        builder.putVec4(
+            screenEffects.tintR(),
+            screenEffects.tintG(),
+            screenEffects.tintB(),
+            screenEffects.tintAmount()
+        );
+        
+        // Vec4 8: Ring color
+        builder.putVec4(
+            ringColor.r(),
+            ringColor.g(),
+            ringColor.b(),
+            ringColor.opacity()
+        );
+        
+        // Vec4 9: Shape configuration
+        builder.putVec4(
+            (float) shapeConfig.type().getShaderCode(),
+            shapeConfig.radius(),
+            shapeConfig.majorRadius(),
+            shapeConfig.minorRadius()
+        );
+        
+        // Vec4 10: Shape extras
+        builder.putVec4(
+            (float) shapeConfig.sideCount(),
+            0f,  // Reserved for orbital radius
+            0f,  // Reserved for orbital count
+            0f   // Reserved for orbital phase
+        );
     }
     
     // STATUS STRING (for HUD display)
