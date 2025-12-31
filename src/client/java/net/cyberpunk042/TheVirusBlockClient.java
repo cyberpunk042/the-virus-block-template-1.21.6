@@ -264,11 +264,72 @@ public class TheVirusBlockClient implements ClientModInitializer {
 								float radius = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "radius");
 								net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setRadius(radius);
 								ctx.getSource().sendFeedback(
-									net.minecraft.text.Text.literal("§d§lGPU Shockwave radius: §f" + radius + " blocks")
+									net.minecraft.text.Text.literal("§d§lRadius: §f" + radius + " blocks")
 								);
 								return 1;
 							})
 						)
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("thickness")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("thickness",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.5f, 50.0f))
+							.executes(ctx -> {
+								float thickness = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "thickness");
+								net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setThickness(thickness);
+								ctx.getSource().sendFeedback(
+									net.minecraft.text.Text.literal("§d§lThickness: §f" + thickness + " blocks")
+								);
+								return 1;
+							})
+						)
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("intensity")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("intensity",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.0f, 3.0f))
+							.executes(ctx -> {
+								float intensity = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "intensity");
+								net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setIntensity(intensity);
+								ctx.getSource().sendFeedback(
+									net.minecraft.text.Text.literal("§d§lIntensity: §f" + intensity)
+								);
+								return 1;
+							})
+						)
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("speed")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("speed",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(1.0f, 200.0f))
+							.executes(ctx -> {
+								float speed = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "speed");
+								net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setSpeed(speed);
+								ctx.getSource().sendFeedback(
+									net.minecraft.text.Text.literal("§d§lSpeed: §f" + speed + " blocks/sec")
+								);
+								return 1;
+							})
+						)
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("maxradius")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("max",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(10.0f, 500.0f))
+							.executes(ctx -> {
+								float max = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "max");
+								net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setMaxRadius(max);
+								ctx.getSource().sendFeedback(
+									net.minecraft.text.Text.literal("§d§lMax Radius: §f" + max + " blocks")
+								);
+								return 1;
+							})
+						)
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("status")
+						.executes(ctx -> {
+							ctx.getSource().sendFeedback(
+								net.minecraft.text.Text.literal("§d§lGPU Shockwave: §f" + 
+									net.cyberpunk042.client.visual.shader.ShockwavePostEffect.getStatusString())
+							);
+							return 1;
+						})
 					)
 			);
 		});
