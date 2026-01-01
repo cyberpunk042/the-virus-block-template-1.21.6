@@ -123,7 +123,8 @@ public final class DefinitionBuilder {
                 buildBindings(state),
                 buildTriggers(state),
                 null, // lifecycle - handled separately
-                (net.cyberpunk042.field.force.ForceFieldConfig) defFields.get("forceConfig")
+                (net.cyberpunk042.field.force.ForceFieldConfig) defFields.get("forceConfig"),
+                state.shockwaveAdapter().toJson()  // Field-level shockwave FX config
             );
             
             // CP3: Field-level in definition - modifiers should never be null now

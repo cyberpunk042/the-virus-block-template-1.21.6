@@ -157,4 +157,17 @@ public class ContentProviderFactory {
     public SubTabPane.ContentProvider trace() {
         return new PanelWrapper(new TraceSubPanel(parent, state));
     }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // FX TAB CONTENT
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Creates the Shockwave sub-tab content.
+     */
+    public SubTabPane.ContentProvider shockwave() {
+        ShockwaveSubPanel panel = new ShockwaveSubPanel(parent, state, 0);
+        panel.setWidgetChangedCallback(onWidgetsChanged);
+        return new PanelWrapper(panel);
+    }
 }

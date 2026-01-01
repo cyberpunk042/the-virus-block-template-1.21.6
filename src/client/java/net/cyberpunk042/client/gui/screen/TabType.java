@@ -13,6 +13,9 @@ public enum TabType {
     /** Level 3: Debug controls (operator only) */
     DEBUG("Debug", "D", "Internal field controls"),
     
+    /** Visual Effects controls (operator only) */
+    FX("FX", "F", "Visual effects & shaders"),
+    
     /** Profile management */
     PROFILES("Profiles", "P", "Save and load profiles");
     

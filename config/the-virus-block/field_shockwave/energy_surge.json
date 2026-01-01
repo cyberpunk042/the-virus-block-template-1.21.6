@@ -1,0 +1,35 @@
+{
+    "name": "Energy Surge",
+    "description": "Electric blue rapid rings with screen flash",
+    "shape": {
+        "type": "POINT"
+    },
+    "ring": {
+        "count": 7,
+        "spacing": 0.25,
+        "thickness": 0.05,
+        "maxRadius": 20.0,
+        "speed": 2.0,
+        "glowWidth": 0.3,
+        "intensity": 1.2,
+        "color": {
+            "r": 0.3,
+            "g": 0.8,
+            "b": 1.0,
+            "opacity": 0.95
+        }
+    },
+    "timing": {
+        "autoRetractOnRingEnd": true
+    },
+    "screen": {
+        "vignetteAmount": 0.4,
+        "vignetteRadius": 0.3,
+        "tint": {
+            "r": 0.2,
+            "g": 0.7,
+            "b": 1.0,
+            "amount": 0.3
+        }
+    }
+}

@@ -93,6 +93,23 @@ public final class GuiClientHandlers {
             });
         });
         
+        // Handle shockwave trigger broadcast - trigger local visual effect
+        ClientPlayNetworking.registerGlobalReceiver(ShockwaveTriggerS2CPayload.ID, (payload, context) -> {
+            context.client().execute(() -> {
+                Logging.GUI.topic("network").info("Received shockwave trigger at ({}, {}, {})", 
+                    payload.worldX(), payload.worldY(), payload.worldZ());
+                
+                // Apply shockwave config and trigger effect
+                try {
+                    net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setTargetPosition(
+                        payload.worldX(), payload.worldY(), payload.worldZ());
+                    net.cyberpunk042.client.visual.shader.ShockwavePostEffect.trigger();
+                } catch (Exception e) {
+                    Logging.GUI.topic("network").error("Failed to trigger shockwave: {}", e.getMessage());
+                }
+            });
+        });
+        
         Logging.GUI.topic("network").info("GUI client handlers registered");
     }
     

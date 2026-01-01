@@ -271,6 +271,22 @@ public class ContentBuilder {
         return this;
     }
     
+    /** Creates a row of 3 sliders with equal width. */
+    public ContentBuilder sliderTriple(String label1, String path1, float min1, float max1,
+                                       String label2, String path2, float min2, float max2,
+                                       String label3, String path3, float min3, float max3) {
+        int thirdWidth = (availableWidth() - WIDGET_GAP * 2) / 3;
+        int x2 = leftPadding() + thirdWidth + WIDGET_GAP;
+        int x3 = leftPadding() + (thirdWidth + WIDGET_GAP) * 2;
+        
+        createSliderWidget(label1, path1, leftPadding(), currentY, thirdWidth, min1, max1, "%.2f", v -> v, v -> v);
+        createSliderWidget(label2, path2, x2, currentY, thirdWidth, min2, max2, "%.2f", v -> v, v -> v);
+        createSliderWidget(label3, path3, x3, currentY, thirdWidth, min3, max3, "%.2f", v -> v, v -> v);
+        
+        currentY += COMPACT_HEIGHT + WIDGET_GAP;
+        return this;
+    }
+    
     /** Creates a row of 2 degree sliders (0-360° display, 0-1 state). */
     public ContentBuilder sliderPairDegrees(String label1, String path1, String label2, String path2) {
         int halfWidth = (availableWidth() - WIDGET_GAP) / 2;

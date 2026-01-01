@@ -188,6 +188,9 @@ public class PresetRegistry {
         if (mergeData.has("prediction")) {
             affected.add("Prediction");
         }
+        if (mergeData.has("shockwave") || hasNestedKey(mergeData, "shockwave")) {
+            affected.add("Shockwave FX");
+        }
         
         if (affected.isEmpty()) {
             affected.add("General settings");
@@ -306,6 +309,13 @@ public class PresetRegistry {
         
         if (mergeData.has("transform") && mergeData.get("transform").isJsonObject()) {
             applyTransform(state, mergeData.getAsJsonObject("transform"));
+        }
+        
+        // ═══════════════════════════════════════════════════════════════
+        // SHOCKWAVE FX SETTINGS
+        // ═══════════════════════════════════════════════════════════════
+        if (mergeData.has("shockwave") && mergeData.get("shockwave").isJsonObject()) {
+            applyShockwave(state, mergeData.getAsJsonObject("shockwave"));
         }
         
         // ═══════════════════════════════════════════════════════════════
@@ -471,6 +481,107 @@ public class PresetRegistry {
             float z = json.has("rotationZ") ? json.get("rotationZ").getAsFloat() : (currentRot != null ? currentRot.z : 0);
             state.set("transform.rotation", new Vector3f(x, y, z));
         }
+    }
+    
+    /**
+     * Apply shockwave FX preset settings.
+     * Supports all shockwave.* paths that the ShockwaveAdapter handles.
+     */
+    private static void applyShockwave(FieldEditState state, JsonObject json) {
+        // Shape
+        if (json.has("shapeType")) {
+            try {
+                state.set("shockwave.shapeType", 
+                    net.cyberpunk042.client.visual.shader.ShockwavePostEffect.ShapeType.valueOf(
+                        json.get("shapeType").getAsString().toUpperCase()));
+            } catch (IllegalArgumentException ignored) {}
+        }
+        if (json.has("mainRadius")) state.set("shockwave.mainRadius", json.get("mainRadius").getAsFloat());
+        if (json.has("orbitalRadius")) state.set("shockwave.orbitalRadius", json.get("orbitalRadius").getAsFloat());
+        if (json.has("orbitDistance")) state.set("shockwave.orbitDistance", json.get("orbitDistance").getAsFloat());
+        if (json.has("orbitalCount")) state.set("shockwave.orbitalCount", json.get("orbitalCount").getAsInt());
+        
+        // Ring geometry
+        if (json.has("ringCount")) state.set("shockwave.ringCount", json.get("ringCount").getAsInt());
+        if (json.has("ringSpacing")) state.set("shockwave.ringSpacing", json.get("ringSpacing").getAsFloat());
+        if (json.has("ringThickness")) state.set("shockwave.ringThickness", json.get("ringThickness").getAsFloat());
+        if (json.has("ringMaxRadius")) state.set("shockwave.ringMaxRadius", json.get("ringMaxRadius").getAsFloat());
+        if (json.has("ringSpeed")) state.set("shockwave.ringSpeed", json.get("ringSpeed").getAsFloat());
+        if (json.has("ringGlowWidth")) state.set("shockwave.ringGlowWidth", json.get("ringGlowWidth").getAsFloat());
+        if (json.has("ringIntensity")) state.set("shockwave.ringIntensity", json.get("ringIntensity").getAsFloat());
+        if (json.has("ringContractMode")) state.set("shockwave.ringContractMode", json.get("ringContractMode").getAsBoolean());
+        
+        // Ring color
+        if (json.has("ringColorR")) state.set("shockwave.ringColorR", json.get("ringColorR").getAsFloat());
+        if (json.has("ringColorG")) state.set("shockwave.ringColorG", json.get("ringColorG").getAsFloat());
+        if (json.has("ringColorB")) state.set("shockwave.ringColorB", json.get("ringColorB").getAsFloat());
+        if (json.has("ringColorOpacity")) state.set("shockwave.ringColorOpacity", json.get("ringColorOpacity").getAsFloat());
+        
+        // Orbital body
+        if (json.has("orbitalBodyR")) state.set("shockwave.orbitalBodyR", json.get("orbitalBodyR").getAsFloat());
+        if (json.has("orbitalBodyG")) state.set("shockwave.orbitalBodyG", json.get("orbitalBodyG").getAsFloat());
+        if (json.has("orbitalBodyB")) state.set("shockwave.orbitalBodyB", json.get("orbitalBodyB").getAsFloat());
+        
+        // Orbital corona
+        if (json.has("orbitalCoronaR")) state.set("shockwave.orbitalCoronaR", json.get("orbitalCoronaR").getAsFloat());
+        if (json.has("orbitalCoronaG")) state.set("shockwave.orbitalCoronaG", json.get("orbitalCoronaG").getAsFloat());
+        if (json.has("orbitalCoronaB")) state.set("shockwave.orbitalCoronaB", json.get("orbitalCoronaB").getAsFloat());
+        if (json.has("orbitalCoronaA")) state.set("shockwave.orbitalCoronaA", json.get("orbitalCoronaA").getAsFloat());
+        if (json.has("orbitalCoronaWidth")) state.set("shockwave.orbitalCoronaWidth", json.get("orbitalCoronaWidth").getAsFloat());
+        if (json.has("orbitalCoronaIntensity")) state.set("shockwave.orbitalCoronaIntensity", json.get("orbitalCoronaIntensity").getAsFloat());
+        if (json.has("orbitalRimPower")) state.set("shockwave.orbitalRimPower", json.get("orbitalRimPower").getAsFloat());
+        if (json.has("orbitalRimFalloff")) state.set("shockwave.orbitalRimFalloff", json.get("orbitalRimFalloff").getAsFloat());
+        
+        // Beam geometry
+        if (json.has("beamHeight")) state.set("shockwave.beamHeight", json.get("beamHeight").getAsFloat());
+        if (json.has("beamWidth")) state.set("shockwave.beamWidth", json.get("beamWidth").getAsFloat());
+        if (json.has("beamWidthScale")) state.set("shockwave.beamWidthScale", json.get("beamWidthScale").getAsFloat());
+        if (json.has("beamTaper")) state.set("shockwave.beamTaper", json.get("beamTaper").getAsFloat());
+        
+        // Beam body
+        if (json.has("beamBodyR")) state.set("shockwave.beamBodyR", json.get("beamBodyR").getAsFloat());
+        if (json.has("beamBodyG")) state.set("shockwave.beamBodyG", json.get("beamBodyG").getAsFloat());
+        if (json.has("beamBodyB")) state.set("shockwave.beamBodyB", json.get("beamBodyB").getAsFloat());
+        
+        // Beam corona
+        if (json.has("beamCoronaR")) state.set("shockwave.beamCoronaR", json.get("beamCoronaR").getAsFloat());
+        if (json.has("beamCoronaG")) state.set("shockwave.beamCoronaG", json.get("beamCoronaG").getAsFloat());
+        if (json.has("beamCoronaB")) state.set("shockwave.beamCoronaB", json.get("beamCoronaB").getAsFloat());
+        if (json.has("beamCoronaA")) state.set("shockwave.beamCoronaA", json.get("beamCoronaA").getAsFloat());
+        if (json.has("beamCoronaWidth")) state.set("shockwave.beamCoronaWidth", json.get("beamCoronaWidth").getAsFloat());
+        if (json.has("beamCoronaIntensity")) state.set("shockwave.beamCoronaIntensity", json.get("beamCoronaIntensity").getAsFloat());
+        if (json.has("beamRimPower")) state.set("shockwave.beamRimPower", json.get("beamRimPower").getAsFloat());
+        if (json.has("beamRimFalloff")) state.set("shockwave.beamRimFalloff", json.get("beamRimFalloff").getAsFloat());
+        
+        // Animation timing
+        if (json.has("orbitalSpeed")) state.set("shockwave.orbitalSpeed", json.get("orbitalSpeed").getAsFloat());
+        if (json.has("orbitalSpawnDuration")) state.set("shockwave.orbitalSpawnDuration", json.get("orbitalSpawnDuration").getAsFloat());
+        if (json.has("orbitalRetractDuration")) state.set("shockwave.orbitalRetractDuration", json.get("orbitalRetractDuration").getAsFloat());
+        if (json.has("beamGrowDuration")) state.set("shockwave.beamGrowDuration", json.get("beamGrowDuration").getAsFloat());
+        if (json.has("beamShrinkDuration")) state.set("shockwave.beamShrinkDuration", json.get("beamShrinkDuration").getAsFloat());
+        if (json.has("beamHoldDuration")) state.set("shockwave.beamHoldDuration", json.get("beamHoldDuration").getAsFloat());
+        if (json.has("beamWidthGrowFactor")) state.set("shockwave.beamWidthGrowFactor", json.get("beamWidthGrowFactor").getAsFloat());
+        if (json.has("beamLengthGrowFactor")) state.set("shockwave.beamLengthGrowFactor", json.get("beamLengthGrowFactor").getAsFloat());
+        
+        // Delays
+        if (json.has("orbitalSpawnDelay")) state.set("shockwave.orbitalSpawnDelay", json.get("orbitalSpawnDelay").getAsFloat());
+        if (json.has("beamStartDelay")) state.set("shockwave.beamStartDelay", json.get("beamStartDelay").getAsFloat());
+        if (json.has("retractDelay")) state.set("shockwave.retractDelay", json.get("retractDelay").getAsFloat());
+        if (json.has("autoRetractOnRingEnd")) state.set("shockwave.autoRetractOnRingEnd", json.get("autoRetractOnRingEnd").getAsBoolean());
+        
+        // Screen effects
+        if (json.has("blackout")) state.set("shockwave.blackout", json.get("blackout").getAsFloat());
+        if (json.has("vignetteAmount")) state.set("shockwave.vignetteAmount", json.get("vignetteAmount").getAsFloat());
+        if (json.has("vignetteRadius")) state.set("shockwave.vignetteRadius", json.get("vignetteRadius").getAsFloat());
+        if (json.has("tintR")) state.set("shockwave.tintR", json.get("tintR").getAsFloat());
+        if (json.has("tintG")) state.set("shockwave.tintG", json.get("tintG").getAsFloat());
+        if (json.has("tintB")) state.set("shockwave.tintB", json.get("tintB").getAsFloat());
+        if (json.has("tintAmount")) state.set("shockwave.tintAmount", json.get("tintAmount").getAsFloat());
+        
+        // Blend
+        if (json.has("blendRadius")) state.set("shockwave.blendRadius", json.get("blendRadius").getAsFloat());
+        
+        TheVirusBlock.LOGGER.debug("Applied shockwave preset with {} properties", json.keySet().size());
     }
     
     // ═══════════════════════════════════════════════════════════════════════

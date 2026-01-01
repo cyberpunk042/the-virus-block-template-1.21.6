@@ -83,6 +83,9 @@ public abstract class WorldRendererShockwaveMixin {
         // Update camera position for target mode calculations
         ShockwavePostEffect.updateCameraPosition((float)camX, (float)camY, (float)camZ);
         
+        // Update shockwave position if follow mode is enabled
+        ShockwavePostEffect.tickFollowPosition((float)camX, (float)camY, (float)camZ);
+        
         // Compute forward vector from Camera object (consistent with depth buffer)
         float yaw = (float) Math.toRadians(camera.getYaw());
         float pitch = (float) Math.toRadians(camera.getPitch());

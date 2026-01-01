@@ -19,6 +19,7 @@ import java.util.List;
  *   <li><b>Quick:</b> Fill, Appearance, Visibility, Transform</li>
  *   <li><b>Advanced:</b> Animation, Prediction, Linking, Modifiers</li>
  *   <li><b>Debug:</b> Beam, Trigger, Lifecycle, Bindings, Trace</li>
+ *   <li><b>FX:</b> Shockwave (visual effects)</li>
  * </ul>
  * 
  * <p>The Profiles tab uses a separate panel and is handled by the main screen.</p>
@@ -34,6 +35,7 @@ public class ContentArea implements ScreenComponent {
     private SubTabPane quickSubTabs;
     private SubTabPane advancedSubTabs;
     private SubTabPane debugSubTabs;
+    private SubTabPane fxSubTabs;
     
     // Content provider factory
     private final ContentProviderFactory contentFactory;
@@ -74,6 +76,7 @@ public class ContentArea implements ScreenComponent {
         initQuickSubTabs();
         initAdvancedSubTabs();
         initDebugSubTabs();
+        initFxSubTabs();
     }
     
     private void initQuickSubTabs() {
@@ -122,6 +125,18 @@ public class ContentArea implements ScreenComponent {
         debugSubTabs.setActiveTab(savedSubtab);
     }
     
+    private void initFxSubTabs() {
+        int savedSubtab = GuiConfigPersistence.loadSavedSubtab(TabType.FX);
+        fxSubTabs = new SubTabPane(textRenderer)
+            .addTab("Shockwave", contentFactory.shockwave())
+            .onTabChange(idx -> {
+                GuiConfigPersistence.saveSubtab(TabType.FX, idx);
+                onSubTabChange.run();
+            });
+        fxSubTabs.setBounds(bounds);
+        fxSubTabs.setActiveTab(savedSubtab);
+    }
+    
     /**
      * Sets the active main tab and switches content.
      */
@@ -137,6 +152,7 @@ public class ContentArea implements ScreenComponent {
             case QUICK -> quickSubTabs;
             case ADVANCED -> advancedSubTabs;
             case DEBUG -> debugSubTabs;
+            case FX -> fxSubTabs;
             case PROFILES -> null; // Profiles uses separate panel
         };
     }
@@ -224,5 +240,12 @@ public class ContentArea implements ScreenComponent {
      */
     public SubTabPane getDebugSubTabs() {
         return debugSubTabs;
+    }
+    
+    /**
+     * Returns the FX sub-tabs pane.
+     */
+    public SubTabPane getFxSubTabs() {
+        return fxSubTabs;
     }
 }

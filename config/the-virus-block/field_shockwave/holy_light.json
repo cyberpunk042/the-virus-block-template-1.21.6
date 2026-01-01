@@ -1,0 +1,54 @@
+{
+    "name": "Holy Light",
+    "description": "Bright ascending beams with golden orbitals",
+    "shape": {
+        "type": "ORBITAL",
+        "orbitalCount": 8,
+        "orbitalRadius": 0.2,
+        "orbitDistance": 1.5
+    },
+    "orbital": {
+        "speed": 0.3,
+        "body": {
+            "r": 1.0,
+            "g": 0.95,
+            "b": 0.7
+        },
+        "corona": {
+            "r": 1.0,
+            "g": 0.9,
+            "b": 0.5,
+            "a": 0.9,
+            "width": 0.25,
+            "intensity": 2.0
+        },
+        "rimPower": 2.5
+    },
+    "beam": {
+        "height": 10.0,
+        "width": 0.15,
+        "taper": 0.6,
+        "growDuration": 0.8,
+        "holdDuration": 1.5,
+        "body": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 0.8
+        },
+        "corona": {
+            "r": 1.0,
+            "g": 0.95,
+            "b": 0.6,
+            "a": 0.85
+        }
+    },
+    "screen": {
+        "blackout": 0.1,
+        "tint": {
+            "r": 1.0,
+            "g": 0.95,
+            "b": 0.7,
+            "amount": 0.2
+        }
+    }
+}

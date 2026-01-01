@@ -47,6 +47,7 @@ public class FieldEditState {
     // ADAPTERS (handle data categories)
     // ═══════════════════════════════════════════════════════════════════════════
     
+    // Per-primitive adapters (stored in each primitive)
     private final ShapeAdapter shapeAdapter = new ShapeAdapter();
     private final AnimationAdapter animationAdapter = new AnimationAdapter();
     private final FillAdapter fillAdapter = new FillAdapter();
@@ -57,18 +58,25 @@ public class FieldEditState {
     private final LinkAdapter linkAdapter = new LinkAdapter();
     private final TriggerAdapter triggerAdapter = new TriggerAdapter();
     
+    // Field-level adapters (stored at field definition level, not per-primitive)
+    private final ShockwaveAdapter shockwaveAdapter = new ShockwaveAdapter();
+    
+    // List of per-primitive adapters only
     private final List<PrimitiveAdapter> adapters = List.of(
         shapeAdapter, animationAdapter, fillAdapter, transformAdapter,
         appearanceAdapter, visibilityAdapter, arrangementAdapter, linkAdapter, triggerAdapter
     );
     
-    private final Map<String, PrimitiveAdapter> adapterByCategory;
+    // Map includes BOTH primitive adapters AND field-level adapters for path routing
+    private final Map<String, AbstractAdapter> adapterByCategory;
     
     {
-        Map<String, PrimitiveAdapter> map = new HashMap<>();
+        Map<String, AbstractAdapter> map = new HashMap<>();
         for (PrimitiveAdapter adapter : adapters) {
-            map.put(adapter.category(), adapter);
+            map.put(adapter.category(), (AbstractAdapter) adapter);
         }
+        // Add field-level adapters
+        map.put(shockwaveAdapter.category(), shockwaveAdapter);
         
         // Register adapters under all expected path prefixes for backward compatibility
         // Panels use paths like "spin.speed", "sphere.radius", "mask.count"
@@ -295,7 +303,7 @@ public class FieldEditState {
         String[] parts = path.split("\\.", 2);
         String category = parts[0];
         
-        PrimitiveAdapter adapter = adapterByCategory.get(category);
+        AbstractAdapter adapter = adapterByCategory.get(category);
         if (adapter != null) {
             // Pass the FULL path to the adapter - it handles internal navigation
             adapter.set(path, value);
@@ -313,7 +321,7 @@ public class FieldEditState {
         String[] parts = path.split("\\.", 2);
         String category = parts[0];
         
-        PrimitiveAdapter adapter = adapterByCategory.get(category);
+        AbstractAdapter adapter = adapterByCategory.get(category);
         if (adapter != null) {
             // Pass the FULL path to the adapter - it handles internal navigation
             return adapter.get(path);
@@ -366,6 +374,7 @@ public class FieldEditState {
     public AppearanceAdapter appearanceAdapterObj() { return appearanceAdapter; }
     public VisibilityAdapter visibilityAdapterObj() { return visibilityAdapter; }
     public ArrangementAdapter arrangementAdapterObj() { return arrangementAdapter; }
+    public ShockwaveAdapter shockwaveAdapter() { return shockwaveAdapter; }
     
     // ═══════════════════════════════════════════════════════════════════════════
     // BACKWARD-COMPATIBLE CONFIG ACCESSORS (used by panels and DefinitionBuilder)
@@ -470,11 +479,31 @@ public class FieldEditState {
         lifecycle = net.cyberpunk042.field.influence.LifecycleConfig.DEFAULT;
         forceConfig = null;
         
+        // Reset field-level adapters (not in adapters list since they aren't PrimitiveAdapters)
+        shockwaveAdapter.reset();
+        
         markDirty();
         Logging.GUI.topic("state").info("FieldEditState reset to defaults");
         
         // Notify listeners of full reset (widgets should reinitialize)
         notifyStateChanged(ChangeType.FULL_RESET);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // FIELD DEFINITION INTEGRATION
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Loads shockwave config from a FieldDefinition.
+     * Call this after loading the definition to sync the FX state.
+     */
+    public void loadShockwaveFromDefinition(net.cyberpunk042.field.FieldDefinition def) {
+        if (def != null && def.shockwave() != null) {
+            shockwaveAdapter.loadFromJson(def.shockwave());
+            Logging.GUI.topic("state").debug("Loaded shockwave config from field definition: {}", def.id());
+        } else {
+            shockwaveAdapter.reset();
+        }
     }
     
     // JSON SERIALIZATION (delegates to SerializationManager)

@@ -136,12 +136,12 @@ public class ShockwavePostEffect {
          * @param mainRadius Radius of the central sphere
          * @param orbitalRadius Radius of each orbiting sphere
          * @param orbitDistance Distance from center to orbital centers
-         * @param count Number of orbiting spheres (1-8)
+         * @param count Number of orbiting spheres (1-32)
          */
         public static ShapeConfig orbital(float mainRadius, float orbitalRadius, 
                                           float orbitDistance, int count) {
             return new ShapeConfig(ShapeType.ORBITAL, mainRadius, 0, orbitalRadius, 
-                                   Math.max(1, Math.min(8, count)), orbitDistance);
+                                   Math.max(1, Math.min(32, count)), orbitDistance);  // Match shader cap of 32
         }
     }
     
@@ -297,12 +297,19 @@ public class ShockwavePostEffect {
     private static long beamStartTime = 0;
     private static boolean beamShrinking = false;
     
+    // Retract delay state
+    private static long retractDelayStartTime = 0;
+    private static boolean waitingForRetractDelay = false;
+    
     // Origin mode: CAMERA = rings around player, TARGET = rings around cursor hit point
     public enum OriginMode { CAMERA, TARGET }
     private static OriginMode originMode = OriginMode.CAMERA;
     
     // Target world position (for TARGET mode)
     private static float targetX = 0, targetY = 0, targetZ = 0;
+    
+    // Follow camera flag - when true, the target position updates to camera position each frame
+    private static boolean followCamera = false;
     
     // ═══════════════════════════════════════════════════════════════════════════
     // INITIALIZATION
@@ -485,7 +492,7 @@ public class ShockwavePostEffect {
     
     // Advanced param setters
     public static void setRingCount(int count) {
-        int c = Math.max(1, Math.min(10, count));
+        int c = Math.max(1, Math.min(50, count));  // Match shader cap of 50
         ringParams = new RingParams(ringParams.thickness(), ringParams.intensity(),
             ringParams.animationSpeed(), ringParams.maxRadius(), c, ringParams.spacing(),
             ringParams.glowWidth(), ringParams.contractMode());
@@ -630,6 +637,44 @@ public class ShockwavePostEffect {
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
+    // FOLLOW CAMERA MODE
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Enable or disable follow camera mode.
+     * When enabled, the shockwave target position tracks the camera/player each frame.
+     */
+    public static void setFollowCamera(boolean follow) {
+        followCamera = follow;
+        if (follow) {
+            // Switch to TARGET mode so position updates are used
+            originMode = OriginMode.TARGET;
+        }
+        Logging.RENDER.topic("shockwave_gpu")
+            .kv("followCamera", follow)
+            .info("Follow camera mode {}", follow ? "enabled" : "disabled");
+    }
+    
+    public static boolean isFollowCamera() {
+        return followCamera;
+    }
+    
+    /**
+     * Called each frame from the render mixin to update position if following.
+     * @param camX Camera X position
+     * @param camY Camera Y position  
+     * @param camZ Camera Z position
+     */
+    public static void tickFollowPosition(float camX, float camY, float camZ) {
+        if (followCamera && originMode == OriginMode.TARGET) {
+            // Update target to follow camera/player
+            targetX = camX;
+            targetY = camY;
+            targetZ = camZ;
+        }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
     // SCREEN EFFECTS
     // ═══════════════════════════════════════════════════════════════════════════
     
@@ -740,16 +785,21 @@ public class ShockwavePostEffect {
      * Handles: phase rotation, spawn progress, retract progress.
      */
     public static void tickOrbitalPhase() {
-        if (!enabled) return;
-        
-        // Orbital rotation (always ticks when orbital shape active)
+        // Orbital phase rotation - runs even when disabled for live preview
         if (shapeConfig.type() == ShapeType.ORBITAL) {
             AnimationTimingConfig timing = orbitalEffectConfig.timing();
             
             orbitalPhase += timing.orbitalSpeed();
             if (orbitalPhase > 6.28318f) orbitalPhase -= 6.28318f;
             if (orbitalPhase < 0f) orbitalPhase += 6.28318f;
-            
+        }
+        
+        // Animation (spawn/retract) only runs when enabled
+        if (!enabled) return;
+        
+        // Spawn/retract animation (only when orbital shape active and enabled)
+        if (shapeConfig.type() == ShapeType.ORBITAL) {
+            AnimationTimingConfig timing = orbitalEffectConfig.timing();
             long now = System.currentTimeMillis();
             
             // Spawn/retract animation
@@ -784,10 +834,24 @@ public class ShockwavePostEffect {
                 float linear = Math.min(1f, elapsed / timing.beamShrinkDuration());
                 beamProgress = 1f - applyEasing(linear, timing.beamShrinkEasing());
                 
-                // Beam shrink complete - start retract after delay
+                // Beam shrink complete - start retract delay
                 if (beamProgress <= 0.01f) {
                     beamProgress = 0f;
                     beamShrinking = false;
+                    
+                    // Check if retract delay is needed
+                    if (timing.retractDelay() > 0) {
+                        waitingForRetractDelay = true;
+                        retractDelayStartTime = now;
+                    } else {
+                        startOrbitalRetract();
+                    }
+                }
+            } else if (waitingForRetractDelay) {
+                // Waiting for retract delay to complete
+                float elapsed = now - retractDelayStartTime;
+                if (elapsed >= timing.retractDelay()) {
+                    waitingForRetractDelay = false;
                     startOrbitalRetract();
                 }
             } else if (orbitalSpawnProgress >= 0.99f && beamProgress < 1f && !orbitalRetracting && now >= beamStartTime) {
@@ -900,8 +964,8 @@ public class ShockwavePostEffect {
     // UNIFORM BUFFER CONSTRUCTION - Single source of truth for shader data
     // ═══════════════════════════════════════════════════════════════════════════
     
-    /** Buffer layout: 16 vec4s = 256 bytes (extended for full orbital+beam config) */
-    public static final int VEC4_COUNT = 16;
+    /** Buffer layout: 18 vec4s = 288 bytes (extended for separate beam corona + geometry) */
+    public static final int VEC4_COUNT = 18;
     public static final int BUFFER_SIZE = VEC4_COUNT * 16;
     
     /**
@@ -1028,6 +1092,23 @@ public class ShockwavePostEffect {
         Color4f beamCoronaColor = beamVis.corona().color();
         builder.putVec4(
             beamCoronaColor.r(), beamCoronaColor.g(), beamCoronaColor.b(), beamCoronaColor.a()
+        );
+        
+        // Vec4 16: Beam geometry (width absolute, taper) + retractDelay/padding
+        builder.putVec4(
+            beamVis.width(),   // Absolute width (0 = use widthScale)
+            beamVis.taper(),   // Taper factor (1 = uniform)
+            orbitalEffectConfig.timing().retractDelay(),  // Delay after beam shrink
+            0f  // padding
+        );
+        
+        // Vec4 17: Beam corona settings (separate from orbital)
+        CoronaConfig beamCorona = beamVis.corona();
+        builder.putVec4(
+            beamCorona.width(),
+            beamCorona.intensity(),
+            beamCorona.rimPower(),
+            beamCorona.rimFalloff()
         );
     }
     

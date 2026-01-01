@@ -112,6 +112,18 @@ layout(std140) uniform ShockwaveConfig {
     float BeamCoronaG;
     float BeamCoronaB;
     float BeamCoronaA;
+    
+    // vec4 16: Beam geometry extras
+    float BeamWidthAbs;     // Absolute width (blocks), 0 = use scale
+    float BeamTaper;        // Taper factor (1 = uniform, <1 = narrow top)
+    float RetractDelay;     // ms delay after beam shrinks before retract
+    float _padding16;
+    
+    // vec4 17: Beam corona settings (separate from orbital)
+    float BeamCoronaWidth;
+    float BeamCoronaIntensity;
+    float BeamRimPower;
+    float BeamRimFalloff;
 };
 
 out vec4 fragColor;
@@ -263,7 +275,7 @@ float getShapeDistance(vec3 worldPos, vec3 shapeCenter) {
 float sdfOrbitalSpheresOnly(vec3 p, vec3 center, float orbitalRadius,
                             float orbitDistance, int count, float phase) {
     float d = 1e10;  // Start far away
-    for (int i = 0; i < count && i < 8; i++) {
+    for (int i = 0; i < count && i < 32; i++) {
         vec3 orbPos = getOrbitalPosition(center, i, count, orbitDistance, phase);
         d = min(d, length(p - orbPos) - orbitalRadius);
     }
@@ -279,19 +291,34 @@ float sdfCapsule(vec3 p, vec3 a, vec3 b, float r) {
     return length(p - closest) - r;
 }
 
+// SDF for tapered capsule (cone-like with caps)
+float sdfTaperedCapsule(vec3 p, vec3 a, vec3 b, float rBottom, float rTop) {
+    vec3 ab = b - a;
+    vec3 ap = p - a;
+    float t = clamp(dot(ap, ab) / dot(ab, ab), 0.0, 1.0);
+    float radius = mix(rBottom, rTop, t);  // Interpolate radius along beam
+    vec3 closest = a + t * ab;
+    return length(p - closest) - radius;
+}
+
 // SDF for beams from orbitals to sky
 float sdfBeams(vec3 p, vec3 center, float orbitalRadius, float orbitDistance,
                int count, float phase, float beamHeight) {
     if (beamHeight < 0.1) return 1e10;  // No beam
     
     float d = 1e10;
-    float beamRadius = orbitalRadius * BeamWidthScale;  // Use uniform for width
     
-    for (int i = 0; i < count && i < 8; i++) {
+    // Beam width: use absolute if provided, otherwise scale
+    float baseRadius = (BeamWidthAbs > 0.01) ? BeamWidthAbs : (orbitalRadius * BeamWidthScale);
+    
+    // Taper: 1.0 = uniform, <1 = narrow at top, >1 = wide at top
+    float topRadius = baseRadius * BeamTaper;
+    
+    for (int i = 0; i < count && i < 32; i++) {
         vec3 orbPos = getOrbitalPosition(center, i, count, orbitDistance, phase);
         vec3 beamStart = orbPos;
         vec3 beamEnd = orbPos + vec3(0.0, beamHeight, 0.0);  // Straight up
-        d = min(d, sdfCapsule(p, beamStart, beamEnd, beamRadius));
+        d = min(d, sdfTaperedCapsule(p, beamStart, beamEnd, baseRadius, topRadius));
     }
     return d;
 }
@@ -319,7 +346,9 @@ vec3 calcNormal(vec3 p, vec3 center, float orbitalRadius,
 }
 
 // Raymarch to find orbital/beam hit
-// Returns: vec4(hitDist, rimAmount, 0, 0) - hitDist < 0 means no hit
+// Returns: vec4(hitDist, rimAmount, hitType, didHit) 
+// hitType: 0 = orbital sphere, 1 = beam
+// hitDist < 0 means no hit (but may have corona glow in rimAmount)
 vec4 raymarchOrbitalSpheres(vec3 rayOrigin, vec3 rayDir, float maxDist,
                             vec3 center, float orbitalRadius, float orbitDistance,
                             int count, float phase, float beamHeight) {
@@ -331,11 +360,20 @@ vec4 raymarchOrbitalSpheres(vec3 rayOrigin, vec3 rayDir, float maxDist,
         
         // Hit surface
         if (d < RAYMARCH_EPSILON) {
+            // Determine if we hit beam or orbital by comparing distances
+            float orbDist = sdfOrbitalSpheresOnly(p, center, orbitalRadius, orbitDistance, count, phase);
+            float beamDist = sdfBeams(p, center, orbitalRadius, orbitDistance, count, phase, beamHeight);
+            float hitType = (beamDist < orbDist) ? 1.0 : 0.0;  // 0=orbital, 1=beam
+            
             // Calculate rim/corona based on view angle to normal
             vec3 normal = calcNormal(p, center, orbitalRadius, orbitDistance, count, phase, beamHeight);
             float rim = 1.0 - abs(dot(normal, -rayDir));
-            rim = pow(rim, RimPower);  // Use configurable rim sharpness
-            return vec4(t, rim, 0.0, 1.0);
+            
+            // Use different rim power for beams vs orbitals
+            float rimPwr = (hitType > 0.5) ? BeamRimPower : RimPower;
+            rim = pow(rim, rimPwr);
+            
+            return vec4(t, rim, hitType, 1.0);
         }
         
         // Too far
@@ -497,6 +535,7 @@ void main() {
             if (hitInfo.w > 0.5) {
                 // HIT! Check if orbital is in front of scene geometry (depth test)
                 float hitDist = hitInfo.x;
+                float hitType = hitInfo.z;  // 0=orbital, 1=beam
                 
                 // Only render if orbital is closer than scene OR we're looking at sky
                 bool inFrontOfScene = isAtFarPlane || (hitDist < linearDepth);
@@ -505,16 +544,31 @@ void main() {
                     // Draw sphere/beam with body color and rim corona
                     float rimAmount = hitInfo.y;
                     
-                    // Use orbital corona color
-                    vec3 orbBodyColor = vec3(OrbitalBodyR, OrbitalBodyG, OrbitalBodyB);
-                    vec3 orbCoronaColor = vec3(OrbitalCoronaR, OrbitalCoronaG, OrbitalCoronaB);
+                    // Select colors and alpha based on hit type
+                    vec3 bodyColor, coronaColor;
+                    float alpha, intensity;
                     
-                    // Body color with corona rim
-                    orbitalColor = orbCoronaColor * rimAmount * 2.0 * CoronaIntensity;
-                    orbitalAlpha = 1.0;
+                    if (hitType > 0.5) {
+                        // BEAM hit - use beam colors and alpha
+                        bodyColor = vec3(BeamBodyR, BeamBodyG, BeamBodyB);
+                        coronaColor = vec3(BeamCoronaR, BeamCoronaG, BeamCoronaB);
+                        alpha = BeamCoronaA;
+                        intensity = BeamCoronaIntensity;
+                    } else {
+                        // ORBITAL hit - use orbital colors and alpha
+                        bodyColor = vec3(OrbitalBodyR, OrbitalBodyG, OrbitalBodyB);
+                        coronaColor = vec3(OrbitalCoronaR, OrbitalCoronaG, OrbitalCoronaB);
+                        alpha = OrbitalCoronaA;
+                        intensity = CoronaIntensity;
+                    }
                     
-                    // Override base color with body color (default black)
-                    baseColor = mix(orbBodyColor, orbCoronaColor, rimAmount * 0.8);
+                    // Corona rim effect
+                    orbitalColor = coronaColor * rimAmount * 2.0 * intensity;
+                    orbitalAlpha = alpha;
+                    
+                    // Blend body with scene based on alpha
+                    vec3 solidColor = mix(bodyColor, coronaColor, rimAmount * 0.8);
+                    baseColor = mix(baseColor, solidColor, alpha);
                 }
             } else if (hitInfo.y > 0.01) {
                 // Near miss corona glow - also needs depth check
@@ -533,7 +587,7 @@ void main() {
     // ═══════════════════════════════════════════════════════════════════════
     
     float totalMask = 0.0;
-    int ringCountInt = clamp(int(RingCount), 1, 10);
+    int ringCountInt = clamp(int(RingCount), 1, 50);
     float spacing = max(1.0, RingSpacing);
     float glowW = max(1.0, GlowWidth);  // Glow width from uniform
     

@@ -22,6 +22,7 @@ public final class GuiPacketRegistration {
         PayloadTypeRegistry.playS2C().register(DebugFieldS2CPayload.ID, DebugFieldS2CPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(ServerProfilesS2CPayload.ID, ServerProfilesS2CPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(FieldEditUpdateS2CPayload.ID, FieldEditUpdateS2CPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(ShockwaveTriggerS2CPayload.ID, ShockwaveTriggerS2CPayload.CODEC);
         
         // Client -> Server
         PayloadTypeRegistry.playC2S().register(ProfileSaveC2SPayload.ID, ProfileSaveC2SPayload.CODEC);
@@ -29,8 +30,9 @@ public final class GuiPacketRegistration {
         PayloadTypeRegistry.playC2S().register(DebugFieldC2SPayload.ID, DebugFieldC2SPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(RequestProfilesC2SPayload.ID, RequestProfilesC2SPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(FieldSpawnC2SPayload.ID, FieldSpawnC2SPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(ShockwaveFieldSpawnC2SPayload.ID, ShockwaveFieldSpawnC2SPayload.CODEC);
         
-        Logging.GUI.topic("network").info("GUI packets registered (5 S2C, 5 C2S)");
+        Logging.GUI.topic("network").info("GUI packets registered (6 S2C, 6 C2S)");
     }
     
     /**
@@ -210,6 +212,93 @@ public final class GuiPacketRegistration {
                         }
                     } catch (Exception e) {
                         Logging.GUI.topic("network").error("Failed to spawn field: {}", e.getMessage());
+                        e.printStackTrace();
+                    }
+                });
+            }
+        );
+        
+        // Shockwave field spawn handler - spawn at absolute world coordinates
+        net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.registerGlobalReceiver(
+            ShockwaveFieldSpawnC2SPayload.ID, (payload, context) -> {
+                context.server().execute(() -> {
+                    var player = context.player();
+                    var world = player.getWorld();
+                    
+                    Logging.GUI.topic("network").info(">>> SHOCKWAVE FIELD SPAWN PACKET RECEIVED <<<");
+                    Logging.GUI.topic("network").info("Player {} spawning shockwave field at ({}, {}, {})", 
+                        player.getName().getString(), payload.worldX(), payload.worldY(), payload.worldZ());
+                    
+                    try {
+                        // Parse the field definition from JSON
+                        net.cyberpunk042.field.loader.FieldLoader loader = new net.cyberpunk042.field.loader.FieldLoader();
+                        net.cyberpunk042.field.FieldDefinition definition = loader.parseDefinition(
+                            com.google.gson.JsonParser.parseString(payload.fieldJson()).getAsJsonObject()
+                        );
+                        
+                        if (definition == null) {
+                            Logging.GUI.topic("network").warn("Failed to parse shockwave field definition");
+                            return;
+                        }
+                        
+                        // Create unique ID for this spawn
+                        String fullId = "shockwave_" + java.util.UUID.randomUUID().toString().substring(0, 8) + "_" + System.currentTimeMillis();
+                        net.minecraft.util.Identifier defId = net.minecraft.util.Identifier.of("the-virus-block", fullId);
+                        
+                        // Build the spawn definition with unique ID
+                        net.cyberpunk042.field.FieldDefinition spawnDef = net.cyberpunk042.field.FieldDefinition.builder(fullId)
+                            .type(definition.type())
+                            .baseRadius(definition.baseRadius())
+                            .themeId(definition.themeId())
+                            .layers(definition.layers())
+                            .modifiers(definition.modifiers())
+                            .follow(definition.follow())
+                            .beam(definition.beam())
+                            .bindings(definition.bindings())
+                            .triggers(definition.triggers())
+                            .lifecycle(definition.lifecycle())
+                            .forceConfig(definition.forceConfig())
+                            .build();
+                        net.cyberpunk042.field.FieldRegistry.register(spawnDef);
+                        
+                        // Sync definition to client
+                        String spawnDefJson = spawnDef.toJson().toString();
+                        net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(
+                            player,
+                            new net.cyberpunk042.network.FieldDefinitionSyncPayload(defId.toString(), spawnDefJson)
+                        );
+                        
+                        // Spawn at absolute world position (from raycast)
+                        net.minecraft.util.math.Vec3d spawnPos = new net.minecraft.util.math.Vec3d(
+                            payload.worldX(), payload.worldY(), payload.worldZ());
+                        
+                        // Spawn the field with indefinite duration (shockwave is visual only)
+                        net.cyberpunk042.field.FieldManager manager = net.cyberpunk042.field.FieldManager.get(world);
+                        var instance = manager.spawnAt(defId, spawnPos, 1.0f, 600); // 30 seconds visual duration
+                        
+                        if (instance != null) {
+                            Logging.GUI.topic("network").info("Shockwave field {} spawned at {}", 
+                                instance.id(), spawnPos);
+                            
+                            // Broadcast shockwave trigger to ALL players in range (256 blocks)
+                            var triggerPayload = ShockwaveTriggerS2CPayload.create(
+                                payload.worldX(), payload.worldY(), payload.worldZ(), 
+                                payload.fieldJson());
+                            
+                            for (var targetPlayer : world.getPlayers()) {
+                                double distance = targetPlayer.getPos().distanceTo(spawnPos);
+                                if (distance < 256.0) {
+                                    net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(
+                                        targetPlayer, triggerPayload);
+                                    Logging.GUI.topic("network").debug("Sent shockwave trigger to {} (dist={})", 
+                                        targetPlayer.getName().getString(), distance);
+                                }
+                            }
+                        } else {
+                            Logging.GUI.topic("network").warn("Failed to spawn shockwave field");
+                        }
+                    } catch (Exception e) {
+                        Logging.GUI.topic("network").error("Failed to spawn shockwave field: {}", e.getMessage());
                         e.printStackTrace();
                     }
                 });

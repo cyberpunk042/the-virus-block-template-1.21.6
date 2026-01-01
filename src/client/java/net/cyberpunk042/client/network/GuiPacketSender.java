@@ -82,4 +82,23 @@ public final class GuiPacketSender {
         Logging.GUI.topic("network").info(">>> SENDING FieldSpawnC2SPayload (ID={}) <<<", payload.getId().id());
         ClientPlayNetworking.send(payload);
     }
+    
+    /**
+     * Spawn shockwave field at absolute world coordinates.
+     * 
+     * @param fieldJson Complete field definition JSON (includes shockwave config)
+     * @param worldX Absolute world X position
+     * @param worldY Absolute world Y position
+     * @param worldZ Absolute world Z position
+     * @param sourcePrimitiveRef Reference to source primitive (e.g., "0.0" for layer0.prim0)
+     */
+    public static void spawnShockwaveField(String fieldJson, 
+            float worldX, float worldY, float worldZ, String sourcePrimitiveRef) {
+        Logging.GUI.topic("network").info("Sending shockwave field spawn at ({}, {}, {}) source={}", 
+            worldX, worldY, worldZ, sourcePrimitiveRef);
+        
+        var payload = ShockwaveFieldSpawnC2SPayload.create(
+            fieldJson, worldX, worldY, worldZ, sourcePrimitiveRef);
+        ClientPlayNetworking.send(payload);
+    }
 }

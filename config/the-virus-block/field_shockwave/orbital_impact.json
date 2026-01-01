@@ -1,0 +1,48 @@
+{
+    "name": "Orbital Impact",
+    "description": "Dramatic orbital spheres with beams",
+    "shape": {
+        "type": "ORBITAL",
+        "mainRadius": 1.0,
+        "orbitalCount": 6,
+        "orbitalRadius": 0.3,
+        "orbitDistance": 2.0
+    },
+    "orbital": {
+        "speed": 0.5,
+        "spawnDuration": 0.8,
+        "body": {
+            "r": 0.2,
+            "g": 0.6,
+            "b": 1.0
+        },
+        "corona": {
+            "r": 0.4,
+            "g": 0.8,
+            "b": 1.0,
+            "a": 0.7,
+            "width": 0.2,
+            "intensity": 1.5
+        }
+    },
+    "beam": {
+        "height": 5.0,
+        "width": 0.1,
+        "taper": 0.8,
+        "growDuration": 0.5,
+        "startDelay": 0.3,
+        "body": {
+            "r": 0.3,
+            "g": 0.7,
+            "b": 1.0
+        }
+    },
+    "screen": {
+        "tint": {
+            "r": 0.2,
+            "g": 0.5,
+            "b": 1.0,
+            "amount": 0.15
+        }
+    }
+}

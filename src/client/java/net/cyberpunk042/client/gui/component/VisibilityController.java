@@ -133,6 +133,14 @@ public class VisibilityController {
     }
     
     /**
+     * Returns true if the FX (visual effects) tab should be visible.
+     * Only visible to operators who have unlocked debug mode.
+     */
+    public boolean isFxTabVisible() {
+        return isDebugUnlocked();
+    }
+    
+    /**
      * Returns true if the Profiles tab should be visible.
      * Currently always visible.
      */

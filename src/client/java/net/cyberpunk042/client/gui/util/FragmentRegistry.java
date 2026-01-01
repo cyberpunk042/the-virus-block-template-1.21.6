@@ -64,6 +64,7 @@ public final class FragmentRegistry {
     private static final String PRIMITIVES_FOLDER = "field_primitives";
     private static final String TRANSFORMS_FOLDER = "field_transforms";
     private static final String FORCE_FOLDER = "field_force";
+    private static final String SHOCKWAVE_FOLDER = "field_shockwave";
 
     // Caches: presetName -> JsonObject
     private static final Map<String, Map<String, JsonObject>> shapePresets = new ConcurrentHashMap<>();
@@ -81,6 +82,7 @@ public final class FragmentRegistry {
     private static final Map<String, JsonObject> primitivePresets = new ConcurrentHashMap<>();
     private static final Map<String, JsonObject> transformPresets = new ConcurrentHashMap<>();
     private static final Map<String, JsonObject> forcePresets = new ConcurrentHashMap<>();
+    private static final Map<String, JsonObject> shockwavePresets = new ConcurrentHashMap<>();
 
     private static boolean loaded = false;
 
@@ -111,6 +113,7 @@ public final class FragmentRegistry {
         primitivePresets.clear();
         transformPresets.clear();
         forcePresets.clear();
+        shockwavePresets.clear();
         loaded = false;
         ensureLoaded();
     }
@@ -138,6 +141,7 @@ public final class FragmentRegistry {
         ensureFolder(PRIMITIVES_FOLDER);
         ensureFolder(TRANSFORMS_FOLDER);
         ensureFolder(FORCE_FOLDER);
+        ensureFolder(SHOCKWAVE_FOLDER);
 
         // Load each category
         loadShapeFragments();
@@ -155,6 +159,7 @@ public final class FragmentRegistry {
         loadSimplePresets(PRIMITIVES_FOLDER, primitivePresets);
         loadSimplePresets(TRANSFORMS_FOLDER, transformPresets);
         loadSimplePresets(FORCE_FOLDER, forcePresets);
+        loadSimplePresets(SHOCKWAVE_FOLDER, shockwavePresets);
 
         LOGGER.info("Presets loaded: shapes={}, fills={}, masks={}, arrangements={}, animations={}, beams={}, follow={}, appearances={}, layers={}, links={}, orbits={}, predictions={}, primitives={}, transforms={}",
             shapePresets.values().stream().mapToInt(Map::size).sum(),
@@ -807,6 +812,161 @@ public final class FragmentRegistry {
     public static Optional<JsonObject> getForceJson(String presetName) {
         ensureLoaded();
         return Optional.ofNullable(forcePresets.get(presetName));
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // SHOCKWAVE FRAGMENTS
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Lists available shockwave presets.
+     * Returns preset names suitable for dropdown display.
+     */
+    public static List<String> listShockwaveFragments() {
+        ensureLoaded();
+        return withDefaults(shockwavePresets.keySet());
+    }
+    
+    /**
+     * Apply a shockwave preset to current state.
+     * Replaces the entire shockwave config with the preset values.
+     */
+    public static void applyShockwaveFragment(FieldEditState state, String presetName) {
+        ensureLoaded();
+        if ("Custom".equals(presetName) || "Default".equals(presetName)) {
+            return;
+        }
+
+        JsonObject json = shockwavePresets.get(presetName);
+        if (json == null) {
+            LOGGER.warn("Shockwave preset '{}' not found. Available: {}", presetName, shockwavePresets.keySet());
+            return;
+        }
+
+        // Shape settings
+        if (json.has("shape")) {
+            JsonObject shape = json.getAsJsonObject("shape");
+            if (shape.has("type")) {
+                try {
+                    state.set("shockwave.shapeType", 
+                        net.cyberpunk042.client.visual.shader.ShockwavePostEffect.ShapeType.valueOf(
+                            shape.get("type").getAsString().toUpperCase()));
+                } catch (IllegalArgumentException ignored) {}
+            }
+            if (shape.has("mainRadius")) state.set("shockwave.mainRadius", shape.get("mainRadius").getAsFloat());
+            if (shape.has("orbitalCount")) state.set("shockwave.orbitalCount", shape.get("orbitalCount").getAsInt());
+            if (shape.has("orbitalRadius")) state.set("shockwave.orbitalRadius", shape.get("orbitalRadius").getAsFloat());
+            if (shape.has("orbitDistance")) state.set("shockwave.orbitDistance", shape.get("orbitDistance").getAsFloat());
+        }
+        
+        // Ring settings
+        if (json.has("ring")) {
+            JsonObject ring = json.getAsJsonObject("ring");
+            if (ring.has("count")) state.set("shockwave.ringCount", ring.get("count").getAsInt());
+            if (ring.has("spacing")) state.set("shockwave.ringSpacing", ring.get("spacing").getAsFloat());
+            if (ring.has("thickness")) state.set("shockwave.ringThickness", ring.get("thickness").getAsFloat());
+            if (ring.has("maxRadius")) state.set("shockwave.ringMaxRadius", ring.get("maxRadius").getAsFloat());
+            if (ring.has("speed")) state.set("shockwave.ringSpeed", ring.get("speed").getAsFloat());
+            if (ring.has("glowWidth")) state.set("shockwave.ringGlowWidth", ring.get("glowWidth").getAsFloat());
+            if (ring.has("intensity")) state.set("shockwave.ringIntensity", ring.get("intensity").getAsFloat());
+            if (ring.has("contractMode")) state.set("shockwave.ringContractMode", ring.get("contractMode").getAsBoolean());
+            if (ring.has("color")) {
+                JsonObject color = ring.getAsJsonObject("color");
+                if (color.has("r")) state.set("shockwave.ringColorR", color.get("r").getAsFloat());
+                if (color.has("g")) state.set("shockwave.ringColorG", color.get("g").getAsFloat());
+                if (color.has("b")) state.set("shockwave.ringColorB", color.get("b").getAsFloat());
+                if (color.has("opacity")) state.set("shockwave.ringColorOpacity", color.get("opacity").getAsFloat());
+            }
+        }
+        
+        // Orbital settings
+        if (json.has("orbital")) {
+            JsonObject orbital = json.getAsJsonObject("orbital");
+            if (orbital.has("speed")) state.set("shockwave.orbitalSpeed", orbital.get("speed").getAsFloat());
+            if (orbital.has("spawnDuration")) state.set("shockwave.orbitalSpawnDuration", orbital.get("spawnDuration").getAsFloat());
+            if (orbital.has("retractDuration")) state.set("shockwave.orbitalRetractDuration", orbital.get("retractDuration").getAsFloat());
+            if (orbital.has("body")) {
+                JsonObject body = orbital.getAsJsonObject("body");
+                if (body.has("r")) state.set("shockwave.orbitalBodyR", body.get("r").getAsFloat());
+                if (body.has("g")) state.set("shockwave.orbitalBodyG", body.get("g").getAsFloat());
+                if (body.has("b")) state.set("shockwave.orbitalBodyB", body.get("b").getAsFloat());
+            }
+            if (orbital.has("corona")) {
+                JsonObject corona = orbital.getAsJsonObject("corona");
+                if (corona.has("r")) state.set("shockwave.orbitalCoronaR", corona.get("r").getAsFloat());
+                if (corona.has("g")) state.set("shockwave.orbitalCoronaG", corona.get("g").getAsFloat());
+                if (corona.has("b")) state.set("shockwave.orbitalCoronaB", corona.get("b").getAsFloat());
+                if (corona.has("a")) state.set("shockwave.orbitalCoronaA", corona.get("a").getAsFloat());
+                if (corona.has("width")) state.set("shockwave.orbitalCoronaWidth", corona.get("width").getAsFloat());
+                if (corona.has("intensity")) state.set("shockwave.orbitalCoronaIntensity", corona.get("intensity").getAsFloat());
+            }
+            if (orbital.has("rimPower")) state.set("shockwave.orbitalRimPower", orbital.get("rimPower").getAsFloat());
+            if (orbital.has("rimFalloff")) state.set("shockwave.orbitalRimFalloff", orbital.get("rimFalloff").getAsFloat());
+        }
+        
+        // Beam settings
+        if (json.has("beam")) {
+            JsonObject beam = json.getAsJsonObject("beam");
+            if (beam.has("height")) state.set("shockwave.beamHeight", beam.get("height").getAsFloat());
+            if (beam.has("width")) state.set("shockwave.beamWidth", beam.get("width").getAsFloat());
+            if (beam.has("widthScale")) state.set("shockwave.beamWidthScale", beam.get("widthScale").getAsFloat());
+            if (beam.has("taper")) state.set("shockwave.beamTaper", beam.get("taper").getAsFloat());
+            if (beam.has("growDuration")) state.set("shockwave.beamGrowDuration", beam.get("growDuration").getAsFloat());
+            if (beam.has("shrinkDuration")) state.set("shockwave.beamShrinkDuration", beam.get("shrinkDuration").getAsFloat());
+            if (beam.has("holdDuration")) state.set("shockwave.beamHoldDuration", beam.get("holdDuration").getAsFloat());
+            if (beam.has("startDelay")) state.set("shockwave.beamStartDelay", beam.get("startDelay").getAsFloat());
+            if (beam.has("body")) {
+                JsonObject body = beam.getAsJsonObject("body");
+                if (body.has("r")) state.set("shockwave.beamBodyR", body.get("r").getAsFloat());
+                if (body.has("g")) state.set("shockwave.beamBodyG", body.get("g").getAsFloat());
+                if (body.has("b")) state.set("shockwave.beamBodyB", body.get("b").getAsFloat());
+            }
+            if (beam.has("corona")) {
+                JsonObject corona = beam.getAsJsonObject("corona");
+                if (corona.has("r")) state.set("shockwave.beamCoronaR", corona.get("r").getAsFloat());
+                if (corona.has("g")) state.set("shockwave.beamCoronaG", corona.get("g").getAsFloat());
+                if (corona.has("b")) state.set("shockwave.beamCoronaB", corona.get("b").getAsFloat());
+                if (corona.has("a")) state.set("shockwave.beamCoronaA", corona.get("a").getAsFloat());
+                if (corona.has("width")) state.set("shockwave.beamCoronaWidth", corona.get("width").getAsFloat());
+                if (corona.has("intensity")) state.set("shockwave.beamCoronaIntensity", corona.get("intensity").getAsFloat());
+            }
+            if (beam.has("rimPower")) state.set("shockwave.beamRimPower", beam.get("rimPower").getAsFloat());
+            if (beam.has("rimFalloff")) state.set("shockwave.beamRimFalloff", beam.get("rimFalloff").getAsFloat());
+        }
+        
+        // Timing/Delays
+        if (json.has("timing")) {
+            JsonObject timing = json.getAsJsonObject("timing");
+            if (timing.has("orbitalSpawnDelay")) state.set("shockwave.orbitalSpawnDelay", timing.get("orbitalSpawnDelay").getAsFloat());
+            if (timing.has("retractDelay")) state.set("shockwave.retractDelay", timing.get("retractDelay").getAsFloat());
+            if (timing.has("autoRetractOnRingEnd")) state.set("shockwave.autoRetractOnRingEnd", timing.get("autoRetractOnRingEnd").getAsBoolean());
+        }
+        
+        // Screen effects
+        if (json.has("screen")) {
+            JsonObject screen = json.getAsJsonObject("screen");
+            if (screen.has("blackout")) state.set("shockwave.blackout", screen.get("blackout").getAsFloat());
+            if (screen.has("vignetteAmount")) state.set("shockwave.vignetteAmount", screen.get("vignetteAmount").getAsFloat());
+            if (screen.has("vignetteRadius")) state.set("shockwave.vignetteRadius", screen.get("vignetteRadius").getAsFloat());
+            if (screen.has("tint")) {
+                JsonObject tint = screen.getAsJsonObject("tint");
+                if (tint.has("r")) state.set("shockwave.tintR", tint.get("r").getAsFloat());
+                if (tint.has("g")) state.set("shockwave.tintG", tint.get("g").getAsFloat());
+                if (tint.has("b")) state.set("shockwave.tintB", tint.get("b").getAsFloat());
+                if (tint.has("amount")) state.set("shockwave.tintAmount", tint.get("amount").getAsFloat());
+            }
+        }
+        
+        // Blend
+        if (json.has("blendRadius")) state.set("shockwave.blendRadius", json.get("blendRadius").getAsFloat());
+        
+        // Global scale & positioning
+        if (json.has("globalScale")) state.set("shockwave.globalScale", json.get("globalScale").getAsFloat());
+        if (json.has("followPosition")) state.set("shockwave.followPosition", json.get("followPosition").getAsBoolean());
+        
+        // Notify listeners that a fragment was applied
+        state.notifyStateChanged(ChangeType.FRAGMENT_APPLIED);
+        LOGGER.info("Applied shockwave preset: {}", presetName);
     }
     
 }

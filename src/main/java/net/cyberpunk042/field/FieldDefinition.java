@@ -77,7 +77,8 @@ public record FieldDefinition(
     @JsonField(skipIfEmpty = true) Map<String, BindingConfig> bindings,
     @JsonField(skipIfEmpty = true) List<TriggerConfig> triggers,
     @Nullable @JsonField(skipIfNull = true) LifecycleConfig lifecycle,
-    @Nullable @JsonField(skipIfNull = true) ForceFieldConfig forceConfig
+    @Nullable @JsonField(skipIfNull = true) ForceFieldConfig forceConfig,
+    @Nullable @JsonField(skipIfNull = true) JsonObject shockwave  // Field-level FX effect
 ){
     
     /**
@@ -97,7 +98,7 @@ public record FieldDefinition(
     public static FieldDefinition empty(String id) {
         return new FieldDefinition(
             id, FieldType.SHIELD, 1.0f, null, List.of(),
-            null, null, null, Map.of(), List.of(), null, null);
+            null, null, null, Map.of(), List.of(), null, null, null);
     }
     
     /**
@@ -106,7 +107,7 @@ public record FieldDefinition(
     public static FieldDefinition of(String id, List<FieldLayer> layers) {
         return new FieldDefinition(
             id, FieldType.SHIELD, 1.0f, null, layers,
-            null, null, null, Map.of(), List.of(), null, null);
+            null, null, null, Map.of(), List.of(), null, null, null);
     }
     
     /**
@@ -115,7 +116,7 @@ public record FieldDefinition(
     public static FieldDefinition of(String id, List<FieldLayer> layers, String themeId) {
         return new FieldDefinition(
             id, FieldType.SHIELD, 1.0f, themeId, layers,
-            null, null, null, Map.of(), List.of(), null, null);
+            null, null, null, Map.of(), List.of(), null, null, null);
     }
     
     /**
@@ -161,6 +162,13 @@ public record FieldDefinition(
     }
     
     /**
+     * Whether this field has a shockwave effect configured.
+     */
+    public boolean hasShockwave() {
+        return shockwave != null && shockwave.size() > 0;
+    }
+    
+    /**
      * Serializes this field definition to JSON.
      * 
      * @return JSON representation of this definition
@@ -189,6 +197,7 @@ public record FieldDefinition(
         private List<TriggerConfig> triggers = List.of();
         private LifecycleConfig lifecycle = null;
         private ForceFieldConfig forceConfig = null;
+        private JsonObject shockwave = null;
         
         public Builder(String id) { this.id = id; }
         
@@ -204,12 +213,13 @@ public record FieldDefinition(
         public Builder triggers(List<TriggerConfig> t) { this.triggers = t; return this; }
         public Builder lifecycle(LifecycleConfig l) { this.lifecycle = l; return this; }
         public Builder forceConfig(ForceFieldConfig f) { this.forceConfig = f; return this; }
+        public Builder shockwave(JsonObject s) { this.shockwave = s; return this; }
         
         public FieldDefinition build() {
             return new FieldDefinition(
                 id, type, baseRadius, themeId, layers,
                 modifiers, follow, beam,
-                bindings, triggers, lifecycle, forceConfig);
+                bindings, triggers, lifecycle, forceConfig, shockwave);
         }
     }
 }

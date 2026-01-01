@@ -49,6 +49,7 @@ public class TabBar implements ScreenComponent {
     private ButtonWidget quickTabBtn;
     private ButtonWidget advancedTabBtn;
     private ButtonWidget debugTabBtn;
+    private ButtonWidget fxTabBtn;
     private ButtonWidget profilesTabBtn;
     private DropdownWidget<String> presetDropdown;
     private CyclingButtonWidget<Boolean> rendererModeToggle;
@@ -134,6 +135,18 @@ public class TabBar implements ScreenComponent {
             x += tabWidth + TAB_GAP;
         }
         
+        // FX tab (hidden if not debug unlocked - same as Debug)
+        String fxLabel = useShortLabels ? TabType.FX.shortLabel() : TabType.FX.label();
+        fxTabBtn = ButtonWidget.builder(Text.literal(fxLabel), btn -> switchTab(TabType.FX))
+            .dimensions(x, y, tabWidth, height)
+            .tooltip(Tooltip.of(Text.literal(TabType.FX.tooltip())))
+            .build();
+        fxTabBtn.visible = visibility.isFxTabVisible();
+        widgets.add(fxTabBtn);
+        if (fxTabBtn.visible) {
+            x += tabWidth + TAB_GAP;
+        }
+        
         // Profiles tab (always visible)
         String profLabel = useShortLabels ? TabType.PROFILES.shortLabel() : TabType.PROFILES.label();
         profilesTabBtn = ButtonWidget.builder(Text.literal(profLabel), btn -> switchTab(TabType.PROFILES))
@@ -211,6 +224,7 @@ public class TabBar implements ScreenComponent {
         if (quickTabBtn != null) quickTabBtn.active = currentTab != TabType.QUICK;
         if (advancedTabBtn != null) advancedTabBtn.active = currentTab != TabType.ADVANCED;
         if (debugTabBtn != null) debugTabBtn.active = currentTab != TabType.DEBUG;
+        if (fxTabBtn != null) fxTabBtn.active = currentTab != TabType.FX;
         if (profilesTabBtn != null) profilesTabBtn.active = currentTab != TabType.PROFILES;
     }
     
@@ -221,7 +235,8 @@ public class TabBar implements ScreenComponent {
     public void refreshVisibility() {
         // If current tab is now hidden, switch to Quick first
         if ((currentTab == TabType.ADVANCED && !visibility.isAdvancedTabVisible()) ||
-            (currentTab == TabType.DEBUG && !visibility.isDebugTabVisible())) {
+            (currentTab == TabType.DEBUG && !visibility.isDebugTabVisible()) ||
+            (currentTab == TabType.FX && !visibility.isFxTabVisible())) {
             currentTab = TabType.QUICK;
         }
         // Rebuild to remove hidden tabs completely (no gaps)
