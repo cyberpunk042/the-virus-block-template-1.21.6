@@ -184,10 +184,19 @@ vec3 reconstructWorldPos(vec2 uv, float linearDepth) {
 
 // Smooth minimum - creates unified flowing shapes instead of discrete circles
 // k = blend radius (0 = sharp min, larger = more blending)
+// Creates OUTWARD bulge when shapes overlap
 float smin(float a, float b, float k) {
     if (k < 0.001) return min(a, b);  // Fallback to hard min
     float h = clamp(0.5 + 0.5*(b-a)/k, 0.0, 1.0);
     return mix(b, a, h) - k*h*(1.0-h);
+}
+
+// Smooth maximum - creates INWARD blend (opposite of smin)
+// Shapes unite at intersection without expanding outer envelope
+float smax(float a, float b, float k) {
+    if (k < 0.001) return max(a, b);  // Fallback to hard max
+    float h = clamp(0.5 - 0.5*(b-a)/k, 0.0, 1.0);
+    return mix(b, a, h) + k*h*(1.0-h);
 }
 
 // Point/Sphere: distance from center (POINT has radius=0, SPHERE has radius>0)
@@ -218,17 +227,29 @@ vec3 getOrbitalPosition(vec3 center, int index, int count, float distance, float
 }
 
 // Orbital system: main sphere + N orbiting spheres
-// Uses smin with BlendRadius for unified flowing rings
+// BlendRadius > 0: smin (outward bulge, expands flower pattern)
+// BlendRadius < 0: smax (inward blend, unites center without expanding)
+// BlendRadius = 0: hard union (discrete circles)
 float sdfOrbitalSystem(vec3 p, vec3 center, float mainRadius, float orbitalRadius,
                        float orbitDistance, int count, float phase) {
     // Distance to main sphere
     float d = length(p - center) - mainRadius;
     
-    // Union with each orbital sphere using smooth min for unified flow
+    // Union with each orbital sphere using blend function
     for (int i = 0; i < count && i < 8; i++) {
         vec3 orbPos = getOrbitalPosition(center, i, count, orbitDistance, phase);
         float orbDist = length(p - orbPos) - orbitalRadius;
-        d = smin(d, orbDist, BlendRadius);  // Smooth blend creates unified pattern
+        
+        if (BlendRadius > 0.001) {
+            // Positive: smooth min (outward blend, flower expands)
+            d = smin(d, orbDist, BlendRadius);
+        } else if (BlendRadius < -0.001) {
+            // Negative: smooth max (inward blend, unites at center)
+            d = smax(d, orbDist, -BlendRadius);
+        } else {
+            // Zero: hard union (discrete circles)
+            d = min(d, orbDist);
+        }
     }
     return d;
 }
@@ -562,13 +583,14 @@ void main() {
                         intensity = CoronaIntensity;
                     }
                     
-                    // Corona rim effect
+                    // Corona rim effect (additive glow, uses alpha)
                     orbitalColor = coronaColor * rimAmount * 2.0 * intensity;
                     orbitalAlpha = alpha;
                     
-                    // Blend body with scene based on alpha
+                    // Body is SOLID (fully opaque) - not blended with scene
+                    // Corona rim adds color at the edges
                     vec3 solidColor = mix(bodyColor, coronaColor, rimAmount * 0.8);
-                    baseColor = mix(baseColor, solidColor, alpha);
+                    baseColor = solidColor;  // Fully replace scene color when hit
                 }
             } else if (hitInfo.y > 0.01) {
                 // Near miss corona glow - also needs depth check

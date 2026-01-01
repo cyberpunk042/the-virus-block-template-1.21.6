@@ -5,7 +5,9 @@ import net.cyberpunk042.client.gui.builder.ContentBuilder;
 import net.cyberpunk042.client.gui.state.FieldEditState;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.visual.shader.ShockwavePostEffect;
-import net.cyberpunk042.client.visual.shader.ShockwavePostEffect.ShapeType;
+import net.cyberpunk042.client.visual.shader.shockwave.ShockwaveTypes.ShapeType;
+import net.cyberpunk042.client.visual.shader.shockwave.ShockwaveTypes.OriginMode;
+import net.cyberpunk042.client.visual.shader.shockwave.ShockwaveTypes.EasingType;
 import net.cyberpunk042.log.Logging;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -260,7 +262,7 @@ public class ShockwaveSubPanel extends BoundPanel {
                         String.format("Shockwave @ %.0f, %.0f, %.0f", pos.x, pos.y, pos.z));
                 } else {
                     // No hit - fallback to camera mode
-                    ShockwavePostEffect.setOriginMode(ShockwavePostEffect.OriginMode.CAMERA);
+                    ShockwavePostEffect.setOriginMode(OriginMode.CAMERA);
                     ShockwavePostEffect.trigger();
                     net.cyberpunk042.client.gui.widget.ToastNotification.info("No block hit - using camera mode");
                 }
@@ -335,7 +337,7 @@ public class ShockwaveSubPanel extends BoundPanel {
         // Geometry: OrbitDist | BlendRadius | CoronaWidth (3 sliders)
         content.sliderTriple(
             "OrbDst", "shockwave.orbitDistance", 1f, 500f,
-            "Blend", "shockwave.blendRadius", 0f, 50f,
+            "Blend", "shockwave.blendRadius", -50f, 50f,
             "OrbCorW", "shockwave.orbitalCoronaWidth", 0.5f, 50f
         );
         
@@ -385,7 +387,7 @@ public class ShockwaveSubPanel extends BoundPanel {
         // Row 2: WidthScale | CoronaWidth | CoronaAlpha (3 sliders)
         // Note: WidthScale is only used when Width is 0 (else Width takes priority)
         content.sliderTriple(
-            "WScl", "shockwave.beamWidthScale", 0.1f, 2f,
+            "WScl", "shockwave.beamWidthScale", 0.01f, 2f,
             "BmCorW", "shockwave.beamCoronaWidth", 0.5f, 50f,
             "BmAlph", "shockwave.beamCoronaA", 0f, 1f
         );
@@ -450,6 +452,30 @@ public class ShockwaveSubPanel extends BoundPanel {
         widgets.add(net.cyberpunk042.client.gui.util.GuiWidgets.toggle(x + halfW + GuiConstants.COMPACT_GAP, y, halfW, "AutoRet",
             autoRetr, "Retract when rings end",
             v -> state.set("shockwave.autoRetractOnRingEnd", v)));
+        content.advanceBy(22);
+        
+        // Row 5: Orbital Easing dropdowns (2-column)
+        y = content.getCurrentY();
+        EasingType orbSpawnEase = (EasingType) state.get("shockwave.orbitalSpawnEasing");
+        EasingType orbRetractEase = (EasingType) state.get("shockwave.orbitalRetractEasing");
+        widgets.add(net.cyberpunk042.client.gui.util.GuiWidgets.enumDropdown(x, y, halfW,
+            "OrbSpnEase", EasingType.class, orbSpawnEase, "Orbital spawn easing curve",
+            v -> state.set("shockwave.orbitalSpawnEasing", v)));
+        widgets.add(net.cyberpunk042.client.gui.util.GuiWidgets.enumDropdown(x + halfW + GuiConstants.COMPACT_GAP, y, halfW,
+            "OrbRetEase", EasingType.class, orbRetractEase, "Orbital retract easing curve",
+            v -> state.set("shockwave.orbitalRetractEasing", v)));
+        content.advanceBy(22);
+        
+        // Row 6: Beam Easing dropdowns (2-column)
+        y = content.getCurrentY();
+        EasingType bmGrowEase = (EasingType) state.get("shockwave.beamGrowEasing");
+        EasingType bmShrinkEase = (EasingType) state.get("shockwave.beamShrinkEasing");
+        widgets.add(net.cyberpunk042.client.gui.util.GuiWidgets.enumDropdown(x, y, halfW,
+            "BmGrowEase", EasingType.class, bmGrowEase, "Beam grow easing curve",
+            v -> state.set("shockwave.beamGrowEasing", v)));
+        widgets.add(net.cyberpunk042.client.gui.util.GuiWidgets.enumDropdown(x + halfW + GuiConstants.COMPACT_GAP, y, halfW,
+            "BmShrinkEase", EasingType.class, bmShrinkEase, "Beam shrink easing curve",
+            v -> state.set("shockwave.beamShrinkEasing", v)));
         content.advanceBy(22);
         
         content.gap();

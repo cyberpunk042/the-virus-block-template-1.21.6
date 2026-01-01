@@ -492,7 +492,7 @@ public class PresetRegistry {
         if (json.has("shapeType")) {
             try {
                 state.set("shockwave.shapeType", 
-                    net.cyberpunk042.client.visual.shader.ShockwavePostEffect.ShapeType.valueOf(
+                    net.cyberpunk042.client.visual.shader.shockwave.ShockwaveTypes.ShapeType.valueOf(
                         json.get("shapeType").getAsString().toUpperCase()));
             } catch (IllegalArgumentException ignored) {}
         }

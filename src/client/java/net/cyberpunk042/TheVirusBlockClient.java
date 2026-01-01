@@ -378,7 +378,7 @@ public class TheVirusBlockClient implements ClientModInitializer {
 								} else {
 									// No hit - use camera mode
 									net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setOriginMode(
-										net.cyberpunk042.client.visual.shader.ShockwavePostEffect.OriginMode.CAMERA);
+										net.cyberpunk042.client.visual.shader.shockwave.ShockwaveTypes.OriginMode.CAMERA);
 									net.cyberpunk042.client.visual.shader.ShockwavePostEffect.trigger();
 									ctx.getSource().sendFeedback(
 										net.minecraft.text.Text.literal("§d§lShockwave from camera (no block in range)")
@@ -392,7 +392,7 @@ public class TheVirusBlockClient implements ClientModInitializer {
 						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("camera")
 							.executes(ctx -> {
 								net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setOriginMode(
-									net.cyberpunk042.client.visual.shader.ShockwavePostEffect.OriginMode.CAMERA);
+									net.cyberpunk042.client.visual.shader.shockwave.ShockwaveTypes.OriginMode.CAMERA);
 								ctx.getSource().sendFeedback(
 									net.minecraft.text.Text.literal("§d§lOrigin mode: §fCAMERA (around you)")
 								);
@@ -402,7 +402,7 @@ public class TheVirusBlockClient implements ClientModInitializer {
 						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("target")
 							.executes(ctx -> {
 								net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setOriginMode(
-									net.cyberpunk042.client.visual.shader.ShockwavePostEffect.OriginMode.TARGET);
+									net.cyberpunk042.client.visual.shader.shockwave.ShockwaveTypes.OriginMode.TARGET);
 								ctx.getSource().sendFeedback(
 									net.minecraft.text.Text.literal("§d§lOrigin mode: §fTARGET (use /shockwavegpu cursor)")
 								);

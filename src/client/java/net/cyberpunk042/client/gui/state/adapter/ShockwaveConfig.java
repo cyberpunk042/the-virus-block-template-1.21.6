@@ -1,6 +1,7 @@
 package net.cyberpunk042.client.gui.state.adapter;
 
-import net.cyberpunk042.client.visual.shader.ShockwavePostEffect.ShapeType;
+import net.cyberpunk042.client.visual.shader.shockwave.ShockwaveTypes.ShapeType;
+import net.cyberpunk042.client.visual.shader.shockwave.ShockwaveTypes.EasingType;
 
 /**
  * Shockwave configuration stored in FieldEditState.
@@ -103,6 +104,14 @@ public record ShockwaveConfig(
     float beamLengthGrowFactor,     // 0=instant, 1=gradual
     
     // ═══════════════════════════════════════════════════════════════════════
+    // EASING TYPES
+    // ═══════════════════════════════════════════════════════════════════════
+    EasingType orbitalSpawnEasing,  // Easing for orbital spawn
+    EasingType orbitalRetractEasing,// Easing for orbital retract
+    EasingType beamGrowEasing,      // Easing for beam grow
+    EasingType beamShrinkEasing,    // Easing for beam shrink
+    
+    // ═══════════════════════════════════════════════════════════════════════
     // DELAYS
     // ═══════════════════════════════════════════════════════════════════════
     float orbitalSpawnDelay,        // ms delay before spawn
@@ -139,22 +148,24 @@ public record ShockwaveConfig(
         // Shape
         ShapeType.ORBITAL, 0f, 2f, 10f, 4,
         // Ring geometry & visual
-        10, 8f, 4f, 400f, 15f, 8f, 1f, false,
+        10, 8f, 1f, 400f, 15f, 8f, 1f, false,  // ringThickness=1f (was 4f)
         0f, 1f, 1f, 1f,  // ring color (cyan)
         // Orbital body
-        0f, 0f, 0f,  // black body
+        1f, 1f, 1f,  // WHITE body (was black)
         // Orbital corona
         0f, 1f, 1f, 1f,  // cyan coronaRGBA
-        2f, 1f, 2f, 1f,  // corona width/intensity/rimPower/rimFalloff
+        2f, 0.10f, 2f, 1f,  // corona width/intensity=0.10f (was 1f)/rimPower/rimFalloff
         // Beam geometry
-        100f, 0f, 0.3f, 1f,  // height/width/widthScale/taper
+        100f, 0f, 0.10f, 1f,  // height/width/widthScale=0.10f (was 0.3f)/taper
         // Beam body
-        0f, 0f, 0f,  // black body
+        1f, 1f, 1f,  // WHITE body (was black)
         // Beam corona
         0f, 1f, 1f, 1f,  // cyan coronaRGBA
-        2f, 1f, 2f, 1f,  // corona width/intensity/rimPower/rimFalloff
-        // Animation timing
-        0.008f, 2500f, 1500f, 1500f, 800f, 0f, 0f, 1f,
+        2f, 0.5f, 2f, 1f,  // corona width/intensity=0.5f (was 1f)/rimPower/rimFalloff
+        // Animation timing: orbSpeed, orbSpawnDur, orbRetractDur, beamGrowDur=3000 (was 1500), beamShrinkDur, beamHoldDur, beamWidthGrow, beamLengthGrow
+        0.008f, 2500f, 1500f, 3000f, 800f, 0f, 0f, 1f,
+        // Easing types: orbSpawnEase, orbRetractEase, beamGrowEase, beamShrinkEase
+        EasingType.EASE_OUT, EasingType.EASE_IN, EasingType.EASE_IN, EasingType.EASE_IN,
         // Delays
         0f, 0f, 0f, true,
         // Screen effects
@@ -195,6 +206,7 @@ public record ShockwaveConfig(
         private float orbitalSpeed, orbitalSpawnDuration, orbitalRetractDuration;
         private float beamGrowDuration, beamShrinkDuration, beamHoldDuration;
         private float beamWidthGrowFactor, beamLengthGrowFactor;
+        private EasingType orbitalSpawnEasing, orbitalRetractEasing, beamGrowEasing, beamShrinkEasing;
         private float orbitalSpawnDelay, beamStartDelay, retractDelay;
         private boolean autoRetractOnRingEnd;
         private float blackout, vignetteAmount, vignetteRadius;
@@ -259,6 +271,10 @@ public record ShockwaveConfig(
             this.beamHoldDuration = src.beamHoldDuration;
             this.beamWidthGrowFactor = src.beamWidthGrowFactor;
             this.beamLengthGrowFactor = src.beamLengthGrowFactor;
+            this.orbitalSpawnEasing = src.orbitalSpawnEasing;
+            this.orbitalRetractEasing = src.orbitalRetractEasing;
+            this.beamGrowEasing = src.beamGrowEasing;
+            this.beamShrinkEasing = src.beamShrinkEasing;
             this.orbitalSpawnDelay = src.orbitalSpawnDelay;
             this.beamStartDelay = src.beamStartDelay;
             this.retractDelay = src.retractDelay;
@@ -342,6 +358,12 @@ public record ShockwaveConfig(
         public Builder beamWidthGrowFactor(float v) { this.beamWidthGrowFactor = v; return this; }
         public Builder beamLengthGrowFactor(float v) { this.beamLengthGrowFactor = v; return this; }
         
+        // Easing type setters
+        public Builder orbitalSpawnEasing(EasingType v) { this.orbitalSpawnEasing = v; return this; }
+        public Builder orbitalRetractEasing(EasingType v) { this.orbitalRetractEasing = v; return this; }
+        public Builder beamGrowEasing(EasingType v) { this.beamGrowEasing = v; return this; }
+        public Builder beamShrinkEasing(EasingType v) { this.beamShrinkEasing = v; return this; }
+        
         // Delay setters
         public Builder orbitalSpawnDelay(float v) { this.orbitalSpawnDelay = v; return this; }
         public Builder beamStartDelay(float v) { this.beamStartDelay = v; return this; }
@@ -380,6 +402,7 @@ public record ShockwaveConfig(
                 orbitalSpeed, orbitalSpawnDuration, orbitalRetractDuration,
                 beamGrowDuration, beamShrinkDuration, beamHoldDuration,
                 beamWidthGrowFactor, beamLengthGrowFactor,
+                orbitalSpawnEasing, orbitalRetractEasing, beamGrowEasing, beamShrinkEasing,
                 orbitalSpawnDelay, beamStartDelay, retractDelay, autoRetractOnRingEnd,
                 blackout, vignetteAmount, vignetteRadius, tintR, tintG, tintB, tintAmount,
                 blendRadius,

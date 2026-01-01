@@ -1,7 +1,7 @@
 package net.cyberpunk042.client.gui.state.adapter;
 
 import net.cyberpunk042.client.visual.shader.ShockwavePostEffect;
-import net.cyberpunk042.client.visual.shader.ShockwavePostEffect.*;
+import net.cyberpunk042.client.visual.shader.shockwave.ShockwaveTypes.*;
 import net.cyberpunk042.log.Logging;
 
 /**
@@ -114,6 +114,12 @@ public class ShockwaveAdapter extends AbstractAdapter {
             case "beamHoldDuration" -> config.beamHoldDuration();
             case "beamWidthGrowFactor" -> config.beamWidthGrowFactor();
             case "beamLengthGrowFactor" -> config.beamLengthGrowFactor();
+            
+            // Easing types
+            case "orbitalSpawnEasing" -> config.orbitalSpawnEasing();
+            case "orbitalRetractEasing" -> config.orbitalRetractEasing();
+            case "beamGrowEasing" -> config.beamGrowEasing();
+            case "beamShrinkEasing" -> config.beamShrinkEasing();
             
             // Delays
             case "orbitalSpawnDelay" -> config.orbitalSpawnDelay();
@@ -231,6 +237,24 @@ public class ShockwaveAdapter extends AbstractAdapter {
             case "beamWidthGrowFactor" -> b.beamWidthGrowFactor(toFloat(value));
             case "beamLengthGrowFactor" -> b.beamLengthGrowFactor(toFloat(value));
             
+            // Easing types
+            case "orbitalSpawnEasing" -> {
+                EasingType type = value instanceof EasingType et ? et : EasingType.valueOf(value.toString());
+                b.orbitalSpawnEasing(type);
+            }
+            case "orbitalRetractEasing" -> {
+                EasingType type = value instanceof EasingType et ? et : EasingType.valueOf(value.toString());
+                b.orbitalRetractEasing(type);
+            }
+            case "beamGrowEasing" -> {
+                EasingType type = value instanceof EasingType et ? et : EasingType.valueOf(value.toString());
+                b.beamGrowEasing(type);
+            }
+            case "beamShrinkEasing" -> {
+                EasingType type = value instanceof EasingType et ? et : EasingType.valueOf(value.toString());
+                b.beamShrinkEasing(type);
+            }
+            
             // Delays
             case "orbitalSpawnDelay" -> b.orbitalSpawnDelay(toFloat(value));
             case "beamStartDelay" -> b.beamStartDelay(toFloat(value));
@@ -328,16 +352,16 @@ public class ShockwaveAdapter extends AbstractAdapter {
             config.orbitalSpeed(),
             config.orbitalSpawnDuration(),
             config.orbitalRetractDuration(),
-            EasingType.EASE_OUT,  // TODO: Make configurable
-            EasingType.EASE_IN,
+            config.orbitalSpawnEasing(),
+            config.orbitalRetractEasing(),
             config.beamHeight() * scale,  // Scale beam height
             config.beamGrowDuration(),
             config.beamShrinkDuration(),
             config.beamHoldDuration(),
             config.beamWidthGrowFactor(),
             config.beamLengthGrowFactor(),
-            EasingType.EASE_OUT,
-            EasingType.EASE_IN,
+            config.beamGrowEasing(),
+            config.beamShrinkEasing(),
             config.orbitalSpawnDelay(),
             config.beamStartDelay(),
             config.retractDelay(),
@@ -538,6 +562,12 @@ public class ShockwaveAdapter extends AbstractAdapter {
         json.addProperty("beamWidthGrowFactor", config.beamWidthGrowFactor());
         json.addProperty("beamLengthGrowFactor", config.beamLengthGrowFactor());
         
+        // Easing types
+        json.addProperty("orbitalSpawnEasing", config.orbitalSpawnEasing().name());
+        json.addProperty("orbitalRetractEasing", config.orbitalRetractEasing().name());
+        json.addProperty("beamGrowEasing", config.beamGrowEasing().name());
+        json.addProperty("beamShrinkEasing", config.beamShrinkEasing().name());
+        
         // Delays
         json.addProperty("orbitalSpawnDelay", config.orbitalSpawnDelay());
         json.addProperty("beamStartDelay", config.beamStartDelay());
@@ -649,6 +679,12 @@ public class ShockwaveAdapter extends AbstractAdapter {
         if (json.has("beamHoldDuration")) b.beamHoldDuration(json.get("beamHoldDuration").getAsFloat());
         if (json.has("beamWidthGrowFactor")) b.beamWidthGrowFactor(json.get("beamWidthGrowFactor").getAsFloat());
         if (json.has("beamLengthGrowFactor")) b.beamLengthGrowFactor(json.get("beamLengthGrowFactor").getAsFloat());
+        
+        // Easing types
+        if (json.has("orbitalSpawnEasing")) b.orbitalSpawnEasing(EasingType.valueOf(json.get("orbitalSpawnEasing").getAsString()));
+        if (json.has("orbitalRetractEasing")) b.orbitalRetractEasing(EasingType.valueOf(json.get("orbitalRetractEasing").getAsString()));
+        if (json.has("beamGrowEasing")) b.beamGrowEasing(EasingType.valueOf(json.get("beamGrowEasing").getAsString()));
+        if (json.has("beamShrinkEasing")) b.beamShrinkEasing(EasingType.valueOf(json.get("beamShrinkEasing").getAsString()));
         
         // Delays
         if (json.has("orbitalSpawnDelay")) b.orbitalSpawnDelay(json.get("orbitalSpawnDelay").getAsFloat());

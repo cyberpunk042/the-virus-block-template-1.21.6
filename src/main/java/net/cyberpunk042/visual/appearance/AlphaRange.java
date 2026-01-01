@@ -38,7 +38,7 @@ public record AlphaRange(
     public static final AlphaRange HALF = new AlphaRange(0.5f, 0.5f);
     
     /** Default field alpha. */
-    public static final AlphaRange DEFAULT = new AlphaRange(0.6f, 0.8f);
+    public static final AlphaRange DEFAULT = new AlphaRange(1.0f, 1.0f);
     
     /**
      * Creates a constant alpha.

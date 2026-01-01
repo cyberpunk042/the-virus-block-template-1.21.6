@@ -7,308 +7,49 @@ import net.minecraft.client.render.DefaultFramebufferSet;
 import com.mojang.blaze3d.buffers.Std140Builder;
 import net.minecraft.util.Identifier;
 import net.cyberpunk042.log.Logging;
+import net.cyberpunk042.client.visual.shader.shockwave.ShockwaveTypes.*;
 
 import java.util.Set;
 
 /**
  * Manages the GPU shockwave post-effect.
- * 
- * <p>This uses the MODERN FrameGraphBuilder API to properly access the depth buffer.
- * Unlike the legacy API, this passes depth to the shader correctly.
- * 
- * <p>Commands:
- * <ul>
- *   <li>/shockwavegpu - toggle</li>
- *   <li>/shockwavegpu trigger - start animation</li>
- *   <li>/shockwavegpu radius <n> - set static radius</li>
- *   <li>/shockwavegpu thickness <n> - set ring thickness</li>
- *   <li>/shockwavegpu intensity <n> - set glow intensity</li>
- *   <li>/shockwavegpu speed <n> - set animation speed</li>
- *   <li>/shockwavegpu maxradius <n> - set max animation radius</li>
- * </ul>
+ * Types are defined in ShockwaveTypes (RingParams, ShapeType, OriginMode, etc.)
  */
 public class ShockwavePostEffect {
     
-    private static final Identifier SHADER_ID = 
-        Identifier.of("the-virus-block", "shockwave_ring");
-    
-    // Use the full STAGES set to ensure depth is bound
+    private static final Identifier SHADER_ID = Identifier.of("the-virus-block", "shockwave_ring");
     private static final Set<Identifier> REQUIRED_TARGETS = DefaultFramebufferSet.STAGES;
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // STATE RECORDS - Group related parameters for cleaner code
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    /**
-     * Ring appearance and animation parameters.
-     */
-    public record RingParams(
-        float thickness,      // Ring width (blocks)
-        float intensity,      // Glow intensity (0-2)
-        float animationSpeed, // Blocks per second
-        float maxRadius,      // Auto-stop radius
-        int count,            // Number of concentric rings
-        float spacing,        // Distance between rings (blocks)
-        float glowWidth,      // Glow falloff width (blocks)
-        boolean contractMode  // false = expand, true = contract
-    ) {
-        public static final RingParams DEFAULT = new RingParams(
-            4.0f, 1.0f, 15.0f, 400.0f, 10, 8.0f, 8.0f, false
-        );
-    }
-    
-    /**
-     * Ring coloring (RGB + opacity).
-     */
-    public record RingColor(float r, float g, float b, float opacity) {
-        public static final RingColor DEFAULT = new RingColor(0f, 1f, 1f, 1f); // Cyan
-    }
-    
-    /**
-     * Screen-wide post-processing effects.
-     */
-    public record ScreenEffects(
-        float blackout,        // 0 = no blackout, 1 = full black
-        float vignetteAmount,  // 0 = no vignette, 1 = strong
-        float vignetteRadius,  // Inner radius of vignette
-        float tintR, float tintG, float tintB,
-        float tintAmount       // 0 = no tint, 1 = full tint
-    ) {
-        public static final ScreenEffects NONE = new ScreenEffects(0f, 0f, 0.5f, 1f, 1f, 1f, 0f);
-    }
-    
-    /**
-     * Camera position and orientation state.
-     */
-    public record CameraState(
-        float x, float y, float z,             // Current camera position
-        float forwardX, float forwardY, float forwardZ,  // View direction
-        float frozenX, float frozenY, float frozenZ      // Frozen at raycast time
-    ) {
-        public static final CameraState ORIGIN = new CameraState(0,0,0, 0,0,1, 0,0,0);
-    }
-    
-    /**
-     * Shape type for shockwave emission source.
-     * POINT is the current/default behavior.
-     */
-    public enum ShapeType {
-        POINT(0),      // Current behavior - rings from single point
-        SPHERE(1),     // Rings from sphere surface  
-        TORUS(2),      // Rings from torus (donut) surface
-        POLYGON(3),    // N-sided polygon rings (triangle, square, hex...)
-        ORBITAL(4);    // Main sphere + orbiting spheres
-        
-        private final int shaderCode;
-        ShapeType(int code) { this.shaderCode = code; }
-        public int getShaderCode() { return shaderCode; }
-    }
-    
-    /**
-     * Shape configuration for advanced shockwave emission.
-     */
-    public record ShapeConfig(
-        ShapeType type,
-        float radius,           // Main radius (sphere/polygon)
-        float majorRadius,      // Torus major
-        float minorRadius,      // Torus minor / orbital sphere radius
-        int sideCount,          // Polygon sides / orbital count
-        float orbitDistance     // Distance from center to orbital centers
-    ) {
-        public static final ShapeConfig POINT = new ShapeConfig(
-            ShapeType.POINT, 0f, 0f, 0f, 0, 0f
-        );
-        
-        public static ShapeConfig sphere(float radius) {
-            return new ShapeConfig(ShapeType.SPHERE, radius, 0, 0, 0, 0);
-        }
-        
-        public static ShapeConfig torus(float major, float minor) {
-            return new ShapeConfig(ShapeType.TORUS, 0, major, minor, 0, 0);
-        }
-        
-        public static ShapeConfig polygon(int sides, float radius) {
-            return new ShapeConfig(ShapeType.POLYGON, radius, 0, 0, sides, 0);
-        }
-        
-        /**
-         * Creates an orbital configuration: main sphere + orbiting spheres.
-         * @param mainRadius Radius of the central sphere
-         * @param orbitalRadius Radius of each orbiting sphere
-         * @param orbitDistance Distance from center to orbital centers
-         * @param count Number of orbiting spheres (1-32)
-         */
-        public static ShapeConfig orbital(float mainRadius, float orbitalRadius, 
-                                          float orbitDistance, int count) {
-            return new ShapeConfig(ShapeType.ORBITAL, mainRadius, 0, orbitalRadius, 
-                                   Math.max(1, Math.min(32, count)), orbitDistance);  // Match shader cap of 32
-        }
-    }
     
     // ═══════════════════════════════════════════════════════════════════════════
     // STATE
     // ═══════════════════════════════════════════════════════════════════════════
-
     
     private static boolean enabled = false;
     private static boolean animating = false;
     private static long animationStartTime = 0;
-    
-    // Current animated radius (separate from params because it changes during animation)
     private static float currentRadius = 20.0f;
     
-    // State records - the primary state storage
     private static RingParams ringParams = RingParams.DEFAULT;
     private static RingColor ringColor = RingColor.DEFAULT;
     private static ScreenEffects screenEffects = ScreenEffects.NONE;
     private static CameraState cameraState = CameraState.ORIGIN;
-    private static ShapeConfig shapeConfig = ShapeConfig.POINT;  // Default: current behavior
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // ORBITAL EFFECT CONFIGURATION - Complete control over all visual parameters
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    /** RGB color (0-1 per channel) */
-    public record Color3f(float r, float g, float b) {
-        public static final Color3f BLACK = new Color3f(0f, 0f, 0f);
-        public static final Color3f WHITE = new Color3f(1f, 1f, 1f);
-        public static final Color3f CYAN = new Color3f(0f, 1f, 1f);
-    }
-    
-    /** RGBA color with opacity (0-1 per channel) */
-    public record Color4f(float r, float g, float b, float a) {
-        public static final Color4f CYAN_FULL = new Color4f(0f, 1f, 1f, 1f);
-        public static final Color4f WHITE_FULL = new Color4f(1f, 1f, 1f, 1f);
-    }
-    
-    /** Corona/rim glow effect configuration */
-    public record CoronaConfig(
-        Color4f color,      // Corona RGBA
-        float width,        // Glow spread (blocks)
-        float intensity,    // Brightness multiplier
-        float rimPower,     // Rim sharpness (0.5-5)
-        float rimFalloff    // Rim fade curve (0.5-3)
-    ) {
-        public static final CoronaConfig DEFAULT = new CoronaConfig(
-            Color4f.CYAN_FULL, 2.0f, 1.0f, 2.0f, 1.0f
-        );
-    }
-    
-    /** Orbital sphere visual configuration */
-    public record OrbitalVisualConfig(
-        Color3f bodyColor,      // Sphere body color (usually black)
-        CoronaConfig corona     // Corona/rim glow settings
-    ) {
-        public static final OrbitalVisualConfig DEFAULT = new OrbitalVisualConfig(
-            Color3f.BLACK, CoronaConfig.DEFAULT
-        );
-    }
-    
-    /** Beam visual configuration */
-    public record BeamVisualConfig(
-        Color3f bodyColor,      // Beam body color (usually black)
-        CoronaConfig corona,    // Corona/rim glow settings
-        float width,            // Absolute width (blocks), 0 = use widthScale
-        float widthScale,       // Width as ratio of orbital radius (0.1-1.0)
-        float taper             // Taper factor (1=uniform, <1=narrow top)
-    ) {
-        public static final BeamVisualConfig DEFAULT = new BeamVisualConfig(
-            Color3f.BLACK, CoronaConfig.DEFAULT, 0f, 0.3f, 1.0f
-        );
-    }
-    
-    /** Easing curve types */
-    public enum EasingType { LINEAR, EASE_IN, EASE_OUT, EASE_IN_OUT }
-    
-    /** Animation timing configuration */
-    public record AnimationTimingConfig(
-        // Orbital animation
-        float orbitalSpeed,           // Rotation speed (rad/frame)
-        float orbitalSpawnDuration,   // ms to spawn
-        float orbitalRetractDuration, // ms to retract
-        EasingType orbitalSpawnEasing,
-        EasingType orbitalRetractEasing,
-        
-        // Beam animation
-        float beamHeight,             // Max height (0 = infinity)
-        float beamGrowDuration,       // ms to grow
-        float beamShrinkDuration,     // ms to shrink
-        float beamHoldDuration,       // ms at full height before shrink
-        float beamWidthGrowFactor,    // 0 = fixed, 1 = animated
-        float beamLengthGrowFactor,   // 0 = instant, 1 = gradual
-        EasingType beamGrowEasing,
-        EasingType beamShrinkEasing,
-        
-        // Delays
-        float orbitalSpawnDelay,      // ms delay before spawn
-        float beamStartDelay,         // ms delay after spawn before beam
-        float retractDelay,           // ms delay after beam shrink
-        
-        // Triggers
-        boolean autoRetractOnRingEnd  // Auto-shrink when rings finish
-    ) {
-        public static final AnimationTimingConfig DEFAULT = new AnimationTimingConfig(
-            0.008f,   // orbitalSpeed
-            2500f,    // orbitalSpawnDuration
-            1500f,    // orbitalRetractDuration
-            EasingType.EASE_OUT,
-            EasingType.EASE_IN,
-            100f,     // beamHeight (0 = infinity)
-            1500f,    // beamGrowDuration
-            800f,     // beamShrinkDuration
-            0f,       // beamHoldDuration
-            0f,       // beamWidthGrowFactor (fixed width)
-            1f,       // beamLengthGrowFactor (gradual)
-            EasingType.EASE_OUT,
-            EasingType.EASE_IN,
-            0f,       // orbitalSpawnDelay
-            0f,       // beamStartDelay
-            0f,       // retractDelay
-            true      // autoRetractOnRingEnd
-        );
-    }
-    
-    /** Master configuration combining all orbital effect settings */
-    public record OrbitalEffectConfig(
-        OrbitalVisualConfig orbital,
-        BeamVisualConfig beam,
-        AnimationTimingConfig timing,
-        float blendRadius           // Shape blending (0=sharp, 5+=unified)
-    ) {
-        public static final OrbitalEffectConfig DEFAULT = new OrbitalEffectConfig(
-            OrbitalVisualConfig.DEFAULT,
-            BeamVisualConfig.DEFAULT,
-            AnimationTimingConfig.DEFAULT,
-            3.0f  // blendRadius
-        );
-    }
-    
-    // Current orbital effect config
+    private static ShapeConfig shapeConfig = ShapeConfig.POINT;
     private static OrbitalEffectConfig orbitalEffectConfig = OrbitalEffectConfig.DEFAULT;
     
-    // Orbital animation state (runtime, not config)
-    private static float orbitalPhase = 0f;           // Current rotation angle
-    private static float orbitalSpawnProgress = 0f;   // 0 = hidden, 1 = full
+    // Orbital animation state
+    private static float orbitalPhase = 0f;
+    private static float orbitalSpawnProgress = 0f;
     private static long orbitalSpawnStartTime = 0;
     private static boolean orbitalRetracting = false;
-    
-    // Beam animation state (runtime, not config)
     private static float beamProgress = 0f;
     private static long beamStartTime = 0;
     private static boolean beamShrinking = false;
-    
-    // Retract delay state
     private static long retractDelayStartTime = 0;
     private static boolean waitingForRetractDelay = false;
     
-    // Origin mode: CAMERA = rings around player, TARGET = rings around cursor hit point
-    public enum OriginMode { CAMERA, TARGET }
+    // Origin mode and target
     private static OriginMode originMode = OriginMode.CAMERA;
-    
-    // Target world position (for TARGET mode)
     private static float targetX = 0, targetY = 0, targetZ = 0;
-    
-    // Follow camera flag - when true, the target position updates to camera position each frame
     private static boolean followCamera = false;
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -863,14 +604,9 @@ public class ShockwavePostEffect {
         }
     }
     
-    /** Apply easing curve to a 0-1 linear value */
+    /** Apply easing curve to a 0-1 linear value - delegates to centralized utility */
     private static float applyEasing(float t, EasingType easing) {
-        return switch (easing) {
-            case LINEAR -> t;
-            case EASE_IN -> t * t;
-            case EASE_OUT -> 1f - (1f - t) * (1f - t);
-            case EASE_IN_OUT -> t < 0.5f ? 2f * t * t : 1f - (float) Math.pow(-2f * t + 2f, 2f) / 2f;
-        };
+        return net.cyberpunk042.util.math.EasingFunctions.apply(t, easing.toFunctionType());
     }
     
     /**
@@ -961,155 +697,27 @@ public class ShockwavePostEffect {
     public static float getBeamProgress() { return beamProgress; }
     
     // ═══════════════════════════════════════════════════════════════════════════
-    // UNIFORM BUFFER CONSTRUCTION - Single source of truth for shader data
+    // UNIFORM BUFFER CONSTRUCTION - Delegated to ShockwaveUBOWriter
     // ═══════════════════════════════════════════════════════════════════════════
     
-    /** Buffer layout: 18 vec4s = 288 bytes (extended for separate beam corona + geometry) */
-    public static final int VEC4_COUNT = 18;
-    public static final int BUFFER_SIZE = VEC4_COUNT * 16;
+    /** Buffer layout: 18 vec4s = 288 bytes */
+    public static final int VEC4_COUNT = net.cyberpunk042.client.visual.shader.shockwave.ShockwaveUBOWriter.VEC4_COUNT;
+    public static final int BUFFER_SIZE = net.cyberpunk042.client.visual.shader.shockwave.ShockwaveUBOWriter.BUFFER_SIZE;
     
     /**
      * Writes all shockwave state to a Std140 uniform buffer.
-     * This is the SINGLE SOURCE OF TRUTH for buffer layout.
-     * 
      * @param builder The Std140Builder to write to
      * @param aspectRatio Screen aspect ratio (width/height)  
      * @param fovRadians Field of view in radians
      */
     public static void writeUniformBuffer(Std140Builder builder, float aspectRatio, float fovRadians) {
-        // Vec4 0: Basic params
-        float time = (System.currentTimeMillis() % 10000) / 1000.0f;
-        builder.putVec4(getCurrentRadius(), ringParams.thickness(), ringParams.intensity(), time);
-        
-        // Vec4 1: Ring count, spacing, contract mode, glow width
-        builder.putVec4(
-            (float) ringParams.count(), 
-            ringParams.spacing(),
-            ringParams.contractMode() ? 1.0f : 0.0f, 
-            ringParams.glowWidth()
+        var snapshot = new net.cyberpunk042.client.visual.shader.shockwave.ShockwaveUBOWriter.UBOSnapshot(
+            getCurrentRadius(), ringParams, ringColor, screenEffects,
+            cameraState, isTargetMode(), targetX, targetY, targetZ,
+            shapeConfig, orbitalPhase, orbitalSpawnProgress, beamProgress,
+            orbitalEffectConfig
         );
-        
-        // Vec4 2: Target world position + UseWorldOrigin flag
-        float useWorldOrigin = isTargetMode() ? 1.0f : 0.0f;
-        builder.putVec4(targetX, targetY, targetZ, useWorldOrigin);
-        
-        // Vec4 3: Camera world position + aspect ratio
-        // ALWAYS use CURRENT camera position for ray origin
-        // The TARGET position (for orbital center) is fixed, but rays must originate
-        // from where the camera actually is RIGHT NOW
-        float camX = cameraState.x();
-        float camY = cameraState.y();
-        float camZ = cameraState.z();
-        builder.putVec4(camX, camY, camZ, aspectRatio);
-        
-        // Vec4 4: Camera forward direction + FOV
-        builder.putVec4(
-            cameraState.forwardX(), 
-            cameraState.forwardY(), 
-            cameraState.forwardZ(), 
-            fovRadians
-        );
-        
-        // Vec4 5: Camera up direction (simplified - always world up)
-        builder.putVec4(0f, 1f, 0f, 0f);
-        
-        // Vec4 6: Screen blackout / vignette
-        builder.putVec4(
-            screenEffects.blackout(),
-            screenEffects.vignetteAmount(),
-            screenEffects.vignetteRadius(),
-            0f
-        );
-        
-        // Vec4 7: Color tint
-        builder.putVec4(
-            screenEffects.tintR(),
-            screenEffects.tintG(),
-            screenEffects.tintB(),
-            screenEffects.tintAmount()
-        );
-        
-        // Vec4 8: Ring color
-        builder.putVec4(
-            ringColor.r(),
-            ringColor.g(),
-            ringColor.b(),
-            ringColor.opacity()
-        );
-        
-        // Vec4 9: Shape configuration
-        builder.putVec4(
-            (float) shapeConfig.type().getShaderCode(),
-            shapeConfig.radius(),
-            shapeConfig.majorRadius(),
-            shapeConfig.minorRadius()
-        );
-        
-        // Vec4 10: Shape extras (polygon sides / orbital params)
-        float animatedOrbitDistance = shapeConfig.orbitDistance() * orbitalSpawnProgress;
-        // beamHeight=0 means infinity -> use large value
-        float beamHeight = orbitalEffectConfig.timing().beamHeight();
-        float effectiveBeamHeight = beamHeight <= 0.01f ? 10000f : beamHeight;
-        float animatedBeamHeight = beamProgress * effectiveBeamHeight;
-        builder.putVec4(
-            (float) shapeConfig.sideCount(),  // Polygon sides OR orbital count
-            animatedOrbitDistance,            // Animated distance (0 at spawn, full at end)
-            orbitalPhase,                     // Current rotation angle (radians)
-            animatedBeamHeight                // Beam height (0 when hidden, full when grown)
-        );
-        
-        // Vec4 11: Shared corona config (orbital corona for now, beam will override in shader)
-        CoronaConfig orbCorona = orbitalEffectConfig.orbital().corona();
-        builder.putVec4(
-            orbCorona.width(),
-            orbCorona.intensity(),
-            orbCorona.rimPower(),
-            orbitalEffectConfig.blendRadius()
-        );
-        
-        // Vec4 12: Orbital body color (RGB) + rim falloff
-        Color3f orbBody = orbitalEffectConfig.orbital().bodyColor();
-        builder.putVec4(
-            orbBody.r(), orbBody.g(), orbBody.b(),
-            orbCorona.rimFalloff()
-        );
-        
-        // Vec4 13: Orbital corona color (RGBA)
-        Color4f orbCoronaColor = orbCorona.color();
-        builder.putVec4(
-            orbCoronaColor.r(), orbCoronaColor.g(), orbCoronaColor.b(), orbCoronaColor.a()
-        );
-        
-        // Vec4 14: Beam body color (RGB) + beam width scale
-        Color3f beamBody = orbitalEffectConfig.beam().bodyColor();
-        BeamVisualConfig beamVis = orbitalEffectConfig.beam();
-        builder.putVec4(
-            beamBody.r(), beamBody.g(), beamBody.b(),
-            beamVis.widthScale()
-        );
-        
-        // Vec4 15: Beam corona color (RGBA)
-        Color4f beamCoronaColor = beamVis.corona().color();
-        builder.putVec4(
-            beamCoronaColor.r(), beamCoronaColor.g(), beamCoronaColor.b(), beamCoronaColor.a()
-        );
-        
-        // Vec4 16: Beam geometry (width absolute, taper) + retractDelay/padding
-        builder.putVec4(
-            beamVis.width(),   // Absolute width (0 = use widthScale)
-            beamVis.taper(),   // Taper factor (1 = uniform)
-            orbitalEffectConfig.timing().retractDelay(),  // Delay after beam shrink
-            0f  // padding
-        );
-        
-        // Vec4 17: Beam corona settings (separate from orbital)
-        CoronaConfig beamCorona = beamVis.corona();
-        builder.putVec4(
-            beamCorona.width(),
-            beamCorona.intensity(),
-            beamCorona.rimPower(),
-            beamCorona.rimFalloff()
-        );
+        net.cyberpunk042.client.visual.shader.shockwave.ShockwaveUBOWriter.writeBuffer(builder, snapshot, aspectRatio, fovRadians);
     }
     
     // STATUS STRING (for HUD display)
@@ -1126,27 +734,8 @@ public class ShockwavePostEffect {
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
-    // TEST SEQUENCE - Cycle through configurations to verify all features
+    // TEST SEQUENCE - Delegated to ShockwaveTestPresets
     // ═══════════════════════════════════════════════════════════════════════════
-    
-    private static int testStep = -1;
-    private static final String[] TEST_NAMES = {
-        "1: Basic trigger (cyan)",
-        "2: Red rings",
-        "3: Green rings",
-        "4: Multiple rings (5)",
-        "5: Thick rings",
-        "6: High intensity",
-        "7: Blackout 50%",
-        "8: Vignette effect",
-        "9: Red tint",
-        "10: All screen effects",
-        "11: SPHERE shape (r=5)",
-        "12: TORUS shape (20/3)",
-        "13: POLYGON hex (6 sides)",
-        "14: ORBITAL (4 spheres)",
-        "RESET: Back to defaults"
-    };
     
     /**
      * Cycles to the next test configuration.
@@ -1154,112 +743,21 @@ public class ShockwavePostEffect {
      * @return Description of current test step
      */
     public static String cycleTest() {
-        testStep++;
-        if (testStep >= TEST_NAMES.length) testStep = 0;
-        
-        // Reset to defaults first
-        ringParams = RingParams.DEFAULT;
-        ringColor = RingColor.DEFAULT;
-        screenEffects = ScreenEffects.NONE;
-        shapeConfig = ShapeConfig.POINT;  // Reset shape so each test starts fresh
-        
-        switch (testStep) {
-            case 0 -> {
-                // Basic trigger - default cyan
-                trigger();
-            }
-            case 1 -> {
-                // Red rings
-                ringColor = new RingColor(1f, 0f, 0f, 1f);
-                trigger();
-            }
-            case 2 -> {
-                // Green rings
-                ringColor = new RingColor(0f, 1f, 0f, 1f);
-                trigger();
-            }
-            case 3 -> {
-                // Multiple rings
-                ringParams = new RingParams(ringParams.thickness(), ringParams.intensity(),
-                    ringParams.animationSpeed(), ringParams.maxRadius(), 5, 15f,
-                    ringParams.glowWidth(), ringParams.contractMode());
-                trigger();
-            }
-            case 4 -> {
-                // Thick rings
-                ringParams = new RingParams(10f, ringParams.intensity(),
-                    ringParams.animationSpeed(), ringParams.maxRadius(), ringParams.count(), 
-                    ringParams.spacing(), 15f, ringParams.contractMode());
-                trigger();
-            }
-            case 5 -> {
-                // High intensity
-                ringParams = new RingParams(ringParams.thickness(), 2.5f,
-                    ringParams.animationSpeed(), ringParams.maxRadius(), ringParams.count(), 
-                    ringParams.spacing(), ringParams.glowWidth(), ringParams.contractMode());
-                trigger();
-            }
-            case 6 -> {
-                // Blackout with animation
-                screenEffects = new ScreenEffects(0.5f, 0f, 0.5f, 1f, 1f, 1f, 0f);
-                trigger();
-            }
-            case 7 -> {
-                // Vignette with animation
-                screenEffects = new ScreenEffects(0f, 0.8f, 0.3f, 1f, 1f, 1f, 0f);
-                trigger();
-            }
-            case 8 -> {
-                // Red tint with animation
-                screenEffects = new ScreenEffects(0f, 0f, 0.5f, 1f, 0.3f, 0.3f, 0.7f);
-                trigger();
-            }
-            case 9 -> {
-                // All screen effects
-                screenEffects = new ScreenEffects(0.3f, 0.5f, 0.4f, 1f, 0.5f, 0.8f, 0.5f);
-                ringColor = new RingColor(1f, 0.5f, 0f, 1f); // Orange
-                trigger();
-            }
-            case 10 -> {
-                // Reset to defaults
-                enabled = false;
-            }
-            case 11 -> {
-                // Sphere shape
-                shapeConfig = ShapeConfig.sphere(5f);
-                trigger();
-            }
-            case 12 -> {
-                // Torus shape
-                shapeConfig = ShapeConfig.torus(20f, 3f);
-                trigger();
-            }
-            case 13 -> {
-                // Polygon (hexagon)
-                shapeConfig = ShapeConfig.polygon(6, 15f);
-                trigger();
-            }
-            case 14 -> {
-                // Orbital (4 spheres)
-                shapeConfig = ShapeConfig.orbital(5f, 2f, 15f, 4);
-                trigger();
-            }
-            case 15 -> {
-                // Reset to defaults
-                shapeConfig = ShapeConfig.POINT;
-                enabled = false;
-            }
-        }
-        
-        return TEST_NAMES[testStep];
+        var config = net.cyberpunk042.client.visual.shader.shockwave.ShockwaveTestPresets.cycleNext();
+        ringParams = config.ringParams();
+        ringColor = config.ringColor();
+        screenEffects = config.screenEffects();
+        shapeConfig = config.shapeConfig();
+        if (config.shouldDisable()) enabled = false;
+        if (config.shouldTrigger()) trigger();
+        return config.name();
     }
     
     /**
      * Gets current test step name without cycling.
      */
     public static String getCurrentTestName() {
-        if (testStep < 0 || testStep >= TEST_NAMES.length) return "Use /shockwavegpu test to start";
-        return TEST_NAMES[testStep];
+        return net.cyberpunk042.client.visual.shader.shockwave.ShockwaveTestPresets.getCurrentName();
     }
     
     // ═══════════════════════════════════════════════════════════════════════════

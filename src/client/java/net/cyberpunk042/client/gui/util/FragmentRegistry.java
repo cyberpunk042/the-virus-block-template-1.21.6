@@ -849,7 +849,7 @@ public final class FragmentRegistry {
             if (shape.has("type")) {
                 try {
                     state.set("shockwave.shapeType", 
-                        net.cyberpunk042.client.visual.shader.ShockwavePostEffect.ShapeType.valueOf(
+                        net.cyberpunk042.client.visual.shader.shockwave.ShockwaveTypes.ShapeType.valueOf(
                             shape.get("type").getAsString().toUpperCase()));
                 } catch (IllegalArgumentException ignored) {}
             }
