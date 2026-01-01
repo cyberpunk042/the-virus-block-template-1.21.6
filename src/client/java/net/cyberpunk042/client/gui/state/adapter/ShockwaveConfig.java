@@ -134,6 +134,7 @@ public record ShockwaveConfig(
     // SHAPE BLENDING
     // ═══════════════════════════════════════════════════════════════════════
     float blendRadius,          // Smooth min blend (0=sharp, 5+=unified)
+    boolean combinedMode,       // true = combined shockwave from center, false = individual orbital sources
     
     // ═══════════════════════════════════════════════════════════════════════
     // GLOBAL SCALE & POSITIONING
@@ -172,7 +173,7 @@ public record ShockwaveConfig(
         // Screen effects
         0f, 0f, 0.5f, 1f, 1f, 1f, 0f,
         // Blend
-        0f,
+        0f, true,  // blendRadius, combinedMode (true = combined shockwave from center)
         // Global scale & positioning
         1f, false, 2f  // globalScale, followPosition, cursorYOffset
     );
@@ -213,6 +214,7 @@ public record ShockwaveConfig(
         private float blackout, vignetteAmount, vignetteRadius;
         private float tintR, tintG, tintB, tintAmount;
         private float blendRadius;
+        private boolean combinedMode;
         private float globalScale;
         private boolean followPosition;
         private float cursorYOffset;
@@ -289,6 +291,7 @@ public record ShockwaveConfig(
             this.tintB = src.tintB;
             this.tintAmount = src.tintAmount;
             this.blendRadius = src.blendRadius;
+            this.combinedMode = src.combinedMode;
             this.globalScale = src.globalScale;
             this.followPosition = src.followPosition;
             this.cursorYOffset = src.cursorYOffset;
@@ -384,6 +387,7 @@ public record ShockwaveConfig(
         
         // Blend setter
         public Builder blendRadius(float v) { this.blendRadius = v; return this; }
+        public Builder combinedMode(boolean v) { this.combinedMode = v; return this; }
         
         // Global scale & positioning setters
         public Builder globalScale(float v) { this.globalScale = v; return this; }
@@ -409,7 +413,7 @@ public record ShockwaveConfig(
                 orbitalSpawnEasing, orbitalRetractEasing, beamGrowEasing, beamShrinkEasing,
                 orbitalSpawnDelay, beamStartDelay, retractDelay, autoRetractOnRingEnd,
                 blackout, vignetteAmount, vignetteRadius, tintR, tintG, tintB, tintAmount,
-                blendRadius,
+                blendRadius, combinedMode,
                 globalScale, followPosition, cursorYOffset
             );
         }

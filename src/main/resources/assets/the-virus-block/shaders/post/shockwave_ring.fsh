@@ -117,7 +117,7 @@ layout(std140) uniform ShockwaveConfig {
     float BeamWidthAbs;     // Absolute width (blocks), 0 = use scale
     float BeamTaper;        // Taper factor (1 = uniform, <1 = narrow top)
     float RetractDelay;     // ms delay after beam shrinks before retract
-    float _padding16;
+    float CombinedMode;     // 0 = individual orbital sources, 1 = combined shockwave from center
     
     // vec4 17: Beam corona settings (separate from orbital)
     float BeamCoronaWidth;
@@ -182,21 +182,68 @@ vec3 reconstructWorldPos(vec2 uv, float linearDepth) {
 #define SHAPE_POLYGON  3
 #define SHAPE_ORBITAL  4
 
-// Smooth minimum - creates unified flowing shapes instead of discrete circles
-// k = blend radius (0 = sharp min, larger = more blending)
-// Creates OUTWARD bulge when shapes overlap
-float smin(float a, float b, float k) {
-    if (k < 0.001) return min(a, b);  // Fallback to hard min
-    float h = clamp(0.5 + 0.5*(b-a)/k, 0.0, 1.0);
-    return mix(b, a, h) - k*h*(1.0-h);
+// ═══════════════════════════════════════════════════════════════════════════
+// SDF COMBINATION OPERATIONS (from Ronja's tutorial / hg_sdf library)
+// These properly handle inside/outside/boundary for correct isodistance contours
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Basic merge (union) - hard minimum
+float sdf_merge(float shape1, float shape2) {
+    return min(shape1, shape2);
 }
 
-// Smooth maximum - creates INWARD blend (opposite of smin)
-// Shapes unite at intersection without expanding outer envelope
-float smax(float a, float b, float k) {
-    if (k < 0.001) return max(a, b);  // Fallback to hard max
-    float h = clamp(0.5 - 0.5*(b-a)/k, 0.0, 1.0);
-    return mix(b, a, h) + k*h*(1.0-h);
+// Basic intersect - hard maximum
+float sdf_intersect(float shape1, float shape2) {
+    return max(shape1, shape2);
+}
+
+// Smooth merge (round union) - creates smooth blend at intersection
+// This is the PROPER way to combine SDFs for flower patterns!
+// radius = blend zone size (0 = sharp corners, larger = more rounded)
+float round_merge(float shape1, float shape2, float radius) {
+    if (radius < 0.001) return sdf_merge(shape1, shape2);
+    
+    // Grow shapes by radius, then compute smooth inside distance
+    vec2 intersectionSpace = vec2(shape1 - radius, shape2 - radius);
+    intersectionSpace = min(intersectionSpace, 0.0);
+    float insideDistance = -length(intersectionSpace);
+    
+    // Compute outside distance with proper handling
+    float simpleUnion = sdf_merge(shape1, shape2);
+    float outsideDistance = max(simpleUnion, radius);
+    
+    // Combine for complete SDF
+    return insideDistance + outsideDistance;
+}
+
+// Smooth intersect - rounded intersection
+float round_intersect(float shape1, float shape2, float radius) {
+    if (radius < 0.001) return sdf_intersect(shape1, shape2);
+    
+    vec2 intersectionSpace = vec2(shape1 + radius, shape2 + radius);
+    intersectionSpace = max(intersectionSpace, 0.0);
+    float outsideDistance = length(intersectionSpace);
+    
+    float simpleIntersection = sdf_intersect(shape1, shape2);
+    float insideDistance = min(simpleIntersection, -radius);
+    
+    return outsideDistance + insideDistance;
+}
+
+// Champfer merge - creates beveled/chamfered corners instead of rounded
+float champfer_merge(float shape1, float shape2, float champferSize) {
+    const float SQRT_05 = 0.70710678118;
+    float simpleMerge = sdf_merge(shape1, shape2);
+    float champfer = (shape1 + shape2) * SQRT_05;
+    champfer = champfer - champferSize;
+    return sdf_merge(simpleMerge, champfer);
+}
+
+// Legacy polynomial smooth min (kept for reference/comparison)
+float smin(float a, float b, float k) {
+    if (k < 0.001) return min(a, b);
+    float h = clamp(0.5 + 0.5*(b-a)/k, 0.0, 1.0);
+    return mix(b, a, h) - k*h*(1.0-h);
 }
 
 // Point/Sphere: distance from center (POINT has radius=0, SPHERE has radius>0)
@@ -227,42 +274,124 @@ vec3 getOrbitalPosition(vec3 center, int index, int count, float distance, float
 }
 
 // Orbital system: main sphere + N orbiting spheres
-// BlendRadius > 0: smin (outward bulge, flower expands)
-// BlendRadius < 0: fade out main sphere (keep only orbitals)
-// BlendRadius = 0: hard union (discrete circles)
-float sdfOrbitalSystem(vec3 p, vec3 center, float mainRadius, float orbitalRadius,
-                       float orbitDistance, int count, float phase) {
-    // Compute main sphere distance
-    float mainDist = length(p - center) - mainRadius;
+// mainRadius > 0.1: Include center sphere in SDF (affects flower shape)
+// mainRadius ≈ 0: Orbitals-only (pure flower/petal pattern)
+// BlendRadius > 0: smin (outward bulge, petals merge smoothly)
+// BlendRadius = 0: hard union (discrete orbital circles)
+// BlendRadius < 0: legacy mode (bidirectional waves)
+
+// 2D Orbital system - computes SDF in XZ plane only (like Ronja's tutorial)
+// This produces proper flower-shaped isodistance contours!
+float sdfOrbitalSystem2D(vec2 p, vec2 center, float mainRadius, float orbitalRadius,
+                         float orbitDistance, int count, float phase) {
     
-    // Compute orbitals-only distance (union of all orbital spheres)
-    float orbitalsDist = 1e10;  // Start far away
-    for (int i = 0; i < count && i < 32; i++) {
-        vec3 orbPos = getOrbitalPosition(center, i, count, orbitDistance, phase);
-        float orbDist = length(p - orbPos) - orbitalRadius;
-        orbitalsDist = min(orbitalsDist, orbDist);
+    // Start with either main circle or first orbital
+    float combined;
+    bool hasMainCircle = mainRadius > 0.1;
+    
+    if (hasMainCircle) {
+        // Start with main circle
+        combined = length(p - center) - mainRadius;
+    } else {
+        // Start with first orbital (no main circle)
+        int safeCount = max(1, count);
+        float angle = phase + (0.0 / float(safeCount)) * 6.28318;
+        vec2 firstOrbPos = center + vec2(cos(angle), sin(angle)) * orbitDistance;
+        combined = length(p - firstOrbPos) - orbitalRadius;
     }
     
-    if (BlendRadius > 0.001) {
-        // Positive: smooth min (outward blend, flower expands)
-        // Blend main + orbitals together
-        float d = mainDist;
-        for (int i = 0; i < count && i < 32; i++) {
-            vec3 orbPos = getOrbitalPosition(center, i, count, orbitDistance, phase);
-            float orbDist = length(p - orbPos) - orbitalRadius;
-            d = smin(d, orbDist, BlendRadius);
+    // Determine which combination function to use
+    bool useRoundMerge = BlendRadius > 0.001;
+    
+    // Combine all orbitals into the system
+    int startIdx = hasMainCircle ? 0 : 1;
+    int safeCount = max(1, count);
+    for (int i = startIdx; i < count && i < 32; i++) {
+        float angle = phase + (float(i) / float(safeCount)) * 6.28318;
+        vec2 orbPos = center + vec2(cos(angle), sin(angle)) * orbitDistance;
+        float orbDist = length(p - orbPos) - orbitalRadius;
+        
+        if (useRoundMerge) {
+            // Proper smooth union - creates correct flower contours!
+            combined = round_merge(combined, orbDist, BlendRadius);
+        } else {
+            // Hard union (BlendRadius = 0 or negative)
+            combined = sdf_merge(combined, orbDist);
         }
-        return d;
-    } else if (BlendRadius < -0.001) {
-        // Negative: fade out main sphere, keep only orbitals
-        // -1 = 100% orbitals only, 0 = full system
-        float fadeAmount = clamp(-BlendRadius, 0.0, 1.0);
-        // Mix between full system (main+orbitals) and orbitals-only
-        float fullSystem = min(mainDist, orbitalsDist);
-        return mix(fullSystem, orbitalsDist, fadeAmount);
+    }
+    
+    return combined;
+}
+
+// COMBINED MODE: Distance from center, with flower-shaped radial modulation
+// The center is the SOURCE. Orbitals define the shape of the expanding wave.
+// This creates a single unified shockwave that follows petal curves.
+float sdfCombinedFlower2D(vec2 p, vec2 center, float mainRadius, float orbitalRadius,
+                          float orbitDistance, int count, float phase) {
+    
+    vec2 rel = p - center;
+    float distFromCenter = length(rel);
+    float angle = atan(rel.y, rel.x);
+    
+    // Compute the flower shape radius at this angle
+    // This is the distance from center to the petal boundary at angle θ
+    float petalAngle = 6.28318 / float(max(1, count));
+    
+    // Base radius is orbitDistance, with bumps outward at each petal
+    // The petal tips are at orbitDistance + orbitalRadius
+    // The valleys between petals are at orbitDistance - orbitalRadius (or mainRadius if larger)
+    float petalPhase = mod(angle - phase, petalAngle) - petalAngle * 0.5;
+    float petalInfluence = cos(petalPhase * float(count));  // -1 at valleys, +1 at tips
+    
+    // Compute flower boundary radius at this angle
+    float innerRadius = mainRadius > 0.1 ? mainRadius : (orbitDistance - orbitalRadius);
+    float outerRadius = orbitDistance + orbitalRadius;
+    
+    // Smooth interpolation between inner and outer based on petal influence
+    // petalInfluence goes from -1 (valley) to +1 (tip)
+    float normalized = (petalInfluence + 1.0) * 0.5;  // 0 to 1
+    
+    // Apply blending for smoothness
+    if (BlendRadius > 0.001) {
+        normalized = smoothstep(0.0, 1.0, normalized);
+    }
+    
+    float flowerRadius = mix(innerRadius, outerRadius, normalized);
+    
+    // SDF: negative inside, zero on boundary, positive outside
+    return distFromCenter - flowerRadius;
+}
+
+// 3D wrapper - projects to XZ plane for flower-shaped shockwave contours
+// The Y difference from center adds to the distance for proper 3D falloff
+float sdfOrbitalSystem(vec3 p, vec3 center, float mainRadius, float orbitalRadius,
+                       float orbitDistance, int count, float phase) {
+    
+    vec2 p2D = p.xz;
+    vec2 center2D = center.xz;
+    float dist2D;
+    
+    // CombinedMode > 0.5 = Combined shockwave from center (flower-shaped)
+    // CombinedMode <= 0.5 = Individual orbital sources (legacy SDF union)
+    if (CombinedMode > 0.5) {
+        // COMBINED MODE: Single shockwave from center, shaped like a flower
+        dist2D = sdfCombinedFlower2D(p2D, center2D, mainRadius, orbitalRadius,
+                                      orbitDistance, count, phase);
     } else {
-        // Zero: hard union (discrete circles)
-        return min(mainDist, orbitalsDist);
+        // INDIVIDUAL MODE: Each orbital is its own source (legacy behavior)
+        dist2D = sdfOrbitalSystem2D(p2D, center2D, mainRadius, orbitalRadius,
+                                     orbitDistance, count, phase);
+    }
+    
+    // Add Y-distance contribution for proper 3D behavior
+    float yDiff = abs(p.y - center.y);
+    
+    if (dist2D > 0.0) {
+        // Outside the shape - add 3D falloff
+        return sqrt(dist2D * dist2D + yDiff * yDiff);
+    } else {
+        // Inside the shape - adjust for Y distance
+        return dist2D + yDiff;
     }
 }
 
@@ -288,8 +417,22 @@ float getShapeDistance(vec3 worldPos, vec3 shapeCenter) {
     else if (shapeType == SHAPE_ORBITAL) {
         // Main sphere (ShapeRadius) + orbiting spheres (ShapeMinorR)
         // ShapeSideCount = orbital count, OrbitDistance = distance from center
-        return sdfOrbitalSystem(worldPos, shapeCenter, ShapeRadius, ShapeMinorR,
+        float rawDist = sdfOrbitalSystem(worldPos, shapeCenter, ShapeRadius, ShapeMinorR,
                                 OrbitDistance, int(ShapeSideCount), OrbitalPhase);
+        
+        // OUTWARD-ONLY WAVE MODE (BlendRadius >= 0):
+        // Clamp SDF to max(0, dist) so pixels INSIDE the combined shape
+        // return distance=0. This suppresses inward-propagating shockwave rings.
+        // The flower pattern still forms because the combined boundary is still computed,
+        // but rings only expand OUTWARD from that boundary.
+        //
+        // LEGACY MODE (BlendRadius < 0):
+        // Keep full SDF with negative values inside - waves propagate both directions.
+        if (BlendRadius >= 0.0) {
+            return max(0.0, rawDist);  // Outward waves only
+        } else {
+            return rawDist;  // Full bidirectional waves (legacy)
+        }
     }
     
     // Fallback: point distance

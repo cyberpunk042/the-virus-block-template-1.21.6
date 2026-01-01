@@ -138,6 +138,7 @@ public class ShockwaveAdapter extends AbstractAdapter {
             
             // Blend
             case "blendRadius" -> config.blendRadius();
+            case "combinedMode" -> config.combinedMode();
             
             // Global scale & positioning
             case "globalScale" -> config.globalScale();
@@ -273,6 +274,7 @@ public class ShockwaveAdapter extends AbstractAdapter {
             
             // Blend
             case "blendRadius" -> b.blendRadius(toFloat(value));
+            case "combinedMode" -> b.combinedMode(toBool(value));
             
             // Global scale & positioning
             case "globalScale" -> b.globalScale(toFloat(value));
@@ -377,6 +379,7 @@ public class ShockwaveAdapter extends AbstractAdapter {
         
         // Blend
         ShockwavePostEffect.setBlendRadius(config.blendRadius());
+        ShockwavePostEffect.setCombinedMode(config.combinedMode());
         
         // Follow position
         ShockwavePostEffect.setFollowCamera(config.followPosition());

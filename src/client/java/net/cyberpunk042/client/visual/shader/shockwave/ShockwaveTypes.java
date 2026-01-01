@@ -135,10 +135,10 @@ public final class ShockwaveTypes {
     
     public record OrbitalEffectConfig(
         OrbitalVisualConfig orbital, BeamVisualConfig beam,
-        AnimationTimingConfig timing, float blendRadius
+        AnimationTimingConfig timing, float blendRadius, boolean combinedMode
     ) {
         public static final OrbitalEffectConfig DEFAULT = new OrbitalEffectConfig(
-            OrbitalVisualConfig.DEFAULT, BeamVisualConfig.DEFAULT, AnimationTimingConfig.DEFAULT, 3.0f
+            OrbitalVisualConfig.DEFAULT, BeamVisualConfig.DEFAULT, AnimationTimingConfig.DEFAULT, 3.0f, true
         );
     }
     

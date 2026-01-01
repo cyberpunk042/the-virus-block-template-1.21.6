@@ -639,23 +639,28 @@ public class ShockwavePostEffect {
     public static BeamVisualConfig getBeamVisual() { return orbitalEffectConfig.beam(); }
     public static AnimationTimingConfig getAnimationTiming() { return orbitalEffectConfig.timing(); }
     public static float getBlendRadius() { return orbitalEffectConfig.blendRadius(); }
+    public static boolean getCombinedMode() { return orbitalEffectConfig.combinedMode(); }
     
     // Update entire sub-configs
     public static void setOrbitalVisual(OrbitalVisualConfig v) {
         orbitalEffectConfig = new OrbitalEffectConfig(v, orbitalEffectConfig.beam(), 
-            orbitalEffectConfig.timing(), orbitalEffectConfig.blendRadius());
+            orbitalEffectConfig.timing(), orbitalEffectConfig.blendRadius(), orbitalEffectConfig.combinedMode());
     }
     public static void setBeamVisual(BeamVisualConfig v) {
         orbitalEffectConfig = new OrbitalEffectConfig(orbitalEffectConfig.orbital(), v, 
-            orbitalEffectConfig.timing(), orbitalEffectConfig.blendRadius());
+            orbitalEffectConfig.timing(), orbitalEffectConfig.blendRadius(), orbitalEffectConfig.combinedMode());
     }
     public static void setAnimationTiming(AnimationTimingConfig v) {
         orbitalEffectConfig = new OrbitalEffectConfig(orbitalEffectConfig.orbital(), 
-            orbitalEffectConfig.beam(), v, orbitalEffectConfig.blendRadius());
+            orbitalEffectConfig.beam(), v, orbitalEffectConfig.blendRadius(), orbitalEffectConfig.combinedMode());
     }
     public static void setBlendRadius(float v) {
         orbitalEffectConfig = new OrbitalEffectConfig(orbitalEffectConfig.orbital(), 
-            orbitalEffectConfig.beam(), orbitalEffectConfig.timing(), v);
+            orbitalEffectConfig.beam(), orbitalEffectConfig.timing(), v, orbitalEffectConfig.combinedMode());
+    }
+    public static void setCombinedMode(boolean v) {
+        orbitalEffectConfig = new OrbitalEffectConfig(orbitalEffectConfig.orbital(), 
+            orbitalEffectConfig.beam(), orbitalEffectConfig.timing(), orbitalEffectConfig.blendRadius(), v);
     }
     
     // Convenience setters for frequently-used timing params

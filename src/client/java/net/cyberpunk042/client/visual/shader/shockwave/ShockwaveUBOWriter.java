@@ -172,12 +172,12 @@ public final class ShockwaveUBOWriter {
             beamCoronaColor.r(), beamCoronaColor.g(), beamCoronaColor.b(), beamCoronaColor.a()
         );
         
-        // Vec4 16: Beam geometry (width absolute, taper) + retractDelay/padding
+        // Vec4 16: Beam geometry (width absolute, taper) + retractDelay + combinedMode
         builder.putVec4(
             beamVis.width(),
             beamVis.taper(),
             orbitalEffectConfig.timing().retractDelay(),
-            0f
+            orbitalEffectConfig.combinedMode() ? 1f : 0f
         );
         
         // Vec4 17: Beam corona settings (separate from orbital)

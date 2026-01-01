@@ -33,6 +33,11 @@ public class ShockwaveSubPanel extends BoundPanel {
     
     @Override
     protected void buildContent() {
+        // CRITICAL: Sync adapter config to PostEffect when panel opens.
+        // This ensures the visual effect matches what the GUI shows (defaults).
+        // Without this, the GUI shows "Orbital" but PostEffect might still have old values.
+        state.shockwaveAdapter().syncToPostEffect();
+        
         ContentBuilder content = content(startY);
         
         // Used by trigger buttons
@@ -305,11 +310,22 @@ public class ShockwaveSubPanel extends BoundPanel {
             "B", "shockwave.ringColorB", 0f, 1f
         );
         
-        // Row 4: Opacity + RingSpeed (moved from Animation duplicate)
-        content.sliderPair(
-            "Opac", "shockwave.ringColorOpacity", 0f, 1f,
-            "RngSpd", "shockwave.ringSpeed", 1f, 100f
-        );
+        // Row 4: Opacity | RingSpeed | Combined toggle
+        y = content.getCurrentY();
+        int thirdW2 = (w - GuiConstants.COMPACT_GAP * 2) / 3;
+        int xMid = x + thirdW2 + GuiConstants.COMPACT_GAP;
+        int x3Row4 = xMid + thirdW2 + GuiConstants.COMPACT_GAP;
+        
+        widgets.add(net.cyberpunk042.client.gui.util.GuiWidgets.slider(x, y, thirdW2,
+            "Opac", 0f, 1f, (Float)state.get("shockwave.ringColorOpacity"), "%.2f", "Ring opacity",
+            v -> state.set("shockwave.ringColorOpacity", v)));
+        widgets.add(net.cyberpunk042.client.gui.util.GuiWidgets.slider(xMid, y, thirdW2,
+            "RngSpd", 1f, 100f, (Float)state.get("shockwave.ringSpeed"), "%.1f", "Ring expansion speed",
+            v -> state.set("shockwave.ringSpeed", v)));
+        widgets.add(net.cyberpunk042.client.gui.util.GuiWidgets.toggle(x3Row4, y, thirdW2, "Combined",
+            (Boolean)state.get("shockwave.combinedMode"), "Combined mode: single shockwave from center",
+            v -> state.set("shockwave.combinedMode", v)));
+        content.advanceBy(22);
         
         // Row 5: Polygon Sides (only shown when ShapeType=POLYGON and manual mode)
         ShapeType currentShapeType = (ShapeType) state.get("shockwave.shapeType");
