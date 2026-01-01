@@ -23,7 +23,8 @@
     "WorldRendererDepthTestMixin",
     "WorldRendererShockwaveMixin",
     "ShockwaveTestMixin",
-    "PostEffectPassMixin"
+    "PostEffectPassMixin",
+    "CompiledShaderMixin"
   ],
   "injectors": {
     "defaultRequire": 1

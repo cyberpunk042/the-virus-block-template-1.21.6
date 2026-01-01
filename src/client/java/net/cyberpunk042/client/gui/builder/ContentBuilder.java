@@ -130,6 +130,38 @@ public class ContentBuilder {
     }
     
     /**
+     * Adds a styled section header with a reset button on the right.
+     * When clicked, the reset button executes the provided action.
+     * 
+     * @param text The header text
+     * @param resetAction Action to execute when reset is clicked
+     * @return this builder for chaining
+     */
+    public ContentBuilder sectionHeaderWithReset(String text, Runnable resetAction) {
+        String displayText = "── " + text + " ──";
+        int resetWidth = 30;
+        int headerWidth = availableWidth() - resetWidth - 4;
+        
+        // Header text on the left
+        net.minecraft.client.gui.widget.TextWidget headerWidget = new net.minecraft.client.gui.widget.TextWidget(
+            leftPadding(), currentY + 2, headerWidth, 12,
+            Text.literal(displayText), getTextRenderer()
+        );
+        headerWidget.setTextColor(0xFFFFFF);
+        widgets.add(headerWidget);
+        
+        // Reset button on the right
+        widgets.add(net.minecraft.client.gui.widget.ButtonWidget.builder(
+            Text.literal("↺"), btn -> resetAction.run()
+        ).dimensions(leftPadding() + headerWidth + 4, currentY, resetWidth, 14)
+         .tooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.literal("Reset to defaults")))
+         .build());
+        
+        currentY += 14;
+        return this;
+    }
+    
+    /**
      * Adds a small info text line (for descriptions, hints).
      * Uses gray color, smaller font (75% scale), and compact spacing.
      * 

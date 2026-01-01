@@ -3,6 +3,7 @@ package net.cyberpunk042.client.gui.panel.sub;
 import net.cyberpunk042.client.gui.builder.BoundPanel;
 import net.cyberpunk042.client.gui.builder.ContentBuilder;
 import net.cyberpunk042.client.gui.state.FieldEditState;
+import net.cyberpunk042.client.gui.state.adapter.ShockwaveConfig;
 import net.cyberpunk042.client.gui.util.GuiConstants;
 import net.cyberpunk042.client.visual.shader.ShockwavePostEffect;
 import net.cyberpunk042.client.visual.shader.shockwave.ShockwaveTypes.ShapeType;
@@ -287,7 +288,7 @@ public class ShockwaveSubPanel extends BoundPanel {
         // 1. SHOCKWAVE RINGS - All ring controls consolidated
         // ═══════════════════════════════════════════════════════════════════════
         
-        content.sectionHeader("Rings");
+        content.sectionHeaderWithReset("Rings", this::resetRingsSection);
         
         // Row 1: Count | Spacing | Thickness
         content.sliderTriple(
@@ -347,7 +348,7 @@ public class ShockwaveSubPanel extends BoundPanel {
         boolean isOrbitalMode = currentShapeType == ShapeType.ORBITAL;
         
         if (isOrbitalMode) {
-        content.sectionHeader("Orbital");
+        content.sectionHeaderWithReset("Orbital", this::resetOrbitalSection);
         
         // Geometry: Count | MainR | OrbR (3 sliders)
         content.sliderTriple(
@@ -396,7 +397,7 @@ public class ShockwaveSubPanel extends BoundPanel {
         // BEAMS
         // ═══════════════════════════════════════════════════════════════════════
         
-        content.sectionHeader("Beams");
+        content.sectionHeaderWithReset("Beams", this::resetBeamSection);
         
         // Row 1: Height | Width | Taper
         // Note: Width=0 uses WidthScale proportionally, Width>0 overrides with absolute
@@ -442,7 +443,7 @@ public class ShockwaveSubPanel extends BoundPanel {
         // ANIMATION
         // ═══════════════════════════════════════════════════════════════════════
         
-        content.sectionHeader("Animation");
+        content.sectionHeaderWithReset("Animation", this::resetAnimationSection);
         
         // Row 1: Orbital Spawn | Retract | OrbDelay (3 sliders)
         content.sliderTriple(
@@ -570,4 +571,86 @@ public class ShockwaveSubPanel extends BoundPanel {
     }
     
     public int getHeight() { return contentHeight; }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SECTION RESET HELPERS
+    // Reset specific sections to their DEFAULT values from ShockwaveConfig
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    private void resetRingsSection() {
+        var d = ShockwaveConfig.DEFAULT;
+        state.set("shockwave.ringCount", (float) d.ringCount());
+        state.set("shockwave.ringSpacing", d.ringSpacing());
+        state.set("shockwave.ringThickness", d.ringThickness());
+        state.set("shockwave.ringMaxRadius", d.ringMaxRadius());
+        state.set("shockwave.ringGlowWidth", d.ringGlowWidth());
+        state.set("shockwave.ringIntensity", d.ringIntensity());
+        state.set("shockwave.ringColorR", d.ringColorR());
+        state.set("shockwave.ringColorG", d.ringColorG());
+        state.set("shockwave.ringColorB", d.ringColorB());
+        state.set("shockwave.ringColorOpacity", d.ringColorOpacity());
+        state.set("shockwave.ringSpeed", d.ringSpeed());
+        state.set("shockwave.combinedMode", d.combinedMode());
+        rebuildContent();
+        notifyWidgetsChanged();
+    }
+    
+    private void resetOrbitalSection() {
+        var d = ShockwaveConfig.DEFAULT;
+        state.set("shockwave.orbitalCount", (float) d.orbitalCount());
+        state.set("shockwave.mainRadius", d.mainRadius());
+        state.set("shockwave.orbitalRadius", d.orbitalRadius());
+        state.set("shockwave.orbitDistance", d.orbitDistance());
+        state.set("shockwave.blendRadius", d.blendRadius());
+        state.set("shockwave.orbitalCoronaWidth", d.orbitalCoronaWidth());
+        state.set("shockwave.orbitalBodyR", d.orbitalBodyR());
+        state.set("shockwave.orbitalBodyG", d.orbitalBodyG());
+        state.set("shockwave.orbitalBodyB", d.orbitalBodyB());
+        state.set("shockwave.orbitalCoronaR", d.orbitalCoronaR());
+        state.set("shockwave.orbitalCoronaG", d.orbitalCoronaG());
+        state.set("shockwave.orbitalCoronaB", d.orbitalCoronaB());
+        state.set("shockwave.orbitalCoronaA", d.orbitalCoronaA());
+        state.set("shockwave.orbitalCoronaIntensity", d.orbitalCoronaIntensity());
+        state.set("shockwave.orbitalRimPower", d.orbitalRimPower());
+        state.set("shockwave.orbitalRimFalloff", d.orbitalRimFalloff());
+        rebuildContent();
+        notifyWidgetsChanged();
+    }
+    
+    private void resetBeamSection() {
+        var d = ShockwaveConfig.DEFAULT;
+        state.set("shockwave.beamHeight", d.beamHeight());
+        state.set("shockwave.beamWidth", d.beamWidth());
+        state.set("shockwave.beamWidthScale", d.beamWidthScale());
+        state.set("shockwave.beamTaper", d.beamTaper());
+        state.set("shockwave.beamBodyR", d.beamBodyR());
+        state.set("shockwave.beamBodyG", d.beamBodyG());
+        state.set("shockwave.beamBodyB", d.beamBodyB());
+        state.set("shockwave.beamCoronaR", d.beamCoronaR());
+        state.set("shockwave.beamCoronaG", d.beamCoronaG());
+        state.set("shockwave.beamCoronaB", d.beamCoronaB());
+        state.set("shockwave.beamCoronaA", d.beamCoronaA());
+        state.set("shockwave.beamCoronaWidth", d.beamCoronaWidth());
+        state.set("shockwave.beamCoronaIntensity", d.beamCoronaIntensity());
+        state.set("shockwave.beamRimPower", d.beamRimPower());
+        state.set("shockwave.beamRimFalloff", d.beamRimFalloff());
+        rebuildContent();
+        notifyWidgetsChanged();
+    }
+    
+    private void resetAnimationSection() {
+        var d = ShockwaveConfig.DEFAULT;
+        state.set("shockwave.orbitalSpeed", d.orbitalSpeed());
+        state.set("shockwave.orbitalSpawnDuration", d.orbitalSpawnDuration());
+        state.set("shockwave.orbitalRetractDuration", d.orbitalRetractDuration());
+        state.set("shockwave.beamGrowDuration", d.beamGrowDuration());
+        state.set("shockwave.beamShrinkDuration", d.beamShrinkDuration());
+        state.set("shockwave.beamHoldDuration", d.beamHoldDuration());
+        state.set("shockwave.orbitalSpawnDelay", d.orbitalSpawnDelay());
+        state.set("shockwave.beamStartDelay", d.beamStartDelay());
+        state.set("shockwave.retractDelay", d.retractDelay());
+        state.set("shockwave.autoRetractOnRingEnd", d.autoRetractOnRingEnd());
+        rebuildContent();
+        notifyWidgetsChanged();
+    }
 }
