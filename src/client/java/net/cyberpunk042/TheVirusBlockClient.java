@@ -640,6 +640,125 @@ public class TheVirusBlockClient implements ClientModInitializer {
 							)
 						)
 					)
+				);
+			
+			// ═══════════════════════════════════════════════════════════════════════════
+			// SHADER ANIMATION COMMAND
+			// ═══════════════════════════════════════════════════════════════════════════
+			dispatcher.register(
+				net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("shaderanim")
+					// Status (no args)
+					.executes(ctx -> {
+						String status = net.cyberpunk042.client.visual.shader.ShaderAnimationManager.getStatusString();
+						ctx.getSource().sendFeedback(
+							net.minecraft.text.Text.literal("§d§lShader Animation: §f" + status)
+						);
+						return 1;
+					})
+					// Presets
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("off")
+						.executes(ctx -> {
+							net.cyberpunk042.client.visual.shader.ShaderAnimationManager.setMode(
+								net.cyberpunk042.client.visual.shader.ShaderAnimationManager.PRESET_NONE);
+							ctx.getSource().sendFeedback(
+								net.minecraft.text.Text.literal("§d§lAnimation: §fOFF")
+							);
+							return 1;
+						})
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("breathe")
+						.executes(ctx -> {
+							net.cyberpunk042.client.visual.shader.ShaderAnimationManager.setMode(
+								net.cyberpunk042.client.visual.shader.ShaderAnimationManager.PRESET_BREATHING);
+							ctx.getSource().sendFeedback(
+								net.minecraft.text.Text.literal("§d§lAnimation: §fBreathing (rim + corona)")
+							);
+							return 1;
+						})
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("energy")
+						.executes(ctx -> {
+							net.cyberpunk042.client.visual.shader.ShaderAnimationManager.setMode(
+								net.cyberpunk042.client.visual.shader.ShaderAnimationManager.PRESET_ENERGY);
+							ctx.getSource().sendFeedback(
+								net.minecraft.text.Text.literal("§d§lAnimation: §fEnergy (corona + flicker)")
+							);
+							return 1;
+						})
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("rainbow")
+						.executes(ctx -> {
+							net.cyberpunk042.client.visual.shader.ShaderAnimationManager.setMode(
+								net.cyberpunk042.client.visual.shader.ShaderAnimationManager.PRESET_RAINBOW);
+							ctx.getSource().sendFeedback(
+								net.minecraft.text.Text.literal("§d§lAnimation: §fRainbow (color cycling)")
+							);
+							return 1;
+						})
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("unstable")
+						.executes(ctx -> {
+							net.cyberpunk042.client.visual.shader.ShaderAnimationManager.setMode(
+								net.cyberpunk042.client.visual.shader.ShaderAnimationManager.PRESET_UNSTABLE);
+							ctx.getSource().sendFeedback(
+								net.minecraft.text.Text.literal("§d§lAnimation: §fUnstable (flicker + pulse + wave)")
+							);
+							return 1;
+						})
+					)
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("all")
+						.executes(ctx -> {
+							net.cyberpunk042.client.visual.shader.ShaderAnimationManager.setMode(
+								net.cyberpunk042.client.visual.shader.ShaderAnimationManager.PRESET_ALL);
+							ctx.getSource().sendFeedback(
+								net.minecraft.text.Text.literal("§d§lAnimation: §fALL EFFECTS")
+							);
+							return 1;
+						})
+					)
+					// Speed control
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("speed")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("value",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.1f, 10.0f))
+							.executes(ctx -> {
+								float speed = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "value");
+								net.cyberpunk042.client.visual.shader.ShaderAnimationManager.setSpeed(speed);
+								ctx.getSource().sendFeedback(
+									net.minecraft.text.Text.literal("§d§lAnimation Speed: §f" + speed + "x")
+								);
+								return 1;
+							})
+						)
+					)
+					// Strength control
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("strength")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("value",
+							com.mojang.brigadier.arguments.FloatArgumentType.floatArg(0.0f, 1.0f))
+							.executes(ctx -> {
+								float strength = com.mojang.brigadier.arguments.FloatArgumentType.getFloat(ctx, "value");
+								net.cyberpunk042.client.visual.shader.ShaderAnimationManager.setStrength(strength);
+								ctx.getSource().sendFeedback(
+									net.minecraft.text.Text.literal("§d§lAnimation Strength: §f" + (int)(strength * 100) + "%")
+								);
+								return 1;
+							})
+						)
+					)
+					// Raw mode bitmask
+					.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("mode")
+						.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("bitmask",
+							com.mojang.brigadier.arguments.IntegerArgumentType.integer(0, 63))
+							.executes(ctx -> {
+								int mode = com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "bitmask");
+								net.cyberpunk042.client.visual.shader.ShaderAnimationManager.setMode(mode);
+								ctx.getSource().sendFeedback(
+									net.minecraft.text.Text.literal("§d§lAnimation Mode: §f" + mode + 
+										" (" + net.cyberpunk042.client.visual.shader.ShaderAnimationManager.getModeDescription() + ")")
+								);
+								return 1;
+							})
+						)
+					)
 			);
 		});
 	}

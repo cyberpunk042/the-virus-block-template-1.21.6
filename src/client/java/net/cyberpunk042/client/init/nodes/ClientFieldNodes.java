@@ -227,6 +227,15 @@ public final class ClientFieldNodes {
         "fresnel_shader", "Fresnel Shader",
         () -> {
             net.cyberpunk042.client.visual.shader.FresnelPipelines.init();
+            
+            // Initialize shader animation system (time-based effects)
+            net.cyberpunk042.client.visual.shader.ShaderAnimationManager.init();
+            
+            // Register tick event to update animation time
+            net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
+                client -> net.cyberpunk042.client.visual.shader.ShaderAnimationManager.tick()
+            );
+            
             return 1;
         }
     );

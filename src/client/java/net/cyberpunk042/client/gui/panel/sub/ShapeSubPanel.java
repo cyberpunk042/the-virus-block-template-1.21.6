@@ -1335,6 +1335,111 @@ public class ShapeSubPanel extends AbstractPanel {
             y += step;
         }
         
+        // ─── SHADER ANIMATION SECTION ─────────────────────────────────────────────
+        // (Temporary location - will be moved to Animation panel later)
+        var animHeader = net.minecraft.client.gui.widget.ButtonWidget.builder(
+                net.minecraft.text.Text.literal("── Shader Animation ──"), btn -> {})
+            .dimensions(x, y, w, GuiConstants.COMPACT_HEIGHT)
+            .build();
+        widgets.add(animHeader);
+        y += step;
+        
+        // Get animation state references
+        var animMgr = net.cyberpunk042.client.visual.shader.ShaderAnimationManager.class;
+        int currentMode = net.cyberpunk042.client.visual.shader.ShaderAnimationManager.getMode();
+        
+        // === ROW 1: Preset Quick-Select Buttons ===
+        int thirdW = (w - GuiConstants.PADDING * 2) / 3;
+        
+        var offBtn = net.minecraft.client.gui.widget.ButtonWidget.builder(
+                net.minecraft.text.Text.literal("Off"), btn -> {
+                    net.cyberpunk042.client.visual.shader.ShaderAnimationManager.setMode(
+                        net.cyberpunk042.client.visual.shader.ShaderAnimationManager.PRESET_NONE);
+                })
+            .dimensions(x, y, thirdW, GuiConstants.COMPACT_HEIGHT)
+            .build();
+        widgets.add(offBtn);
+        
+        var breatheBtn = net.minecraft.client.gui.widget.ButtonWidget.builder(
+                net.minecraft.text.Text.literal("Breathe"), btn -> {
+                    net.cyberpunk042.client.visual.shader.ShaderAnimationManager.setMode(
+                        net.cyberpunk042.client.visual.shader.ShaderAnimationManager.PRESET_BREATHING);
+                })
+            .dimensions(x + thirdW + GuiConstants.PADDING, y, thirdW, GuiConstants.COMPACT_HEIGHT)
+            .build();
+        widgets.add(breatheBtn);
+        
+        var allBtn = net.minecraft.client.gui.widget.ButtonWidget.builder(
+                net.minecraft.text.Text.literal("All FX"), btn -> {
+                    net.cyberpunk042.client.visual.shader.ShaderAnimationManager.setMode(
+                        net.cyberpunk042.client.visual.shader.ShaderAnimationManager.PRESET_ALL);
+                })
+            .dimensions(x + (thirdW + GuiConstants.PADDING) * 2, y, thirdW, GuiConstants.COMPACT_HEIGHT)
+            .build();
+        widgets.add(allBtn);
+        y += step;
+        
+        // === ROW 2-3: Individual Mode Toggles (3 per row) ===
+        // Row 2: Corona Breathe, Rim Breathe, Alpha Pulse
+        boolean coronaOn = (currentMode & net.cyberpunk042.client.visual.shader.ShaderAnimationManager.MODE_BREATHE_CORONA) != 0;
+        var coronaToggle = GuiWidgets.toggle(x, y, thirdW, "Corona",
+            coronaOn, "Breathing corona glow",
+            v -> net.cyberpunk042.client.visual.shader.ShaderAnimationManager.toggleMode(
+                net.cyberpunk042.client.visual.shader.ShaderAnimationManager.MODE_BREATHE_CORONA));
+        widgets.add(coronaToggle);
+        
+        boolean rimOn = (currentMode & net.cyberpunk042.client.visual.shader.ShaderAnimationManager.MODE_BREATHE_RIM) != 0;
+        var rimToggle = GuiWidgets.toggle(x + thirdW + GuiConstants.PADDING, y, thirdW, "Rim",
+            rimOn, "Breathing rim lighting",
+            v -> net.cyberpunk042.client.visual.shader.ShaderAnimationManager.toggleMode(
+                net.cyberpunk042.client.visual.shader.ShaderAnimationManager.MODE_BREATHE_RIM));
+        widgets.add(rimToggle);
+        
+        boolean pulseOn = (currentMode & net.cyberpunk042.client.visual.shader.ShaderAnimationManager.MODE_PULSE_ALPHA) != 0;
+        var pulseToggle = GuiWidgets.toggle(x + (thirdW + GuiConstants.PADDING) * 2, y, thirdW, "Pulse",
+            pulseOn, "Alpha pulsing",
+            v -> net.cyberpunk042.client.visual.shader.ShaderAnimationManager.toggleMode(
+                net.cyberpunk042.client.visual.shader.ShaderAnimationManager.MODE_PULSE_ALPHA));
+        widgets.add(pulseToggle);
+        y += step;
+        
+        // Row 3: Rainbow, Flicker, Wave
+        boolean rainbowOn = (currentMode & net.cyberpunk042.client.visual.shader.ShaderAnimationManager.MODE_COLOR_CYCLE) != 0;
+        var rainbowToggle = GuiWidgets.toggle(x, y, thirdW, "Rainbow",
+            rainbowOn, "Color cycling",
+            v -> net.cyberpunk042.client.visual.shader.ShaderAnimationManager.toggleMode(
+                net.cyberpunk042.client.visual.shader.ShaderAnimationManager.MODE_COLOR_CYCLE));
+        widgets.add(rainbowToggle);
+        
+        boolean flickerOn = (currentMode & net.cyberpunk042.client.visual.shader.ShaderAnimationManager.MODE_FLICKER) != 0;
+        var flickerToggle = GuiWidgets.toggle(x + thirdW + GuiConstants.PADDING, y, thirdW, "Flicker",
+            flickerOn, "Energy flicker",
+            v -> net.cyberpunk042.client.visual.shader.ShaderAnimationManager.toggleMode(
+                net.cyberpunk042.client.visual.shader.ShaderAnimationManager.MODE_FLICKER));
+        widgets.add(flickerToggle);
+        
+        boolean waveOn = (currentMode & net.cyberpunk042.client.visual.shader.ShaderAnimationManager.MODE_WAVE_INTENSITY) != 0;
+        var waveToggle = GuiWidgets.toggle(x + (thirdW + GuiConstants.PADDING) * 2, y, thirdW, "Wave",
+            waveOn, "Wave intensity pattern",
+            v -> net.cyberpunk042.client.visual.shader.ShaderAnimationManager.toggleMode(
+                net.cyberpunk042.client.visual.shader.ShaderAnimationManager.MODE_WAVE_INTENSITY));
+        widgets.add(waveToggle);
+        y += step;
+        
+        // === ROW 4: Speed + Strength sliders ===
+        float animSpeed = net.cyberpunk042.client.visual.shader.ShaderAnimationManager.getSpeed();
+        var speedSlider = GuiWidgets.slider(x, y, halfW,
+            "Speed", 0.1f, 5f, animSpeed, "%.1fx", "Animation speed multiplier",
+            v -> net.cyberpunk042.client.visual.shader.ShaderAnimationManager.setSpeed(v));
+        widgets.add(speedSlider);
+        
+        float animStrength = net.cyberpunk042.client.visual.shader.ShaderAnimationManager.getStrength();
+        var strengthSlider = GuiWidgets.slider(x + halfW + GuiConstants.PADDING, y, halfW,
+            "Strength", 0f, 1f, animStrength, "%.0f%%", "Animation amplitude",
+            v -> net.cyberpunk042.client.visual.shader.ShaderAnimationManager.setStrength(v));
+        widgets.add(strengthSlider);
+        y += step;
+        
         return y;
     }
     

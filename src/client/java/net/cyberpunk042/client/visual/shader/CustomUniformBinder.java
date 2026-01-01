@@ -106,7 +106,7 @@ public final class CustomUniformBinder {
      * @param renderPass The active RenderPass
      */
     public static void bindCustomUniforms(RenderPass renderPass) {
-        // Bind Fresnel/Horizon if set
+        // Bind Fresnel/Horizon if set (now includes animation params in the UBO)
         if (currentHorizon != null) {
             bindFresnelParams(renderPass, currentHorizon);
         }
@@ -171,14 +171,14 @@ public final class CustomUniformBinder {
     }
     
     /**
-     * Binds FresnelParams uniform buffer with BOTH Horizon AND Corona parameters.
-     * Since Corona UBO binding doesn't work as a separate pass, we combine them.
+     * Binds FresnelParams uniform buffer with Horizon, Corona, AND Animation parameters.
+     * Since all params go to the same UBO, we combine them in one call.
      */
     private static void bindFresnelParams(RenderPass renderPass, HorizonEffect effect) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            // Combined buffer: 6 x vec4 = 96 bytes
-            // 2 for Horizon + 4 for Corona
-            Std140Builder builder = Std140Builder.onStack(stack, 96);
+            // Combined buffer: 7 x vec4 = 112 bytes
+            // 2 for Horizon + 3 for Corona + 1 for Animation
+            Std140Builder builder = Std140Builder.onStack(stack, 112);
             
             // === HORIZON (Rim Lighting) ===
             // vec4 RimColorAndPower (rgb = color, w = power)
@@ -230,6 +230,15 @@ public final class CustomUniformBinder {
                 builder.putVec4(0f, 0f, 0f, 0f);
                 builder.putVec4(0f, 0f, 0f, 0f);
             }
+            
+            // === ANIMATION (Time-based effects) ===
+            // vec4 AnimationParams: x=time, y=mode (as float), z=speed, w=strength
+            float time = ShaderAnimationManager.getTime();
+            int mode = ShaderAnimationManager.getMode();
+            float speed = ShaderAnimationManager.getSpeed();
+            float strength = ShaderAnimationManager.getStrength();
+            
+            builder.putVec4(time, (float)mode, speed, strength);
             
             // Upload buffer to GPU and bind
             GpuBuffer gpuBuffer = RenderSystem.getDevice().createBuffer(
