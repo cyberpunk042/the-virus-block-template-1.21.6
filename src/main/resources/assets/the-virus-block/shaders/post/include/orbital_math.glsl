@@ -137,9 +137,45 @@ float sdfOrbitalSystem(vec3 p, vec3 center, float mainRadius, float orbitalRadiu
     // CombinedMode > 0.5 = Combined shockwave from center (flower-shaped)
     // CombinedMode <= 0.5 = Individual orbital sources (legacy SDF union)
     if (CombinedMode > 0.5) {
-        // COMBINED MODE: Single shockwave from center, shaped like a flower
-        dist2D = sdfCombinedFlower2D(p2D, center2D, mainRadius, orbitalRadius,
-                                      orbitDistance, count, phase);
+        // COMBINED MODE: Single shockwave from center
+        // 
+        // KEY INSIGHT: Like non-combined mode, we want the wave to naturally
+        // become circular as it travels farther from the source. This happens
+        // automatically with SDF unions, but we need to simulate it here.
+        //
+        // Strategy: Blend from flower shape to circle based on ACTUAL distance
+        // from center compared to the flower's size.
+        
+        // Compute flower-shaped distance (petal contours)
+        float flowerDist = sdfCombinedFlower2D(p2D, center2D, mainRadius, orbitalRadius,
+                                               orbitDistance, count, phase);
+        
+        // Compute simple circular distance (unified wave from outer petal tips)
+        float outerRadius = orbitDistance + orbitalRadius;
+        float circleDist = length(p2D - center2D) - outerRadius;
+        
+        // Actual distance from center (not the SDF, the raw distance)
+        float actualDist = length(p2D - center2D);
+        
+        // AUTOMATIC CIRCULARIZATION based on distance:
+        // - At actualDist <= outerRadius: pure flower shape (we're near/inside the source)
+        // - At actualDist = outerRadius * 2: 50% blend
+        // - At actualDist >= outerRadius * 3: fully circular (far from source)
+        //
+        // BlendRadius can adjust the transition speed:
+        //   BlendRadius = 0: default transition (circular at 3x flower size)
+        //   BlendRadius > 0: faster transition (becomes circular sooner)
+        //   BlendRadius < 0: slower transition (stays flower-shaped longer)
+        
+        float transitionScale = 3.0 - (BlendRadius / 25.0);  // BlendRadius=50 -> 1x, BlendRadius=-50 -> 5x
+        transitionScale = max(1.5, transitionScale);  // Never blend before 1.5x the flower size
+        
+        float blendStart = outerRadius;
+        float blendEnd = outerRadius * transitionScale;
+        
+        float circleBlend = smoothstep(blendStart, blendEnd, actualDist);
+        
+        dist2D = mix(flowerDist, circleDist, circleBlend);
     } else {
         // INDIVIDUAL MODE: Each orbital is its own source (legacy behavior)
         dist2D = sdfOrbitalSystem2D(p2D, center2D, mainRadius, orbitalRadius,
