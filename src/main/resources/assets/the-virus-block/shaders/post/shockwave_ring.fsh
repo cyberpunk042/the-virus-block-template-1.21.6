@@ -227,31 +227,43 @@ vec3 getOrbitalPosition(vec3 center, int index, int count, float distance, float
 }
 
 // Orbital system: main sphere + N orbiting spheres
-// BlendRadius > 0: smin (outward bulge, expands flower pattern)
-// BlendRadius < 0: smax (inward blend, unites center without expanding)
+// BlendRadius > 0: smin (outward bulge, flower expands)
+// BlendRadius < 0: fade out main sphere (keep only orbitals)
 // BlendRadius = 0: hard union (discrete circles)
 float sdfOrbitalSystem(vec3 p, vec3 center, float mainRadius, float orbitalRadius,
                        float orbitDistance, int count, float phase) {
-    // Distance to main sphere
-    float d = length(p - center) - mainRadius;
+    // Compute main sphere distance
+    float mainDist = length(p - center) - mainRadius;
     
-    // Union with each orbital sphere using blend function
-    for (int i = 0; i < count && i < 8; i++) {
+    // Compute orbitals-only distance (union of all orbital spheres)
+    float orbitalsDist = 1e10;  // Start far away
+    for (int i = 0; i < count && i < 32; i++) {
         vec3 orbPos = getOrbitalPosition(center, i, count, orbitDistance, phase);
         float orbDist = length(p - orbPos) - orbitalRadius;
-        
-        if (BlendRadius > 0.001) {
-            // Positive: smooth min (outward blend, flower expands)
-            d = smin(d, orbDist, BlendRadius);
-        } else if (BlendRadius < -0.001) {
-            // Negative: smooth max (inward blend, unites at center)
-            d = smax(d, orbDist, -BlendRadius);
-        } else {
-            // Zero: hard union (discrete circles)
-            d = min(d, orbDist);
-        }
+        orbitalsDist = min(orbitalsDist, orbDist);
     }
-    return d;
+    
+    if (BlendRadius > 0.001) {
+        // Positive: smooth min (outward blend, flower expands)
+        // Blend main + orbitals together
+        float d = mainDist;
+        for (int i = 0; i < count && i < 32; i++) {
+            vec3 orbPos = getOrbitalPosition(center, i, count, orbitDistance, phase);
+            float orbDist = length(p - orbPos) - orbitalRadius;
+            d = smin(d, orbDist, BlendRadius);
+        }
+        return d;
+    } else if (BlendRadius < -0.001) {
+        // Negative: fade out main sphere, keep only orbitals
+        // -1 = 100% orbitals only, 0 = full system
+        float fadeAmount = clamp(-BlendRadius, 0.0, 1.0);
+        // Mix between full system (main+orbitals) and orbitals-only
+        float fullSystem = min(mainDist, orbitalsDist);
+        return mix(fullSystem, orbitalsDist, fadeAmount);
+    } else {
+        // Zero: hard union (discrete circles)
+        return min(mainDist, orbitalsDist);
+    }
 }
 
 // Main dispatch - returns distance from worldPos to the shape surface

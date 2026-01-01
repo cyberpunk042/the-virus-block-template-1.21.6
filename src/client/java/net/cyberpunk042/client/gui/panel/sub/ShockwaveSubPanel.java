@@ -247,19 +247,22 @@ public class ShockwaveSubPanel extends BoundPanel {
                 if (hit != null && hit.getType() == net.minecraft.util.hit.HitResult.Type.BLOCK) {
                     var pos = hit.getPos();
                     
+                    // Apply Y offset from config
+                    float yOffset = state.shockwaveAdapter().getConfig().cursorYOffset();
+                    
                     // Get current field state and source primitive ref
                     String fieldJson = state.toStateJson();
                     String sourceRef = state.shockwaveAdapter().shapeSourceRef();
                     
-                    // Spawn field at cursor position via server (server broadcasts to all)
+                    // Spawn field at cursor position + Y offset via server
                     net.cyberpunk042.client.network.GuiPacketSender.spawnShockwaveField(
-                        fieldJson, (float)pos.x, (float)pos.y, (float)pos.z, sourceRef);
+                        fieldJson, (float)pos.x, (float)pos.y + yOffset, (float)pos.z, sourceRef);
                     
                     // Server will broadcast ShockwaveTriggerS2CPayload to all players in range
                     // including us, so no need to trigger locally
                     
                     net.cyberpunk042.client.gui.widget.ToastNotification.success(
-                        String.format("Shockwave @ %.0f, %.0f, %.0f", pos.x, pos.y, pos.z));
+                        String.format("Shockwave @ %.0f, %.0f, %.0f", pos.x, pos.y + yOffset, pos.z));
                 } else {
                     // No hit - fallback to camera mode
                     ShockwavePostEffect.setOriginMode(OriginMode.CAMERA);
@@ -510,6 +513,9 @@ public class ShockwaveSubPanel extends BoundPanel {
             contract, "Rings contract instead of expand",
             v -> state.set("shockwave.ringContractMode", v)));
         content.advanceBy(22);
+        
+        // Row 4: Cursor Y Offset
+        content.slider("Y Offset", "shockwave.cursorYOffset").range(-10f, 20f).format("%.1f").add();
         content.gap();
         
         // ═══════════════════════════════════════════════════════════════════════

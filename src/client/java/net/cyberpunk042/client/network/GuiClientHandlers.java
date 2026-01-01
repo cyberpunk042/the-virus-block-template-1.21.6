@@ -101,6 +101,8 @@ public final class GuiClientHandlers {
                 
                 // Apply shockwave config and trigger effect
                 try {
+                    // CRITICAL: Disable follow camera - shockwave should stay at world position
+                    net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setFollowCamera(false);
                     net.cyberpunk042.client.visual.shader.ShockwavePostEffect.setTargetPosition(
                         payload.worldX(), payload.worldY(), payload.worldZ());
                     net.cyberpunk042.client.visual.shader.ShockwavePostEffect.trigger();

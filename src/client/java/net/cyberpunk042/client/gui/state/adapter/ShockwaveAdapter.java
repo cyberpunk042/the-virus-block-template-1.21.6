@@ -142,6 +142,7 @@ public class ShockwaveAdapter extends AbstractAdapter {
             // Global scale & positioning
             case "globalScale" -> config.globalScale();
             case "followPosition" -> config.followPosition();
+            case "cursorYOffset" -> config.cursorYOffset();
             
             default -> {
                 Logging.GUI.topic("adapter").warn("Unknown shockwave property: {}", prop);
@@ -276,6 +277,7 @@ public class ShockwaveAdapter extends AbstractAdapter {
             // Global scale & positioning
             case "globalScale" -> b.globalScale(toFloat(value));
             case "followPosition" -> b.followPosition(toBool(value));
+            case "cursorYOffset" -> b.cursorYOffset(toFloat(value));
             
             default -> Logging.GUI.topic("adapter").warn("Unknown shockwave property: {}", prop);
         }
@@ -484,6 +486,7 @@ public class ShockwaveAdapter extends AbstractAdapter {
     
     /**
      * Serialize shockwave config to JSON for field definition storage.
+     * Uses nested objects for clean, readable structure.
      */
     public com.google.gson.JsonObject toJson() {
         var json = new com.google.gson.JsonObject();
@@ -493,102 +496,130 @@ public class ShockwaveAdapter extends AbstractAdapter {
             json.addProperty("shapeSourceRef", shapeSourceRef);
         }
         
-        // Shape
-        json.addProperty("shapeType", config.shapeType().name());
-        json.addProperty("mainRadius", config.mainRadius());
-        json.addProperty("orbitalRadius", config.orbitalRadius());
-        json.addProperty("orbitDistance", config.orbitDistance());
-        json.addProperty("orbitalCount", config.orbitalCount());
+        // ═══ SHAPE ═══
+        var shape = new com.google.gson.JsonObject();
+        shape.addProperty("type", config.shapeType().name());
+        shape.addProperty("mainRadius", config.mainRadius());
+        shape.addProperty("orbitalRadius", config.orbitalRadius());
+        shape.addProperty("orbitDistance", config.orbitDistance());
+        shape.addProperty("orbitalCount", config.orbitalCount());
+        json.add("shape", shape);
         
-        // Ring geometry
-        json.addProperty("ringCount", config.ringCount());
-        json.addProperty("ringSpacing", config.ringSpacing());
-        json.addProperty("ringThickness", config.ringThickness());
-        json.addProperty("ringMaxRadius", config.ringMaxRadius());
-        json.addProperty("ringSpeed", config.ringSpeed());
-        json.addProperty("ringGlowWidth", config.ringGlowWidth());
-        json.addProperty("ringIntensity", config.ringIntensity());
-        json.addProperty("ringContractMode", config.ringContractMode());
+        // ═══ RING ═══
+        var ring = new com.google.gson.JsonObject();
+        ring.addProperty("count", config.ringCount());
+        ring.addProperty("spacing", config.ringSpacing());
+        ring.addProperty("thickness", config.ringThickness());
+        ring.addProperty("maxRadius", config.ringMaxRadius());
+        ring.addProperty("speed", config.ringSpeed());
+        ring.addProperty("glowWidth", config.ringGlowWidth());
+        ring.addProperty("intensity", config.ringIntensity());
+        ring.addProperty("contractMode", config.ringContractMode());
+        // Ring color as array
+        var ringColor = new com.google.gson.JsonArray();
+        ringColor.add(config.ringColorR());
+        ringColor.add(config.ringColorG());
+        ringColor.add(config.ringColorB());
+        ringColor.add(config.ringColorOpacity());
+        ring.add("color", ringColor);
+        json.add("ring", ring);
         
-        // Ring color
-        json.addProperty("ringColorR", config.ringColorR());
-        json.addProperty("ringColorG", config.ringColorG());
-        json.addProperty("ringColorB", config.ringColorB());
-        json.addProperty("ringColorOpacity", config.ringColorOpacity());
+        // ═══ ORBITAL ═══
+        var orbital = new com.google.gson.JsonObject();
+        // Body color as array
+        var orbBody = new com.google.gson.JsonArray();
+        orbBody.add(config.orbitalBodyR());
+        orbBody.add(config.orbitalBodyG());
+        orbBody.add(config.orbitalBodyB());
+        orbital.add("bodyColor", orbBody);
+        // Corona
+        var orbCorona = new com.google.gson.JsonObject();
+        var orbCoronaColor = new com.google.gson.JsonArray();
+        orbCoronaColor.add(config.orbitalCoronaR());
+        orbCoronaColor.add(config.orbitalCoronaG());
+        orbCoronaColor.add(config.orbitalCoronaB());
+        orbCoronaColor.add(config.orbitalCoronaA());
+        orbCorona.add("color", orbCoronaColor);
+        orbCorona.addProperty("width", config.orbitalCoronaWidth());
+        orbCorona.addProperty("intensity", config.orbitalCoronaIntensity());
+        orbCorona.addProperty("rimPower", config.orbitalRimPower());
+        orbCorona.addProperty("rimFalloff", config.orbitalRimFalloff());
+        orbital.add("corona", orbCorona);
+        json.add("orbital", orbital);
         
-        // Orbital body
-        json.addProperty("orbitalBodyR", config.orbitalBodyR());
-        json.addProperty("orbitalBodyG", config.orbitalBodyG());
-        json.addProperty("orbitalBodyB", config.orbitalBodyB());
+        // ═══ BEAM ═══
+        var beam = new com.google.gson.JsonObject();
+        beam.addProperty("height", config.beamHeight());
+        beam.addProperty("width", config.beamWidth());
+        beam.addProperty("widthScale", config.beamWidthScale());
+        beam.addProperty("taper", config.beamTaper());
+        // Body color as array
+        var beamBody = new com.google.gson.JsonArray();
+        beamBody.add(config.beamBodyR());
+        beamBody.add(config.beamBodyG());
+        beamBody.add(config.beamBodyB());
+        beam.add("bodyColor", beamBody);
+        // Corona
+        var beamCorona = new com.google.gson.JsonObject();
+        var beamCoronaColor = new com.google.gson.JsonArray();
+        beamCoronaColor.add(config.beamCoronaR());
+        beamCoronaColor.add(config.beamCoronaG());
+        beamCoronaColor.add(config.beamCoronaB());
+        beamCoronaColor.add(config.beamCoronaA());
+        beamCorona.add("color", beamCoronaColor);
+        beamCorona.addProperty("width", config.beamCoronaWidth());
+        beamCorona.addProperty("intensity", config.beamCoronaIntensity());
+        beamCorona.addProperty("rimPower", config.beamRimPower());
+        beamCorona.addProperty("rimFalloff", config.beamRimFalloff());
+        beam.add("corona", beamCorona);
+        json.add("beam", beam);
         
-        // Orbital corona
-        json.addProperty("orbitalCoronaR", config.orbitalCoronaR());
-        json.addProperty("orbitalCoronaG", config.orbitalCoronaG());
-        json.addProperty("orbitalCoronaB", config.orbitalCoronaB());
-        json.addProperty("orbitalCoronaA", config.orbitalCoronaA());
-        json.addProperty("orbitalCoronaWidth", config.orbitalCoronaWidth());
-        json.addProperty("orbitalCoronaIntensity", config.orbitalCoronaIntensity());
-        json.addProperty("orbitalRimPower", config.orbitalRimPower());
-        json.addProperty("orbitalRimFalloff", config.orbitalRimFalloff());
+        // ═══ ANIMATION ═══
+        var animation = new com.google.gson.JsonObject();
+        animation.addProperty("orbitalSpeed", config.orbitalSpeed());
+        // Orbital timing
+        var orbTiming = new com.google.gson.JsonObject();
+        orbTiming.addProperty("spawnDuration", config.orbitalSpawnDuration());
+        orbTiming.addProperty("retractDuration", config.orbitalRetractDuration());
+        orbTiming.addProperty("spawnEasing", config.orbitalSpawnEasing().name());
+        orbTiming.addProperty("retractEasing", config.orbitalRetractEasing().name());
+        orbTiming.addProperty("spawnDelay", config.orbitalSpawnDelay());
+        animation.add("orbital", orbTiming);
+        // Beam timing
+        var beamTiming = new com.google.gson.JsonObject();
+        beamTiming.addProperty("growDuration", config.beamGrowDuration());
+        beamTiming.addProperty("shrinkDuration", config.beamShrinkDuration());
+        beamTiming.addProperty("holdDuration", config.beamHoldDuration());
+        beamTiming.addProperty("widthGrowFactor", config.beamWidthGrowFactor());
+        beamTiming.addProperty("lengthGrowFactor", config.beamLengthGrowFactor());
+        beamTiming.addProperty("growEasing", config.beamGrowEasing().name());
+        beamTiming.addProperty("shrinkEasing", config.beamShrinkEasing().name());
+        beamTiming.addProperty("startDelay", config.beamStartDelay());
+        animation.add("beam", beamTiming);
+        // Retract
+        animation.addProperty("retractDelay", config.retractDelay());
+        animation.addProperty("autoRetractOnRingEnd", config.autoRetractOnRingEnd());
+        json.add("animation", animation);
         
-        // Beam geometry
-        json.addProperty("beamHeight", config.beamHeight());
-        json.addProperty("beamWidth", config.beamWidth());
-        json.addProperty("beamWidthScale", config.beamWidthScale());
-        json.addProperty("beamTaper", config.beamTaper());
+        // ═══ SCREEN EFFECTS ═══
+        var screen = new com.google.gson.JsonObject();
+        screen.addProperty("blackout", config.blackout());
+        screen.addProperty("vignetteAmount", config.vignetteAmount());
+        screen.addProperty("vignetteRadius", config.vignetteRadius());
+        // Tint color as array
+        var tint = new com.google.gson.JsonArray();
+        tint.add(config.tintR());
+        tint.add(config.tintG());
+        tint.add(config.tintB());
+        tint.add(config.tintAmount());
+        screen.add("tint", tint);
+        screen.addProperty("blendRadius", config.blendRadius());
+        json.add("screen", screen);
         
-        // Beam body
-        json.addProperty("beamBodyR", config.beamBodyR());
-        json.addProperty("beamBodyG", config.beamBodyG());
-        json.addProperty("beamBodyB", config.beamBodyB());
-        
-        // Beam corona
-        json.addProperty("beamCoronaR", config.beamCoronaR());
-        json.addProperty("beamCoronaG", config.beamCoronaG());
-        json.addProperty("beamCoronaB", config.beamCoronaB());
-        json.addProperty("beamCoronaA", config.beamCoronaA());
-        json.addProperty("beamCoronaWidth", config.beamCoronaWidth());
-        json.addProperty("beamCoronaIntensity", config.beamCoronaIntensity());
-        json.addProperty("beamRimPower", config.beamRimPower());
-        json.addProperty("beamRimFalloff", config.beamRimFalloff());
-        
-        // Animation timing
-        json.addProperty("orbitalSpeed", config.orbitalSpeed());
-        json.addProperty("orbitalSpawnDuration", config.orbitalSpawnDuration());
-        json.addProperty("orbitalRetractDuration", config.orbitalRetractDuration());
-        json.addProperty("beamGrowDuration", config.beamGrowDuration());
-        json.addProperty("beamShrinkDuration", config.beamShrinkDuration());
-        json.addProperty("beamHoldDuration", config.beamHoldDuration());
-        json.addProperty("beamWidthGrowFactor", config.beamWidthGrowFactor());
-        json.addProperty("beamLengthGrowFactor", config.beamLengthGrowFactor());
-        
-        // Easing types
-        json.addProperty("orbitalSpawnEasing", config.orbitalSpawnEasing().name());
-        json.addProperty("orbitalRetractEasing", config.orbitalRetractEasing().name());
-        json.addProperty("beamGrowEasing", config.beamGrowEasing().name());
-        json.addProperty("beamShrinkEasing", config.beamShrinkEasing().name());
-        
-        // Delays
-        json.addProperty("orbitalSpawnDelay", config.orbitalSpawnDelay());
-        json.addProperty("beamStartDelay", config.beamStartDelay());
-        json.addProperty("retractDelay", config.retractDelay());
-        json.addProperty("autoRetractOnRingEnd", config.autoRetractOnRingEnd());
-        
-        // Screen effects
-        json.addProperty("blackout", config.blackout());
-        json.addProperty("vignetteAmount", config.vignetteAmount());
-        json.addProperty("vignetteRadius", config.vignetteRadius());
-        json.addProperty("tintR", config.tintR());
-        json.addProperty("tintG", config.tintG());
-        json.addProperty("tintB", config.tintB());
-        json.addProperty("tintAmount", config.tintAmount());
-        
-        // Blend
-        json.addProperty("blendRadius", config.blendRadius());
-        
-        // Global scale & positioning
+        // ═══ GLOBAL ═══
         json.addProperty("globalScale", config.globalScale());
         json.addProperty("followPosition", config.followPosition());
+        json.addProperty("cursorYOffset", config.cursorYOffset());
         
         return json;
     }
@@ -607,106 +638,166 @@ public class ShockwaveAdapter extends AbstractAdapter {
         
         ShockwaveConfig.Builder b = ShockwaveConfig.DEFAULT.toBuilder();
         
-        // Shape
-        if (json.has("shapeType")) {
-            try {
-                b.shapeType(ShapeType.valueOf(json.get("shapeType").getAsString()));
-            } catch (IllegalArgumentException e) { /* keep default */ }
+        // ═══ SHAPE ═══
+        if (json.has("shape")) {
+            var shape = json.getAsJsonObject("shape");
+            if (shape.has("type")) {
+                try { b.shapeType(ShapeType.valueOf(shape.get("type").getAsString())); } 
+                catch (IllegalArgumentException e) { /* keep default */ }
+            }
+            if (shape.has("mainRadius")) b.mainRadius(shape.get("mainRadius").getAsFloat());
+            if (shape.has("orbitalRadius")) b.orbitalRadius(shape.get("orbitalRadius").getAsFloat());
+            if (shape.has("orbitDistance")) b.orbitDistance(shape.get("orbitDistance").getAsFloat());
+            if (shape.has("orbitalCount")) b.orbitalCount(shape.get("orbitalCount").getAsInt());
         }
-        if (json.has("mainRadius")) b.mainRadius(json.get("mainRadius").getAsFloat());
-        if (json.has("orbitalRadius")) b.orbitalRadius(json.get("orbitalRadius").getAsFloat());
-        if (json.has("orbitDistance")) b.orbitDistance(json.get("orbitDistance").getAsFloat());
-        if (json.has("orbitalCount")) b.orbitalCount(json.get("orbitalCount").getAsInt());
         
-        // Ring geometry
-        if (json.has("ringCount")) b.ringCount(json.get("ringCount").getAsInt());
-        if (json.has("ringSpacing")) b.ringSpacing(json.get("ringSpacing").getAsFloat());
-        if (json.has("ringThickness")) b.ringThickness(json.get("ringThickness").getAsFloat());
-        if (json.has("ringMaxRadius")) b.ringMaxRadius(json.get("ringMaxRadius").getAsFloat());
-        if (json.has("ringSpeed")) b.ringSpeed(json.get("ringSpeed").getAsFloat());
-        if (json.has("ringGlowWidth")) b.ringGlowWidth(json.get("ringGlowWidth").getAsFloat());
-        if (json.has("ringIntensity")) b.ringIntensity(json.get("ringIntensity").getAsFloat());
-        if (json.has("ringContractMode")) b.ringContractMode(json.get("ringContractMode").getAsBoolean());
+        // ═══ RING ═══
+        if (json.has("ring")) {
+            var ring = json.getAsJsonObject("ring");
+            if (ring.has("count")) b.ringCount(ring.get("count").getAsInt());
+            if (ring.has("spacing")) b.ringSpacing(ring.get("spacing").getAsFloat());
+            if (ring.has("thickness")) b.ringThickness(ring.get("thickness").getAsFloat());
+            if (ring.has("maxRadius")) b.ringMaxRadius(ring.get("maxRadius").getAsFloat());
+            if (ring.has("speed")) b.ringSpeed(ring.get("speed").getAsFloat());
+            if (ring.has("glowWidth")) b.ringGlowWidth(ring.get("glowWidth").getAsFloat());
+            if (ring.has("intensity")) b.ringIntensity(ring.get("intensity").getAsFloat());
+            if (ring.has("contractMode")) b.ringContractMode(ring.get("contractMode").getAsBoolean());
+            if (ring.has("color")) {
+                var c = ring.getAsJsonArray("color");
+                if (c.size() >= 4) {
+                    b.ringColorR(c.get(0).getAsFloat());
+                    b.ringColorG(c.get(1).getAsFloat());
+                    b.ringColorB(c.get(2).getAsFloat());
+                    b.ringColorOpacity(c.get(3).getAsFloat());
+                }
+            }
+        }
         
-        // Ring color
-        if (json.has("ringColorR")) b.ringColorR(json.get("ringColorR").getAsFloat());
-        if (json.has("ringColorG")) b.ringColorG(json.get("ringColorG").getAsFloat());
-        if (json.has("ringColorB")) b.ringColorB(json.get("ringColorB").getAsFloat());
-        if (json.has("ringColorOpacity")) b.ringColorOpacity(json.get("ringColorOpacity").getAsFloat());
+        // ═══ ORBITAL ═══
+        if (json.has("orbital")) {
+            var orbital = json.getAsJsonObject("orbital");
+            if (orbital.has("bodyColor")) {
+                var c = orbital.getAsJsonArray("bodyColor");
+                if (c.size() >= 3) {
+                    b.orbitalBodyR(c.get(0).getAsFloat());
+                    b.orbitalBodyG(c.get(1).getAsFloat());
+                    b.orbitalBodyB(c.get(2).getAsFloat());
+                }
+            }
+            if (orbital.has("corona")) {
+                var corona = orbital.getAsJsonObject("corona");
+                if (corona.has("color")) {
+                    var c = corona.getAsJsonArray("color");
+                    if (c.size() >= 4) {
+                        b.orbitalCoronaR(c.get(0).getAsFloat());
+                        b.orbitalCoronaG(c.get(1).getAsFloat());
+                        b.orbitalCoronaB(c.get(2).getAsFloat());
+                        b.orbitalCoronaA(c.get(3).getAsFloat());
+                    }
+                }
+                if (corona.has("width")) b.orbitalCoronaWidth(corona.get("width").getAsFloat());
+                if (corona.has("intensity")) b.orbitalCoronaIntensity(corona.get("intensity").getAsFloat());
+                if (corona.has("rimPower")) b.orbitalRimPower(corona.get("rimPower").getAsFloat());
+                if (corona.has("rimFalloff")) b.orbitalRimFalloff(corona.get("rimFalloff").getAsFloat());
+            }
+        }
         
-        // Orbital body
-        if (json.has("orbitalBodyR")) b.orbitalBodyR(json.get("orbitalBodyR").getAsFloat());
-        if (json.has("orbitalBodyG")) b.orbitalBodyG(json.get("orbitalBodyG").getAsFloat());
-        if (json.has("orbitalBodyB")) b.orbitalBodyB(json.get("orbitalBodyB").getAsFloat());
+        // ═══ BEAM ═══
+        if (json.has("beam")) {
+            var beam = json.getAsJsonObject("beam");
+            if (beam.has("height")) b.beamHeight(beam.get("height").getAsFloat());
+            if (beam.has("width")) b.beamWidth(beam.get("width").getAsFloat());
+            if (beam.has("widthScale")) b.beamWidthScale(beam.get("widthScale").getAsFloat());
+            if (beam.has("taper")) b.beamTaper(beam.get("taper").getAsFloat());
+            if (beam.has("bodyColor")) {
+                var c = beam.getAsJsonArray("bodyColor");
+                if (c.size() >= 3) {
+                    b.beamBodyR(c.get(0).getAsFloat());
+                    b.beamBodyG(c.get(1).getAsFloat());
+                    b.beamBodyB(c.get(2).getAsFloat());
+                }
+            }
+            if (beam.has("corona")) {
+                var corona = beam.getAsJsonObject("corona");
+                if (corona.has("color")) {
+                    var c = corona.getAsJsonArray("color");
+                    if (c.size() >= 4) {
+                        b.beamCoronaR(c.get(0).getAsFloat());
+                        b.beamCoronaG(c.get(1).getAsFloat());
+                        b.beamCoronaB(c.get(2).getAsFloat());
+                        b.beamCoronaA(c.get(3).getAsFloat());
+                    }
+                }
+                if (corona.has("width")) b.beamCoronaWidth(corona.get("width").getAsFloat());
+                if (corona.has("intensity")) b.beamCoronaIntensity(corona.get("intensity").getAsFloat());
+                if (corona.has("rimPower")) b.beamRimPower(corona.get("rimPower").getAsFloat());
+                if (corona.has("rimFalloff")) b.beamRimFalloff(corona.get("rimFalloff").getAsFloat());
+            }
+        }
         
-        // Orbital corona
-        if (json.has("orbitalCoronaR")) b.orbitalCoronaR(json.get("orbitalCoronaR").getAsFloat());
-        if (json.has("orbitalCoronaG")) b.orbitalCoronaG(json.get("orbitalCoronaG").getAsFloat());
-        if (json.has("orbitalCoronaB")) b.orbitalCoronaB(json.get("orbitalCoronaB").getAsFloat());
-        if (json.has("orbitalCoronaA")) b.orbitalCoronaA(json.get("orbitalCoronaA").getAsFloat());
-        if (json.has("orbitalCoronaWidth")) b.orbitalCoronaWidth(json.get("orbitalCoronaWidth").getAsFloat());
-        if (json.has("orbitalCoronaIntensity")) b.orbitalCoronaIntensity(json.get("orbitalCoronaIntensity").getAsFloat());
-        if (json.has("orbitalRimPower")) b.orbitalRimPower(json.get("orbitalRimPower").getAsFloat());
-        if (json.has("orbitalRimFalloff")) b.orbitalRimFalloff(json.get("orbitalRimFalloff").getAsFloat());
+        // ═══ ANIMATION ═══
+        if (json.has("animation")) {
+            var anim = json.getAsJsonObject("animation");
+            if (anim.has("orbitalSpeed")) b.orbitalSpeed(anim.get("orbitalSpeed").getAsFloat());
+            if (anim.has("retractDelay")) b.retractDelay(anim.get("retractDelay").getAsFloat());
+            if (anim.has("autoRetractOnRingEnd")) b.autoRetractOnRingEnd(anim.get("autoRetractOnRingEnd").getAsBoolean());
+            // Orbital timing
+            if (anim.has("orbital")) {
+                var orb = anim.getAsJsonObject("orbital");
+                if (orb.has("spawnDuration")) b.orbitalSpawnDuration(orb.get("spawnDuration").getAsFloat());
+                if (orb.has("retractDuration")) b.orbitalRetractDuration(orb.get("retractDuration").getAsFloat());
+                if (orb.has("spawnEasing")) {
+                    try { b.orbitalSpawnEasing(EasingType.valueOf(orb.get("spawnEasing").getAsString())); }
+                    catch (IllegalArgumentException e) { /* keep default */ }
+                }
+                if (orb.has("retractEasing")) {
+                    try { b.orbitalRetractEasing(EasingType.valueOf(orb.get("retractEasing").getAsString())); }
+                    catch (IllegalArgumentException e) { /* keep default */ }
+                }
+                if (orb.has("spawnDelay")) b.orbitalSpawnDelay(orb.get("spawnDelay").getAsFloat());
+            }
+            // Beam timing
+            if (anim.has("beam")) {
+                var beamT = anim.getAsJsonObject("beam");
+                if (beamT.has("growDuration")) b.beamGrowDuration(beamT.get("growDuration").getAsFloat());
+                if (beamT.has("shrinkDuration")) b.beamShrinkDuration(beamT.get("shrinkDuration").getAsFloat());
+                if (beamT.has("holdDuration")) b.beamHoldDuration(beamT.get("holdDuration").getAsFloat());
+                if (beamT.has("widthGrowFactor")) b.beamWidthGrowFactor(beamT.get("widthGrowFactor").getAsFloat());
+                if (beamT.has("lengthGrowFactor")) b.beamLengthGrowFactor(beamT.get("lengthGrowFactor").getAsFloat());
+                if (beamT.has("growEasing")) {
+                    try { b.beamGrowEasing(EasingType.valueOf(beamT.get("growEasing").getAsString())); }
+                    catch (IllegalArgumentException e) { /* keep default */ }
+                }
+                if (beamT.has("shrinkEasing")) {
+                    try { b.beamShrinkEasing(EasingType.valueOf(beamT.get("shrinkEasing").getAsString())); }
+                    catch (IllegalArgumentException e) { /* keep default */ }
+                }
+                if (beamT.has("startDelay")) b.beamStartDelay(beamT.get("startDelay").getAsFloat());
+            }
+        }
         
-        // Beam geometry
-        if (json.has("beamHeight")) b.beamHeight(json.get("beamHeight").getAsFloat());
-        if (json.has("beamWidth")) b.beamWidth(json.get("beamWidth").getAsFloat());
-        if (json.has("beamWidthScale")) b.beamWidthScale(json.get("beamWidthScale").getAsFloat());
-        if (json.has("beamTaper")) b.beamTaper(json.get("beamTaper").getAsFloat());
+        // ═══ SCREEN EFFECTS ═══
+        if (json.has("screen")) {
+            var screen = json.getAsJsonObject("screen");
+            if (screen.has("blackout")) b.blackout(screen.get("blackout").getAsFloat());
+            if (screen.has("vignetteAmount")) b.vignetteAmount(screen.get("vignetteAmount").getAsFloat());
+            if (screen.has("vignetteRadius")) b.vignetteRadius(screen.get("vignetteRadius").getAsFloat());
+            if (screen.has("blendRadius")) b.blendRadius(screen.get("blendRadius").getAsFloat());
+            if (screen.has("tint")) {
+                var t = screen.getAsJsonArray("tint");
+                if (t.size() >= 4) {
+                    b.tintR(t.get(0).getAsFloat());
+                    b.tintG(t.get(1).getAsFloat());
+                    b.tintB(t.get(2).getAsFloat());
+                    b.tintAmount(t.get(3).getAsFloat());
+                }
+            }
+        }
         
-        // Beam body
-        if (json.has("beamBodyR")) b.beamBodyR(json.get("beamBodyR").getAsFloat());
-        if (json.has("beamBodyG")) b.beamBodyG(json.get("beamBodyG").getAsFloat());
-        if (json.has("beamBodyB")) b.beamBodyB(json.get("beamBodyB").getAsFloat());
-        
-        // Beam corona
-        if (json.has("beamCoronaR")) b.beamCoronaR(json.get("beamCoronaR").getAsFloat());
-        if (json.has("beamCoronaG")) b.beamCoronaG(json.get("beamCoronaG").getAsFloat());
-        if (json.has("beamCoronaB")) b.beamCoronaB(json.get("beamCoronaB").getAsFloat());
-        if (json.has("beamCoronaA")) b.beamCoronaA(json.get("beamCoronaA").getAsFloat());
-        if (json.has("beamCoronaWidth")) b.beamCoronaWidth(json.get("beamCoronaWidth").getAsFloat());
-        if (json.has("beamCoronaIntensity")) b.beamCoronaIntensity(json.get("beamCoronaIntensity").getAsFloat());
-        if (json.has("beamRimPower")) b.beamRimPower(json.get("beamRimPower").getAsFloat());
-        if (json.has("beamRimFalloff")) b.beamRimFalloff(json.get("beamRimFalloff").getAsFloat());
-        
-        // Animation timing
-        if (json.has("orbitalSpeed")) b.orbitalSpeed(json.get("orbitalSpeed").getAsFloat());
-        if (json.has("orbitalSpawnDuration")) b.orbitalSpawnDuration(json.get("orbitalSpawnDuration").getAsFloat());
-        if (json.has("orbitalRetractDuration")) b.orbitalRetractDuration(json.get("orbitalRetractDuration").getAsFloat());
-        if (json.has("beamGrowDuration")) b.beamGrowDuration(json.get("beamGrowDuration").getAsFloat());
-        if (json.has("beamShrinkDuration")) b.beamShrinkDuration(json.get("beamShrinkDuration").getAsFloat());
-        if (json.has("beamHoldDuration")) b.beamHoldDuration(json.get("beamHoldDuration").getAsFloat());
-        if (json.has("beamWidthGrowFactor")) b.beamWidthGrowFactor(json.get("beamWidthGrowFactor").getAsFloat());
-        if (json.has("beamLengthGrowFactor")) b.beamLengthGrowFactor(json.get("beamLengthGrowFactor").getAsFloat());
-        
-        // Easing types
-        if (json.has("orbitalSpawnEasing")) b.orbitalSpawnEasing(EasingType.valueOf(json.get("orbitalSpawnEasing").getAsString()));
-        if (json.has("orbitalRetractEasing")) b.orbitalRetractEasing(EasingType.valueOf(json.get("orbitalRetractEasing").getAsString()));
-        if (json.has("beamGrowEasing")) b.beamGrowEasing(EasingType.valueOf(json.get("beamGrowEasing").getAsString()));
-        if (json.has("beamShrinkEasing")) b.beamShrinkEasing(EasingType.valueOf(json.get("beamShrinkEasing").getAsString()));
-        
-        // Delays
-        if (json.has("orbitalSpawnDelay")) b.orbitalSpawnDelay(json.get("orbitalSpawnDelay").getAsFloat());
-        if (json.has("beamStartDelay")) b.beamStartDelay(json.get("beamStartDelay").getAsFloat());
-        if (json.has("retractDelay")) b.retractDelay(json.get("retractDelay").getAsFloat());
-        if (json.has("autoRetractOnRingEnd")) b.autoRetractOnRingEnd(json.get("autoRetractOnRingEnd").getAsBoolean());
-        
-        // Screen effects
-        if (json.has("blackout")) b.blackout(json.get("blackout").getAsFloat());
-        if (json.has("vignetteAmount")) b.vignetteAmount(json.get("vignetteAmount").getAsFloat());
-        if (json.has("vignetteRadius")) b.vignetteRadius(json.get("vignetteRadius").getAsFloat());
-        if (json.has("tintR")) b.tintR(json.get("tintR").getAsFloat());
-        if (json.has("tintG")) b.tintG(json.get("tintG").getAsFloat());
-        if (json.has("tintB")) b.tintB(json.get("tintB").getAsFloat());
-        if (json.has("tintAmount")) b.tintAmount(json.get("tintAmount").getAsFloat());
-        
-        // Blend
-        if (json.has("blendRadius")) b.blendRadius(json.get("blendRadius").getAsFloat());
-        
-        // Global scale & positioning
+        // ═══ GLOBAL ═══
         if (json.has("globalScale")) b.globalScale(json.get("globalScale").getAsFloat());
         if (json.has("followPosition")) b.followPosition(json.get("followPosition").getAsBoolean());
+        if (json.has("cursorYOffset")) b.cursorYOffset(json.get("cursorYOffset").getAsFloat());
         
         config = b.build();
         syncToPostEffect();

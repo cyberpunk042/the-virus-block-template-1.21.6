@@ -139,7 +139,8 @@ public record ShockwaveConfig(
     // GLOBAL SCALE & POSITIONING
     // ═══════════════════════════════════════════════════════════════════════
     float globalScale,          // Global size multiplier (0.0 - 2.0, default 1.0)
-    boolean followPosition      // Follow source primitive position each frame
+    boolean followPosition,     // Follow source primitive position each frame
+    float cursorYOffset         // Y offset when spawning at cursor (default 2.0)
 ) {
     /**
      * Default configuration for orbital shockwave.
@@ -148,23 +149,23 @@ public record ShockwaveConfig(
         // Shape
         ShapeType.ORBITAL, 0f, 2f, 10f, 4,
         // Ring geometry & visual
-        10, 8f, 1f, 400f, 15f, 8f, 1f, false,  // ringThickness=1f (was 4f)
-        0f, 1f, 1f, 1f,  // ring color (cyan)
-        // Orbital body
-        1f, 1f, 1f,  // WHITE body (was black)
-        // Orbital corona
-        0f, 1f, 1f, 1f,  // cyan coronaRGBA
-        2f, 0.10f, 2f, 1f,  // corona width/intensity=0.10f (was 1f)/rimPower/rimFalloff
+        10, 8f, 1f, 400f, 15f, 8f, 1f, false,
+        1f, 1f, 1f, 1f,  // ring color WHITE
+        // Orbital body - BLACK
+        0f, 0f, 0f,
+        // Orbital corona - WHITE
+        1f, 1f, 1f, 1f,  // coronaRGBA
+        2f, 0.5f, 2f, 1.3f,  // coronaWidth/intensity/rimPower/rimFalloff
         // Beam geometry
-        100f, 0f, 0.10f, 1f,  // height/width/widthScale=0.10f (was 0.3f)/taper
-        // Beam body
-        1f, 1f, 1f,  // WHITE body (was black)
-        // Beam corona
-        0f, 1f, 1f, 1f,  // cyan coronaRGBA
-        2f, 0.5f, 2f, 1f,  // corona width/intensity=0.5f (was 1f)/rimPower/rimFalloff
-        // Animation timing: orbSpeed, orbSpawnDur, orbRetractDur, beamGrowDur=3000 (was 1500), beamShrinkDur, beamHoldDur, beamWidthGrow, beamLengthGrow
+        100f, 0f, 0.5f, 1f,  // height/width/widthScale/taper
+        // Beam body - BLACK
+        0f, 0f, 0f,
+        // Beam corona - WHITE
+        1f, 1f, 1f, 1f,  // coronaRGBA
+        2f, 0.5f, 2f, 1f,  // coronaWidth/intensity/rimPower/rimFalloff
+        // Animation timing
         0.008f, 2500f, 1500f, 3000f, 800f, 0f, 0f, 1f,
-        // Easing types: orbSpawnEase, orbRetractEase, beamGrowEase, beamShrinkEase
+        // Easing types
         EasingType.EASE_OUT, EasingType.EASE_IN, EasingType.EASE_IN, EasingType.EASE_IN,
         // Delays
         0f, 0f, 0f, true,
@@ -173,7 +174,7 @@ public record ShockwaveConfig(
         // Blend
         0f,
         // Global scale & positioning
-        1f, false  // globalScale=1.0, followPosition=false
+        1f, false, 2f  // globalScale, followPosition, cursorYOffset
     );
     
     /**
@@ -214,6 +215,7 @@ public record ShockwaveConfig(
         private float blendRadius;
         private float globalScale;
         private boolean followPosition;
+        private float cursorYOffset;
         
         public Builder() {
             this(DEFAULT);
@@ -289,6 +291,7 @@ public record ShockwaveConfig(
             this.blendRadius = src.blendRadius;
             this.globalScale = src.globalScale;
             this.followPosition = src.followPosition;
+            this.cursorYOffset = src.cursorYOffset;
         }
         
         // Shape setters
@@ -385,6 +388,7 @@ public record ShockwaveConfig(
         // Global scale & positioning setters
         public Builder globalScale(float v) { this.globalScale = v; return this; }
         public Builder followPosition(boolean v) { this.followPosition = v; return this; }
+        public Builder cursorYOffset(float v) { this.cursorYOffset = v; return this; }
         
         public ShockwaveConfig build() {
             return new ShockwaveConfig(
@@ -406,7 +410,7 @@ public record ShockwaveConfig(
                 orbitalSpawnDelay, beamStartDelay, retractDelay, autoRetractOnRingEnd,
                 blackout, vignetteAmount, vignetteRadius, tintR, tintG, tintB, tintAmount,
                 blendRadius,
-                globalScale, followPosition
+                globalScale, followPosition, cursorYOffset
             );
         }
     }
