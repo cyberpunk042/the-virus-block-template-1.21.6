@@ -871,11 +871,26 @@ public final class FragmentRegistry {
             if (ring.has("intensity")) state.set("shockwave.ringIntensity", ring.get("intensity").getAsFloat());
             if (ring.has("contractMode")) state.set("shockwave.ringContractMode", ring.get("contractMode").getAsBoolean());
             if (ring.has("color")) {
-                JsonObject color = ring.getAsJsonObject("color");
-                if (color.has("r")) state.set("shockwave.ringColorR", color.get("r").getAsFloat());
-                if (color.has("g")) state.set("shockwave.ringColorG", color.get("g").getAsFloat());
-                if (color.has("b")) state.set("shockwave.ringColorB", color.get("b").getAsFloat());
-                if (color.has("opacity")) state.set("shockwave.ringColorOpacity", color.get("opacity").getAsFloat());
+                var colorElement = ring.get("color");
+                if (colorElement.isJsonArray()) {
+                    // Array format: [r, g, b, a]
+                    var arr = colorElement.getAsJsonArray();
+                    if (arr.size() >= 3) {
+                        state.set("shockwave.ringColorR", arr.get(0).getAsFloat());
+                        state.set("shockwave.ringColorG", arr.get(1).getAsFloat());
+                        state.set("shockwave.ringColorB", arr.get(2).getAsFloat());
+                    }
+                    if (arr.size() >= 4) {
+                        state.set("shockwave.ringColorOpacity", arr.get(3).getAsFloat());
+                    }
+                } else if (colorElement.isJsonObject()) {
+                    // Object format: {r, g, b, opacity}
+                    JsonObject color = colorElement.getAsJsonObject();
+                    if (color.has("r")) state.set("shockwave.ringColorR", color.get("r").getAsFloat());
+                    if (color.has("g")) state.set("shockwave.ringColorG", color.get("g").getAsFloat());
+                    if (color.has("b")) state.set("shockwave.ringColorB", color.get("b").getAsFloat());
+                    if (color.has("opacity")) state.set("shockwave.ringColorOpacity", color.get("opacity").getAsFloat());
+                }
             }
         }
         
@@ -885,21 +900,55 @@ public final class FragmentRegistry {
             if (orbital.has("speed")) state.set("shockwave.orbitalSpeed", orbital.get("speed").getAsFloat());
             if (orbital.has("spawnDuration")) state.set("shockwave.orbitalSpawnDuration", orbital.get("spawnDuration").getAsFloat());
             if (orbital.has("retractDuration")) state.set("shockwave.orbitalRetractDuration", orbital.get("retractDuration").getAsFloat());
-            if (orbital.has("body")) {
+            
+            // Body color - supports both array [r,g,b] and object {r,g,b}
+            if (orbital.has("bodyColor")) {
+                var bodyEl = orbital.get("bodyColor");
+                if (bodyEl.isJsonArray()) {
+                    var arr = bodyEl.getAsJsonArray();
+                    if (arr.size() >= 3) {
+                        state.set("shockwave.orbitalBodyR", arr.get(0).getAsFloat());
+                        state.set("shockwave.orbitalBodyG", arr.get(1).getAsFloat());
+                        state.set("shockwave.orbitalBodyB", arr.get(2).getAsFloat());
+                    }
+                }
+            } else if (orbital.has("body")) {
                 JsonObject body = orbital.getAsJsonObject("body");
                 if (body.has("r")) state.set("shockwave.orbitalBodyR", body.get("r").getAsFloat());
                 if (body.has("g")) state.set("shockwave.orbitalBodyG", body.get("g").getAsFloat());
                 if (body.has("b")) state.set("shockwave.orbitalBodyB", body.get("b").getAsFloat());
             }
+            
+            // Corona - supports nested color array or flat r,g,b,a
             if (orbital.has("corona")) {
                 JsonObject corona = orbital.getAsJsonObject("corona");
-                if (corona.has("r")) state.set("shockwave.orbitalCoronaR", corona.get("r").getAsFloat());
-                if (corona.has("g")) state.set("shockwave.orbitalCoronaG", corona.get("g").getAsFloat());
-                if (corona.has("b")) state.set("shockwave.orbitalCoronaB", corona.get("b").getAsFloat());
-                if (corona.has("a")) state.set("shockwave.orbitalCoronaA", corona.get("a").getAsFloat());
+                // Check for color array first
+                if (corona.has("color")) {
+                    var colorEl = corona.get("color");
+                    if (colorEl.isJsonArray()) {
+                        var arr = colorEl.getAsJsonArray();
+                        if (arr.size() >= 3) {
+                            state.set("shockwave.orbitalCoronaR", arr.get(0).getAsFloat());
+                            state.set("shockwave.orbitalCoronaG", arr.get(1).getAsFloat());
+                            state.set("shockwave.orbitalCoronaB", arr.get(2).getAsFloat());
+                        }
+                        if (arr.size() >= 4) {
+                            state.set("shockwave.orbitalCoronaA", arr.get(3).getAsFloat());
+                        }
+                    }
+                } else {
+                    // Flat r,g,b,a fields
+                    if (corona.has("r")) state.set("shockwave.orbitalCoronaR", corona.get("r").getAsFloat());
+                    if (corona.has("g")) state.set("shockwave.orbitalCoronaG", corona.get("g").getAsFloat());
+                    if (corona.has("b")) state.set("shockwave.orbitalCoronaB", corona.get("b").getAsFloat());
+                    if (corona.has("a")) state.set("shockwave.orbitalCoronaA", corona.get("a").getAsFloat());
+                }
                 if (corona.has("width")) state.set("shockwave.orbitalCoronaWidth", corona.get("width").getAsFloat());
                 if (corona.has("intensity")) state.set("shockwave.orbitalCoronaIntensity", corona.get("intensity").getAsFloat());
+                if (corona.has("rimPower")) state.set("shockwave.orbitalRimPower", corona.get("rimPower").getAsFloat());
+                if (corona.has("rimFalloff")) state.set("shockwave.orbitalRimFalloff", corona.get("rimFalloff").getAsFloat());
             }
+            // Legacy flat rimPower/rimFalloff
             if (orbital.has("rimPower")) state.set("shockwave.orbitalRimPower", orbital.get("rimPower").getAsFloat());
             if (orbital.has("rimFalloff")) state.set("shockwave.orbitalRimFalloff", orbital.get("rimFalloff").getAsFloat());
         }
@@ -915,26 +964,114 @@ public final class FragmentRegistry {
             if (beam.has("shrinkDuration")) state.set("shockwave.beamShrinkDuration", beam.get("shrinkDuration").getAsFloat());
             if (beam.has("holdDuration")) state.set("shockwave.beamHoldDuration", beam.get("holdDuration").getAsFloat());
             if (beam.has("startDelay")) state.set("shockwave.beamStartDelay", beam.get("startDelay").getAsFloat());
-            if (beam.has("body")) {
+            
+            // Body color - supports both array [r,g,b] and object {r,g,b}
+            if (beam.has("bodyColor")) {
+                var bodyEl = beam.get("bodyColor");
+                if (bodyEl.isJsonArray()) {
+                    var arr = bodyEl.getAsJsonArray();
+                    if (arr.size() >= 3) {
+                        state.set("shockwave.beamBodyR", arr.get(0).getAsFloat());
+                        state.set("shockwave.beamBodyG", arr.get(1).getAsFloat());
+                        state.set("shockwave.beamBodyB", arr.get(2).getAsFloat());
+                    }
+                }
+            } else if (beam.has("body")) {
                 JsonObject body = beam.getAsJsonObject("body");
                 if (body.has("r")) state.set("shockwave.beamBodyR", body.get("r").getAsFloat());
                 if (body.has("g")) state.set("shockwave.beamBodyG", body.get("g").getAsFloat());
                 if (body.has("b")) state.set("shockwave.beamBodyB", body.get("b").getAsFloat());
             }
+            
+            // Corona - supports nested color array or flat r,g,b,a
             if (beam.has("corona")) {
                 JsonObject corona = beam.getAsJsonObject("corona");
-                if (corona.has("r")) state.set("shockwave.beamCoronaR", corona.get("r").getAsFloat());
-                if (corona.has("g")) state.set("shockwave.beamCoronaG", corona.get("g").getAsFloat());
-                if (corona.has("b")) state.set("shockwave.beamCoronaB", corona.get("b").getAsFloat());
-                if (corona.has("a")) state.set("shockwave.beamCoronaA", corona.get("a").getAsFloat());
+                // Check for color array first
+                if (corona.has("color")) {
+                    var colorEl = corona.get("color");
+                    if (colorEl.isJsonArray()) {
+                        var arr = colorEl.getAsJsonArray();
+                        if (arr.size() >= 3) {
+                            state.set("shockwave.beamCoronaR", arr.get(0).getAsFloat());
+                            state.set("shockwave.beamCoronaG", arr.get(1).getAsFloat());
+                            state.set("shockwave.beamCoronaB", arr.get(2).getAsFloat());
+                        }
+                        if (arr.size() >= 4) {
+                            state.set("shockwave.beamCoronaA", arr.get(3).getAsFloat());
+                        }
+                    }
+                } else {
+                    // Flat r,g,b,a fields
+                    if (corona.has("r")) state.set("shockwave.beamCoronaR", corona.get("r").getAsFloat());
+                    if (corona.has("g")) state.set("shockwave.beamCoronaG", corona.get("g").getAsFloat());
+                    if (corona.has("b")) state.set("shockwave.beamCoronaB", corona.get("b").getAsFloat());
+                    if (corona.has("a")) state.set("shockwave.beamCoronaA", corona.get("a").getAsFloat());
+                }
                 if (corona.has("width")) state.set("shockwave.beamCoronaWidth", corona.get("width").getAsFloat());
                 if (corona.has("intensity")) state.set("shockwave.beamCoronaIntensity", corona.get("intensity").getAsFloat());
+                if (corona.has("rimPower")) state.set("shockwave.beamRimPower", corona.get("rimPower").getAsFloat());
+                if (corona.has("rimFalloff")) state.set("shockwave.beamRimFalloff", corona.get("rimFalloff").getAsFloat());
             }
+            // Legacy flat rimPower/rimFalloff
             if (beam.has("rimPower")) state.set("shockwave.beamRimPower", beam.get("rimPower").getAsFloat());
             if (beam.has("rimFalloff")) state.set("shockwave.beamRimFalloff", beam.get("rimFalloff").getAsFloat());
         }
+        // Animation settings (new nested structure)
+        if (json.has("animation")) {
+            JsonObject anim = json.getAsJsonObject("animation");
+            if (anim.has("orbitalSpeed")) state.set("shockwave.orbitalSpeed", anim.get("orbitalSpeed").getAsFloat());
+            if (anim.has("retractDelay")) state.set("shockwave.retractDelay", anim.get("retractDelay").getAsFloat());
+            if (anim.has("autoRetractOnRingEnd")) state.set("shockwave.autoRetractOnRingEnd", anim.get("autoRetractOnRingEnd").getAsBoolean());
+            
+            // Orbital timing sub-object
+            if (anim.has("orbital")) {
+                JsonObject orbTiming = anim.getAsJsonObject("orbital");
+                if (orbTiming.has("spawnDuration")) state.set("shockwave.orbitalSpawnDuration", orbTiming.get("spawnDuration").getAsFloat());
+                if (orbTiming.has("retractDuration")) state.set("shockwave.orbitalRetractDuration", orbTiming.get("retractDuration").getAsFloat());
+                if (orbTiming.has("spawnEasing")) {
+                    try {
+                        state.set("shockwave.orbitalSpawnEasing", 
+                            net.cyberpunk042.client.visual.shader.shockwave.ShockwaveTypes.EasingType.valueOf(
+                                orbTiming.get("spawnEasing").getAsString().toUpperCase()));
+                    } catch (IllegalArgumentException ignored) {}
+                }
+                if (orbTiming.has("retractEasing")) {
+                    try {
+                        state.set("shockwave.orbitalRetractEasing", 
+                            net.cyberpunk042.client.visual.shader.shockwave.ShockwaveTypes.EasingType.valueOf(
+                                orbTiming.get("retractEasing").getAsString().toUpperCase()));
+                    } catch (IllegalArgumentException ignored) {}
+                }
+                if (orbTiming.has("spawnDelay")) state.set("shockwave.orbitalSpawnDelay", orbTiming.get("spawnDelay").getAsFloat());
+            }
+            
+            // Beam timing sub-object
+            if (anim.has("beam")) {
+                JsonObject beamTiming = anim.getAsJsonObject("beam");
+                if (beamTiming.has("growDuration")) state.set("shockwave.beamGrowDuration", beamTiming.get("growDuration").getAsFloat());
+                if (beamTiming.has("shrinkDuration")) state.set("shockwave.beamShrinkDuration", beamTiming.get("shrinkDuration").getAsFloat());
+                if (beamTiming.has("holdDuration")) state.set("shockwave.beamHoldDuration", beamTiming.get("holdDuration").getAsFloat());
+                if (beamTiming.has("widthGrowFactor")) state.set("shockwave.beamWidthGrowFactor", beamTiming.get("widthGrowFactor").getAsFloat());
+                if (beamTiming.has("lengthGrowFactor")) state.set("shockwave.beamLengthGrowFactor", beamTiming.get("lengthGrowFactor").getAsFloat());
+                if (beamTiming.has("growEasing")) {
+                    try {
+                        state.set("shockwave.beamGrowEasing", 
+                            net.cyberpunk042.client.visual.shader.shockwave.ShockwaveTypes.EasingType.valueOf(
+                                beamTiming.get("growEasing").getAsString().toUpperCase()));
+                    } catch (IllegalArgumentException ignored) {}
+                }
+                if (beamTiming.has("shrinkEasing")) {
+                    try {
+                        state.set("shockwave.beamShrinkEasing", 
+                            net.cyberpunk042.client.visual.shader.shockwave.ShockwaveTypes.EasingType.valueOf(
+                                beamTiming.get("shrinkEasing").getAsString().toUpperCase()));
+                    } catch (IllegalArgumentException ignored) {}
+                }
+                if (beamTiming.has("startDelay")) state.set("shockwave.beamStartDelay", beamTiming.get("startDelay").getAsFloat());
+            }
+        }
         
-        // Timing/Delays
+        // Timing/Delays (legacy flat format)
         if (json.has("timing")) {
             JsonObject timing = json.getAsJsonObject("timing");
             if (timing.has("orbitalSpawnDelay")) state.set("shockwave.orbitalSpawnDelay", timing.get("orbitalSpawnDelay").getAsFloat());
@@ -948,21 +1085,38 @@ public final class FragmentRegistry {
             if (screen.has("blackout")) state.set("shockwave.blackout", screen.get("blackout").getAsFloat());
             if (screen.has("vignetteAmount")) state.set("shockwave.vignetteAmount", screen.get("vignetteAmount").getAsFloat());
             if (screen.has("vignetteRadius")) state.set("shockwave.vignetteRadius", screen.get("vignetteRadius").getAsFloat());
+            if (screen.has("blendRadius")) state.set("shockwave.blendRadius", screen.get("blendRadius").getAsFloat());
             if (screen.has("tint")) {
-                JsonObject tint = screen.getAsJsonObject("tint");
-                if (tint.has("r")) state.set("shockwave.tintR", tint.get("r").getAsFloat());
-                if (tint.has("g")) state.set("shockwave.tintG", tint.get("g").getAsFloat());
-                if (tint.has("b")) state.set("shockwave.tintB", tint.get("b").getAsFloat());
-                if (tint.has("amount")) state.set("shockwave.tintAmount", tint.get("amount").getAsFloat());
+                var tintEl = screen.get("tint");
+                if (tintEl.isJsonArray()) {
+                    // Array format: [r, g, b, amount]
+                    var arr = tintEl.getAsJsonArray();
+                    if (arr.size() >= 3) {
+                        state.set("shockwave.tintR", arr.get(0).getAsFloat());
+                        state.set("shockwave.tintG", arr.get(1).getAsFloat());
+                        state.set("shockwave.tintB", arr.get(2).getAsFloat());
+                    }
+                    if (arr.size() >= 4) {
+                        state.set("shockwave.tintAmount", arr.get(3).getAsFloat());
+                    }
+                } else if (tintEl.isJsonObject()) {
+                    // Object format: {r, g, b, amount}
+                    JsonObject tint = tintEl.getAsJsonObject();
+                    if (tint.has("r")) state.set("shockwave.tintR", tint.get("r").getAsFloat());
+                    if (tint.has("g")) state.set("shockwave.tintG", tint.get("g").getAsFloat());
+                    if (tint.has("b")) state.set("shockwave.tintB", tint.get("b").getAsFloat());
+                    if (tint.has("amount")) state.set("shockwave.tintAmount", tint.get("amount").getAsFloat());
+                }
             }
         }
         
-        // Blend
+        // Blend (also check top-level for legacy support)
         if (json.has("blendRadius")) state.set("shockwave.blendRadius", json.get("blendRadius").getAsFloat());
         
         // Global scale & positioning
         if (json.has("globalScale")) state.set("shockwave.globalScale", json.get("globalScale").getAsFloat());
         if (json.has("followPosition")) state.set("shockwave.followPosition", json.get("followPosition").getAsBoolean());
+        if (json.has("cursorYOffset")) state.set("shockwave.cursorYOffset", json.get("cursorYOffset").getAsFloat());
         
         // Notify listeners that a fragment was applied
         state.notifyStateChanged(ChangeType.FRAGMENT_APPLIED);

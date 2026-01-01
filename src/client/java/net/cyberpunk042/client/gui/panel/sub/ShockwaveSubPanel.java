@@ -273,6 +273,9 @@ public class ShockwaveSubPanel extends BoundPanel {
         }).dimensions(x + halfW + GuiConstants.COMPACT_GAP, y, halfW, 20).build());
         content.advanceBy(22);
         
+        // Y Offset for At Cursor spawn
+        content.slider("Y Offset", "shockwave.cursorYOffset").range(-10f, 20f).format("%.1f").add();
+        
         content.gap();
         
         // ═══════════════════════════════════════════════════════════════════════
@@ -513,9 +516,6 @@ public class ShockwaveSubPanel extends BoundPanel {
             contract, "Rings contract instead of expand",
             v -> state.set("shockwave.ringContractMode", v)));
         content.advanceBy(22);
-        
-        // Row 4: Cursor Y Offset
-        content.slider("Y Offset", "shockwave.cursorYOffset").range(-10f, 20f).format("%.1f").add();
         content.gap();
         
         // ═══════════════════════════════════════════════════════════════════════

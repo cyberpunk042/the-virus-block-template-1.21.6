@@ -157,7 +157,7 @@ public record ShockwaveConfig(
         1f, 1f, 1f, 1f,  // coronaRGBA
         2f, 0.5f, 2f, 1.3f,  // coronaWidth/intensity/rimPower/rimFalloff
         // Beam geometry
-        100f, 0f, 0.5f, 1f,  // height/width/widthScale/taper
+        100f, 0f, 0.1f, 1f,  // height/width/widthScale/taper
         // Beam body - BLACK
         0f, 0f, 0f,
         // Beam corona - WHITE
