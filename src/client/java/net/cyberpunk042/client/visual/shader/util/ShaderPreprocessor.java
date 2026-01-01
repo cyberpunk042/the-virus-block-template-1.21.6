@@ -139,14 +139,24 @@ public final class ShaderPreprocessor {
     /**
      * Resolve include path relative to base shader path.
      * 
-     * @param basePath Path like "shaders/post/shockwave_ring.fsh"
+     * <p>NOTE: Minecraft's ShaderLoader strips the "shaders/" prefix from identifiers,
+     * so we receive paths like "post/shockwave_ring" instead of "shaders/post/shockwave_ring".
+     * We must prepend "shaders/" when loading include files from resources.</p>
+     * 
+     * @param basePath Path like "post/shockwave_ring" (without shaders/ prefix)
      * @param includePath Path like "include/math.glsl"
      * @return Resolved path like "shaders/post/include/math.glsl"
      */
     private static String resolvePath(String basePath, String includePath) {
+        // Prepend "shaders/" since ShaderLoader strips it from the identifier
+        String fullBasePath = basePath;
+        if (!basePath.startsWith("shaders/")) {
+            fullBasePath = "shaders/" + basePath;
+        }
+        
         // Get directory of base file
-        int lastSlash = basePath.lastIndexOf('/');
-        String baseDir = (lastSlash >= 0) ? basePath.substring(0, lastSlash + 1) : "";
+        int lastSlash = fullBasePath.lastIndexOf('/');
+        String baseDir = (lastSlash >= 0) ? fullBasePath.substring(0, lastSlash + 1) : "shaders/";
         return baseDir + includePath;
     }
     

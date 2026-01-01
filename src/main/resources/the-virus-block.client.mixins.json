@@ -24,7 +24,7 @@
     "WorldRendererShockwaveMixin",
     "ShockwaveTestMixin",
     "PostEffectPassMixin",
-    "CompiledShaderMixin"
+    "ShaderLoaderMixin"
   ],
   "injectors": {
     "defaultRequire": 1
