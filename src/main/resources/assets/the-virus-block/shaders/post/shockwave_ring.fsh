@@ -326,40 +326,59 @@ float sdfOrbitalSystem2D(vec2 p, vec2 center, float mainRadius, float orbitalRad
 // COMBINED MODE: Distance from center, with flower-shaped radial modulation
 // The center is the SOURCE. Orbitals define the shape of the expanding wave.
 // This creates a single unified shockwave that follows petal curves.
+// 
+// KEY INSIGHT: To preserve flower shape at ALL distances, we compute a "normalized"
+// distance where 1.0 = on the flower boundary. The RingRadius then scales this.
 float sdfCombinedFlower2D(vec2 p, vec2 center, float mainRadius, float orbitalRadius,
                           float orbitDistance, int count, float phase) {
     
     vec2 rel = p - center;
     float distFromCenter = length(rel);
-    float angle = atan(rel.y, rel.x);
     
-    // Compute the flower shape radius at this angle
-    // This is the distance from center to the petal boundary at angle θ
-    float petalAngle = 6.28318 / float(max(1, count));
-    
-    // Base radius is orbitDistance, with bumps outward at each petal
-    // The petal tips are at orbitDistance + orbitalRadius
-    // The valleys between petals are at orbitDistance - orbitalRadius (or mainRadius if larger)
-    float petalPhase = mod(angle - phase, petalAngle) - petalAngle * 0.5;
-    float petalInfluence = cos(petalPhase * float(count));  // -1 at valleys, +1 at tips
-    
-    // Compute flower boundary radius at this angle
-    float innerRadius = mainRadius > 0.1 ? mainRadius : (orbitDistance - orbitalRadius);
-    float outerRadius = orbitDistance + orbitalRadius;
-    
-    // Smooth interpolation between inner and outer based on petal influence
-    // petalInfluence goes from -1 (valley) to +1 (tip)
-    float normalized = (petalInfluence + 1.0) * 0.5;  // 0 to 1
-    
-    // Apply blending for smoothness
-    if (BlendRadius > 0.001) {
-        normalized = smoothstep(0.0, 1.0, normalized);
+    // Handle center point
+    if (distFromCenter < 0.001) {
+        return -(orbitDistance + orbitalRadius);  // Deeply inside
     }
     
-    float flowerRadius = mix(innerRadius, outerRadius, normalized);
+    float angle = atan(rel.y, rel.x);
     
-    // SDF: negative inside, zero on boundary, positive outside
-    return distFromCenter - flowerRadius;
+    // Compute angular distance to nearest petal (orbital)
+    // Orbitals are at angles: phase, phase + 2π/count, phase + 4π/count, ...
+    float angularPeriod = 6.28318 / float(max(1, count));
+    float relativeAngle = angle - phase;
+    
+    // Find distance to nearest petal center (wraps around)
+    float nearestPetalAngle = round(relativeAngle / angularPeriod) * angularPeriod;
+    float angularDistToPetal = abs(relativeAngle - nearestPetalAngle);
+    
+    // Normalize to [0, 1]: 0 = at petal center, 1 = between petals
+    float normalizedAngularDist = angularDistToPetal / (angularPeriod * 0.5);
+    normalizedAngularDist = clamp(normalizedAngularDist, 0.0, 1.0);
+    
+    // Compute flower radius at this angle
+    // At petal (orbital center): radius = orbitDistance + orbitalRadius (outer edge of orbital)
+    // Between petals: radius = innerRadius (either mainRadius or valley depth)
+    float outerRadius = orbitDistance + orbitalRadius;  // Petal tip
+    float innerRadius = mainRadius > 0.1 ? mainRadius : max(0.1, orbitDistance - orbitalRadius);  // Valley
+    
+    // Smooth interpolation from outer (petal) to inner (valley)
+    float t = normalizedAngularDist;
+    if (BlendRadius > 0.001) {
+        // Smoother transition with blend
+        t = smoothstep(0.0, 1.0, t);
+    }
+    float flowerRadius = mix(outerRadius, innerRadius, t);
+    
+    // PRESERVE FLOWER SHAPE: Instead of simple distance-to-boundary,
+    // compute normalized distance where 1.0 = on the flower surface
+    // This way, as RingRadius grows, the shape stays consistent
+    float normalizedDist = distFromCenter / flowerRadius;
+    
+    // Convert back to "SDF-like" value for compatibility with ring system
+    // Ring appears where: normalizedDist * outerRadius == RingRadius
+    // So we return: (normalizedDist - 1.0) * flowerRadius
+    // At boundary: (1-1)*R = 0, Inside: negative, Outside: positive
+    return (normalizedDist - 1.0) * outerRadius;
 }
 
 // 3D wrapper - projects to XZ plane for flower-shaped shockwave contours
